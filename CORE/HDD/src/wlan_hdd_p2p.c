@@ -1250,6 +1250,7 @@ int hdd_setP2pNoa( struct net_device *dev, tANI_U8 *command )
     tP2pPsConfig NoA;
     int count, duration, start_time;
     char *param;
+    int ret;
 
     param = strnchr(command, strlen(command), ' ');
     if (param == NULL)
@@ -1259,9 +1260,15 @@ int hdd_setP2pNoa( struct net_device *dev, tANI_U8 *command )
        return -EINVAL;
     }
     param++;
-    sscanf(param, "%d %d %d", &count, &start_time, &duration);
+    ret = sscanf(param, "%d %d %d", &count, &start_time, &duration);
+    if (ret != 3) {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+               "%s: P2P_SET GO NoA: fail to read params, ret=%d",
+                __func__, ret);
+        return -EINVAL;
+    }
     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-               "%s: P2P_SET GO NoA: count=%d duration=%d interval=%d",
+               "%s: P2P_SET GO NoA: count=%d start_time=%d duration=%d",
                 __func__, count, start_time, duration);
     duration = MS_TO_MUS(duration);
     /* PS Selection
@@ -1327,6 +1334,7 @@ int hdd_setP2pOpps( struct net_device *dev, tANI_U8 *command )
     tP2pPsConfig NoA;
     char *param;
     int legacy_ps, opp_ps, ctwindow;
+    int ret;
 
     param = strnchr(command, strlen(command), ' ');
     if (param == NULL)
@@ -1336,7 +1344,13 @@ int hdd_setP2pOpps( struct net_device *dev, tANI_U8 *command )
         return -EINVAL;
     }
     param++;
-    sscanf(param, "%d %d %d", &legacy_ps, &opp_ps, &ctwindow);
+    ret = sscanf(param, "%d %d %d", &legacy_ps, &opp_ps, &ctwindow);
+    if (ret != 3) {
+        VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s: P2P_SET GO PS: fail to read params, ret=%d",
+                 __func__, ret);
+        return -EINVAL;
+    }
     VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                  "%s: P2P_SET GO PS: legacy_ps=%d opp_ps=%d ctwindow=%d",
                  __func__, legacy_ps, opp_ps, ctwindow);
