@@ -123,6 +123,9 @@ CONFIG_CHECKSUM_OFFLOAD := 1
 #Enable GTK offload
 CONFIG_GTK_OFFLOAD := 1
 
+#Enable IPA offload
+CONFIG_IPA_OFFLOAD := 1
+
 ifeq ($(CONFIG_CFG80211),y)
 HAVE_CFG80211 := 1
 else
@@ -235,6 +238,7 @@ HDD_OBJS := 	$(HDD_SRC_DIR)/bap_hdd_main.o \
 		$(HDD_SRC_DIR)/wlan_hdd_softap_tx_rx.o \
 		$(HDD_SRC_DIR)/wlan_hdd_tx_rx.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wext.o \
+		$(HDD_SRC_DIR)/wlan_hdd_ipa.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wmm.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wowl.o
 
@@ -1024,6 +1028,11 @@ endif
 #Enable Checksum Offload support
 ifeq ($(CONFIG_CHECKSUM_OFFLOAD), 1)
 CDEFINES += -DCHECKSUM_OFFLOAD
+endif
+
+#Enable Checksum Offload support
+ifeq ($(CONFIG_IPA_OFFLOAD), 1)
+CDEFINES += -DIPA_OFFLOAD -DHDD_IPA_USE_IPA_RM_TIMER
 endif
 
 #Enable GTK Offload
