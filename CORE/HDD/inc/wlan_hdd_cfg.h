@@ -1817,6 +1817,48 @@ typedef enum
 #define CFG_ENABLE_FW_LOG_ENABLE                 ( 1 )
 #define CFG_ENABLE_FW_LOG_DEFAULT                ( CFG_ENABLE_FW_LOG_DISABLE )
 
+#ifdef IPA_OFFLOAD
+/*
+ * IPA Offload
+ */
+#define CFG_IPA_OFFLOAD_NAME                     "gIPAEnable"
+#define CFG_IPA_OFFLOAD_DISABLE                  ( 0 )
+#define CFG_IPA_OFFLOAD_ENABLE                   ( 1 )
+#define CFG_IPA_OFFLOAD_DEFAULT                  ( CFG_IPA_OFFLOAD_ENABLE )
+
+/*
+ * IPA IPv6 Offload
+ */
+#define CFG_IPA_IPV6_OFFLOAD_NAME                "gIPAIPv6Enable"
+#define CFG_IPA_IPV6_OFFLOAD_DISABLE             ( 0 )
+#define CFG_IPA_IPV6_OFFLOAD_ENABLE              ( 1 )
+#define CFG_IPA_IPV6_OFFLOAD_DEFAULT             ( CFG_IPA_IPV6_OFFLOAD_DISABLE )
+
+/*
+ * IPA DESC SIZE
+ */
+#define CFG_IPA_DESC_SIZE_NAME                   "gIPADescSize"
+#define CFG_IPA_DESC_SIZE_MIN                    ( 800 )
+#define CFG_IPA_DESC_SIZE_MAX                    ( 8000 )
+#define CFG_IPA_DESC_SIZE_DEFAULT                ( 800 )
+
+/*
+ * IPA PRE FILTER
+ */
+#define CFG_IPA_PRE_FILTER_NAME                  "gIPAPreFilterEnable"
+#define CFG_IPA_PRE_FILTER_DISABLE               ( 0 )
+#define CFG_IPA_PRE_FILTER_ENABLE                ( 1 )
+#define CFG_IPA_PRE_FILTER_DEFAULT               ( CFG_IPA_PRE_FILTER_ENABLE )
+
+/*
+ * IPA IPA RESOURCE MANAGER
+ */
+#define CFG_IPA_RM_NAME                          "gIPARMEnable"
+#define CFG_IPA_RM_DISABLE                       ( 0 )
+#define CFG_IPA_RM_ENABLE                        ( 1 )
+#define CFG_IPA_RM_DEFAULT                       ( CFG_IPA_RM_DISABLE )
+#endif
+
 /*
  * P2P Listen Offload
  */
@@ -2258,6 +2300,13 @@ typedef struct
    v_U8_t                      maxWoWFilters;
    v_U8_t                      wowEnable;
    v_U8_t                      isCoalesingInIBSSAllowed;
+#ifdef IPA_OFFLOAD
+   v_BOOL_t                    IpaEnable;
+   v_BOOL_t                    IpaIPv6Enable;
+   v_BOOL_t                    IpaPreFilterEnable;
+   v_BOOL_t                    IpaRMEnable;
+   v_U32_t                     IpaDescSize;
+#endif
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
