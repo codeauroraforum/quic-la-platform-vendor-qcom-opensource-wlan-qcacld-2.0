@@ -745,6 +745,16 @@ eHalStatus csrScanRequest(tpAniSirGlobal pMac, tANI_U16 sessionId,
                     if(csrIsAnySessionConnected(pMac))
                     {
                         pScanRequest->restTime = pMac->roam.configParam.nRestTimeConc;
+                        if(pScanRequest->scanType == eSIR_ACTIVE_SCAN)
+                        {
+                            pScanRequest->maxChnTime = pMac->roam.configParam.nActiveMaxChnTimeConc;
+                            pScanRequest->minChnTime = pMac->roam.configParam.nActiveMinChnTimeConc;
+                        }
+                        else
+                        {
+                            pScanRequest->maxChnTime = pMac->roam.configParam.nPassiveMaxChnTimeConc;
+                            pScanRequest->minChnTime = pMac->roam.configParam.nPassiveMinChnTimeConc;
+                        }
                     }
                 }
 #endif
