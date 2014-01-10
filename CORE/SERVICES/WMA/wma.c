@@ -4775,6 +4775,7 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	struct wma_target_req *msg;
 	u_int8_t vdev_id, peer_id;
 	VOS_STATUS status;
+	tPowerdBm maxTxPower;
 
 	pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
 	vdev = wma_find_vdev_by_addr(wma, add_bss->bssId, &vdev_id);
@@ -4812,8 +4813,10 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
         req.vht_capable = add_bss->vhtCapable;
 #if defined WLAN_FEATURE_VOWIFI
 	req.max_txpow = add_bss->maxTxPower;
+	maxTxPower = add_bss->maxTxPower;
 #else
 	req.max_txpow = 0;
+	maxTxPower = 0;
 #endif
 	req.beacon_intval = add_bss->beaconInterval;
 	req.dtim_period = add_bss->dtimPeriod;
@@ -4832,12 +4835,11 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 		goto peer_cleanup;
 	}
 
-	/* Initialize protection mode to no protection */
-	if (wmi_unified_vdev_set_param_send(wma->wmi_handle, vdev_id,
-					    WMI_VDEV_PARAM_PROTECTION_MODE,
-					    IEEE80211_PROT_NONE)) {
-		WMA_LOGE("Failed to initialize protection mode");
-	}
+	/* Configure rest of bss info once the vdev started */
+	wma_vdev_set_bss_params(wma, add_bss->staContext.smesessionId,
+		add_bss->beaconInterval, add_bss->dtimPeriod,
+		add_bss->shortSlotTimeSupported, add_bss->llbCoexist,
+		maxTxPower);
 
 	return;
 
