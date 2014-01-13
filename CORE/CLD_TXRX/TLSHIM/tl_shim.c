@@ -630,10 +630,7 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 
 		/* Flush the cached frames to HDD before passing new rx frame */
 		tl_shim_flush_rx_frames(vos_ctx, tl_shim, staid, 0);
-#ifdef IPA_OFFLOAD
-		ret = sta_info->data_rx(vos_ctx, rx_buf_list, staid);
-		if (ret == VOS_STATUS_E_INVAL) {
-#endif
+
 		buf = rx_buf_list;
 		while (buf) {
 			next_buf = adf_nbuf_queue_next(buf);
@@ -660,9 +657,6 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
                 adf_nbuf_free(buf);
             buf = next_buf;
 		}
-#ifdef IPA_OFFLOAD
-	}
-#endif
 	} else /* This should not happen if sta_info->registered is true */
 		goto drop_rx_buf;
 
@@ -765,6 +759,7 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 
 	/* Zero out skb's context buffer for the driver to use */
 	adf_os_mem_set(skb->cb, 0, sizeof(skb->cb));
+
 	adf_nbuf_map_single(adf_ctx, skb, ADF_OS_DMA_TO_DEVICE);
 
 	if ((tl_shim->ip_checksum_offload) && (skb->protocol == htons(ETH_P_IP))
@@ -782,32 +777,6 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 
 	return NULL;
 }
-
-#ifdef IPA_OFFLOAD
-adf_nbuf_t WLANTL_SendIPA_DataFrame(void *vos_ctx, void *vdev,
-                                    adf_nbuf_t skb)
-{
-    struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
-                                                           vos_ctx);
-	adf_nbuf_t ret;
-
-	ENTER();
-
-	if ((tl_shim->ip_checksum_offload) && (skb->protocol == htons(ETH_P_IP))
-		 && (skb->ip_summed == CHECKSUM_PARTIAL))
-		skb->ip_summed = CHECKSUM_COMPLETE;
-
-	/* Terminate the (single-element) list of tx frames */
-	skb->next = NULL;
-	ret = tl_shim->tx((struct ol_txrx_vdev_t *)vdev, skb);
-	if (ret) {
-		TLSHIM_LOGW("Failed to tx");
-		return ret;
-	}
-
-	return NULL;
-}
-#endif
 
 VOS_STATUS WLANTL_ResumeDataTx(void *vos_ctx, u_int8_t *sta_id)
 {
