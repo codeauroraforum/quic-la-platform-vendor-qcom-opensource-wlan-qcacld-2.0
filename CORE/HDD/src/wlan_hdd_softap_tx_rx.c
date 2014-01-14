@@ -53,9 +53,7 @@
 #include <halTypes.h>
 #include <net/ieee80211_radiotap.h>
 
-#ifdef IPA_OFFLOAD
-#include <wlan_hdd_ipa.h>
-#endif
+
 /*--------------------------------------------------------------------------- 
   Preprocessor definitions and constants
   -------------------------------------------------------------------------*/ 
@@ -398,9 +396,6 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
    //Get TL AC corresponding to Qdisc queue index/AC.
    ac = hdd_QdiscAcToTlAC[skb->queue_mapping];
 
-#if defined (IPA_OFFLOAD)
-   if(!(NBUF_OWNER_ID(skb) == IPA_NBUF_OWNER_ID)) {
-#endif
    // Check if the buffer has enough header room
    skb = skb_unshare(skb, GFP_ATOMIC);
    if (!skb)
@@ -414,9 +409,6 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        if (!skb)
            goto drop_pkt;
    }
-#if defined (IPA_OFFLOAD)
-   }
-#endif
 
    if (WLANTL_SendSTA_DataFrame((WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
                                  STAId, skb) != NULL) {
@@ -1589,21 +1581,11 @@ VOS_STATUS hdd_softap_RegisterSTA( hdd_adapter_t *pAdapter,
    staDesc.ucIsReplayCheckValid = VOS_FALSE;
 
    // Register the Station with TL...      
-#ifdef IPA_OFFLOAD
-   if (hdd_ipa_is_enabled(pHddCtx)) {
-      vosStatus = WLANTL_RegisterSTAClient( (WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
-                                         hdd_ipa_process_rxt,
-                                         hdd_softap_tx_complete_cbk,
-                                         hdd_softap_tx_fetch_packet_cbk, &staDesc, 0 );
-   } else {
-#endif
-      vosStatus = WLANTL_RegisterSTAClient( (WLAN_HDD_GET_CTX(pAdapter))->pvosContext, 
+   vosStatus = WLANTL_RegisterSTAClient( (WLAN_HDD_GET_CTX(pAdapter))->pvosContext, 
                                          hdd_softap_rx_packet_cbk, 
                                          hdd_softap_tx_complete_cbk, 
                                          hdd_softap_tx_fetch_packet_cbk, &staDesc, 0 );
-#ifdef IPA_OFFLOAD
-   }
-#endif
+   
    if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
    {
       VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ERROR, 

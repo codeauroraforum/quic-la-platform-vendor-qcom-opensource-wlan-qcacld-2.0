@@ -988,9 +988,6 @@ struct hdd_context_s
     tdls_scan_context_t tdls_scan_ctxt;
 #endif
 
-#ifdef IPA_OFFLOAD
-    void *hdd_ipa;
-#endif
     /* MC/BC Filter state variable
      * This always contains the value that is currently
      * configured
