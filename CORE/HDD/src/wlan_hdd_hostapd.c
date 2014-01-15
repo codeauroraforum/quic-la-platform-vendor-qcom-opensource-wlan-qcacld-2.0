@@ -77,9 +77,6 @@
 #include "wlan_btc_svc.h"
 #include <bap_hdd_main.h>
 #include "wlan_hdd_p2p.h"
-#ifdef IPA_OFFLOAD
-#include <wlan_hdd_ipa.h>
-#endif
 
 #ifdef QCA_WIFI_2_0
 #include "wma.h"
@@ -484,11 +481,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 //@@@ need wep logic here to set privacy bit
                 hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
             }
-#ifdef IPA_OFFLOAD
-            if (hdd_ipa_is_enabled(pHddCtx))
-                hdd_ipa_wlan_evt(pHostapdAdapter, WLAN_RX_SAP_SELF_STA_ID,
-                    WLAN_AP_CONNECT, pHostapdAdapter->dev->dev_addr);
-#endif
             
             if (0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)
             {
@@ -557,11 +549,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             sapCleanupChannelList();
 
             pHddApCtx->operatingChannel = 0; //Invalidate the channel info.
-#ifdef IPA_OFFLOAD
-            if (hdd_ipa_is_enabled(pHddCtx))
-                 hdd_ipa_wlan_evt(pHostapdAdapter, WLAN_RX_SAP_SELF_STA_ID,
-                            WLAN_AP_DISCONNECT, pHostapdAdapter->dev->dev_addr);
-#endif
             goto stopbss;
         case eSAP_STA_SET_KEY_EVENT:
             //TODO: forward the message to hostapd once implementtation is done for now just print
@@ -638,13 +625,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                                        (v_MACADDR_t *)wrqu.addr.sa_data,
                                        pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.wmmEnabled);
             }
-#ifdef IPA_OFFLOAD
-            if (hdd_ipa_is_enabled(pHddCtx))
-                hdd_ipa_wlan_evt(pHostapdAdapter,
-                    pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staId,
-                    WLAN_CLIENT_CONNECT_EX,
-                    pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac.bytes);
-#endif
 
             // Stop AP inactivity timer
             if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_RUNNING)
@@ -707,11 +687,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, FL("ERROR: HDD Failed to find sta id!!"));
                 return VOS_STATUS_E_FAILURE;
             }
-#ifdef IPA_OFFLOAD
-            if (hdd_ipa_is_enabled(pHddCtx))
-                 hdd_ipa_wlan_evt(pHostapdAdapter, staId, WLAN_CLIENT_DISCONNECT,
-                      pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac.bytes);
-#endif
             hdd_softap_DeregisterSTA(pHostapdAdapter, staId);
 
             if (0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)
