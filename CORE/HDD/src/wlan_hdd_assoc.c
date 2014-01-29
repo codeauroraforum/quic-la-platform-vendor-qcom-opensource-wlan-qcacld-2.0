@@ -920,6 +920,15 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
     }
 #endif
 
+    if (pHddCtx->cfg_ini->enablePowersaveOffload &&
+       ((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) ||
+        (WLAN_HDD_P2P_CLIENT == pAdapter->device_mode)))
+    {
+       sme_PsOffloadDisableDeferredPowerSave(
+                   WLAN_HDD_GET_HAL_CTX(pAdapter),
+                   pAdapter->sessionId);
+    }
+
     //Unblock anyone waiting for disconnect to complete
     complete(&pAdapter->disconnect_comp_var);
     return( status );
@@ -1884,6 +1893,15 @@ static eHalStatus hdd_RoamSetKeyCompleteHandler( hdd_adapter_t *pAdapter, tCsrRo
                                                WLANTL_STA_AUTHENTICATED );
 
             pHddStaCtx->conn_info.uIsAuthenticated = VOS_TRUE;
+
+            if (pHddCtx->cfg_ini->enablePowersaveOffload &&
+                ((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) ||
+                 (WLAN_HDD_P2P_CLIENT == pAdapter->device_mode)))
+            {
+               sme_PsOffloadEnableDeferredPowerSave(
+                                  WLAN_HDD_GET_HAL_CTX(pAdapter),
+                                  pAdapter->sessionId);
+            }
          }
          else
          {
@@ -2234,7 +2252,9 @@ eHalStatus hdd_RoamTdlsStatusUpdateHandler(hdd_adapter_t *pAdapter,
 {
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 #ifdef QCA_WIFI_2_0
+#ifdef CONFIG_TDLS_IMPLICIT
     tdlsCtx_t *pHddTdlsCtx = WLAN_HDD_GET_TDLS_CTX_PTR(pAdapter);
+#endif
 #endif
     eHalStatus status = eHAL_STATUS_FAILURE ;
     tANI_U8 staIdx;
@@ -2262,6 +2282,19 @@ eHalStatus hdd_RoamTdlsStatusUpdateHandler(hdd_adapter_t *pAdapter,
        pRoamInfo->peerMac[4],
        pRoamInfo->peerMac[5]) ;
 #endif
+
+#ifdef QCA_WIFI_2_0
+#ifdef CONFIG_TDLS_IMPLICIT
+    if (!pHddTdlsCtx)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: TDLS ctx is null, ignore roamResult (%d)",
+                  __func__, roamResult);
+        return status;
+    }
+#endif
+#endif
+
     switch( roamResult )
     {
         case eCSR_ROAM_RESULT_ADD_TDLS_PEER:
