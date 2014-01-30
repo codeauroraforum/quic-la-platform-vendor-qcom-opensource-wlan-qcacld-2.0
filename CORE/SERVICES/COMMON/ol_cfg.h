@@ -64,6 +64,7 @@ struct txrx_pdev_cfg_t {
 	u32 max_peer_id;
 	u32 max_vdev;
 	u32 max_nbuf_frags;
+	u32 throttle_period_ms;
 	enum wlan_frm_fmt frame_type;
 };
 
@@ -313,6 +314,22 @@ int ol_cfg_tx_download_size(ol_pdev_handle pdev);
  */
 int ol_cfg_rx_host_defrag_timeout_duplicate_check(ol_pdev_handle pdev);
 
+/**
+ * brief Query for the period in ms used for throttling for
+ * thermal mitigation
+ * @details
+ *   In LL systems, transmit data throttling is used for thermal
+ *   mitigation where data is paused and resumed during the
+ *   throttle period i.e. the throttle period consists of an
+ *   "on" phase when transmit is allowed and an "off" phase when
+ *   transmit is suspended. This function returns the total
+ *   period used for throttling.
+ *
+ * @param pdev - handle to the physical device
+ * @return the total throttle period in ms
+ */
+int ol_cfg_throttle_period_ms(ol_pdev_handle pdev);
+
 typedef enum {
    wlan_frm_tran_cap_raw = 0x01,
    wlan_frm_tran_cap_native_wifi = 0x02,
@@ -391,15 +408,19 @@ static inline int
 ol_tx_cfg_max_tx_queue_depth_ll(ol_pdev_handle pdev)
 {
     /*
-     * Store up to 700 frames for a paused vdev.
+     * Store up to 1500 frames for a paused vdev.
      * For example, if the vdev is sending 300 Mbps of traffic, and the
      * PHY is capable of 600 Mbps, then it will take 56 ms for the PHY to
      * drain both the 700 frames that are queued initially, plus the next
      * 700 frames that come in while the PHY is catching up.
      * So in this example scenario, the PHY will remain fully utilized
      * in a MCC system that has a channel-switching period of 56 ms or less.
+     * 700 frames calculation was correct when FW drain packet without
+     * any overhead. Actual situation drain overhead will slowdown drain
+     * speed. And channel period is less than 56 msec
+     * Worst scenario, 1500 frames should be stored in host.
      */
-    return 700;
+    return 1500;
 }
 
 #endif /* _OL_CFG__H_ */

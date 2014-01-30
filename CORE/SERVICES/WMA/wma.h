@@ -156,6 +156,7 @@
 #define WMA_ROAM_BEACON_WEIGHT_DEFAULT       (14)
 #define WMA_ROAM_OPP_SCAN_PERIOD_DEFAULT     (120000)
 #define WMA_ROAM_OPP_SCAN_AGING_PERIOD_DEFAULT (WMA_ROAM_OPP_SCAN_PERIOD_DEFAULT * 5)
+#define WMA_ROAM_PREAUTH_SCAN_TIME           (50)
 
 #define WMA_INVALID_KEY_IDX	0xff
 #define WMA_DFS_RADAR_FOUND   1
@@ -215,6 +216,14 @@ enum wma_tdls_peer_reason {
 };
 #endif /* FEATURE_WLAN_TDLS */
 
+typedef enum {
+        /* Roaming preauth channel state */
+        WMA_ROAM_PREAUTH_CHAN_NONE,
+        WMA_ROAM_PREAUTH_CHAN_REQUESTED,
+        WMA_ROAM_PREAUTH_ON_CHAN,
+        WMA_ROAM_PREAUTH_CHAN_CANCEL_REQUESTED,
+        WMA_ROAM_PREAUTH_CHAN_COMPLETED
+} t_wma_roam_preauth_chan_state_t;
 /*
  * memory chunck allocated by Host to be managed by FW
  * used only for low latency interfaces like pcie
@@ -293,6 +302,16 @@ struct qpower_params {
 };
 
 typedef struct {
+	u_int32_t gtxRTMask[2]; /* for HT and VHT rate masks */
+	u_int32_t gtxUsrcfg; /* host request for GTX mask */
+	u_int32_t gtxPERThreshold; /* default: 10% */
+	u_int32_t gtxPERMargin; /* default: 2% */
+	u_int32_t gtxTPCstep; /* default: 1 */
+	u_int32_t gtxTPCMin; /* default: 5 */
+	u_int32_t gtxBWMask; /* 20/40/80/160 Mhz */
+}gtx_config_t;
+
+typedef struct {
 	u_int32_t ani_enable;
 	u_int32_t ani_poll_len;
 	u_int32_t ani_listen_len;
@@ -321,6 +340,7 @@ typedef struct {
 	u_int32_t amsdu;
         struct pps pps_params;
 	struct qpower_params qpower_params;
+	gtx_config_t gtx_info;
 } vdev_cli_config_t;
 
 #define WMA_WOW_PTRN_MASK_VALID     0xFF
@@ -381,6 +401,9 @@ struct wma_txrx_node {
 	v_BOOL_t nlo_match_evt_received;
 	v_BOOL_t pno_in_progress;
 #endif
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+	v_BOOL_t plm_in_progress;
+#endif
 	v_BOOL_t ptrn_match_enable;
 	v_BOOL_t conn_state;
 	/* BSS parameters cached for use in WDA_ADD_STA */
@@ -405,6 +428,8 @@ struct wma_txrx_node {
 	tANI_U8                 fw_stats_set;
 	void *del_staself_req;
 	tANI_U8 bss_status;
+	tANI_U8 rate_flags;
+	tANI_U8 nss;
 };
 
 #if defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
@@ -513,8 +538,13 @@ typedef struct {
 	u_int8_t powersave_mode;
 	v_BOOL_t ptrn_match_enable_all_vdev;
 	void* pGetRssiReq;
+	t_thermal_mgmt thermal_mgmt_info;
         u_int32_t roam_offload_vdev_id;
         v_BOOL_t  roam_offload_enabled;
+        t_wma_roam_preauth_chan_state_t roam_preauth_scan_state;
+        u_int32_t roam_preauth_scan_id;
+        u_int16_t roam_preauth_chanfreq;
+        void *roam_preauth_chan_context;
 
 	/* Here ol_ini_info is used to store ini
 	 * status of arp offload, ns offload
@@ -1059,6 +1089,7 @@ void regdmn_get_ctl_info(struct regulatory *reg, u_int32_t modesAvail,
 
 /*get the ctl from regdomain*/
 u_int8_t regdmn_get_ctl_for_regdmn(u_int32_t reg_dmn);
+u_int16_t get_regdmn_5g(u_int32_t reg_dmn);
 #endif
 
 #define WMA_FW_PHY_STATS	0x1
@@ -1123,6 +1154,12 @@ struct wma_set_key_params {
 	u_int8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
 };
 
+typedef struct {
+	u_int16_t minTemp;
+	u_int16_t maxTemp;
+	u_int8_t thermalEnable;
+} t_thermal_cmd_params, *tp_thermal_cmd_params;
+
 /* Powersave Related */
 /* Default InActivity Time is 200 ms */
 #define POWERSAVE_DEFAULT_INACTIVITY_TIME 200
@@ -1145,6 +1182,9 @@ struct wma_set_key_params {
 enum wma_cfg_cmd_id {
        WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID = WMI_CMDID_MAX,
        WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
+       /* Set time latency and time quota for MCC home channels */
+       WMA_VDEV_MCC_SET_TIME_LATENCY,
+       WMA_VDEV_MCC_SET_TIME_QUOTA,
        /* Add any new command before this */
        WMA_CMD_ID_MAX
 };
@@ -1301,6 +1341,17 @@ typedef enum {
 	WMI_VDEV_VHT_SET_GID_MGMT = 9
 } packet_power_save;
 
+typedef enum {
+    WMI_VDEV_PARAM_GTX_HT_MCS,
+    WMI_VDEV_PARAM_GTX_VHT_MCS,
+    WMI_VDEV_PARAM_GTX_USR_CFG,
+    WMI_VDEV_PARAM_GTX_THRE,
+    WMI_VDEV_PARAM_GTX_MARGIN,
+    WMI_VDEV_PARAM_GTX_STEP,
+    WMI_VDEV_PARAM_GTX_MINTPC,
+    WMI_VDEV_PARAM_GTX_BW_MASK,
+}green_tx_param;
+
 #define WMA_DEFAULT_QPOWER_MAX_PSPOLL_BEFORE_WAKE 1
 #define WMA_DEFAULT_QPOWER_TX_WAKE_THRESHOLD 2
 #define WMA_DEFAULT_SIFS_BURST_DURATION      8160
@@ -1378,4 +1429,15 @@ u_int16_t   dfs_usenol(struct ieee80211com *ic);
 #define WMA_SMPS_MASK_UPPER_3BITS 0x7
 #define WMA_SMPS_PARAM_VALUE_S 29
 
+/* U-APSD Access Categories */
+enum uapsd_ac {
+	UAPSD_VO,
+	UAPSD_VI,
+	UAPSD_BK,
+	UAPSD_BE
+};
+
+VOS_STATUS wma_disable_uapsd_per_ac(tp_wma_handle wma_handle,
+					u_int32_t vdev_id,
+					enum uapsd_ac ac);
 #endif

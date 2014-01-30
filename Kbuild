@@ -37,7 +37,9 @@ ifeq ($(KERNEL_BUILD), 0)
 
 	#Flag to enable Protected Managment Frames (11w) feature
 	ifneq ($(CONFIG_QCA_CLD_WLAN),)
-	CONFIG_WLAN_FEATURE_11W := y
+		ifeq ($(CONFIG_CNSS),y)
+		CONFIG_WLAN_FEATURE_11W := y
+		endif
 	endif
 
 	#Flag to enable LTE CoEx feature
@@ -50,8 +52,7 @@ endif
 
 # To enable CCX upload, dependent config
 # CONFIG_QCOM_CCX must be enabled.
-CONFIG_QCOM_CCX := y
-CONFIG_QCOM_CCX_UPLOAD := y
+CONFIG_QCOM_CCX_UPLOAD := n
 
 # Feature flags which are not (currently) configurable via Kconfig
 
@@ -853,7 +854,8 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DFEATURE_WLAN_LPHB \
 		-DFEATURE_WLAN_PAL_TIMER_DISABLE \
 		-DFEATURE_WLAN_PAL_MEM_DISABLE \
-                -DQCA_SUPPORT_TXRX_VDEV_PAUSE_LL
+                -DQCA_SUPPORT_TXRX_VDEV_PAUSE_LL \
+		-DQCA_SUPPORT_TX_THROTTLE_LL \
 
 ifeq ($(CONFIG_QCA_WIFI_2_0), 0)
 CDEFINES +=	-DWLANTL_DEBUG
