@@ -2163,14 +2163,18 @@ eHalStatus pmcWowlAddBcastPattern (
     {
        log_ptr->pattern_id = pattern->ucPatternId;
        log_ptr->pattern_byte_offset = pattern->ucPatternByteOffset;
-       log_ptr->pattern_size = pattern->ucPatternSize;
-       log_ptr->pattern_mask_size = pattern->ucPatternMaskSize;
+       log_ptr->pattern_size =
+           (pattern->ucPatternSize <= VOS_LOG_MAX_WOW_PTRN_SIZE) ?
+           pattern->ucPatternSize : VOS_LOG_MAX_WOW_PTRN_SIZE;
+       log_ptr->pattern_mask_size =
+           (pattern->ucPatternMaskSize <= VOS_LOG_MAX_WOW_PTRN_MASK_SIZE) ?
+           pattern->ucPatternMaskSize : VOS_LOG_MAX_WOW_PTRN_MASK_SIZE;
 
        vos_mem_copy(log_ptr->pattern, pattern->ucPattern,
-                   pattern->ucPatternSize);
+                   log_ptr->pattern_size);
        /* 1 bit in the pattern mask denotes 1 byte of pattern. */
        vos_mem_copy(log_ptr->pattern_mask, pattern->ucPatternMask,
-                     pattern->ucPatternMaskSize);
+                     log_ptr->pattern_mask_size);
     }
 
     //The same macro frees the memory.
@@ -2912,6 +2916,12 @@ eHalStatus pmcSetPreferredNetworkList
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_U8 ucDot11Mode;
 
+    if (NULL == pSession)
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                  "%s: pSession is NULL", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
     VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                "%s: SSID = 0x%08x%08x%08x%08x%08x%08x%08x%08x, "
                "0x%08x%08x%08x%08x%08x%08x%08x%08x", __func__,
@@ -2932,6 +2942,12 @@ eHalStatus pmcSetPreferredNetworkList
                *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[24]),
                *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[28]));
 
+    if (!pSession)
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                  "%s: pSessionis NULL", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
 
     pRequestBuf = vos_mem_malloc(sizeof(tSirPNOScanReq));
     if (NULL == pRequestBuf)
@@ -3509,6 +3525,7 @@ eHalStatus pmcOffloadCleanup(tHalHandle hHal, tANI_U32 sessionId)
 
     pmc->uapsdSessionRequired = FALSE;
     pmc->configStaPsEnabled = FALSE;
+    pmc->configDefStaPsEnabled = FALSE;
     pmcOffloadStopAutoStaPsTimer(pMac, sessionId);
     pmcOffloadDoStartUapsdCallbacks(pMac, sessionId, eHAL_STATUS_FAILURE);
     return eHAL_STATUS_SUCCESS;
@@ -3839,6 +3856,9 @@ eHalStatus PmcOffloadDisableStaModePowerSave(tHalHandle hHal,
          */
         smsLog(pMac, LOGE,
                FL("sta mode power save already disabled"));
+        /* Stop the Auto Sta Ps Timer if running */
+        pmcOffloadStopAutoStaPsTimer(pMac, sessionId);
+        pmc->configDefStaPsEnabled = FALSE;
     }
     return status;
 }
@@ -4260,3 +4280,85 @@ eHalStatus pmcOffloadSetTdlsProhibitBmpsStatus(tHalHandle hHal,
 	return eHAL_STATUS_SUCCESS;
 }
 #endif
+
+/******************************************************************************
+*
+* Name:  pmcOffloadIsPowerSaveEnabled
+*
+* Description:
+*    Checks if the device is able to enter one of the power save modes.
+*    "Able to enter" means the power save mode is enabled for the device
+*    and the host is using the correct power source for entry into the
+*    power save mode.  This routine does not indicate whether the device
+*    is actually in the power save mode at a particular point in time.
+*
+* Parameters:
+*    hHal - HAL handle for device
+*    psMode - the power saving mode
+*
+* Returns:
+*    TRUE if device is able to enter the power save mode, FALSE otherwise
+*
+******************************************************************************/
+tANI_BOOLEAN pmcOffloadIsPowerSaveEnabled (tHalHandle hHal, tANI_U32 sessionId,
+                                           tPmcPowerSavingMode psMode)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    tpPsOffloadPerSessionInfo pmc = &pMac->pmcOffloadInfo.pmc[sessionId];
+
+    pmcLog(pMac, LOG2, FL("Entering pmcIsPowerSaveEnabled, power save mode %d"),
+                          psMode);
+
+    /* Check ability to enter based on the specified power saving mode. */
+    switch (psMode)
+    {
+    case ePMC_BEACON_MODE_POWER_SAVE:
+        return pMac->pmcOffloadInfo.staPsEnabled;
+
+    case ePMC_UAPSD_MODE_POWER_SAVE:
+        return pmc->UapsdEnabled;
+
+    default:
+        pmcLog(pMac, LOGE, FL("Invalid power save mode %d"), psMode);
+        PMC_ABORT;
+        return FALSE;
+    }
+}
+
+eHalStatus PmcOffloadEnableDeferredStaModePowerSave(tHalHandle hHal,
+                                                    tANI_U32 sessionId)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    tpPsOffloadPerSessionInfo pmc = &pMac->pmcOffloadInfo.pmc[sessionId];
+    eHalStatus status = eHAL_STATUS_FAILURE;
+
+    if (!pMac->pmcOffloadInfo.staPsEnabled)
+    {
+        smsLog(pMac, LOGE,
+               FL("STA Mode PowerSave is not enabled in ini"));
+        return status;
+    }
+
+    status = pmcOffloadStartAutoStaPsTimer(pMac, sessionId,
+                AUTO_DEFERRED_PS_ENTRY_TIMER_DEFAULT_VALUE);
+    if (eHAL_STATUS_SUCCESS == status)
+    {
+       smsLog(pMac, LOG2,
+          FL("Enabled Deferred ps for session %d"), sessionId);
+       pmc->configDefStaPsEnabled = TRUE;
+    }
+    return status;
+}
+
+eHalStatus PmcOffloadDisableDeferredStaModePowerSave(tHalHandle hHal,
+                                                     tANI_U32 sessionId)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    tpPsOffloadPerSessionInfo pmc = &pMac->pmcOffloadInfo.pmc[sessionId];
+
+    /* Stop the Auto Sta Ps Timer if running */
+    pmcOffloadStopAutoStaPsTimer(pMac, sessionId);
+    pmc->configDefStaPsEnabled = FALSE;
+    return eHAL_STATUS_SUCCESS;
+}
+

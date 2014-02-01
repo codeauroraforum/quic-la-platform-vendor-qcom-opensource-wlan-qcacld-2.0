@@ -112,16 +112,6 @@ static void ol_rx_process_inv_peer(
     #endif
 }
 
-void ol_rx_err(ol_pdev_handle pdev,
-	       u_int8_t vdev_id, u_int8_t *peer_mac_addr, int tid,
-	       u_int32_t tsf32, enum ol_rx_err_type err_type,
-	       adf_nbuf_t rx_frame)
-{
-	/*
-	 * TODO: Report mic error to cfg80211
-	 */
-}
-
 #ifdef QCA_SUPPORT_PEER_DATA_RX_RSSI
 static inline int16_t
 ol_rx_rssi_avg(struct ol_txrx_pdev_t *pdev, int16_t rssi_old, int16_t rssi_new)
@@ -369,9 +359,18 @@ ol_rx_indication_handler(
                 if (status == htt_rx_status_tkip_mic_err &&
                     vdev != NULL &&  peer != NULL)
                 {
-                    ol_rx_err(
-                        pdev->ctrl_pdev, vdev->vdev_id, peer->mac_addr.raw,
-                        tid, 0, OL_RX_ERR_TKIP_MIC, msdu);
+                    union htt_rx_pn_t pn;
+                    u_int8_t key_id;
+                    htt_rx_mpdu_desc_pn(pdev->htt_pdev,
+                                 htt_rx_msdu_desc_retrieve(pdev->htt_pdev,
+                                                           msdu), &pn, 48);
+                    if (htt_rx_msdu_desc_key_id(pdev->htt_pdev,
+                                      htt_rx_msdu_desc_retrieve(pdev->htt_pdev,
+                                      msdu), &key_id) == A_TRUE) {
+                        ol_rx_err(pdev->ctrl_pdev, vdev->vdev_id,
+                                  peer->mac_addr.raw, tid, 0,
+                                  OL_RX_ERR_TKIP_MIC, msdu, &pn.pn48, key_id);
+                    }
                 }
 
     #ifdef WDI_EVENT_ENABLE
@@ -408,7 +407,7 @@ ol_rx_indication_handler(
      */
     htt_rx_msdu_buff_replenish(htt_pdev);
 
-    if ((A_TRUE == rx_ind_release) && peer) {
+    if ((A_TRUE == rx_ind_release) && peer && vdev) {
         ol_rx_reorder_release(vdev, peer, tid, seq_num_start, seq_num_end);
     }
     OL_RX_REORDER_TIMEOUT_UPDATE(peer, tid);
@@ -615,10 +614,8 @@ ol_rx_offload_deliver_ind_handler(
             &tid, &fw_desc, &head_buf, &tail_buf);
 
         peer = ol_txrx_peer_find_by_id(pdev, peer_id);
-        if (peer) {
+        if (peer && peer->vdev) {
             vdev = peer->vdev;
-        }
-        if (vdev) {
 	    OL_RX_OSIF_DELIVER(vdev, peer, head_buf);
         } else {
             buf = head_buf;
@@ -917,7 +914,7 @@ ol_rx_peer_init(struct ol_txrx_pdev_t *pdev, struct ol_txrx_peer_t *peer)
         ol_rx_reorder_init(&peer->tids_rx_reorder[tid], tid);
 
         /* invalid sequence number */
-        peer->tids_last_seq[tid] = 0xffff;
+        peer->tids_last_seq[tid] = IEEE80211_SEQ_MAX;
     }
     /*
      * Set security defaults: no PN check, no security.

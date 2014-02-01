@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -119,22 +119,6 @@ static void cbNotifySetRoamScanNProbes(hdd_context_t *pHddCtx, unsigned long Not
 
 static void cbNotifySetRoamScanHomeAwayTime(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
-    tANI_U16 scanChannelMaxTime = 0;
-
-    /* Home Away Time should be atleast equal to (MaxDwell time + (2*RFS)),
-     * where RFS is the RF Switching time. It is twice RFS to consider the
-     * time to go off channel and return to the home channel. */
-
-     scanChannelMaxTime = sme_getNeighborScanMaxChanTime((tHalHandle)(pHddCtx->hHal));
-     if (pHddCtx->cfg_ini->nRoamScanHomeAwayTime < (scanChannelMaxTime + (2 * HDD_ROAM_SCAN_CHANNEL_SWITCH_TIME)))
-     {
-         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
-                "%s: Invalid config, Home away time(%d) is less than (twice RF switching time + channel max time)(%d)"
-                " Hence enforcing home away time to disable (0)",
-                __func__, pHddCtx->cfg_ini->nRoamScanHomeAwayTime, (scanChannelMaxTime + (2 * HDD_ROAM_SCAN_CHANNEL_SWITCH_TIME)));
-         pHddCtx->cfg_ini->nRoamScanHomeAwayTime = 0;
-     }
-
      sme_UpdateRoamScanHomeAwayTime((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nRoamScanHomeAwayTime, eANI_BOOLEAN_TRUE);
 }
 #endif
@@ -207,22 +191,6 @@ static void cbNotifySetNeighborScanMinChanTime(hdd_context_t *pHddCtx, unsigned 
 
 static void cbNotifySetNeighborScanMaxChanTime(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
-    tANI_U16 homeAwayTime = 0;
-
-    /* Home Away Time should be atleast equal to (MaxDwell time + (2*RFS)),
-    *  where RFS is the RF Switching time. It is twice RFS to consider the
-    *  time to go off channel and return to the home channel. */
-    homeAwayTime = sme_getRoamScanHomeAwayTime((tHalHandle)(pHddCtx->hHal));
-    if (homeAwayTime < (pHddCtx->cfg_ini->nNeighborScanMaxChanTime + (2 * HDD_ROAM_SCAN_CHANNEL_SWITCH_TIME)))
-    {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
-               "%s: Invalid config, Home away time(%d) is less than (twice RF switching time + channel max time)(%d)"
-               " Hence enforcing home away time to disable (0)",
-               __func__, homeAwayTime, (pHddCtx->cfg_ini->nNeighborScanMaxChanTime + (2 * HDD_ROAM_SCAN_CHANNEL_SWITCH_TIME)));
-        homeAwayTime = 0;
-        pHddCtx->cfg_ini->nRoamScanHomeAwayTime = homeAwayTime;
-        sme_UpdateRoamScanHomeAwayTime((tHalHandle)(pHddCtx->hHal), homeAwayTime, eANI_BOOLEAN_FALSE);
-    }
     sme_setNeighborScanMaxChanTime((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nNeighborScanMaxChanTime);
 }
 #endif
@@ -2350,6 +2318,15 @@ REG_TABLE_ENTRY g_registry_table[] =
               CFG_THERMAL_MIGRATION_ENABLE_MIN,
               CFG_THERMAL_MIGRATION_ENABLE_MAX ),
 
+#ifndef QCA_WIFI_ISOC
+   REG_VARIABLE( CFG_THROTTLE_PERIOD_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, throttlePeriod,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THROTTLE_PERIOD_DEFAULT,
+              CFG_THROTTLE_PERIOD_MIN,
+              CFG_THROTTLE_PERIOD_MAX ),
+#endif
+
    REG_VARIABLE( CFG_ENABLE_MODULATED_DTIM_NAME, WLAN_PARAM_Integer,
               hdd_config_t, enableModulatedDTIM,
               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2449,6 +2426,13 @@ REG_VARIABLE( CFG_HT_SMPS_CAP_FEATURE, WLAN_PARAM_Integer,
              CFG_HT_SMPS_CAP_FEATURE_DEFAULT,
              CFG_HT_SMPS_CAP_FEATURE_MIN,
              CFG_HT_SMPS_CAP_FEATURE_MAX ),
+
+REG_VARIABLE( CFG_DISABLE_DFS_CH_SWITCH, WLAN_PARAM_Integer,
+             hdd_config_t, disableDFSChSwitch,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+             CFG_DISABLE_DFS_CH_SWITCH_DEFAULT,
+             CFG_DISABLE_DFS_CH_SWITCH_MIN,
+             CFG_DISABLE_DFS_CH_SWITCH_MAX ),
 
    REG_VARIABLE( CFG_ENABLE_FIRST_SCAN_2G_ONLY_NAME, WLAN_PARAM_Integer,
               hdd_config_t, enableFirstScan2GOnly,
@@ -2998,6 +2982,64 @@ REG_VARIABLE( CFG_SAP_MAX_NO_PEERS, WLAN_PARAM_Integer,
                CFG_SAP_MAX_NO_PEERS_DEFAULT,
                CFG_SAP_MAX_NO_PEERS_MIN,
                CFG_SAP_MAX_NO_PEERS_MAX),
+
+#ifndef QCA_WIFI_ISOC
+   REG_VARIABLE( CFG_THERMAL_TEMP_MIN_LEVEL0_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMinLevel0,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL0_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL0_MIN,
+              CFG_THERMAL_TEMP_MIN_LEVEL0_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MAX_LEVEL0_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMaxLevel0,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL0_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL0_MIN,
+              CFG_THERMAL_TEMP_MAX_LEVEL0_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MIN_LEVEL1_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMinLevel1,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL1_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL1_MIN,
+              CFG_THERMAL_TEMP_MIN_LEVEL1_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MAX_LEVEL1_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMaxLevel1,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL1_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL1_MIN,
+              CFG_THERMAL_TEMP_MAX_LEVEL1_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MIN_LEVEL2_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMinLevel2,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL2_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL2_MIN,
+              CFG_THERMAL_TEMP_MIN_LEVEL2_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MAX_LEVEL2_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMaxLevel2,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL2_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL2_MIN,
+              CFG_THERMAL_TEMP_MAX_LEVEL2_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MIN_LEVEL3_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMinLevel3,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL3_DEFAULT,
+              CFG_THERMAL_TEMP_MIN_LEVEL3_MIN,
+              CFG_THERMAL_TEMP_MIN_LEVEL3_MAX ),
+
+   REG_VARIABLE( CFG_THERMAL_TEMP_MAX_LEVEL3_NAME, WLAN_PARAM_Integer,
+              hdd_config_t, thermalTempMaxLevel3,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL3_DEFAULT,
+              CFG_THERMAL_TEMP_MAX_LEVEL3_MIN,
+              CFG_THERMAL_TEMP_MAX_LEVEL3_MAX ),
+#endif /*#ifndef QCA_WIFI_ISOC*/
 };
 
 /*
@@ -4489,7 +4531,7 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
                temp = (temp & 0xFFF3) | (pConfig->vhtTxMCS2x2 << 2);
 
            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-                    "vhtRxMCS2x2 - %x temp - %lu enable2x2 %d\n",
+                    "vhtRxMCS2x2 - %x temp - %u enable2x2 %d\n",
                     pConfig->vhtRxMCS2x2, temp, pConfig->enable2x2);
 
            if(ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_VHT_TX_MCS_MAP,
@@ -4604,7 +4646,12 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
      }
      else
      {
+#ifndef QCA_WIFI_2_0
             val = WNI_CFG_ASSOC_STA_LIMIT_STADEF;
+#else
+            val = pConfig->maxNumberOfPeers;
+#endif
+
      }
      if(ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_ASSOC_STA_LIMIT, val,
          NULL, eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
@@ -4841,15 +4888,6 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig.csrConfig.nRoamIntraBand            = pConfig->nRoamIntraBand;
    smeConfig.csrConfig.nProbes                   = pConfig->nProbes;
 
-   if (pConfig->nRoamScanHomeAwayTime < (pConfig->nNeighborScanMaxChanTime + (2 * HDD_ROAM_SCAN_CHANNEL_SWITCH_TIME)))
-   {
-       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
-              "%s: Invalid config, Home away time(%d) is less than twice RF switching time + channel max time(%d)"
-              " Hence enforcing home away time to disable (0)",
-              __func__, pConfig->nRoamScanHomeAwayTime,
-              (pConfig->nNeighborScanMaxChanTime + (2 * HDD_ROAM_SCAN_CHANNEL_SWITCH_TIME)));
-       pConfig->nRoamScanHomeAwayTime = 0;
-   }
    smeConfig.csrConfig.nRoamScanHomeAwayTime     = pConfig->nRoamScanHomeAwayTime;
 #endif
    smeConfig.csrConfig.fFirstScanOnly2GChnl      = pConfig->enableFirstScan2GOnly;

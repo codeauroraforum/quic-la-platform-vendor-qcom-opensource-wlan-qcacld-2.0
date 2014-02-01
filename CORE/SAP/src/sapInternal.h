@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 #ifndef WLAN_QCT_WLANSAP_INTERNAL_H
 #define WLAN_QCT_WLANSAP_INTERNAL_H
 
@@ -89,6 +90,9 @@ when           who        what, where, why
 /*----------------------------------------------------------------------------
  *  Defines
  * -------------------------------------------------------------------------*/
+//DFS Non Occupancy Period =30 minutes, in milliseconds
+#define SAP_DFS_NON_OCCUPANCY_PERIOD      (30 * 60 * 1000 )
+
 #define SAP_DEBUG
 // Used to enable or disable security on the BT-AMP link 
 #define WLANSAP_SECURITY_ENABLED_STATE VOS_TRUE
@@ -98,6 +102,10 @@ when           who        what, where, why
 #define VOS_GET_HAL_CB(ctx) vos_get_context( VOS_MODULE_ID_PE, ctx) 
 //MAC Address length
 #define ANI_EAPOL_KEY_RSN_NONCE_SIZE      32
+
+#define IS_ETSI_WEATHER_CH(_ch) ((_ch >= 120) && (_ch <= 130))
+#define DEFAULT_CAC_TIMEOUT (60 * 1000) //msecs - 1 min
+#define ETSI_WEATHER_CH_CAC_TIMEOUT (10 * 60 * 1000) //msecs - 10 min
 
 extern sRegulatoryChannel *regChannels;
 extern const tRfChannelProps rfChannels[NUM_RF_CHANNELS];
@@ -121,6 +129,7 @@ typedef struct sSapContext tSapContext;
 typedef enum {
     eSAP_DISCONNECTED,
     eSAP_CH_SELECT,
+    eSAP_DFS_CAC_WAIT,
     eSAP_STARTING,
     eSAP_STARTED,
     eSAP_DISCONNECTING
@@ -136,6 +145,40 @@ typedef enum {
 typedef struct sSapQosCfg {
     v_U8_t              WmmIsEnabled;
 } tSapQosCfg;
+
+typedef enum {
+        eSAP_DFS_CHANNEL_USABLE,
+        eSAP_DFS_CHANNEL_AVAILABLE,
+        eSAP_DFS_CHANNEL_UNAVAILABLE
+}eSapDfsChanStatus_t;
+
+typedef struct sSapDfsNolInfo {
+    v_U8_t              dfs_channel_number;
+    eSapDfsChanStatus_t radar_status_flag;
+    unsigned long       radar_found_timestamp;
+}tSapDfsNolInfo;
+
+typedef struct sSapDfsInfo {
+    vos_timer_t         sap_dfs_cac_timer;
+    v_U8_t              sap_radar_found_status;
+    v_U8_t              is_dfs_cac_timer_running;
+
+    /*
+     * New channel to move to when a  Radar is
+     * detected on current Channel
+     */
+    v_U8_t              target_channel;
+    v_U8_t              last_radar_found_channel;
+    v_U8_t              ignore_cac;
+
+    /* Requests for Channel Switch Announcement IE
+     * generation and transmission
+     */
+    v_U8_t              csaIERequired;
+    v_U8_t              numCurrentRegDomainDfsChannels;
+    tSapDfsNolInfo      sapDfsChannelNolList[NUM_5GHZ_CHANNELS];
+
+}tSapDfsInfo;
 
 typedef struct sSapContext {
 
@@ -208,6 +251,18 @@ typedef struct sSapContext {
 
     // session to scan
     tANI_BOOLEAN        isScanSessionOpen;
+    /*
+     * This list of channels will hold 5Ghz enabled,DFS in the
+     * Current RegDomain.This list will be used to select a channel,
+     * for SAP to start including any DFS channel and also to select
+     * any random channel[5Ghz-(NON-DFS/DFS)],if SAP is operating
+     * on a DFS channel and a RADAR is detected on the channel.
+     */
+    tSapChannelListInfo SapAllChnlList;
+
+    //Information Required for SAP DFS Master mode
+    tSapDfsInfo         SapDfsInfo;
+
 } *ptSapContext;
 
 
@@ -771,6 +826,26 @@ eCsrPhyMode sapConvertSapPhyModeToCsrPhyMode( eSapPhyMode sapPhyMode );
 ============================================================================*/
 void sapUpdateUnsafeChannelList(void);
 #endif /* FEATURE_WLAN_CH_AVOID */
+
+/*---------------------------------------------------------------------------
+FUNCTION  sapIndicateRadar
+
+DESCRIPTION Function to implement actions on Radar Detection when SAP is on
+            DFS Channel
+
+DEPENDENCIES PARAMETERS
+IN sapContext : Sap Context which hold SapDfsInfo
+   dfs_event : Event from DFS Module
+
+RETURN VALUE  : Target Channel For SAP to Move on to when Radar is Detected.
+
+SIDE EFFECTS
+---------------------------------------------------------------------------*/
+v_U8_t
+sapIndicateRadar(ptSapContext sapContext,tSirSmeDfsEventInd *dfs_event);
+
+VOS_STATUS
+sapInitDfsChannelNolList(ptSapContext sapContext);
 
 #ifdef __cplusplus
 }

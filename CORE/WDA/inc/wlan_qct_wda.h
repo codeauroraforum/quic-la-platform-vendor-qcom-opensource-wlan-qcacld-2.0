@@ -353,6 +353,13 @@ typedef eHalStatus (*pWDAAckFnTxComp)(tpAniSirGlobal, tANI_U32);
 /* generic callback for updating parameters from target to UMAC */
 typedef void (*wda_tgt_cfg_cb) (void *context, void *param);
 
+/*
+ * callback for Indicating Radar to HDD and disable Tx Queues
+ * to stop accepting data Tx packets from netif as radar is
+ * found on the current operating channel
+ */
+typedef void (*wda_dfs_radar_indication_cb) (void *context, void *param);
+
 typedef struct
 {
    tANI_U16 ucValidStaIndex ;
@@ -491,8 +498,15 @@ VOS_STATUS WDA_TxPacket(void *pWDA,
  * open WDA context
  */
 
+#ifndef QCA_WIFI_ISOC
+VOS_STATUS WDA_open(v_PVOID_t pVosContext, v_PVOID_t pOSContext,
+                          wda_tgt_cfg_cb pTgtUpdCB,
+                          wda_dfs_radar_indication_cb radar_ind_cb,
+                          tMacOpenParameters *pMacParams ) ;
+#else
 VOS_STATUS WDA_open(v_PVOID_t pVosContext, v_PVOID_t pOSContext,
                     wda_tgt_cfg_cb pTgtUpdCB, tMacOpenParameters *pMacParams ) ;
+#endif
 
 #ifdef QCA_WIFI_2_0
 #define WDA_start wma_start
@@ -644,7 +658,8 @@ tANI_U8 WDA_MapChannel(tANI_U8);
 
 #define WDA_GET_RX_FT_DONE(pRxMeta) 0
 
-#define WDA_GET_RX_DPU_FEEDBACK(pRxMeta) 0
+#define WDA_GET_RX_DPU_FEEDBACK(pRxMeta) \
+	(((t_packetmeta *)pRxMeta)->dpuFeedback)
 
 #define WDA_GET_RX_BEACON_SENT(pRxMeta) 0
 
@@ -1208,6 +1223,10 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_SET_PNO_CHANGED_IND     SIR_HAL_SET_PNO_CHANGED_IND
 #endif // FEATURE_WLAN_SCAN_PNO
 
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#define WDA_SET_PLM_REQ             SIR_HAL_SET_PLM_REQ
+#endif
+
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 #define WDA_ROAM_SCAN_OFFLOAD_REQ   SIR_HAL_ROAM_SCAN_OFFLOAD_REQ
 #define WDA_ROAM_SCAN_OFFLOAD_RSP   SIR_HAL_ROAM_SCAN_OFFLOAD_RSP
@@ -1279,6 +1298,8 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 #define WDA_RATE_UPDATE_IND         SIR_HAL_RATE_UPDATE_IND
 
+#define WDA_INIT_THERMAL_INFO_CMD   SIR_HAL_INIT_THERMAL_INFO_CMD
+#define WDA_SET_THERMAL_LEVEL       SIR_HAL_SET_THERMAL_LEVEL
 #ifdef FEATURE_WLAN_BATCH_SCAN
 #define WDA_SET_BATCH_SCAN_REQ            SIR_HAL_SET_BATCH_SCAN_REQ
 #define WDA_SET_BATCH_SCAN_RSP            SIR_HAL_SET_BATCH_SCAN_RSP
@@ -1295,6 +1316,14 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_TDLS_PEER_DISCONNECTED    SIR_HAL_TDLS_PEER_DISCONNECTED
 #endif
 #endif
+
+/* Message to Indicate Radar Presence on SAP Channel */
+#define WDA_DFS_RADAR_IND           SIR_HAL_DFS_RADAR_IND
+
+/* Message to indicate beacon tx completion after beacon template update
+ * beacon offload case
+ */
+#define WDA_DFS_BEACON_TX_SUCCESS_IND   SIR_HAL_BEACON_TX_SUCCESS_IND
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 

@@ -67,6 +67,7 @@
 #include "sirMacProtDef.h"
 #include "wlan_qct_wda.h"
 #include "ol_txrx_types.h"
+#include "wlan_qct_wda.h"
 #include <linux/workqueue.h>
 
 /* Platform specific configuration for max. no. of fragments */
@@ -134,12 +135,31 @@
 #define WMA_HW_DEF_SCAN_MAX_DURATION	  30000 /* 30 secs */
 
 /* Max offchannel duration */
-#define WMA_SCAN_AP_PRESENT_MAX_OFFCHANNEL_NUM 5
-#define WMA_SCAN_MAX_OFFCHANNEL_NUM_ACTIVE     10
-#define WMA_SCAN_MAX_OFFCHANNEL_NUM_PASSIVE    4
+#define WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS 5
+
+/* Roaming default values
+ * All time and period values are in milliseconds.
+ * All rssi values are in dB except for WMA_NOISE_FLOOR_DBM_DEFAULT.
+ */
+
+#define WMA_ROAM_SCAN_CHANNEL_SWITCH_TIME    (3)
+#define WMA_NOISE_FLOOR_DBM_DEFAULT          (-96)
+#define WMA_ROAM_RSSI_DIFF_DEFAULT           (5)
+#define WMA_ROAM_DWELL_TIME_ACTIVE_DEFAULT   (100)
+#define WMA_ROAM_DWELL_TIME_PASSIVE_DEFAULT  (110)
+#define WMA_ROAM_MIN_REST_TIME_DEFAULT       (50)
+#define WMA_ROAM_MAX_REST_TIME_DEFAULT       (500)
+#define WMA_ROAM_LOW_RSSI_TRIGGER_DEFAULT    (20)
+#define WMA_ROAM_LOW_RSSI_TRIGGER_VERYLOW    (10)
+#define WMA_ROAM_RSSI_THRESH_DIFF_DEFAULT    (30)
+#define WMA_ROAM_RSSI_CHANGE_RESCAN_DEFAULT  (5)
+#define WMA_ROAM_BEACON_WEIGHT_DEFAULT       (14)
+#define WMA_ROAM_OPP_SCAN_PERIOD_DEFAULT     (120000)
+#define WMA_ROAM_OPP_SCAN_AGING_PERIOD_DEFAULT (WMA_ROAM_OPP_SCAN_PERIOD_DEFAULT * 5)
+#define WMA_ROAM_PREAUTH_SCAN_TIME           (50)
 
 #define WMA_INVALID_KEY_IDX	0xff
-
+#define WMA_DFS_RADAR_FOUND   1
 typedef struct {
 	HTC_ENDPOINT_ID endpoint_id;
 }t_cfg_nv_param;
@@ -196,6 +216,14 @@ enum wma_tdls_peer_reason {
 };
 #endif /* FEATURE_WLAN_TDLS */
 
+typedef enum {
+        /* Roaming preauth channel state */
+        WMA_ROAM_PREAUTH_CHAN_NONE,
+        WMA_ROAM_PREAUTH_CHAN_REQUESTED,
+        WMA_ROAM_PREAUTH_ON_CHAN,
+        WMA_ROAM_PREAUTH_CHAN_CANCEL_REQUESTED,
+        WMA_ROAM_PREAUTH_CHAN_COMPLETED
+} t_wma_roam_preauth_chan_state_t;
 /*
  * memory chunck allocated by Host to be managed by FW
  * used only for low latency interfaces like pcie
@@ -266,6 +294,23 @@ struct pps {
 	v_BOOL_t rssi_chk;
 };
 
+struct qpower_params {
+	u_int32_t max_ps_poll_cnt;
+	u_int32_t max_tx_before_wake;
+	u_int32_t spec_ps_poll_wake_interval;
+	u_int32_t max_spec_nodata_ps_poll;
+};
+
+typedef struct {
+	u_int32_t gtxRTMask[2]; /* for HT and VHT rate masks */
+	u_int32_t gtxUsrcfg; /* host request for GTX mask */
+	u_int32_t gtxPERThreshold; /* default: 10% */
+	u_int32_t gtxPERMargin; /* default: 2% */
+	u_int32_t gtxTPCstep; /* default: 1 */
+	u_int32_t gtxTPCMin; /* default: 5 */
+	u_int32_t gtxBWMask; /* 20/40/80/160 Mhz */
+}gtx_config_t;
+
 typedef struct {
 	u_int32_t ani_enable;
 	u_int32_t ani_poll_len;
@@ -278,6 +323,8 @@ typedef struct {
 	u_int32_t txpow2g;
 	u_int32_t txpow5g;
 	u_int32_t pwrgating;
+	u_int32_t burst_enable;
+	u_int32_t burst_dur;
 } pdev_cli_config_t;
 
 typedef struct {
@@ -292,6 +339,8 @@ typedef struct {
 	u_int32_t ampdu;
 	u_int32_t amsdu;
         struct pps pps_params;
+	struct qpower_params qpower_params;
+	gtx_config_t gtx_info;
 } vdev_cli_config_t;
 
 #define WMA_WOW_PTRN_MASK_VALID     0xFF
@@ -325,6 +374,17 @@ struct wma_wow {
 	v_BOOL_t bmiss_enable;
 	v_BOOL_t gtk_err_enable;
 };
+#ifdef WLAN_FEATURE_11W
+#define CMAC_IPN_LEN 6
+typedef struct {
+	u_int16_t key_length;
+	u_int8_t  key[CSR_AES_KEY_LEN];
+	u_int8_t  ipn[CMAC_IPN_LEN];
+} wma_igtk_key_t;
+#endif
+
+#define WMA_BSS_STATUS_STARTED 0x1
+#define WMA_BSS_STATUS_STOPPED 0x2
 
 struct wma_txrx_node {
 	u_int8_t addr[ETH_ALEN];
@@ -341,6 +401,9 @@ struct wma_txrx_node {
 	v_BOOL_t nlo_match_evt_received;
 	v_BOOL_t pno_in_progress;
 #endif
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+	v_BOOL_t plm_in_progress;
+#endif
 	v_BOOL_t ptrn_match_enable;
 	v_BOOL_t conn_state;
 	/* BSS parameters cached for use in WDA_ADD_STA */
@@ -354,6 +417,19 @@ struct wma_txrx_node {
 	v_BOOL_t vdev_up;
 	u_int64_t tsfadjust;
 	void     *addBssStaContext;
+	tANI_U8 aid;
+	/* Robust Management Frame (RMF) enabled/disabled */
+	tANI_U8 rmfEnabled;
+#ifdef WLAN_FEATURE_11W
+	wma_igtk_key_t key;
+#endif /* WLAN_FEATURE_11W */
+	u_int32_t uapsd_cached_val;
+	tAniGetPEStatsRsp       *stats_rsp;
+	tANI_U8                 fw_stats_set;
+	void *del_staself_req;
+	tANI_U8 bss_status;
+	tANI_U8 rate_flags;
+	tANI_U8 nss;
 };
 
 #if defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
@@ -430,6 +506,8 @@ typedef struct {
 	struct wma_mem_chunk mem_chunks[MAX_MEM_CHUNKS];
 #endif
 	wda_tgt_cfg_cb tgt_cfg_update_cb;
+   /*Callback to indicate radar to HDD*/
+   wda_dfs_radar_indication_cb dfs_radar_indication_cb;
 	HAL_REG_CAPABILITIES reg_cap;
 	u_int32_t scan_id;
 	struct wma_txrx_node *interfaces;
@@ -460,7 +538,13 @@ typedef struct {
 	u_int8_t powersave_mode;
 	v_BOOL_t ptrn_match_enable_all_vdev;
 	void* pGetRssiReq;
+	t_thermal_mgmt thermal_mgmt_info;
         u_int32_t roam_offload_vdev_id;
+        v_BOOL_t  roam_offload_enabled;
+        t_wma_roam_preauth_chan_state_t roam_preauth_scan_state;
+        u_int32_t roam_preauth_scan_id;
+        u_int16_t roam_preauth_chanfreq;
+        void *roam_preauth_chan_context;
 
 	/* Here ol_ini_info is used to store ini
 	 * status of arp offload, ns offload
@@ -471,6 +555,14 @@ typedef struct {
 	u_int8_t ol_ini_info;
         u_int8_t ibss_started;
         tSetBssKeyParams ibsskey_info;
+
+   /*DFS umac interface information*/
+   struct ieee80211com *dfs_ic;
+#ifdef FEATURE_WLAN_SCAN_PNO
+	vos_wake_lock_t pno_wake_lock;
+#endif
+	vos_wake_lock_t wow_wake_lock;
+
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
@@ -990,6 +1082,16 @@ VOS_STATUS wma_update_vdev_tbl(tp_wma_handle wma_handle, u_int8_t vdev_id,
 		ol_txrx_vdev_handle tx_rx_vdev_handle, u_int8_t *mac,
 		u_int32_t vdev_type, bool add_del);
 
+#ifndef QCA_WIFI_ISOC
+int32_t regdmn_get_regdmn_for_country(u_int8_t *alpha2);
+void regdmn_get_ctl_info(struct regulatory *reg, u_int32_t modesAvail,
+     u_int32_t modeSelect);
+
+/*get the ctl from regdomain*/
+u_int8_t regdmn_get_ctl_for_regdmn(u_int32_t reg_dmn);
+u_int16_t get_regdmn_5g(u_int32_t reg_dmn);
+#endif
+
 #define WMA_FW_PHY_STATS	0x1
 #define WMA_FW_RX_REORDER_STATS 0x2
 #define WMA_FW_RX_RC_STATS	0x3
@@ -1012,6 +1114,7 @@ struct wma_tx_ack_work_ctx {
 
 #define WMA_TARGET_REQ_TYPE_VDEV_START 0x1
 #define WMA_TARGET_REQ_TYPE_VDEV_STOP  0x2
+#define WMA_TARGET_REQ_TYPE_VDEV_DEL   0x3
 
 struct wma_target_req {
 	vos_timer_t event_timeout;
@@ -1051,6 +1154,12 @@ struct wma_set_key_params {
 	u_int8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
 };
 
+typedef struct {
+	u_int16_t minTemp;
+	u_int16_t maxTemp;
+	u_int8_t thermalEnable;
+} t_thermal_cmd_params, *tp_thermal_cmd_params;
+
 /* Powersave Related */
 /* Default InActivity Time is 200 ms */
 #define POWERSAVE_DEFAULT_INACTIVITY_TIME 200
@@ -1073,6 +1182,9 @@ struct wma_set_key_params {
 enum wma_cfg_cmd_id {
        WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID = WMI_CMDID_MAX,
        WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
+       /* Set time latency and time quota for MCC home channels */
+       WMA_VDEV_MCC_SET_TIME_LATENCY,
+       WMA_VDEV_MCC_SET_TIME_QUOTA,
        /* Add any new command before this */
        WMA_CMD_ID_MAX
 };
@@ -1099,6 +1211,8 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq);
 
 /* Default rssi threshold defined in CFG80211 */
 #define WMA_RSSI_THOLD_DEFAULT   -300
+
+#define WMA_PNO_WAKE_LOCK_TIMEOUT  (30 * 1000) /* in msec */
 
 #endif
 
@@ -1227,8 +1341,20 @@ typedef enum {
 	WMI_VDEV_VHT_SET_GID_MGMT = 9
 } packet_power_save;
 
+typedef enum {
+    WMI_VDEV_PARAM_GTX_HT_MCS,
+    WMI_VDEV_PARAM_GTX_VHT_MCS,
+    WMI_VDEV_PARAM_GTX_USR_CFG,
+    WMI_VDEV_PARAM_GTX_THRE,
+    WMI_VDEV_PARAM_GTX_MARGIN,
+    WMI_VDEV_PARAM_GTX_STEP,
+    WMI_VDEV_PARAM_GTX_MINTPC,
+    WMI_VDEV_PARAM_GTX_BW_MASK,
+}green_tx_param;
+
 #define WMA_DEFAULT_QPOWER_MAX_PSPOLL_BEFORE_WAKE 1
 #define WMA_DEFAULT_QPOWER_TX_WAKE_THRESHOLD 2
+#define WMA_DEFAULT_SIFS_BURST_DURATION      8160
 
 #define WMA_VHT_PPS_PAID_MATCH 1
 #define WMA_VHT_PPS_GID_MATCH 2
@@ -1260,4 +1386,58 @@ typedef struct {
 
 #endif /* FEATURE_WLAN_TDLS */
 
+/*
+ * Structure to indicate RADAR
+ */
+
+struct wma_dfs_radar_indication {
+    /* unique id identifying the VDEV */
+    A_UINT32        vdev_id;
+    /*Channel number on which the RADAR is present */
+    u_int8_t        ieee_chan_number;
+    /* Channel Frequency*/
+    A_UINT32        chan_freq;
+    /* Flag to Indicate RADAR presence on the
+     * current operating channel
+     */
+    u_int32_t       dfs_radar_status;
+    /* Flag to indicate use NOL */
+    int             use_nol;
+};
+
+/*
+ * WMA-DFS Hooks
+ */
+int ol_if_dfs_attach(struct ieee80211com *ic, void *ptr, void *radar_info);
+u_int64_t ol_if_get_tsf64(struct ieee80211com *ic);
+int ol_if_dfs_disable(struct ieee80211com *ic);
+struct ieee80211_channel * ieee80211_find_channel(struct ieee80211com *ic,
+                                     int freq, u_int32_t flags);
+int ol_if_dfs_enable(struct ieee80211com *ic, int *is_fastclk, void *pe);
+u_int32_t ieee80211_ieee2mhz(u_int32_t chan, u_int32_t flags);
+int ol_if_dfs_get_ext_busy(struct ieee80211com *ic);
+int ol_if_dfs_get_mib_cycle_counts_pct(struct ieee80211com *ic,
+          u_int32_t *rxc_pcnt, u_int32_t *rxf_pcnt, u_int32_t *txf_pcnt);
+u_int16_t ol_if_dfs_usenol(struct ieee80211com *ic);
+void ieee80211_mark_dfs(struct ieee80211com *ic,
+                               struct ieee80211_channel *ichan);
+int  wma_dfs_indicate_radar(struct ieee80211com *ic,
+                               struct ieee80211_channel *ichan);
+u_int16_t   dfs_usenol(struct ieee80211com *ic);
+
+#define WMA_SMPS_MASK_LOWER_16BITS 0xFF
+#define WMA_SMPS_MASK_UPPER_3BITS 0x7
+#define WMA_SMPS_PARAM_VALUE_S 29
+
+/* U-APSD Access Categories */
+enum uapsd_ac {
+	UAPSD_VO,
+	UAPSD_VI,
+	UAPSD_BK,
+	UAPSD_BE
+};
+
+VOS_STATUS wma_disable_uapsd_per_ac(tp_wma_handle wma_handle,
+					u_int32_t vdev_id,
+					enum uapsd_ac ac);
 #endif

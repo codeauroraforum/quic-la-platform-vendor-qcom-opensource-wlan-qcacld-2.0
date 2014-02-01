@@ -24,21 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-/*
- * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
 
 /**
  * @file ol_txrx_types.h
@@ -312,6 +297,26 @@ struct ol_tx_delay_data {
 };
 
 #endif /* QCA_COMPUTE_TX_DELAY */
+
+/* Thermal Mitigation */
+
+typedef enum _throttle_level {
+	THROTTLE_LEVEL_0,
+	THROTTLE_LEVEL_1,
+	THROTTLE_LEVEL_2,
+	THROTTLE_LEVEL_3,
+	/* Invalid */
+	THROTTLE_LEVEL_MAX,
+} throttle_level ;
+
+typedef enum _throttle_phase {
+	THROTTLE_PHASE_OFF,
+	THROTTLE_PHASE_ON,
+	/* Invalid */
+	THROTTLE_PHASE_MAX,
+} throttle_phase ;
+
+#define THROTTLE_TX_THRESHOLD (100)
 
 /*
  * As depicted in the diagram below, the pdev contains an array of
@@ -652,6 +657,25 @@ struct ol_txrx_pdev_t {
 	u_int16_t packet_loss_count[QCA_TX_DELAY_NUM_CATEGORIES];
 
 #endif /* QCA_COMPUTE_TX_DELAY */
+
+	struct {
+		adf_os_spinlock_t mutex;
+		/* timer used to monitor the throttle "on" phase and "off" phase */
+		adf_os_timer_t phase_timer;
+		/* timer used to send tx frames */
+		adf_os_timer_t tx_timer;
+		/*This is the time in ms of the throttling window, it will include an
+		  "on" phase and an "off" phase */
+		u_int32_t throttle_period_ms;
+		/* Current throttle level set by the client ex. level 0, level 1, etc*/
+		throttle_level current_throttle_level;
+		/* Index that points to the phase within the throttle period */
+		throttle_phase current_throttle_phase;
+		/* Maximum number of frames to send to the target at one time */
+		u_int32_t tx_threshold;
+		/* stores time in ms of on and off phase for each throttle level*/
+		int throttle_time_ms[THROTTLE_LEVEL_MAX][THROTTLE_PHASE_MAX];
+	} tx_throttle_ll;
 };
 
 struct ol_txrx_vdev_t {
@@ -706,6 +730,14 @@ struct ol_txrx_vdev_t {
 	u_int32_t num_filters;
 
 	enum wlan_op_mode opmode;
+
+#ifndef CONFIG_QCA_WIFI_ISOC
+#ifdef  QCA_IBSS_SUPPORT
+        /* ibss mode related */
+        int16_t ibss_peer_num;              /* the number of active peers */
+        int16_t ibss_peer_heart_beat_timer; /* for detecting peer departure */
+#endif
+#endif
 
 #if defined(CONFIG_HL_SUPPORT)
 	struct ol_tx_frms_queue_t txqs[OL_TX_VDEV_NUM_QUEUES];

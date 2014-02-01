@@ -62,16 +62,22 @@ pktlog_getbuf_intsafe(struct ath_pktlog_arg *plarg)
 	struct ath_pktlog_hdr *log_hdr;
 	int32_t cur_wr_offset;
 	char *log_ptr;
-	struct ath_pktlog_info *pl_info = plarg->pl_info;
-	u_int16_t log_type = plarg->log_type;
-	size_t log_size = plarg->log_size;
-	uint32_t flags = plarg->flags;
+	struct ath_pktlog_info *pl_info;
+	u_int16_t log_type;
+	size_t log_size;
+	uint32_t flags;
 
 	if (!plarg) {
 		printk("Invalid parg in %s\n", __func__);
 		return;
 	}
+
+	pl_info = plarg->pl_info;
+	log_type = plarg->log_type;
+	log_size = plarg->log_size;
 	log_buf = pl_info->buf;
+	flags = plarg->flags;
+
 	if (!log_buf) {
 		printk("Invalid log_buf in %s\n", __func__);
 		return;
@@ -323,6 +329,8 @@ process_tx_info(struct ol_txrx_pdev_t *txrx_pdev,
 		u_int8_t vdev_id;
 		adf_nbuf_t netbuf;
 		u_int32_t len;
+
+		adf_os_mem_set(&pl_msdu_info, 0, sizeof(pl_msdu_info));
 
 		pl_msdu_info.num_msdu = *msdu_id_info;
 		pl_msdu_info.priv_size = sizeof(uint32_t) *

@@ -87,6 +87,8 @@
 #define IS_5G_BAND(__rfBand)     ((__rfBand & 0x3) == 0x2)
 #define IS_24G_BAND(__rfBand)    ((__rfBand & 0x3) == 0x1)
 
+#define LIM_MAX_CSA_IE_UPDATES                  ( 5 )
+
 // enums exported by LIM are as follows
 
 /// System role definition
@@ -546,6 +548,8 @@ struct tLimIbssPeerNode
     //
     tANI_U8 htSupportedChannelWidthSet;
 
+    tANI_U8 htLdpcCapable;
+
     tANI_U8 beaconHBCount;
     tANI_U8 heartbeatFailure;
 
@@ -575,7 +579,7 @@ typedef struct sLimChannelSwitchInfo
     tLimChannelSwitchState   state;
     tANI_U8                  primaryChannel;
     ePhyChanBondState        secondarySubBand;
-    tANI_U32                 switchCount;
+    tANI_S8                  switchCount;
     tANI_U32                 switchTimeoutValue;
     tANI_U8                  switchMode;
 } tLimChannelSwitchInfo, *tpLimChannelSwitchInfo;

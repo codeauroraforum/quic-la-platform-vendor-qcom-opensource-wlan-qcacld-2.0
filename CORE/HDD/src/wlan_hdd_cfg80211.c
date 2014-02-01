@@ -96,6 +96,8 @@
 #define FREQ_BAND_DIFF_80211G     (5)
 #define MAX_SCAN_SSID 9
 #define MAX_PENDING_LOG 5
+#define MAX_HT_MCS_IDX 8
+#define MAX_VHT_MCS_IDX 10
 #define GET_IE_LEN_IN_BSS_DESC(lenInBss) ( lenInBss + sizeof(lenInBss) - \
         ((int) OFFSET_OF( tSirBssDescription, ieFields)))
 
@@ -473,7 +475,8 @@ static const struct
 };
 
 /* MCS Based rate table */
-static struct index_data_rate_type supported_mcs_rate[] =
+/* HT MCS parameters with Nss = 1 */
+static struct index_data_rate_type supported_mcs_rate_nss1[] =
 {
 /* MCS  L20   L40   S20  S40 */
    {0,  {65,  135,  72,  150}},
@@ -484,6 +487,19 @@ static struct index_data_rate_type supported_mcs_rate[] =
    {5,  {520, 1080, 578, 1200}},
    {6,  {585, 1215, 650, 1350}},
    {7,  {650, 1350, 722, 1500}}
+};
+/* HT MCS parameters with Nss = 2 */
+static struct index_data_rate_type supported_mcs_rate_nss2[] =
+{
+/* MCS  L20    L40   S20   S40 */
+   {0,  {130,  270,  144,  300}},
+   {1,  {260,  540,  289,  600}},
+   {2,  {390,  810,  433,  900}},
+   {3,  {520,  1080, 578,  1200}},
+   {4,  {780,  1620, 867,  1800}},
+   {5,  {1040, 2160, 1156, 2400}},
+   {6,  {1170, 2430, 1300, 2700}},
+   {7,  {1300, 2700, 1444, 3000}}
 };
 
 #ifdef WLAN_FEATURE_11AC
@@ -507,7 +523,8 @@ typedef enum
 } eDataRate11ACMaxMcs;
 
 /* MCS Based VHT rate table */
-static struct index_vht_data_rate_type supported_vht_mcs_rate[] =
+/* MCS parameters with Nss = 1*/
+static struct index_vht_data_rate_type supported_vht_mcs_rate_nss1[] =
 {
 /* MCS  L80    S80     L40   S40    L20   S40*/
    {0,  {293,  325},  {135,  150},  {65,   72}},
@@ -521,6 +538,22 @@ static struct index_vht_data_rate_type supported_vht_mcs_rate[] =
    {8,  {3510, 3900}, {1620, 1800}, {780,  867}},
    {9,  {3900, 4333}, {1800, 2000}, {780,  867}}
 };
+
+/*MCS parameters with Nss = 2*/
+static struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] =
+{
+/* MCS  L80    S80     L40   S40    L20   S40*/
+   {0,  {585,  650},  {270,  300},  {130,  144}},
+   {1,  {1170, 1300}, {540,  600},  {260,  289}},
+   {2,  {1755, 1950}, {810,  900},  {390,  433}},
+   {3,  {2340, 2600}, {1080, 1200}, {520,  578}},
+   {4,  {3510, 3900}, {1620, 1800}, {780,  867}},
+   {5,  {4680, 5200}, {2160, 2400}, {1040, 1156}},
+   {6,  {5265, 5850}, {2430, 2700}, {1170, 1300}},
+   {7,  {5850, 6500}, {2700, 3000}, {1300, 1444}},
+   {8,  {7020, 7800}, {3240, 3600}, {1560, 1733}},
+   {9,  {7800, 8667}, {3600, 4000}, {1560, 1733}}
+};
 #endif /* WLAN_FEATURE_11AC */
 
 extern struct net_device_ops net_ops_struct;
@@ -531,7 +564,8 @@ enum wlan_hdd_tm_attr
     WLAN_HDD_TM_ATTR_INVALID = 0,
     WLAN_HDD_TM_ATTR_CMD     = 1,
     WLAN_HDD_TM_ATTR_DATA    = 2,
-    WLAN_HDD_TM_ATTR_TYPE    = 3,
+    WLAN_HDD_TM_ATTR_STREAM_ID = 3,
+    WLAN_HDD_TM_ATTR_TYPE    = 4,
     /* keep last */
     WLAN_HDD_TM_ATTR_AFTER_LAST,
     WLAN_HDD_TM_ATTR_MAX       = WLAN_HDD_TM_ATTR_AFTER_LAST - 1,
@@ -712,6 +746,10 @@ int wlan_hdd_cfg80211_init(struct device *dev,
     }
 #endif/*FEATURE_WLAN_SCAN_PNO*/
 
+#if defined(QCA_WIFI_2_0) && defined (QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
+    if (vos_get_conparam() != VOS_FTM_MODE) {
+#endif
+
 #ifdef CONFIG_ENABLE_LINUX_REG
     /* even with WIPHY_FLAG_CUSTOM_REGULATORY,
        driver can still register regulatory callback and
@@ -722,6 +760,10 @@ int wlan_hdd_cfg80211_init(struct device *dev,
     wiphy->reg_notifier = wlan_hdd_linux_reg_notifier;
 #else
     wiphy->reg_notifier = wlan_hdd_crda_reg_notifier;
+#endif
+
+#if defined(QCA_WIFI_2_0) && defined (QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
+    }
 #endif
 
     wiphy->max_scan_ssids = MAX_SCAN_SSID;
@@ -1818,10 +1860,12 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
     struct qc_mac_acl_entry *acl_entry = NULL;
     v_SINT_t i;
+    hdd_config_t *iniConfig;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 
     ENTER();
 
+    iniConfig = pHddCtx->cfg_ini;
     pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(pHostapdAdapter);
 
     pConfig = &pHostapdAdapter->sessionCtx.ap.sapConfig;
@@ -1831,6 +1875,8 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     pMgmt_frame = (struct ieee80211_mgmt*)pBeacon->head;
 
     pConfig->beacon_int =  pMgmt_frame->u.beacon.beacon_int;
+
+    pConfig->disableDFSChSwitch = iniConfig->disableDFSChSwitch;
 
     //channel is already set in the set_channel Call back
     //pConfig->channel = pCommitConfig->channel;
@@ -1867,6 +1913,8 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         }
         else
         {
+            pConfig->countryCode[0] = pHddCtx->reg.alpha2[0];
+            pConfig->countryCode[1] = pHddCtx->reg.alpha2[1];
             pConfig->ieee80211d = 0;
         }
         /*
@@ -2733,7 +2781,7 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
 {
     struct wireless_dev *wdev;
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( ndev );
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
+    hdd_context_t *pHddCtx;
     hdd_adapter_t  *pP2pAdapter = NULL;
     tCsrRoamProfile *pRoamProfile = NULL;
     eCsrRoamBssType LastBSSType;
@@ -2742,6 +2790,21 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
     VOS_STATUS status;
 
     ENTER();
+
+    if (!pAdapter)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Adapter context is null", __func__);
+        return VOS_STATUS_E_FAILURE;
+    }
+
+    pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
+    if (!pHddCtx)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: HDD context is null", __func__);
+        return VOS_STATUS_E_FAILURE;
+    }
 
     status = wlan_hdd_validate_context(pHddCtx);
 
@@ -2785,6 +2848,12 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
       )
     {
         hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
+        if (!pWextState)
+        {
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                      "%s: pWextState is null", __func__);
+            return VOS_STATUS_E_FAILURE;
+        }
         pRoamProfile = &pWextState->roamProfile;
         LastBSSType = pRoamProfile->BSSType;
 
@@ -5490,6 +5559,21 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
             hdd_connSetConnectionState(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter),
                                                  eConnectionState_Connecting);
 
+        /* After 8-way handshake supplicant should give the scan command
+         * in that it update the additional IEs, But because of scan
+         * enhancements, the supplicant is not issuing the scan command now.
+         * So the unicast frames which are sent from the host are not having
+         * the additional IEs. If it is P2P CLIENT and there is no additional
+         * IE present in roamProfile, then use the addtional IE form scan_info
+         */
+
+        if ((pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) &&
+                (!pRoamProfile->pAddIEScan))
+        {
+            pRoamProfile->pAddIEScan = &pAdapter->scan_info.scanAddIE.addIEdata[0];
+            pRoamProfile->nAddIEScanLength = pAdapter->scan_info.scanAddIE.length;
+        }
+
         status = sme_RoamConnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
                             pAdapter->sessionId, pRoamProfile, &roamId);
 
@@ -6245,16 +6329,29 @@ static int wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
     int status;
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( ndev );
     VOS_STATUS exitbmpsStatus = VOS_STATUS_E_INVAL;
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    hdd_context_t *pHddCtx;
 
     ENTER();
+
+    if (!pAdapter)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Adapter context is null", __func__);
+        return VOS_STATUS_E_FAILURE;
+    }
 
     hddLog(VOS_TRACE_LEVEL_INFO,
              "%s: device_mode = %d\n",__func__,pAdapter->device_mode);
 
     pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-    status = wlan_hdd_validate_context(pHddCtx);
+    if (!pHddCtx)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: HDD context is null", __func__);
+        return VOS_STATUS_E_FAILURE;
+    }
 
+    status = wlan_hdd_validate_context(pHddCtx);
     if (0 != status)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -7023,7 +7120,85 @@ static int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
     EXIT();
     return 0;
 }
+#ifdef QCA_WIFI_2_0
+static tANI_U8 wlan_hdd_get_mcs_idx(tANI_U16 maxRate, tANI_U8 rate_flags,
+                                    tANI_U8 nss)
+{
+    tANI_U8  rateFlag = 0, curIdx;
+    tANI_U16 curRate;
+    struct index_vht_data_rate_type *supported_vht_mcs_rate;
+    struct index_data_rate_type *supported_mcs_rate;
 
+    hddLog(VOS_TRACE_LEVEL_DEBUG, "%s rate:%d rate_flgs:%d", __func__, maxRate,
+                                  rate_flags);
+    supported_vht_mcs_rate = (struct index_vht_data_rate_type *)
+                              ((nss == 1)? &supported_vht_mcs_rate_nss1 :
+                                           &supported_vht_mcs_rate_nss2);
+    supported_mcs_rate = (struct index_data_rate_type *)
+                          ((nss == 1)? &supported_mcs_rate_nss1 :
+                                       &supported_mcs_rate_nss2);
+
+    if (rate_flags & (eHAL_TX_RATE_VHT20|eHAL_TX_RATE_VHT40|eHAL_TX_RATE_VHT80))
+    {
+        if (rate_flags & eHAL_TX_RATE_SGI)
+        {
+            rateFlag |= 0x1;
+        }
+
+        if (rate_flags & eHAL_TX_RATE_VHT20)
+        {
+            for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++)
+            {
+                 curRate =
+                  supported_vht_mcs_rate[curIdx].supported_VHT20_rate[rateFlag];
+                 if (curRate > maxRate)
+                     break;
+            }
+        }
+        else if (rate_flags & eHAL_TX_RATE_VHT40)
+        {
+            for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++)
+            {
+                 curRate =
+                  supported_vht_mcs_rate[curIdx].supported_VHT40_rate[rateFlag];
+                 if (curRate > maxRate)
+                     break;
+            }
+        }
+        else if (rate_flags & eHAL_TX_RATE_VHT80)
+        {
+            for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++)
+            {
+                 curRate =
+                  supported_vht_mcs_rate[curIdx].supported_VHT80_rate[rateFlag];
+                 if (curRate > maxRate)
+                     break;
+            }
+        }
+    }
+    else
+    {
+        if (rate_flags & eHAL_TX_RATE_HT40)
+        {
+            rateFlag |= 0x1;
+        }
+
+        if (rate_flags & eHAL_TX_RATE_SGI)
+        {
+            rateFlag |= 0x2;
+        }
+
+        for (curIdx = 0; curIdx < MAX_HT_MCS_IDX; curIdx++)
+        {
+             curRate = supported_mcs_rate[curIdx].supported_rate[rateFlag];
+             if (curRate > maxRate)
+                 break;
+        }
+    }
+
+    return (curIdx? (curIdx - 1) : curIdx);
+}
+#endif
 static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
                                    u8* mac, struct station_info *sinfo)
 {
@@ -7048,8 +7223,10 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
     tANI_U8  maxMCSIdx = 0;
     tANI_U8  rateFlag = 1;
     tANI_U8  i, j, rssidx;
-    tANI_U16 temp;
+    tANI_U8  nss = 1;
     int status;
+    struct index_vht_data_rate_type *supported_vht_mcs_rate;
+    struct index_data_rate_type *supported_mcs_rate;
 
 #ifdef WLAN_FEATURE_11AC
     tANI_U32 vht_mcs_map;
@@ -7084,7 +7261,18 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
 
     //convert to the UI units of 100kbps
     myRate = pAdapter->hdd_stats.ClassA_stat.tx_rate * 5;
-
+#ifdef QCA_WIFI_2_0
+    if (!(rate_flags & eHAL_TX_RATE_LEGACY) && myRate)
+    {
+        nss = pAdapter->hdd_stats.ClassA_stat.rx_frag_cnt;
+        pAdapter->hdd_stats.ClassA_stat.mcs_index =
+                                  wlan_hdd_get_mcs_idx(myRate, rate_flags, nss);
+        hddLog(VOS_TRACE_LEVEL_DEBUG, "computed mcs idx %d from rate:%d",
+                                     pAdapter->hdd_stats.ClassA_stat.mcs_index,
+                                     myRate);
+        myRate = 0;
+    }
+#endif
 #ifdef LINKSPEED_DEBUG_ENABLED
     pr_info("RSSI %d, RLMS %u, rate %d, rssi high %d, rssi mid %d, rssi low %d, rate_flags 0x%x, MCS %d\n",
             sinfo->signal,
@@ -7202,6 +7390,11 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
             }
             rateFlag = 0;
 #ifdef WLAN_FEATURE_11AC
+            supported_vht_mcs_rate = (struct index_vht_data_rate_type *)
+                                      ((nss == 1)?
+                                       &supported_vht_mcs_rate_nss1 :
+                                       &supported_vht_mcs_rate_nss2);
+
             /* VHT80 rate has seperate rate table */
             if (rate_flags & (eHAL_TX_RATE_VHT20|eHAL_TX_RATE_VHT40|eHAL_TX_RATE_VHT80))
             {
@@ -7263,10 +7456,13 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
                     rateFlag |= 2;
                 }
 
+                supported_mcs_rate = (struct index_data_rate_type *)
+                                      ((nss == 1)? &supported_mcs_rate_nss1 :
+                                                   &supported_mcs_rate_nss2);
+
                 for (i = 0; i < MCSLeng; i++)
                 {
-                    temp = sizeof(supported_mcs_rate) / sizeof(supported_mcs_rate[0]);
-                    for (j = 0; j < temp; j++)
+                    for (j = 0; j < MAX_HT_MCS_IDX; j++)
                     {
                         if (supported_mcs_rate[j].beacon_rate_index == MCSRates[i])
                         {
@@ -7274,7 +7470,7 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
                             break;
                         }
                     }
-                    if ((j < temp) && (currentRate > maxRate))
+                    if ((j < MAX_HT_MCS_IDX) && (currentRate > maxRate))
                     {
                         maxRate     = currentRate;
                         maxSpeedMCS = 1;
@@ -7318,7 +7514,7 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
         {
             sinfo->txrate.mcs    = maxMCSIdx;
 #ifdef WLAN_FEATURE_11AC
-            sinfo->txrate.nss = 1;
+            sinfo->txrate.nss = nss;
             if (rate_flags & eHAL_TX_RATE_VHT80)
             {
                 sinfo->txrate.flags |= RATE_INFO_FLAGS_VHT_MCS;
@@ -7374,7 +7570,7 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
             //must be MCS
             sinfo->txrate.mcs = pAdapter->hdd_stats.ClassA_stat.mcs_index;
 #ifdef WLAN_FEATURE_11AC
-            sinfo->txrate.nss = 1;
+            sinfo->txrate.nss = nss;
             if (rate_flags & eHAL_TX_RATE_VHT80)
             {
                 sinfo->txrate.flags |= RATE_INFO_FLAGS_VHT_MCS;

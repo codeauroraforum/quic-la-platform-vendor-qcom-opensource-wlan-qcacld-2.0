@@ -2102,6 +2102,7 @@ typedef struct sAniGetPEStatsReq
     tANI_U16                msgLen;  // length of the entire request
     tANI_U32                staId;  // Per STA stats request must contain valid
     tANI_U32                statsMask;  // categories of stats requested. look at ePEStatsMask
+    tANI_U8                 sessionId;
 } tAniGetPEStatsReq, *tpAniGetPEStatsReq;
 
 /*
@@ -2654,6 +2655,27 @@ typedef struct sSirDeltsRsp
     tANI_U8                 macAddr[6]; // only on AP to specify the STA
     tSirDeltsReqInfo        rsp;
 } tSirDeltsRsp, *tpSirDeltsRsp;
+
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+typedef struct sSirPlmReq
+{
+    tANI_U16                diag_token; // Dialog token
+    tANI_U16                meas_token; // measurement token
+    tANI_U16                numBursts; // total number of bursts
+    tANI_U16                burstInt; // burst interval in seconds
+    tANI_U16                measDuration; // in TU's,STA goes off-ch
+    /* no of times the STA should cycle through PLM ch list */
+    tANI_U8                 burstLen;
+    tPowerdBm               desiredTxPwr; // desired tx power
+    tSirMacAddr             macAddr; // MC dest addr
+    /* no of channels */
+    tANI_U8                 plmNumCh;
+    /* channel numbers */
+    tANI_U8                 plmChList[WNI_CFG_VALID_CHANNEL_LIST_LEN];
+    tANI_U8                 sessionId;
+    eAniBoolean             enable;
+} tSirPlmReq, *tpSirPlmReq;
+#endif
 
 #if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
 
@@ -4736,4 +4758,87 @@ typedef struct sSirChAvoidIndType
 } tSirChAvoidIndType;
 #endif /* FEATURE_WLAN_CH_AVOID */
 
+typedef struct sSirSmeDfsEventInd
+{
+    tANI_U32     sessionId;
+    tANI_U8      ieee_chan_number;
+    tANI_U32     chan_freq;
+    tANI_U32     dfs_radar_status;
+    int          use_nol;
+}tSirSmeDfsEventInd, *tpSirSmeDfsEventInd;
+
+typedef struct sSirChanChangeRequest
+{
+    tANI_U16     messageType;
+    tANI_U16     messageLen;
+    tANI_U8      sessionId;
+    tANI_U8      targetChannel;
+    tANI_U8      cbMode;
+}tSirChanChangeRequest, *tpSirChanChangeRequest;
+
+typedef struct sSirChanChangeResponse
+{
+    tANI_U8                  sessionId;
+    tANI_U8                  newChannelNumber;
+    tANI_U8                  channelChangeStatus;
+    ePhyChanBondState        secondaryChannelOffset;
+}tSirChanChangeResponse, *tpSirChanChangeResponse;
+
+typedef struct sSirStartBeaconIndication
+{
+    tANI_U16     messageType;
+    tANI_U16     messageLen;
+    tANI_U8      sessionId;
+    tANI_U8      beaconStartStatus;
+}tSirStartBeaconIndication, *tpSirStartBeaconIndication;
+
+/* Message format for requesting channel switch announcement to lower layers */
+typedef struct sSirDfsCsaIeRequest
+{
+    tANI_U16 msgType;
+    tANI_U16 msgLen;
+    tANI_U8  sessionId;
+    tANI_U8  targetChannel;
+    tANI_U8  csaIeRequired;
+}tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
+
+/* Indication from lower layer indicating the completion of first beacon send
+ * after the beacon template update
+ */
+typedef struct sSirFirstBeaconTxCompleteInd
+{
+   tANI_U16 messageType; // eWNI_SME_MISSED_BEACON_IND
+   tANI_U16 length;
+   tANI_U8  bssIdx;
+}tSirFirstBeaconTxCompleteInd, *tpSirFirstBeaconTxCompleteInd;
+
+typedef struct sSirSmeCSAIeTxCompleteRsp
+{
+    tANI_U8  sessionId;
+    tANI_U8  chanSwIeTxStatus;
+}tSirSmeCSAIeTxCompleteRsp, *tpSirSmeCSAIeTxCompleteRsp;
+
+/* Thermal Mitigation*/
+
+typedef struct{
+    u_int16_t minTempThreshold;
+    u_int16_t maxTempThreshold;
+} t_thermal_level_info, *tp_thermal_level_info;
+
+typedef enum
+{
+    WLAN_WMA_THERMAL_LEVEL_0,
+    WLAN_WMA_THERMAL_LEVEL_1,
+    WLAN_WMA_THERMAL_LEVEL_2,
+    WLAN_WMA_THERMAL_LEVEL_3,
+    WLAN_WMA_MAX_THERMAL_LEVELS
+} t_thermal_level;
+
+typedef struct{
+    /* Array of thermal levels */
+    t_thermal_level_info thermalLevels[WLAN_WMA_MAX_THERMAL_LEVELS];
+    u_int8_t thermalCurrLevel;
+    u_int8_t thermalMgmtEnabled;
+    u_int32_t throttlePeriod;
+} t_thermal_mgmt, *tp_thermal_mgmt;
 #endif /* __SIR_API_H */

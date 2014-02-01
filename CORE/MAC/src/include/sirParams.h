@@ -634,6 +634,17 @@ typedef struct sSirMbMsgP2p
 #endif
 #endif
 
+/* Handling of beacon tx indication from FW */
+#define SIR_HAL_BEACON_TX_SUCCESS_IND       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 242)
+#define SIR_HAL_DFS_RADAR_IND               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 243)
+
+#define SIR_HAL_INIT_THERMAL_INFO_CMD       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 248)
+#define SIR_HAL_SET_THERMAL_LEVEL           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 249)
+
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#define SIR_HAL_SET_PLM_REQ                (SIR_HAL_ITC_MSG_TYPES_BEGIN + 250)
+#endif
+
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types
@@ -737,6 +748,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_LIM_TDLS_LINK_SETUP_CNF_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0x2B)
 #endif
 #define SIR_LIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE (SIR_LIM_TIMEOUT_MSG_START + 0x2C)
+
 #define SIR_LIM_MSG_TYPES_END            (SIR_LIM_MSG_TYPES_BEGIN+0xFF)
 
 // SCH message types

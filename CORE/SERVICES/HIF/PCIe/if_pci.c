@@ -3,7 +3,6 @@
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -60,6 +59,9 @@
 
 #define AR9888_DEVICE_ID (0x003c)
 #define AR6320_DEVICE_ID (0x003e)
+#define AR6320_FW_1_1  (0x11)
+#define AR6320_FW_1_3  (0x13)
+#define AR6320_FW_2_0  (0x20)
 
 #define MAX_NUM_OF_RECEIVES 1000 /* Maximum number of Rx buf to process before break out */
 
@@ -342,6 +344,10 @@ wlan_tasklet(unsigned long data)
     struct hif_pci_softc *sc = (struct hif_pci_softc *) data;
     volatile int tmp;
 
+    if (sc->hif_init_done == FALSE) {
+       goto irq_handled;
+    }
+
     (irqreturn_t)HIF_fw_interrupt_handler(sc->irq_event, sc);
     CE_per_engine_service_any(sc->irq_event, sc);
     adf_os_atomic_set(&sc->tasklet_from_intr, 0);
@@ -354,6 +360,7 @@ wlan_tasklet(unsigned long data)
         tasklet_schedule(&sc->intr_tq);
         return;
     }
+irq_handled:
     if (LEGACY_INTERRUPTS(sc)) {
         /* Enable Legacy PCI line interrupts */
         A_PCI_WRITE32(sc->mem+(SOC_CORE_BASE_ADDRESS | PCIE_INTR_ENABLE_ADDRESS), 
@@ -375,6 +382,7 @@ hif_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     struct ol_softc *ol_sc;
     int probe_again = 0;
     u_int16_t device_id;
+    u_int16_t revision_id;
 
     u_int32_t lcr_val;
 
@@ -459,6 +467,10 @@ again:
         ret = -EIO;
         goto err_iomap;
     }
+
+    /* Disable asynchronous suspend */
+    device_disable_async_suspend(&pdev->dev);
+
     sc = A_MALLOC(sizeof(*sc));
     if (!sc) {
         ret = -ENOMEM;
@@ -480,19 +492,38 @@ again:
 
     sc->cacheline_sz = dma_get_cache_alignment();
 
+    pci_read_config_word(pdev, 0x08, &revision_id);
+
     switch (id->device) {
     case AR9888_DEVICE_ID:
-	    hif_type = HIF_TYPE_AR9888;
-	    target_type = TARGET_TYPE_AR9888;
-	    break;
+        hif_type = HIF_TYPE_AR9888;
+        target_type = TARGET_TYPE_AR9888;
+        break;
+
     case AR6320_DEVICE_ID:
-	    hif_type = HIF_TYPE_AR6320;
-	    target_type = TARGET_TYPE_AR6320;
-	    break;
+        switch(revision_id) {
+        case AR6320_FW_1_1:
+        case AR6320_FW_1_3:
+            hif_type = HIF_TYPE_AR6320;
+            target_type = TARGET_TYPE_AR6320;
+            break;
+
+        case AR6320_FW_2_0:
+            hif_type = HIF_TYPE_AR6320V2;
+            target_type = TARGET_TYPE_AR6320V2;
+            break;
+
+        default:
+            printk(KERN_ERR "unsupported revision id\n");
+            ret = -ENODEV;
+            goto err_tgtstate;
+        }
+        break;
+
     default:
-	    printk(KERN_ERR "unsupported device id\n");
-	    ret = -ENODEV;
-	    goto err_tgtstate;
+        printk(KERN_ERR "unsupported device id\n");
+        ret = -ENODEV;
+        goto err_tgtstate;
     }
     /*
      * Attach Target register table.  This is needed early on --
@@ -521,7 +552,7 @@ again:
          */
         A_PCI_WRITE32(mem + PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_V_MASK);
         while (!hif_pci_targ_is_awake(sc, mem)) {
-		 ;
+            ;
         }
 
 #if PCIE_BAR0_READY_CHECKING
@@ -653,6 +684,7 @@ int hif_pci_reinit(struct pci_dev *pdev, const struct pci_device_id *id)
     u_int32_t hif_type;
     u_int32_t target_type;
     u_int32_t lcr_val;
+    u_int16_t revision_id;
 
 again:
     ret = 0;
@@ -753,16 +785,34 @@ again:
     adf_os_spinlock_init(&sc->target_lock);
 
     sc->cacheline_sz = dma_get_cache_alignment();
+    pci_read_config_word(pdev, 0x08, &revision_id);
 
     switch (id->device) {
     case AR9888_DEVICE_ID:
         hif_type = HIF_TYPE_AR9888;
         target_type = TARGET_TYPE_AR9888;
         break;
+
     case AR6320_DEVICE_ID:
-        hif_type = HIF_TYPE_AR6320;
-        target_type = TARGET_TYPE_AR6320;
+        switch(revision_id) {
+        case AR6320_FW_1_1:
+        case AR6320_FW_1_3:
+            hif_type = HIF_TYPE_AR6320;
+            target_type = TARGET_TYPE_AR6320;
+            break;
+
+        case AR6320_FW_2_0:
+            hif_type = HIF_TYPE_AR6320V2;
+            target_type = TARGET_TYPE_AR6320V2;
+            break;
+
+        default:
+            printk(KERN_ERR "unsupported revision id\n");
+            ret = -ENODEV;
+            goto err_tgtstate;
+        }
         break;
+
     default:
         printk(KERN_ERR "%s: Unsupported device ID!\n", __func__);
         ret = -ENODEV;
@@ -1065,6 +1115,30 @@ hif_pci_configure(struct hif_pci_softc *sc, hif_handle_t *hif_hdl)
     }
 #endif
 
+    if(num_msi_desired == 0) {
+        printk("\n Using PCI Legacy Interrupt\n");
+
+        /* Make sure to wake the Target before enabling Legacy Interrupt */
+        A_PCI_WRITE32(sc->mem + PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS,
+                      PCIE_SOC_WAKE_V_MASK);
+        while (!hif_pci_targ_is_awake(sc, sc->mem)) {
+                ;
+        }
+        /* Use Legacy PCI Interrupts */
+        /*
+         * A potential race occurs here: The CORE_BASE write depends on
+         * target correctly decoding AXI address but host won't know
+         * when target writes BAR to CORE_CTRL. This write might get lost
+         * if target has NOT written BAR. For now, fix the race by repeating
+         * the write in below synchronization checking.
+         */
+        A_PCI_WRITE32(sc->mem+(SOC_CORE_BASE_ADDRESS |
+                      PCIE_INTR_ENABLE_ADDRESS),
+                      PCIE_INTR_FIRMWARE_MASK | PCIE_INTR_CE_MASK_ALL);
+        A_PCI_WRITE32(sc->mem + PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS,
+                      PCIE_SOC_WAKE_RESET);
+    }
+
     sc->num_msi_intrs = num_msi_desired;
     sc->ce_count = CE_COUNT;
 
@@ -1102,30 +1176,14 @@ hif_pci_configure(struct hif_pci_softc *sc, hif_handle_t *hif_hdl)
 
     *hif_hdl = sc->hif_device;
 
-    if(num_msi_desired == 0) {
-        printk("\n Using PCI Legacy Interrupt\n");
-
-        /* Make sure to wake the Target before enabling Legacy Interrupt */
-        A_PCI_WRITE32(sc->mem + PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS,
-                      PCIE_SOC_WAKE_V_MASK);
-        while (!hif_pci_targ_is_awake(sc, sc->mem)) {
-                ;
-        }
-        /* Use Legacy PCI Interrupts */
-        /*
-         * A potential race occurs here: The CORE_BASE write depends on
-         * target correctly decoding AXI address but host won't know
-         * when target writes BAR to CORE_CTRL. This write might get lost
-         * if target has NOT written BAR. For now, fix the race by repeating
-         * the write in below synchronization checking.
-         */
-        A_PCI_WRITE32(sc->mem+(SOC_CORE_BASE_ADDRESS |
-                      PCIE_INTR_ENABLE_ADDRESS),
-                      PCIE_INTR_FIRMWARE_MASK | PCIE_INTR_CE_MASK_ALL);
-        A_PCI_WRITE32(sc->mem + PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS,
-                      PCIE_SOC_WAKE_RESET);
-    }
-
+    /*
+     * Flag to avoid potential unallocated memory access from MSI
+     * interrupt handler which could get scheduled as soon as MSI
+     * is enabled, i.e to take care of the race due to the order
+     * in where MSI is enabled before the memory, that will be
+     * in interrupt handlers, is allocated.
+     */
+    sc->hif_init_done = TRUE;
     return 0;
 
 err_stalled:
@@ -1264,6 +1322,7 @@ hif_pci_suspend(struct pci_dev *pdev, pm_message_t state)
     ol_txrx_pdev_handle txrx_pdev = vos_get_context(VOS_MODULE_ID_TXRX, vos);
     u32 tx_drain_wait_cnt = 0;
     u32 val;
+    v_VOID_t * temp_module;
 
 #ifdef WLAN_LINK_UMAC_SUSPEND_WITH_BUS_SUSPEND
     hdd_suspend_wlan(NULL, NULL);
@@ -1284,21 +1343,30 @@ hif_pci_suspend(struct pci_dev *pdev, pm_message_t state)
     A_PCI_WRITE32(sc->mem + PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_RESET);
 #endif
 
+    if (!txrx_pdev) {
+        printk("%s: txrx_pdev is NULL\n", __func__);
+        return (-1);
+    }
     /* Wait for pending tx completion */
     while (ol_txrx_get_tx_pending(txrx_pdev)) {
-	    msleep(OL_ATH_TX_DRAIN_WAIT_DELAY);
-	    if (++tx_drain_wait_cnt > OL_ATH_TX_DRAIN_WAIT_CNT) {
-		    printk("%s: tx frames are pending\n", __func__);
-		    return (-1);
-	    }
+        msleep(OL_ATH_TX_DRAIN_WAIT_DELAY);
+        if (++tx_drain_wait_cnt > OL_ATH_TX_DRAIN_WAIT_CNT) {
+            printk("%s: tx frames are pending\n", __func__);
+            return (-1);
+        }
     }
 
     /* No need to send WMI_PDEV_SUSPEND_CMDID to FW if WOW is enabled */
-    if (wma_is_wow_mode_selected(vos_get_context(VOS_MODULE_ID_WDA, vos))) {
-          if(wma_enable_wow_in_fw(vos_get_context(VOS_MODULE_ID_WDA, vos)))
+    temp_module = vos_get_context(VOS_MODULE_ID_WDA, vos);
+    if (!temp_module) {
+        printk("%s: WDA module is NULL\n", __func__);
+        return (-1);
+    }
+    if (wma_is_wow_mode_selected(temp_module)) {
+          if(wma_enable_wow_in_fw(temp_module))
                 return (-1);
     } else if (state.event == PM_EVENT_FREEZE || state.event == PM_EVENT_SUSPEND) {
-          if (wma_suspend_target(vos_get_context(VOS_MODULE_ID_WDA, vos), 0))
+          if (wma_suspend_target(temp_module, 0))
                 return (-1);
     }
 
@@ -1322,6 +1390,7 @@ hif_pci_resume(struct pci_dev *pdev)
     void *vos_context = vos_get_global_context(VOS_MODULE_ID_HIF, NULL);
     u32 val;
     int err;
+    v_VOID_t * temp_module;
 
     err = pci_enable_device(pdev);
     if (err)
@@ -1358,9 +1427,14 @@ hif_pci_resume(struct pci_dev *pdev)
 #endif
 
     /* No need to send WMI_PDEV_RESUME_CMDID to FW if WOW is enabled */
-    if (!wma_is_wow_mode_selected(vos_get_context(VOS_MODULE_ID_WDA, vos_context)) &&
+    temp_module = vos_get_context(VOS_MODULE_ID_WDA, vos_context);
+    if (!temp_module) {
+        printk("%s: WDA module is NULL\n", __func__);
+        return (-1);
+    }
+    if (!wma_is_wow_mode_selected(temp_module) &&
         (val == PM_EVENT_HIBERNATE || val == PM_EVENT_SUSPEND)) {
-	    return wma_resume_target(vos_get_context(VOS_MODULE_ID_WDA, vos_context));
+        return wma_resume_target(temp_module);
     }
 
 #ifdef WLAN_LINK_UMAC_SUSPEND_WITH_BUS_SUSPEND
@@ -1380,27 +1454,27 @@ adf_os_size_t initBufferCount(adf_os_size_t maxSize)
 
 #ifdef CONFIG_CNSS
 struct cnss_wlan_driver cnss_wlan_drv_id = {
-	.name       = "hif_pci",
-	.id_table   = hif_pci_id_table,
-	.probe      = hif_pci_probe,
-	.remove     = hif_pci_remove,
-	.reinit     = hif_pci_reinit,
-	.shutdown   = hif_pci_shutdown,
+    .name       = "hif_pci",
+    .id_table   = hif_pci_id_table,
+    .probe      = hif_pci_probe,
+    .remove     = hif_pci_remove,
+    .reinit     = hif_pci_reinit,
+    .shutdown   = hif_pci_shutdown,
 #ifdef ATH_BUS_PM
-	.suspend    = hif_pci_suspend,
-	.resume     = hif_pci_resume,
+    .suspend    = hif_pci_suspend,
+    .resume     = hif_pci_resume,
 #endif
 };
 #else
 MODULE_DEVICE_TABLE(pci, hif_pci_id_table);
 struct pci_driver hif_pci_drv_id = {
-	.name       = "hif_pci",
-	.id_table   = hif_pci_id_table,
-	.probe      = hif_pci_probe,
-	.remove     = hif_pci_remove,
+    .name       = "hif_pci",
+    .id_table   = hif_pci_id_table,
+    .probe      = hif_pci_probe,
+    .remove     = hif_pci_remove,
 #ifdef ATH_BUS_PM
-	.suspend    = hif_pci_suspend,
-	.resume     = hif_pci_resume,
+    .suspend    = hif_pci_suspend,
+    .resume     = hif_pci_resume,
 #endif
 };
 #endif
@@ -1408,9 +1482,9 @@ struct pci_driver hif_pci_drv_id = {
 int hif_register_driver(void)
 {
 #ifdef CONFIG_CNSS
-	return cnss_wlan_register_driver(&cnss_wlan_drv_id);
+    return cnss_wlan_register_driver(&cnss_wlan_drv_id);
 #else
-	return pci_register_driver(&hif_pci_drv_id);
+    return pci_register_driver(&hif_pci_drv_id);
 #endif
 }
 

@@ -1067,7 +1067,7 @@ int bapRsnFormPktFromVosPkt( tAniPacket **ppPacket, vos_pkt_t *pVosPacket )
     v_U16_t uPktLen;
 #define BAP_RSN_SNAP_TYPE_OFFSET 20
 #define BAP_RSN_ETHERNET_3_HEADER_LEN   22
-    v_U8_t *pFrame;
+    v_U8_t *pFrame = NULL;
     tAniPacket *pAniPacket = NULL;
 
     do
@@ -1082,7 +1082,7 @@ int bapRsnFormPktFromVosPkt( tAniPacket **ppPacket, vos_pkt_t *pVosPacket )
             break;
         }
         status = vos_pkt_peek_data( pVosPacket, 0, (v_VOID_t *)&pFrame, uPktLen );
-        if( !VOS_IS_STATUS_SUCCESS(status) ) break;
+        if( !VOS_IS_STATUS_SUCCESS(status) || (NULL == pFrame) ) break;
         retVal = aniAsfPacketAllocateExplicit(&pAniPacket, uPktLen, 0 );
         if( !ANI_IS_STATUS_SUCCESS( retVal ) )
         {
@@ -1099,7 +1099,12 @@ int bapRsnFormPktFromVosPkt( tAniPacket **ppPacket, vos_pkt_t *pVosPacket )
         if( !ANI_IS_STATUS_SUCCESS( retVal ) ) break;
         //Get the rest of the data in
         uPktLen -= BAP_RSN_ETHERNET_3_HEADER_LEN;
-        VOS_ASSERT( uPktLen > 0 );
+        if (uPktLen <= 0){
+           VOS_ASSERT(0);
+           retVal = ANI_ERROR;
+           break;
+        }
+
         retVal = aniAsfPacketAppendBuffer( pAniPacket, pFrame + BAP_RSN_ETHERNET_3_HEADER_LEN, 
                             uPktLen );
         if( !ANI_IS_STATUS_SUCCESS( retVal ) ) 

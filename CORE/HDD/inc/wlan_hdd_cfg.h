@@ -50,7 +50,7 @@
 #endif
 
 //Number of items that can be configured
-#define MAX_CFG_INI_ITEMS   320
+#define MAX_CFG_INI_ITEMS   512
 
 // Defines for all of the things we read from the configuration (registry).
 
@@ -1411,6 +1411,11 @@ typedef enum
 #define CFG_HT_SMPS_CAP_FEATURE_MAX             ( 3 )
 #define CFG_HT_SMPS_CAP_FEATURE_DEFAULT         ( 3 )
 
+#define CFG_DISABLE_DFS_CH_SWITCH                 "gDisableDFSChSwitch"
+#define CFG_DISABLE_DFS_CH_SWITCH_MIN             ( 0 )
+#define CFG_DISABLE_DFS_CH_SWITCH_MAX             ( 1 )
+#define CFG_DISABLE_DFS_CH_SWITCH_DEFAULT         ( 0 )
+
 #define CFG_REPORT_MAX_LINK_SPEED                  "gReportMaxLinkSpeed"
 #define CFG_REPORT_MAX_LINK_SPEED_MIN              ( eHDD_LINK_SPEED_REPORT_ACTUAL )
 #define CFG_REPORT_MAX_LINK_SPEED_MAX              ( eHDD_LINK_SPEED_REPORT_MAX_SCALED )
@@ -1641,6 +1646,56 @@ typedef enum
 #define CFG_THERMAL_MIGRATION_ENABLE_MIN       ( 0 )
 #define CFG_THERMAL_MIGRATION_ENABLE_MAX       ( 1 )
 #define CFG_THERMAL_MIGRATION_ENABLE_DEFAULT   ( 0 )
+
+
+#ifndef QCA_WIFI_ISOC
+
+#define CFG_THROTTLE_PERIOD_NAME               "gThrottlePeriod"
+#define CFG_THROTTLE_PERIOD_MIN                ( 10 )
+#define CFG_THROTTLE_PERIOD_MAX                ( 10000 )
+#define CFG_THROTTLE_PERIOD_DEFAULT            ( 4000 )
+
+#define CFG_THERMAL_TEMP_MIN_LEVEL0_NAME      "gThermalTempMinLevel0"
+#define CFG_THERMAL_TEMP_MIN_LEVEL0_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL0_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL0_DEFAULT   ( 0 )
+
+#define CFG_THERMAL_TEMP_MAX_LEVEL0_NAME      "gThermalTempMaxLevel0"
+#define CFG_THERMAL_TEMP_MAX_LEVEL0_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL0_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL0_DEFAULT   ( 90 )
+
+#define CFG_THERMAL_TEMP_MIN_LEVEL1_NAME      "gThermalTempMinLevel1"
+#define CFG_THERMAL_TEMP_MIN_LEVEL1_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL1_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL1_DEFAULT   ( 70 )
+
+#define CFG_THERMAL_TEMP_MAX_LEVEL1_NAME      "gThermalTempMaxLevel1"
+#define CFG_THERMAL_TEMP_MAX_LEVEL1_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL1_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL1_DEFAULT   ( 110 )
+
+#define CFG_THERMAL_TEMP_MIN_LEVEL2_NAME      "gThermalTempMinLevel2"
+#define CFG_THERMAL_TEMP_MIN_LEVEL2_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL2_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL2_DEFAULT   ( 90 )
+
+#define CFG_THERMAL_TEMP_MAX_LEVEL2_NAME      "gThermalTempMaxLevel2"
+#define CFG_THERMAL_TEMP_MAX_LEVEL2_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL2_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL2_DEFAULT   ( 125 )
+
+#define CFG_THERMAL_TEMP_MIN_LEVEL3_NAME      "gThermalTempMinLevel3"
+#define CFG_THERMAL_TEMP_MIN_LEVEL3_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL3_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MIN_LEVEL3_DEFAULT   ( 110 )
+
+#define CFG_THERMAL_TEMP_MAX_LEVEL3_NAME      "gThermalTempMaxLevel3"
+#define CFG_THERMAL_TEMP_MAX_LEVEL3_MIN       ( 0 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL3_MAX       ( 1000 )
+#define CFG_THERMAL_TEMP_MAX_LEVEL3_DEFAULT   ( 0 )
+
+#endif /*#ifndef QCA_WIFI_ISOC*/
 
 /*
  * Enable/Disable Modulated DTIM feature
@@ -2113,7 +2168,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_SAP_MAX_NO_PEERS                       "gSoftApMaxPeers"
 #define CFG_SAP_MAX_NO_PEERS_MIN                   (1)
 #define CFG_SAP_MAX_NO_PEERS_MAX                   (32)
-#define CFG_SAP_MAX_NO_PEERS_DEFAULT               (14)
+#define CFG_SAP_MAX_NO_PEERS_DEFAULT               (32)
 
 /*---------------------------------------------------------------------------
   Type declarations
@@ -2442,6 +2497,9 @@ typedef struct
    v_U8_t                      allowMCCGODiffBI;
    v_BOOL_t                    isP2pDeviceAddrAdministrated;
    v_U8_t                      thermalMitigationEnable;
+#ifndef QCA_WIFI_ISOC
+   v_U32_t                     throttlePeriod;
+#endif
 #ifdef WLAN_FEATURE_11AC
    v_U8_t                      vhtChannelWidth;
    v_U8_t                      vhtRxMCS;
@@ -2556,6 +2614,17 @@ typedef struct
    v_U8_t                      maxWoWFilters;
    v_U8_t                      wowEnable;
    v_U8_t                      maxNumberOfPeers;
+   v_U8_t                      disableDFSChSwitch;
+#ifndef QCA_WIFI_ISOC
+   v_U16_t                     thermalTempMinLevel0;
+   v_U16_t                     thermalTempMaxLevel0;
+   v_U16_t                     thermalTempMinLevel1;
+   v_U16_t                     thermalTempMaxLevel1;
+   v_U16_t                     thermalTempMinLevel2;
+   v_U16_t                     thermalTempMaxLevel2;
+   v_U16_t                     thermalTempMinLevel3;
+   v_U16_t                     thermalTempMaxLevel3;
+#endif
 } hdd_config_t;
 /*---------------------------------------------------------------------------
   Function declarations and documenation
@@ -2670,6 +2739,7 @@ static __inline unsigned long utilMin( unsigned long a, unsigned long b )
 #if defined (QCA_WIFI_2_0) && \
    !defined (QCA_WIFI_ISOC)
 void hdd_update_tgt_cfg(void *context, void *param);
+void hdd_dfs_indicate_radar(void *context, void *param);
 #endif /* QCA_WIFI_2_0 && !QCA_WIFI_ISOC */
 
 #endif

@@ -154,7 +154,8 @@ ol_txrx_peer_find_by_local_id(
     struct ol_txrx_pdev_t *pdev,
     u_int8_t local_peer_id)
 {
-    if (local_peer_id == OL_TXRX_INVALID_LOCAL_PEER_ID) {
+    if ((local_peer_id == OL_TXRX_INVALID_LOCAL_PEER_ID) ||
+        (local_peer_id >= OL_TXRX_NUM_LOCAL_PEER_IDS)) {
         return NULL;
     }
     return pdev->local_peer_ids.map[local_peer_id];
@@ -603,6 +604,12 @@ ol_txrx_pdev_attach(
     }
 #endif /* QCA_COMPUTE_TX_DELAY */
 
+#ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
+    /* Thermal Mitigation */
+    if (!pdev->cfg.is_high_latency) {
+        ol_tx_throttle_init(pdev);
+    }
+#endif
     return pdev; /* success */
 
 fail8:
@@ -664,6 +671,15 @@ ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev, int force)
     if (ol_cfg_is_high_latency(pdev->ctrl_pdev)) {
         ol_tx_sched_detach(pdev);
     }
+#ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
+    /* Thermal Mitigation */
+    if (!pdev->cfg.is_high_latency) {
+        adf_os_timer_cancel(&pdev->tx_throttle_ll.phase_timer);
+        adf_os_timer_free(&pdev->tx_throttle_ll.phase_timer);
+        adf_os_timer_cancel(&pdev->tx_throttle_ll.tx_timer);
+        adf_os_timer_free(&pdev->tx_throttle_ll.tx_timer);
+    }
+#endif
     if (force) {
         /*
          * The assertion above confirms that all vdevs within this pdev
@@ -714,6 +730,12 @@ ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev, int force)
     adf_os_spinlock_destroy(&pdev->peer_ref_mutex);
     adf_os_spinlock_destroy(&pdev->last_real_peer_mutex);
     adf_os_spinlock_destroy(&pdev->rx.mutex);
+#ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
+    /* Thermal Mitigation */
+    if (!pdev->cfg.is_high_latency) {
+        adf_os_spinlock_destroy(&pdev->tx_throttle_ll.mutex);
+    }
+#endif
     OL_TXRX_PEER_STATS_MUTEX_DESTROY(pdev);
 
     OL_RX_REORDER_TRACE_DETACH(pdev);
@@ -766,10 +788,17 @@ ol_txrx_vdev_attach(
     vdev->num_filters = 0;
 
     adf_os_mem_copy(
-        &vdev->mac_addr.raw[0], vdev_mac_addr, sizeof(vdev->mac_addr));
+        &vdev->mac_addr.raw[0], vdev_mac_addr, OL_TXRX_MAC_ADDR_LEN);
 
     TAILQ_INIT(&vdev->peer_list);
     vdev->last_real_peer = NULL;
+
+    #ifndef CONFIG_QCA_WIFI_ISOC
+    #ifdef  QCA_IBSS_SUPPORT
+    vdev->ibss_peer_num = 0;
+    vdev->ibss_peer_heart_beat_timer = 0;
+    #endif
+    #endif
 
     #if defined(CONFIG_HL_SUPPORT)
     if (ol_cfg_is_high_latency(pdev->ctrl_pdev)) {
@@ -966,7 +995,7 @@ ol_txrx_peer_attach(
     /* store provided params */
     peer->vdev = vdev;
     adf_os_mem_copy(
-        &peer->mac_addr.raw[0], peer_mac_addr, sizeof(peer->mac_addr));
+        &peer->mac_addr.raw[0], peer_mac_addr, OL_TXRX_MAC_ADDR_LEN);
 
     #if defined(CONFIG_HL_SUPPORT)
     if (ol_cfg_is_high_latency(pdev->ctrl_pdev)) {
@@ -1085,6 +1114,17 @@ ol_txrx_peer_state_update(ol_txrx_pdev_handle pdev, u_int8_t *peer_mac,
 	struct ol_txrx_peer_t *peer;
 
 	peer =  ol_txrx_peer_find_hash_find(pdev, peer_mac, 0, 1);
+
+        if (NULL == peer)
+        {
+           TXRX_PRINT(TXRX_PRINT_LEVEL_INFO2, "%s: peer is null for peer_mac"
+             " 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", __FUNCTION__,
+             peer_mac[0], peer_mac[1], peer_mac[2], peer_mac[3],
+             peer_mac[4], peer_mac[5]);
+             return;
+        }
+
+
 	/* TODO: Should we send WMI command of the connection state? */
     /* avoid multiple auth state change. */
     if (peer->state == state) {
@@ -1142,6 +1182,12 @@ ol_txrx_peer_update(ol_txrx_vdev_handle vdev,
 	struct ol_txrx_peer_t *peer;
 
 	peer =  ol_txrx_peer_find_hash_find(vdev->pdev, peer_mac, 0, 1);
+	if (!peer)
+	{
+		TXRX_PRINT(TXRX_PRINT_LEVEL_INFO2, "%s: peer is null", __FUNCTION__);
+		return;
+	}
+
 	switch (select) {
 	case ol_txrx_peer_update_qos_capable:
 		{
@@ -1223,7 +1269,7 @@ ol_txrx_peer_uapsdmask_get(struct ol_txrx_pdev_t *txrx_pdev, u_int16_t peer_id)
 
     struct ol_txrx_peer_t *peer;
     peer = ol_txrx_peer_find_by_id(txrx_pdev, peer_id);
-    if (peer != NULL) {
+    if (!peer) {
         return peer->uapsd_mask;
     }
 
@@ -1724,7 +1770,6 @@ int ol_txrx_debug(ol_txrx_vdev_handle vdev, int debug_specs)
 }
 #endif
 
-#if defined(TEMP_AGGR_CFG)
 int ol_txrx_aggr_cfg(ol_txrx_vdev_handle vdev,
                      int max_subfrms_ampdu,
                      int max_subfrms_amsdu)
@@ -1733,7 +1778,6 @@ int ol_txrx_aggr_cfg(ol_txrx_vdev_handle vdev,
                                 max_subfrms_ampdu,
                                 max_subfrms_amsdu);
 }
-#endif
 
 #if defined(TXRX_DEBUG_LEVEL) && TXRX_DEBUG_LEVEL > 5
 void

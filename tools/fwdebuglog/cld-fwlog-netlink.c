@@ -53,12 +53,14 @@
 #define LOGFILE_FLAG           0x01
 #define CONSOLE_FLAG           0x02
 #define QXDM_FLAG              0x04
+#define SILENT_FLAG            0x08
 
 const char options[] =
 "Options:\n\
 -f, --logfile=<Output log file> [Mandotory]\n\
 -r, --reclimit=<Maximum number of records before the log rolls over> [Optional]\n\
 -c, --console (prints the logs in the console)\n\
+-s, --silent (No print will come when logging)\n\
 -q, --qxdm  (prints the logs in the qxdm)\n\
 The options can also be given in the abbreviated form --option=x or -o x. The options can be given in any order";
 
@@ -77,7 +79,7 @@ const char *progname;
 char dbglogoutfile[PATH_MAX];
 int optionflag;
 
-int rec_limit = 1000000; /* Million records is a good default */
+int rec_limit = 100000000; /* Million records is a good default */
 
 static void
 usage(void)
@@ -91,7 +93,7 @@ extern int parser_init();
 
 
 extern int
-dbglog_parse_debug_logs(u_int8_t *datap, u_int16_t len);
+dbglog_parse_debug_logs(u_int8_t *datap, u_int16_t len, u_int16_t dropped);
 
 static unsigned int get_le32(const unsigned char *pos)
 {
@@ -144,7 +146,8 @@ static void cleanup(void) {
 
     if (fwlog_res == NULL) {
         perror("Failed to open reorder fwlog file");
-        goto out;
+        fclose(log_out);
+        return;
     }
 
     reorder(log_out, fwlog_res);
@@ -178,11 +181,12 @@ int main(int argc, char *argv[])
         {"reclimit", 1, NULL, 'r'},
         {"console", 0, NULL, 'c'},
         {"qxdm", 0, NULL, 'q'},
+        {"silent", 0, NULL, 's'},
         { 0, 0, 0, 0}
     };
 
     while (1) {
-        c = getopt_long (argc, argv, "f:cq:r:", long_options, &option_index);
+        c = getopt_long (argc, argv, "f:scq:r:", long_options, &option_index);
         if (c == -1) break;
 
         switch (c) {
@@ -205,12 +209,15 @@ int main(int argc, char *argv[])
                 rec_limit = strtoul(optarg, NULL, 0);
                 break;
 
+            case 's':
+                optionflag |= SILENT_FLAG;
+                break;
             default:
                 usage();
         }
     }
 
-    if (!(optionflag & (LOGFILE_FLAG | CONSOLE_FLAG | QXDM_FLAG))) {
+    if (!(optionflag & (LOGFILE_FLAG | CONSOLE_FLAG | QXDM_FLAG | SILENT_FLAG))) {
         usage();
 	return -1;
     }
@@ -232,6 +239,11 @@ int main(int argc, char *argv[])
     dest_addr.nl_groups = 0; /* unicast */
 
     nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(RECLEN));
+    if (nlh == NULL) {
+        fprintf(stderr, "Cannot allocate memory \n");
+        close(sock_fd);
+        return -1;
+    }
     memset(nlh, 0, NLMSG_SPACE(RECLEN));
     nlh->nlmsg_len = NLMSG_SPACE(RECLEN);
     nlh->nlmsg_pid = getpid();
@@ -274,8 +286,10 @@ int main(int argc, char *argv[])
         /* Read message from kernel */
         while ((res = recvmsg(sock_fd, &msg, 0)) > 0)  {
             buf = (unsigned char *)NLMSG_DATA(nlh);
-            printf("Read record timestamp=%u length=%u \n",
-                   get_le32(&buf[0]), get_le32(&buf[4]));
+            if (!((optionflag & SILENT_FLAG) == SILENT_FLAG)) {
+                printf("Read record timestamp=%u length=%u fw dropped=%u\n",
+                       get_le32(&buf[0]), get_le32(&buf[4]), get_le32(&buf[8]));
+            }
             fseek(log_out, record * RECLEN, SEEK_SET);
             if ((res = fwrite(buf, RECLEN, 1, log_out)) != 1){
                     perror("fwrite");
@@ -296,7 +310,7 @@ int main(int argc, char *argv[])
 
         while ((res = recvmsg(sock_fd, &msg, 0)) > 0)  {
             buf = (unsigned char *)NLMSG_DATA(nlh);
-            dbglog_parse_debug_logs(&buf[8], get_le32(&buf[4]));
+            dbglog_parse_debug_logs(&buf[12], get_le32(&buf[4]), get_le32(&buf[8]));
         }
         close(sock_fd);
     }

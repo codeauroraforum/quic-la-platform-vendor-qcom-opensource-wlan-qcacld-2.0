@@ -30,10 +30,6 @@
 
   \brief WLAN Host Device Driver implementation for TDLS
 
-  Copyright (c) 2012-2013 Qualcomm Atheros, Inc.
-  All Rights Reserved.
-  Qualcomm Atheros Confidential and Proprietary.
-
   ========================================================================*/
 
 #include <wlan_hdd_includes.h>
@@ -804,10 +800,9 @@ void wlan_hdd_tdls_exit(hdd_adapter_t *pAdapter)
         hddLog(VOS_TRACE_LEVEL_WARN, "%s TDLS not enabled, exiting!", __func__);
         return;
     }
-#ifdef WLAN_OPEN_SOURCE
-    cancel_work_sync(&pHddTdlsCtx->implicit_setup);
-    cancel_delayed_work_sync(&pHddCtx->tdls_scan_ctxt.tdls_scan_work);
-#endif
+
+    vos_flush_work(&pHddTdlsCtx->implicit_setup);
+    vos_flush_delayed_work(&pHddCtx->tdls_scan_ctxt.tdls_scan_work);
 
     /* must stop timer here before freeing peer list, because peerIdleTimer is
     part of peer list structure. */

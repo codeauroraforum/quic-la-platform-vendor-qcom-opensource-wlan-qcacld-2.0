@@ -87,6 +87,7 @@ static inline unsigned int wcnss_get_serial_number(void)
         return 0;
 }
 
+#if !defined(CONFIG_CNSS)
 static inline void *wcnss_wlan_crypto_alloc_ahash(const char *alg_name,
                                                   unsigned int type,
                                                   unsigned int mask)
@@ -123,6 +124,7 @@ static inline void wcnss_wlan_ablkcipher_request_free(void *req)
 static inline void wcnss_wlan_crypto_free_ablkcipher(void *tfm)
 {
 }
+#endif /* !CONFIG_CNSS */
 
 static inline int req_riva_power_on_lock(char *driver_name)
 {

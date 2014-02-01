@@ -146,11 +146,10 @@ VOS_STATUS sysStop( v_CONTEXT_t pVosContext )
    /* post a message to SYS module in MC to stop SME and MAC */
    sysBuildMessageHeader( SYS_MSG_ID_MC_STOP, &sysMsg );
 
-   // Save the user callback and user data to callback in the body pointer
-   // and body data portion of the message.
+   // Save the user callback and user data
    // finished.
-   sysMsg.bodyptr = (void *)sysStopCompleteCb;
-   sysMsg.bodyval = (v_U32_t) &gStopEvt;
+   sysMsg.callback = sysStopCompleteCb;
+   sysMsg.bodyptr  = (void *) &gStopEvt;
 
    // post the message..
    vosStatus = vos_mq_post_message( VOS_MQ_ID_SYS, &sysMsg );
@@ -361,7 +360,7 @@ VOS_STATUS sysMcProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
                vosStatus = macStop( hHal, HAL_STOP_TYPE_SYS_DEEP_SLEEP );
                VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
 
-               ((sysResponseCback)pMsg->bodyptr)((v_VOID_t *)pMsg->bodyval);
+               ((sysResponseCback)pMsg->callback)((v_VOID_t *)pMsg->bodyptr);
 
                vosStatus = VOS_STATUS_SUCCESS;
             }
@@ -380,16 +379,12 @@ VOS_STATUS sysMcProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
 
          case SYS_MSG_ID_MC_TIMER:
          {
-            vos_timer_callback_t timerCB;
-            // hummmm... note says...
-            // invoke the timer callback and the user data stick
-            // into the bodyval; no body to free.    I think this is
-            // what that means.
-            timerCB = (vos_timer_callback_t)pMsg->bodyptr;
+            vos_timer_callback_t timerCB = pMsg->callback;
 
-            // make the callback to the timer routine...
-            timerCB( (v_VOID_t *)pMsg->bodyval );
-
+            if (NULL != timerCB)
+            {
+               timerCB(pMsg->bodyptr);
+            }
             break;
          }
          case SYS_MSG_ID_FTM_RSP:
@@ -469,17 +464,12 @@ VOS_STATUS sysTxProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
 
          case SYS_MSG_ID_TX_TIMER:
          {
-            vos_timer_callback_t timerCB;
+            vos_timer_callback_t timerCB = pMsg->callback;
 
-            // hummmm... note says...
-            // invoke the timer callback and the user data stick
-            // into the bodyval; no body to free.    I think this is
-            // what that means.
-            timerCB = (vos_timer_callback_t)pMsg->bodyptr;
-
-            // make the callback to the timer routine...
-            timerCB( (v_VOID_t *)pMsg->bodyval );
-
+            if (NULL != timerCB)
+            {
+               timerCB(pMsg->bodyptr);
+            }
             break;
          }
 
@@ -526,17 +516,12 @@ VOS_STATUS sysRxProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
       {
          case SYS_MSG_ID_RX_TIMER:
          {
-            vos_timer_callback_t timerCB;
+            vos_timer_callback_t timerCB = pMsg->callback;
 
-            // hummmm... note says...
-            // invoke the timer callback and the user data stick
-            // into the bodyval; no body to free.    I think this is
-            // what that means.
-            timerCB = (vos_timer_callback_t)pMsg->bodyptr;
-
-            // make the callback to the timer routine...
-            timerCB( (v_VOID_t *)pMsg->bodyval );
-
+            if (NULL != timerCB)
+            {
+               timerCB(pMsg->bodyptr);
+            }
             break;
          }
 

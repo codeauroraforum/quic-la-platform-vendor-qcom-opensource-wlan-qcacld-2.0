@@ -203,6 +203,27 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define  WE_PPS_GID_NSTS_ZERO           52
 #define  WE_PPS_RSSI_CHECK              53
 #define WE_ENABLE_STRICT_FCC_REG        54
+#define WE_SET_HTSMPS                   55
+/* Private ioctl for QPower */
+#define WE_SET_QPOWER_MAX_PSPOLL_COUNT            56
+#define WE_SET_QPOWER_MAX_TX_BEFORE_WAKE          57
+#define WE_SET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL   58
+#define WE_SET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL 59
+
+#define WE_SET_BURST_ENABLE             60
+#define WE_SET_BURST_DUR                61
+/* GTX Commands */
+#define WE_SET_GTX_HT_MCS               62
+#define WE_SET_GTX_VHT_MCS              63
+#define WE_SET_GTX_USRCFG               64
+#define WE_SET_GTX_THRE                 65
+#define WE_SET_GTX_MARGIN               66
+#define WE_SET_GTX_STEP                 67
+#define WE_SET_GTX_MINTPC               68
+#define WE_SET_GTX_BWMASK               69
+/* Private ioctl to configure MCC home channels time quota and latency */
+#define WE_MCC_CONFIG_LATENCY           70
+#define WE_MCC_CONFIG_QUOTA             71
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
@@ -246,6 +267,23 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_GET_PPS_DELIM_CRC_FAIL       38
 #define WE_GET_PPS_GID_NSTS_ZERO        39
 #define WE_GET_PPS_RSSI_CHECK           40
+/* Private ioctl for QPower */
+#define WE_GET_QPOWER_MAX_PSPOLL_COUNT            41
+#define WE_GET_QPOWER_MAX_TX_BEFORE_WAKE          42
+#define WE_GET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL   43
+#define WE_GET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL 44
+#define WE_GET_BURST_ENABLE             45
+#define WE_GET_BURST_DUR                46
+/* GTX Commands */
+#define WE_GET_GTX_HT_MCS               47
+#define WE_GET_GTX_VHT_MCS              48
+#define WE_GET_GTX_USRCFG               49
+#define WE_GET_GTX_THRE                 50
+#define WE_GET_GTX_MARGIN               51
+#define WE_GET_GTX_STEP                 52
+#define WE_GET_GTX_MINTPC               53
+#define WE_GET_GTX_BWMASK               54
+
 #endif
 
 /* Private ioctls and their sub-ioctls */
@@ -396,6 +434,10 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #endif
 #define WLAN_GET_LINK_SPEED          (SIOCIWFIRSTPRIV + 31)
 
+/* Private ioctls and their sub-ioctls */
+#define WLAN_PRIV_SET_TWO_INT_GET_NONE   (SIOCIWFIRSTPRIV + 28)
+#define WE_SET_SMPS_PARAM    1
+
 #define WLAN_STATS_INVALID            0
 #define WLAN_STATS_RETRY_CNT          1
 #define WLAN_STATS_MUL_RETRY_CNT      2
@@ -465,6 +507,57 @@ int hdd_validate_mcc_config(hdd_adapter_t *pAdapter, v_UINT_t staId,
 int wlan_hdd_set_filter(hdd_context_t *pHddCtx, tpPacketFilterCfg pRequest, 
                            v_U8_t sessionId);
 #endif
+
+/**---------------------------------------------------------------------------
+
+  \brief mem_alloc_copy_from_user_helper -
+
+   Helper function to allocate buffer and copy user data.
+
+  \param  - wrqu - Pointer to IOCTL Data.
+            len  - size
+
+  \return - On Success pointer to buffer, On failure NULL
+
+  --------------------------------------------------------------------------*/
+static void *mem_alloc_copy_from_user_helper(const void *wrqu_data, size_t len)
+{
+    u8 *ptr = NULL;
+
+  /* in order to protect the code, an extra byte is post appended to the buffer
+   * and the null termination is added.  However, when allocating (len+1) byte
+   * of memory, we need to make sure that there is no uint overflow when doing
+   * addition. In theory check len < UINT_MAX protects the uint overflow. For
+   * wlan private ioctl, the buffer size is much less than UINT_MAX, as a good
+   * guess, now, it is assumed that the private command buffer size is no
+   * greater than 4K (4096 bytes). So we use 4096 as the upper boundary for now.
+   */
+    if (len > MAX_USER_COMMAND_SIZE)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "Invalid length");
+        return NULL;
+    }
+
+
+    ptr = kmalloc(len + 1, GFP_KERNEL);
+    if (NULL == ptr)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "unable to allocate memory");
+        return NULL;
+    }
+
+    if (copy_from_user(ptr, wrqu_data, len))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: failed to copy data to user buffer", __func__);
+        kfree(ptr);
+        return NULL;
+    }
+    ptr[len] = '\0';
+    return ptr;
+}
 
 /**---------------------------------------------------------------------------
 
@@ -1662,7 +1755,8 @@ static int iw_get_bitrate(struct net_device *dev,
                                SME_GLOBAL_CLASSD_STATS |
                                SME_PER_STA_STATS,
                                hdd_StatisticsCB, 0, FALSE,
-                               pHddStaCtx->conn_info.staId[0], pAdapter );
+                               pHddStaCtx->conn_info.staId[0], pAdapter,
+                               pAdapter->sessionId );
 
       if(eHAL_STATUS_SUCCESS != status)
       {
@@ -2400,7 +2494,8 @@ VOS_STATUS  wlan_hdd_get_classAstats(hdd_adapter_t *pAdapter)
                                   0, // not periodic
                                   FALSE, //non-cached results
                                   pHddStaCtx->conn_info.staId[0],
-                                  &context);
+                                  &context,
+                                  pAdapter->sessionId );
    if (eHAL_STATUS_SUCCESS != hstatus)
    {
        hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -2516,7 +2611,8 @@ VOS_STATUS  wlan_hdd_get_station_stats(hdd_adapter_t *pAdapter)
                                0, // not periodic
                                FALSE, //non-cached results
                                pHddStaCtx->conn_info.staId[0],
-                               &context);
+                               &context,
+                               pAdapter->sessionId);
    if (eHAL_STATUS_SUCCESS != hstatus)
    {
       hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -4100,6 +4196,7 @@ static int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
     return 0;
 }
 #endif
+
 /* set param sub-ioctls */
 static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
@@ -4438,13 +4535,13 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
 
         case WE_SET_TM_LEVEL:
         {
+           hddLog(VOS_TRACE_LEVEL_INFO, "Set Thermal Mitigation Level %d",
+                  set_value);
 #ifdef QCA_WIFI_ISOC
            hdd_context_t *hddCtxt = WLAN_HDD_GET_CTX(pAdapter);
-           hddLog(VOS_TRACE_LEVEL_INFO, "Set Thermal Mitigation Level %d", (int)set_value); 
            hddDevTmLevelChangedHandler(hddCtxt->parent_dev, set_value);
 #else
-           hddLog(VOS_TRACE_LEVEL_INFO, "Thermal Mitigation Level %d not set for discrete",
-                 (int)set_value);
+           (void)sme_SetThermalLevel(hHal, set_value);
 #endif
            break;
         }
@@ -4501,6 +4598,78 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            ret = process_wma_set_command((int)pAdapter->sessionId,
                                          (int)WMI_VDEV_PARAM_NSS,
                                          set_value, VDEV_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_HT_MCS:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_HT_MCS %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_HT_MCS,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_VHT_MCS:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_VHT_MCS %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_VHT_MCS,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+       case WE_SET_GTX_USRCFG:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_USR_CFG %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_USR_CFG,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_THRE:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_THRE %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_THRE,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_MARGIN:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_MARGIN %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_MARGIN,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_STEP:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_STEP %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_STEP,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_MINTPC:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_MINTPC %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_MINTPC,
+                                         set_value, GTX_CMD);
+           break;
+        }
+
+        case WE_SET_GTX_BWMASK:
+        {
+           hddLog(LOG1, "WMI_VDEV_PARAM_GTX_BWMASK %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_GTX_BW_MASK,
+                                         set_value, GTX_CMD);
            break;
         }
 
@@ -4646,7 +4815,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
 
         case WE_SET_CHWIDTH:
         {
-           bool chwidth;
+           bool chwidth = false;
            hdd_context_t *phddctx = WLAN_HDD_GET_CTX(pAdapter);
            /*updating channel bonding only on 5Ghz*/
            hddLog(LOG1, "WMI_VDEV_PARAM_CHWIDTH val %d", set_value);
@@ -4819,6 +4988,31 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
             break;
          }
 
+         case WE_SET_BURST_ENABLE:
+         {
+            hddLog(LOG1, "SET Burst enable val %d", set_value);
+            if ((set_value == 0) || (set_value == 1)) {
+                ret = process_wma_set_command((int)pAdapter->sessionId,
+                                          (int)WMI_PDEV_PARAM_BURST_ENABLE,
+                                          set_value, PDEV_CMD);
+            }
+            else
+                ret = -EINVAL;
+            break;
+         }
+         case WE_SET_BURST_DUR:
+         {
+            hddLog(LOG1, "SET Burst duration val %d", set_value);
+            if ((set_value > 0) && (set_value <= 8192)) {
+                ret = process_wma_set_command((int)pAdapter->sessionId,
+                                          (int)WMI_PDEV_PARAM_BURST_DUR,
+                                          set_value, PDEV_CMD);
+            }
+            else
+                ret = -EINVAL;
+            break;
+         }
+
          case WE_SET_TX_CHAINMASK:
          {
             hddLog(LOG1, "WMI_PDEV_PARAM_TX_CHAIN_MASK val %d", set_value);
@@ -4963,7 +5157,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_PAID_MATCH val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_PAID_MATCH,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -4974,7 +5168,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
 	   hddLog(LOG1, "WMI_VDEV_PPS_GID_MATCH val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_GID_MATCH,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -4985,7 +5179,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, " WMI_VDEV_PPS_EARLY_TIM_CLEAR val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_EARLY_TIM_CLEAR,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -4996,7 +5190,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_EARLY_DTIM_CLEAR val %d", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_EARLY_DTIM_CLEAR,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -5007,7 +5201,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_EOF_PAD_DELIM val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_EOF_PAD_DELIM,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -5018,7 +5212,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_MACADDR_MISMATCH val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_MACADDR_MISMATCH,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -5029,7 +5223,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_DELIM_CRC_FAIL val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_DELIM_CRC_FAIL,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -5041,7 +5235,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_GID_NSTS_ZERO val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_GID_NSTS_ZERO,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
         }
 
@@ -5053,8 +5247,208 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_RSSI_CHECK val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_RSSI_CHECK,
-                           set_value, VDEV_CMD);
+                           set_value, PPS_CMD);
            break;
+        }
+
+        case WE_SET_HTSMPS:
+        {
+            hddLog(LOG1, "WE_SET_HTSMPS val %d", set_value);
+            ret = process_wma_set_command((int)pAdapter->sessionId,
+                            (int)WMI_STA_SMPS_FORCE_MODE_CMDID,
+                             set_value, VDEV_CMD);
+            break;
+        }
+
+
+        case WE_SET_QPOWER_MAX_PSPOLL_COUNT:
+        {
+               hddLog(LOG1, "WE_SET_QPOWER_MAX_PSPOLL_COUNT val %d",
+                      set_value);
+	       ret = process_wma_set_command((int)pAdapter->sessionId,
+                                 (int)WMI_STA_PS_PARAM_QPOWER_PSPOLL_COUNT,
+                                 set_value, QPOWER_CMD);
+               break;
+        }
+
+        case WE_SET_QPOWER_MAX_TX_BEFORE_WAKE:
+        {
+           hddLog(LOG1, "WE_SET_QPOWER_MAX_TX_BEFORE_WAKE val %d",
+                  set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                         (int)WMI_STA_PS_PARAM_QPOWER_MAX_TX_BEFORE_WAKE,
+                         set_value, QPOWER_CMD);
+           break;
+        }
+
+        case WE_SET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL:
+        {
+           hddLog(LOG1, "WE_SET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL val %d",
+                  set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                        (int)WMI_STA_PS_PARAM_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL,
+                        set_value, QPOWER_CMD);
+           break;
+        }
+
+        case WE_SET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL:
+        {
+           hddLog(LOG1, "WE_SET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL val %d",
+                  set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                      (int)WMI_STA_PS_PARAM_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL,
+                      set_value, QPOWER_CMD);
+           break;
+        }
+
+        case WE_MCC_CONFIG_LATENCY:
+        {
+            tVOS_CONCURRENCY_MODE concurrent_state = 0;
+            v_U8_t first_adapter_operating_channel = 0;
+            int ret = 0; /* success */
+
+            hddLog(LOG1, "iwpriv cmd to set MCC latency with val %dms",
+                    set_value);
+            /**
+             * Check if concurrency mode is active.
+             * Need to modify this code to support MCC modes other than STA/P2P
+             */
+            concurrent_state = hdd_get_concurrency_mode();
+            if ((concurrent_state == (VOS_STA | VOS_P2P_CLIENT)) ||
+                (concurrent_state == (VOS_STA | VOS_P2P_GO)))
+            {
+                hddLog(LOG1, "STA & P2P are both enabled");
+                /**
+                 * The channel number and latency are formatted in
+                 * a bit vector then passed on to WMA layer.
+                 +**********************************************+
+                 |bits 31-16 |      bits 15-8    |  bits 7-0    |
+                 |  Unused   | latency - Chan. 1 |  channel no. |
+                 +**********************************************+
+                 */
+                /* Get the operating channel of the designated vdev */
+                first_adapter_operating_channel =
+                            hdd_get_operating_channel
+                            (
+                                pAdapter->pHddCtx,
+                                pAdapter->device_mode
+                            );
+                /* Move the time latency for the adapter to bits 15-8 */
+                set_value = set_value << 8;
+                /* Store the channel number at bits 7-0 of the bit vector */
+                set_value = set_value | first_adapter_operating_channel;
+                /* Send command to WMA */
+                ret = process_wma_set_command((int)pAdapter->sessionId,
+                        (int)WMA_VDEV_MCC_SET_TIME_LATENCY,
+                        set_value, VDEV_CMD);
+            }
+            else
+            {
+                hddLog(LOG1, "#s: MCC is not active. Exit w/o setting latency",
+                __func__);
+            }
+            break;
+        }
+
+        case WE_MCC_CONFIG_QUOTA:
+        {
+            v_U8_t first_adapter_operating_channel = 0;
+            v_U8_t second_adapter_opertaing_channel = 0;
+            hdd_adapter_t *staAdapter = NULL;
+            int ret = 0; /* success */
+
+            tVOS_CONCURRENCY_MODE concurrent_state = hdd_get_concurrency_mode();
+            hddLog(LOG1, "iwpriv cmd to set MCC quota with val %dms",
+                set_value);
+            /**
+              * Check if concurrency mode is active.
+              * Need to modify this code to support MCC modes other than STA/P2P
+              */
+            if ((concurrent_state == (VOS_STA | VOS_P2P_CLIENT)) ||
+                (concurrent_state == (VOS_STA | VOS_P2P_GO)))
+            {
+                hddLog(LOG1, "STA & P2P are both enabled");
+                /**
+                 * The channel numbers for both adapters and the time
+                 * quota for the 1st adapter, i.e., one specified in cmd
+                 * are formatted as a bit vector then passed on to WMA
+                 +************************************************************+
+                 |bit 31-24  | bit 23-16  |   bits 15-8   |   bits 7-0        |
+                 |  Unused   | Quota for  | chan. # for   |   chan. # for     |
+                 |           | 1st chan.  | 1st chan.     |   2nd chan.       |
+                 +************************************************************+
+                 */
+                /* Get the operating channel of the specified vdev */
+                first_adapter_operating_channel =
+                            hdd_get_operating_channel
+                            (
+                                pAdapter->pHddCtx,
+                                pAdapter->device_mode
+                            );
+                hddLog(LOG1, "1st channel No.:%d and quota:%dms",
+                        first_adapter_operating_channel, set_value);
+                /* Move the time quota for first channel to bits 15-8 */
+                set_value = set_value << 8;
+                /** Store the channel number of 1st channel at bits 7-0
+                 * of the bit vector
+                 */
+                set_value = set_value | first_adapter_operating_channel;
+                /* Find out the 2nd MCC adapter and its operating channel */
+                if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
+                {
+                    /* iwpriv cmd was issued on wlan0; get p2p0 vdev channel */
+                    if ((concurrent_state & VOS_P2P_CLIENT) != 0)
+                    {
+                        /* The 2nd MCC vdev is P2P client */
+                        staAdapter = hdd_get_adapter(pAdapter->pHddCtx,
+                                        WLAN_HDD_P2P_CLIENT);
+                    } else
+                    {
+                        /* The 2nd MCC vdev is P2P GO */
+                        staAdapter = hdd_get_adapter(pAdapter->pHddCtx,
+                                        WLAN_HDD_P2P_GO);
+                    }
+                }
+                else
+                {
+                    /* iwpriv cmd was issued on p2p0; get wlan0 vdev channel */
+                    staAdapter = hdd_get_adapter(pAdapter->pHddCtx,
+                                     WLAN_HDD_INFRA_STATION);
+                }
+                if (staAdapter != NULL)
+                {
+                    second_adapter_opertaing_channel =
+                            hdd_get_operating_channel
+                            (
+                            staAdapter->pHddCtx,
+                            staAdapter->device_mode
+                            );
+                    hddLog(LOG1, "2nd vdev channel No. is:%d",
+                            second_adapter_opertaing_channel);
+                    /** Now move the time quota and channel number of the
+                     * 1st adapter to bits 23-16 and bits 15-8 of the bit
+                     * vector, respectively.
+                     */
+                    set_value = set_value << 8;
+                    /* Store the channel number for 2nd MCC vdev at bits
+                     * 7-0 of set_value
+                     */
+                    set_value = set_value | second_adapter_opertaing_channel;
+                    ret = process_wma_set_command((int)pAdapter->sessionId,
+                            (int)WMA_VDEV_MCC_SET_TIME_QUOTA,
+                            set_value, VDEV_CMD);
+                }
+                else
+                {
+                    hddLog(LOGE, "NULL adapter handle. Exit");
+                }
+            }
+            else
+            {
+                hddLog(LOG1, "#s: MCC is not active. Exit w/o setting latency",
+                        __func__);
+            }
+            break;
         }
 
 #endif
@@ -5075,14 +5469,12 @@ static int iw_setchar_getnone(struct net_device *dev, struct iw_request_info *in
     VOS_STATUS vstatus;
     int sub_cmd = wrqu->data.flags;
     int ret = 0; /* success */
+    char *pBuffer = NULL;
     hdd_adapter_t *pAdapter = (netdev_priv(dev));
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 #ifdef WLAN_FEATURE_VOWIFI
     hdd_config_t  *pConfig = pHddCtx->cfg_ini;
 #endif /* WLAN_FEATURE_VOWIFI */
-
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: Received length %d", __func__, wrqu->data.length);
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: Received data %s", __func__, extra);
 
     if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
     {
@@ -5091,15 +5483,30 @@ static int iw_setchar_getnone(struct net_device *dev, struct iw_request_info *in
         return -EBUSY;
     }
 
+    /* ODD number is used for set, copy data using copy_from_user */
+    pBuffer = mem_alloc_copy_from_user_helper(wrqu->data.pointer,
+                                              wrqu->data.length);
+    if (NULL == pBuffer)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "mem_alloc_copy_from_user_helper fail");
+        return -ENOMEM;
+    }
+
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+              "%s: Received length %d", __func__, wrqu->data.length);
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+              "%s: Received data %s", __func__, pBuffer);
+
     switch(sub_cmd)
     {
        case WE_WOWL_ADD_PTRN:
           VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "ADD_PTRN\n");
-          hdd_add_wowl_ptrn(pAdapter, extra);
+          hdd_add_wowl_ptrn(pAdapter, pBuffer);
           break;
        case WE_WOWL_DEL_PTRN:
           VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "DEL_PTRN\n");
-          hdd_del_wowl_ptrn(pAdapter, extra);
+          hdd_del_wowl_ptrn(pAdapter, pBuffer);
           break;
 #if defined WLAN_FEATURE_VOWIFI
        case WE_NEIGHBOR_REPORT_REQUEST:
@@ -5114,7 +5521,7 @@ static int iw_setchar_getnone(struct net_device *dev, struct iw_request_info *in
                 if( !neighborReq.no_ssid )
                 {
                    neighborReq.ssid.length = (wrqu->data.length - 1) > 32 ? 32 : (wrqu->data.length - 1) ;
-                   vos_mem_copy( neighborReq.ssid.ssId, extra, neighborReq.ssid.length );
+                   vos_mem_copy( neighborReq.ssid.ssId, pBuffer, neighborReq.ssid.length );
                 }
 
                 callbackInfo.neighborRspCallback = NULL;
@@ -5132,10 +5539,10 @@ static int iw_setchar_getnone(struct net_device *dev, struct iw_request_info *in
 #endif
        case WE_SET_AP_WPS_IE:
           hddLog( LOGE, "Received WE_SET_AP_WPS_IE" );
-          sme_updateP2pIe( WLAN_HDD_GET_HAL_CTX(pAdapter), extra, wrqu->data.length );
+          sme_updateP2pIe( WLAN_HDD_GET_HAL_CTX(pAdapter), pBuffer, wrqu->data.length );
           break;
        case WE_SET_CONFIG:
-          vstatus = hdd_execute_config_command(pHddCtx, extra);
+          vstatus = hdd_execute_config_command(pHddCtx, pBuffer);
           if (VOS_STATUS_SUCCESS != vstatus)
           {
              ret = -EINVAL;
@@ -5148,6 +5555,7 @@ static int iw_setchar_getnone(struct net_device *dev, struct iw_request_info *in
            break;
        }
     }
+    kfree(pBuffer);
     return ret;
 }
 
@@ -5251,6 +5659,86 @@ static int iw_setnone_getint(struct net_device *dev, struct iw_request_info *inf
                                         (int)pAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_NSS,
                                         VDEV_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_HT_MCS:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_HT_MCS");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_HT_MCS,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_VHT_MCS:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_VHT_MCS");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_VHT_MCS,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_USRCFG:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_USR_CFG");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_USR_CFG,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_THRE:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_THRE");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_THRE,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_MARGIN:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_MARGIN");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_MARGIN,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_STEP:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_STEP");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_STEP,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_MINTPC:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_MINTPC");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_MINTPC,
+                                        GTX_CMD);
+           break;
+        }
+
+        case WE_GET_GTX_BWMASK:
+        {
+           hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_BW_MASK");
+           *value = wma_cli_get_command(wmapvosContext,
+                                        (int)pAdapter->sessionId,
+                                        (int)WMI_VDEV_PARAM_GTX_BW_MASK,
+                                        GTX_CMD);
            break;
         }
 
@@ -5396,6 +5884,25 @@ static int iw_setnone_getint(struct net_device *dev, struct iw_request_info *inf
             break;
         }
 
+        case WE_GET_BURST_ENABLE:
+        {
+            hddLog(LOG1, "GET Burst enable value");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_PDEV_PARAM_BURST_ENABLE,
+                                         PDEV_CMD);
+            break;
+        }
+        case WE_GET_BURST_DUR:
+        {
+            hddLog(LOG1, "GET Burst Duration value");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_PDEV_PARAM_BURST_DUR,
+                                         PDEV_CMD);
+            break;
+        }
+
         case WE_GET_TX_CHAINMASK:
         {
             hddLog(LOG1, "GET WMI_PDEV_PARAM_TX_CHAIN_MASK");
@@ -5462,6 +5969,137 @@ static int iw_setnone_getint(struct net_device *dev, struct iw_request_info *inf
             break;
         }
 
+	case WE_GET_PPS_PAID_MATCH:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_PAID_MATCH");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_PAID_MATCH,
+                                         PPS_CMD);
+            break;
+        }
+
+	case WE_GET_PPS_GID_MATCH:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_GID_MATCH");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_GID_MATCH,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_EARLY_TIM_CLEAR:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_EARLY_TIM_CLEAR");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_EARLY_TIM_CLEAR,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_EARLY_DTIM_CLEAR:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_EARLY_DTIM_CLEAR");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_EARLY_DTIM_CLEAR,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_EOF_PAD_DELIM:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_EOF_PAD_DELIM");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_EOF_PAD_DELIM,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_MACADDR_MISMATCH:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_MACADDR_MISMATCH");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_MACADDR_MISMATCH,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_DELIM_CRC_FAIL:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_DELIM_CRC_FAIL");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_DELIM_CRC_FAIL,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_GID_NSTS_ZERO:
+        {
+            hddLog(LOG1, "GET WMI_VDEV_PPS_GID_NSTS_ZERO");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_GID_NSTS_ZERO,
+                                         PPS_CMD);
+            break;
+	}
+
+	case WE_GET_PPS_RSSI_CHECK:
+	{
+
+            hddLog(LOG1, "GET WMI_VDEV_PPS_RSSI_CHECK");
+            *value = wma_cli_get_command(wmapvosContext,
+                                         (int)pAdapter->sessionId,
+                                         (int)WMI_VDEV_PPS_RSSI_CHECK,
+                                         PPS_CMD);
+            break;
+	}
+
+        case WE_GET_QPOWER_MAX_PSPOLL_COUNT:
+        {
+               hddLog(LOG1, "WE_GET_QPOWER_MAX_PSPOLL_COUNT");
+               *value = wma_cli_get_command(wmapvosContext,
+                                      (int)pAdapter->sessionId,
+                                      (int)WMI_STA_PS_PARAM_QPOWER_PSPOLL_COUNT,
+                                      QPOWER_CMD);
+               break;
+        }
+
+        case WE_GET_QPOWER_MAX_TX_BEFORE_WAKE:
+        {
+           hddLog(LOG1, "WE_GET_QPOWER_MAX_TX_BEFORE_WAKE");
+           *value = wma_cli_get_command(wmapvosContext,
+                              (int)pAdapter->sessionId,
+                              (int)WMI_STA_PS_PARAM_QPOWER_MAX_TX_BEFORE_WAKE,
+                              QPOWER_CMD);
+           break;
+        }
+
+        case WE_GET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL:
+        {
+           hddLog(LOG1, "WE_GET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL");
+           *value = wma_cli_get_command(wmapvosContext,
+                      (int)pAdapter->sessionId,
+                      (int)WMI_STA_PS_PARAM_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL,
+                      QPOWER_CMD);
+           break;
+        }
+
+        case WE_GET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL:
+        {
+           hddLog(LOG1, "WE_GET_QPOWER_MAX_PSPOLL_COUNT");
+           *value = wma_cli_get_command(wmapvosContext,
+                      (int)pAdapter->sessionId,
+                      (int)WMI_STA_PS_PARAM_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL,
+                      QPOWER_CMD);
+           break;
+        }
+
 #endif
 
         default:
@@ -5524,7 +6162,17 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     int sub_cmd = wrqu->data.flags;
 #ifdef WLAN_FEATURE_11W
-    hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
+    hdd_wext_state_t *pWextState;
+#endif
+
+    if (pAdapter == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                                        "%s: pAdapter is NULL!", __func__);
+        return -EINVAL;
+    }
+#ifdef WLAN_FEATURE_11W
+    pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
 #endif
 
     if (NULL == WLAN_HDD_GET_CTX(pAdapter))
@@ -5658,9 +6306,9 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
             int count = 0, check = 1;
 
             tANI_U16 tlState;
-            tHalHandle hHal;
-            tpAniSirGlobal pMac;
-            hdd_station_ctx_t *pHddStaCtx;
+            tHalHandle hHal = NULL;
+            tpAniSirGlobal pMac = NULL;
+            hdd_station_ctx_t *pHddStaCtx = NULL;
 
             hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
             hdd_adapter_t *useAdapter = NULL;
@@ -5704,7 +6352,19 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
                 }
 
                 hHal = WLAN_HDD_GET_HAL_CTX( useAdapter );
+                if (!hHal) {
+                    buf = scnprintf(extra + len,  WE_MAX_STR_LEN - len,
+                            "\n pMac is NULL");
+                    len += buf;
+                    break;
+                }
                 pMac = PMAC_STRUCT( hHal );
+                if (!pMac) {
+                    buf = scnprintf(extra + len,  WE_MAX_STR_LEN - len,
+                            "\n pMac is NULL");
+                    len += buf;
+                    break;
+                }
                 pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR( useAdapter );
                 if( !pHddStaCtx )
                 {
@@ -5738,36 +6398,38 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
                 adapter_num++;
             }
 
-            /* Printing Lim State starting with global lim states */
-            buf = scnprintf(extra + len, WE_MAX_STR_LEN - len,
-                    "\n \n LIM STATES:-"
-                    "\n Global Sme State - %s "\
-                    "\n Global mlm State - %s "\
-                    "\n",
-                    macTraceGetLimSmeState(pMac->lim.gLimSmeState),
-                    macTraceGetLimMlmState(pMac->lim.gLimMlmState)
-                    );
-            len += buf;
+            if (pMac) {
+                /* Printing Lim State starting with global lim states */
+                buf = scnprintf(extra + len, WE_MAX_STR_LEN - len,
+                        "\n \n LIM STATES:-"
+                        "\n Global Sme State - %s "\
+                        "\n Global mlm State - %s "\
+                        "\n",
+                        macTraceGetLimSmeState(pMac->lim.gLimSmeState),
+                        macTraceGetLimMlmState(pMac->lim.gLimMlmState)
+                        );
+                len += buf;
 
-            /*printing the PE Sme and Mlm states for valid lim sessions*/
-            while ( check < 3 && count < 255)
-            {
-                if ( pMac->lim.gpSession[count].valid )
+                /*printing the PE Sme and Mlm states for valid lim sessions*/
+                while ( check < 3 && count < 255)
                 {
-                    buf = scnprintf(extra + len, WE_MAX_STR_LEN - len,
-                    "\n Lim Valid Session %d:-"
-                    "\n PE Sme State - %s "
-                    "\n PE Mlm State - %s "
-                    "\n",
-                    check,
-                    macTraceGetLimSmeState(pMac->lim.gpSession[count].limSmeState),
-                    macTraceGetLimMlmState(pMac->lim.gpSession[count].limMlmState)
-                    );
+                    if ( pMac->lim.gpSession[count].valid )
+                    {
+                        buf = scnprintf(extra + len, WE_MAX_STR_LEN - len,
+                            "\n Lim Valid Session %d:-"
+                            "\n PE Sme State - %s "
+                            "\n PE Mlm State - %s "
+                            "\n",
+                            check,
+                            macTraceGetLimSmeState(pMac->lim.gpSession[count].limSmeState),
+                            macTraceGetLimMlmState(pMac->lim.gpSession[count].limMlmState)
+                            );
 
-                    len += buf;
-                    check++;
+                        len += buf;
+                        check++;
+                    }
+                    count++;
                 }
-                count++;
             }
 
             wrqu->data.length = strlen(extra)+1;
@@ -5838,6 +6500,7 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
 
             tChannelListInfo channel_list;
 
+            memset(&channel_list, 0, sizeof(channel_list));
             status = iw_softap_get_channel_list(dev, info, wrqu, (char *)&channel_list);
             if ( !VOS_IS_STATUS_SUCCESS( status ) ) 
             {
@@ -5845,7 +6508,6 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
                 return -EINVAL;
             }
             buf = extra;
-
             /**
              * Maximum channels = WNI_CFG_VALID_CHANNEL_LIST_LEN. Maximum buffer
              * needed = 5 * number of channels. Check ifsufficient
@@ -6101,90 +6763,7 @@ static int iw_setnone_getnone(struct net_device *dev, struct iw_request_info *in
 
             break;
         }
-	case WE_GET_PPS_PAID_MATCH:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_PAID_MATCH");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_PAID_MATCH,
-                                         VDEV_CMD);
-            break;
-        }
-	case WE_GET_PPS_GID_MATCH:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_GID_MATCH");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_GID_MATCH,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_EARLY_TIM_CLEAR:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_EARLY_TIM_CLEAR");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_EARLY_TIM_CLEAR,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_EARLY_DTIM_CLEAR:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_EARLY_DTIM_CLEAR");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_EARLY_DTIM_CLEAR,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_EOF_PAD_DELIM:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_EOF_PAD_DELIM");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_EOF_PAD_DELIM,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_MACADDR_MISMATCH:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_MACADDR_MISMATCH");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_MACADDR_MISMATCH,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_DELIM_CRC_FAIL:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_DELIM_CRC_FAIL");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_DELIM_CRC_FAIL,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_GID_NSTS_ZERO:
-        {
-            hddLog(LOG1, "GET WMI_VDEV_PPS_GID_NSTS_ZERO");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_GID_NSTS_ZERO,
-                                         VDEV_CMD);
-            break;
-	}
-	case WE_GET_PPS_RSSI_CHECK:
-	{
-
-            hddLog(LOG1, "GET WMI_VDEV_PPS_RSSI_CHECK");
-            *value = wma_cli_get_command(wmapvosContext,
-                                         (int)pAdapter->sessionId,
-                                         (int)WMI_VDEV_PPS_RSSI_CHECK,
-                                         VDEV_CMD);
-            break;
-	}
 #endif
-
         case WE_ENABLE_DXE_STALL_DETECT:
         {
             tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
@@ -6320,7 +6899,6 @@ int iw_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
     int sub_cmd = wrqu->data.flags;
-    int *value = (int*)extra;
     int apps_args[MAX_VAR_ARGS] = {0};
     int num_args = wrqu->data.length;
     hdd_station_ctx_t *pStaCtx = NULL ;
@@ -6341,7 +6919,14 @@ int iw_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info
     {
        num_args = MAX_VAR_ARGS;
     }
-    vos_mem_copy(apps_args, value, (sizeof(int)) * num_args);
+
+    /* ODD number is used for set, copy data using copy_from_user */
+    if (copy_from_user(apps_args, wrqu->data.pointer, (sizeof(int)) * num_args))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: failed to copy data to user buffer", __func__);
+        return -EFAULT;
+    }
 
     if(( sub_cmd == WE_MCC_CONFIG_CREDENTIAL ) ||
         (sub_cmd == WE_MCC_CONFIG_PARAMS ))
@@ -7637,9 +8222,9 @@ void wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set)
                                  pAdapter->mc_addr_list.mc_cnt;
                 for (i = 0; i < pAdapter->mc_addr_list.mc_cnt; i++)
                 {
-                    memcpy(&(pMulticastAddrs->multicastAddr[i][0]),
-                            &(pAdapter->mc_addr_list.addr[i][0]),
-                            sizeof(pAdapter->mc_addr_list.addr[i]));
+                    memcpy(pMulticastAddrs->multicastAddr[i],
+                           pAdapter->mc_addr_list.addr[i],
+                           sizeof(pAdapter->mc_addr_list.addr[i]));
                     hddLog(VOS_TRACE_LEVEL_INFO,
                             "%s: %s multicast filter: addr ="
                             MAC_ADDRESS_STR,
@@ -7678,9 +8263,23 @@ static int iw_set_packet_filter_params(struct net_device *dev, struct iw_request
         union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    tpPacketFilterCfg pRequest = (tpPacketFilterCfg) extra;
+    tpPacketFilterCfg pRequest = NULL;
+    int ret;
 
-    return wlan_hdd_set_filter(WLAN_HDD_GET_CTX(pAdapter), pRequest, pAdapter->sessionId);
+    /* ODD number is used for set, copy data using copy_from_user */
+    pRequest = mem_alloc_copy_from_user_helper(wrqu->data.pointer,
+                                               wrqu->data.length);
+    if (NULL == pRequest)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "mem_alloc_copy_from_user_helper fail");
+        return -ENOMEM;
+    }
+
+    ret = wlan_hdd_set_filter(WLAN_HDD_GET_CTX(pAdapter), pRequest, pAdapter->sessionId);
+    kfree(pRequest);
+
+    return ret;
 }
 #endif
 static int iw_get_statistics(struct net_device *dev,
@@ -7720,7 +8319,9 @@ static int iw_get_statistics(struct net_device *dev,
                        SME_GLOBAL_CLASSD_STATS |
                        SME_PER_STA_STATS,
                        hdd_StatisticsCB, 0, FALSE,
-                       (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.staId[0], pAdapter );
+                       (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.staId[0],
+                       pAdapter,
+                       pAdapter->sessionId );
 
     if (eHAL_STATUS_SUCCESS != status)
     {
@@ -7747,7 +8348,9 @@ static int iw_get_statistics(struct net_device *dev,
                        SME_GLOBAL_CLASSD_STATS |
                        SME_PER_STA_STATS,
                        NULL, 0, FALSE,
-                       (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.staId[0], pAdapter );
+                       (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.staId[0],
+                       pAdapter,
+                       pAdapter->sessionId );
 
        return -EINVAL;
     }
@@ -8098,7 +8701,6 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
 
     /*Advance to rssi Threshold*/
     ptr += nOffset;
-
     if (1 != sscanf(ptr,"%d %n",
                     &(pnoRequest.aNetworks[i].rssiThreshold),
                     &nOffset))
@@ -8107,7 +8709,6 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
                   "PNO rssi threshold input is not valid %s",ptr);
         return VOS_STATUS_E_FAILURE;
     }
-
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
             "PNO rssi %d offset %d",
             pnoRequest.aNetworks[i].rssiThreshold,
@@ -8295,6 +8896,8 @@ int hdd_setBand_helper(struct net_device *dev, tANI_U8* ptr)
                 "%s: Current band value = %u, new setting %u ",
                  __func__, currBand, band);
 
+        hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId);
+
         if (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))
         {
              hdd_station_ctx_t *pHddStaCtx = &(pAdapter)->sessionCtx.station;
@@ -8335,11 +8938,7 @@ int hdd_setBand_helper(struct net_device *dev, tANI_U8* ptr)
              }
         }
 
-        hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId);
         sme_ScanFlushResult(hHal, pAdapter->sessionId);
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
-        sme_UpdateBgScanConfigIniChannelList(hHal, (eCsrBand) band);
-#endif
         if (eHAL_STATUS_SUCCESS != sme_SetFreqBand(hHal, (eCsrBand)band))
         {
              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
@@ -8357,10 +8956,10 @@ static int iw_set_band_config(struct net_device *dev,
                            union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    tANI_U8 *ptr = extra;
+    tANI_U8 *ptr = NULL;
     int ret = 0;
 
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,"%s: ", __func__);
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: ", __func__);
 
     if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
     {
@@ -8369,23 +8968,47 @@ static int iw_set_band_config(struct net_device *dev,
         return -EBUSY;
     }
 
+    /* ODD number is used for set, copy data using copy_from_user */
+    ptr = mem_alloc_copy_from_user_helper(wrqu->data.pointer,
+                                          wrqu->data.length);
+    if (NULL == ptr)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "mem_alloc_copy_from_user_helper fail");
+        return -ENOMEM;
+    }
+
     if (memcmp(ptr, "SETBAND ", 8) == 0)
     {
         /* Change band request received */
         ret = hdd_setBand_helper(dev, ptr);
-        return ret;
-
     }
-    return 0;
+    kfree(ptr);
+
+    return ret;
 }
 
 static int iw_set_power_params_priv(struct net_device *dev,
                            struct iw_request_info *info,
                            union iwreq_data *wrqu, char *extra)
 {
+  int ret;
+  char *ptr;
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                 "Set power params Private");
-  return iw_set_power_params(dev,info,wrqu,extra,0);
+  /* ODD number is used for set, copy data using copy_from_user */
+  ptr = mem_alloc_copy_from_user_helper(wrqu->data.pointer,
+                                        wrqu->data.length);
+  if (NULL == ptr)
+  {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "mem_alloc_copy_from_user_helper fail");
+      return -ENOMEM;
+  }
+
+  ret = iw_set_power_params(dev, info, wrqu, ptr, 0);
+  kfree(ptr);
+  return ret;
 }
 
 
@@ -8530,6 +9153,41 @@ VOS_STATUS iw_set_power_params(struct net_device *dev, struct iw_request_info *i
   return VOS_STATUS_SUCCESS;
 }/*iw_set_power_params*/
 
+int iw_set_two_ints_getnone(struct net_device *dev, struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+    int *value = (int *)extra;
+    int sub_cmd = value[0];
+    int ret = 0;
+
+    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+                                  "%s:LOGP in Progress. Ignore!!!", __func__);
+        return -EBUSY;
+    }
+
+    switch(sub_cmd)
+    {
+        case WE_SET_SMPS_PARAM:
+        {
+            hddLog(LOG1, "WE_SET_SMPS_PARAM val %d %d", value[1], value[2]);
+            ret = process_wma_set_command((int)pAdapter->sessionId,
+                            (int)WMI_STA_SMPS_PARAM_CMDID,
+                             value[1] << WMA_SMPS_PARAM_VALUE_S | value[2], VDEV_CMD);
+            break;
+        }
+
+        default:
+        {
+            hddLog(LOGE, "Invalid IOCTL command %d",  sub_cmd);
+            break;
+        }
+    }
+    return ret;
+}
+
 
 // Define the Wireless Extensions to the Linux Network Device structure
 // A number of these routines are NULL (meaning they are not implemented.)
@@ -8643,6 +9301,7 @@ static const iw_handler we_private[] = {
 #endif
 #endif
    [WLAN_GET_LINK_SPEED                 - SIOCIWFIRSTPRIV]   = iw_get_linkspeed,
+   [WLAN_PRIV_SET_TWO_INT_GET_NONE      - SIOCIWFIRSTPRIV]   = iw_set_two_ints_getnone,
 };
 
 /*Maximum command length can be only 15 */
@@ -8797,8 +9456,48 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         "cwmenable" },
 
-    {  WE_SET_TX_CHAINMASK,
+    {  WE_SET_GTX_HT_MCS,
        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxHTMcs" },
+
+    {  WE_SET_GTX_VHT_MCS,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxVHTMcs" },
+
+    {  WE_SET_GTX_USRCFG,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxUsrCfg" },
+
+    {  WE_SET_GTX_THRE,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxThre" },
+
+    {  WE_SET_GTX_MARGIN,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxMargin" },
+
+    {  WE_SET_GTX_STEP,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxStep" },
+
+    {  WE_SET_GTX_MINTPC,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxMinTpc" },
+
+    {  WE_SET_GTX_BWMASK,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "gtxBWMask" },
+
+    {  WE_SET_TX_CHAINMASK,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0,
         "txchainmask" },
 
@@ -8826,6 +9525,16 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0,
         "amsdu" },
+
+    {   WE_SET_BURST_ENABLE,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "burst_enable" },
+
+    {   WE_SET_BURST_DUR,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "burst_dur" },
 
     {   WE_SET_TXPOW_2G,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -8935,6 +9644,37 @@ static const struct iw_priv_args we_private_args[] = {
     {   WE_PPS_RSSI_CHECK,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0, "rssi_chk" },
+
+    {   WE_SET_HTSMPS,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "htsmps" },
+
+
+    {   WE_SET_QPOWER_MAX_PSPOLL_COUNT,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "set_qpspollcnt" },
+
+    {   WE_SET_QPOWER_MAX_TX_BEFORE_WAKE,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "set_qtxwake" },
+
+    {   WE_SET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "set_qwakeintv" },
+
+    {   WE_SET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "set_qnodatapoll" },
+
+    /* handlers for MCC time quota and latency sub ioctls */
+    {   WE_MCC_CONFIG_LATENCY,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "setMccLatency" },
+
+    {   WE_MCC_CONFIG_QUOTA,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "setMccQuota" },
+
 #endif
 
     {   WLAN_PRIV_SET_NONE_GET_INT,
@@ -9054,6 +9794,46 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "get_cwmenable" },
 
+    {  WE_GET_GTX_HT_MCS,
+       0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxHTMcs" },
+
+    {  WE_GET_GTX_VHT_MCS,
+       0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxVHTMcs" },
+
+    {  WE_GET_GTX_USRCFG,
+        0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxUsrCfg" },
+
+    {  WE_GET_GTX_THRE,
+        0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxThre" },
+
+    {  WE_GET_GTX_MARGIN,
+        0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxMargin" },
+
+    {  WE_GET_GTX_STEP,
+        0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxStep" },
+
+    {  WE_GET_GTX_MINTPC,
+        0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxMinTpc" },
+
+    {  WE_GET_GTX_BWMASK,
+        0,
+       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_gtxBWMask" },
+
     {   WE_GET_TX_CHAINMASK,
         0,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -9078,6 +9858,16 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "get_amsdu" },
+
+    {   WE_GET_BURST_ENABLE,
+        0,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_burst_en" },
+
+    {   WE_GET_BURST_DUR,
+        0,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_burst_dur" },
 
     {   WE_GET_TXPOW_2G,
         0,
@@ -9146,6 +9936,27 @@ static const struct iw_priv_args we_private_args[] = {
 	0,
 	IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	"get_rssi_chk"},
+
+    {   WE_GET_QPOWER_MAX_PSPOLL_COUNT,
+        0,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_qpspollcnt"},
+
+    {   WE_GET_QPOWER_MAX_TX_BEFORE_WAKE,
+        0,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_qtxwake"},
+
+    {   WE_GET_QPOWER_SPEC_PSPOLL_WAKE_INTERVAL,
+        0,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_qwakeintv"},
+
+    {   WE_GET_QPOWER_SPEC_MAX_SPEC_NODATA_PSPOLL,
+        0,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        "get_qnodatapoll"},
+
 #endif
 
     /* handlers for main ioctl */
@@ -9517,6 +10328,16 @@ static const struct iw_priv_args we_private_args[] = {
         WLAN_GET_LINK_SPEED,
         IW_PRIV_TYPE_CHAR | 18,
         IW_PRIV_TYPE_CHAR | 5, "getLinkSpeed" },
+
+    /* handlers for main ioctl */
+    {   WLAN_PRIV_SET_TWO_INT_GET_NONE,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+        0,
+        "" },
+    {   WE_SET_SMPS_PARAM,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+        0, "set_smps_param" },
+
 };
 
 
