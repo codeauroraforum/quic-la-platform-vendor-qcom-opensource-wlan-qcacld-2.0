@@ -37,6 +37,7 @@
 #define QCA_VERSION                  0x4100270f
 #define AR6320_REV1_VERSION	     0x5000000
 #define AR6320_REV1_1_VERSION	     0x5000001
+#define AR6320_REV1_3_VERSION	     0x5000003
 #define QCA_FIRMWARE_FILE            "athwlan.bin"
 #define QCA_UTF_FIRMWARE_FILE        "utf.bin"
 #define QCA_BOARD_DATA_FILE          "fakeboar.bin"
@@ -49,17 +50,23 @@
 #define PEER_DEFAULT_STATS_UPDATE_PERIOD    500
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-#define REGISTER_LOCATION       0x4000
-#define REGISTER_SIZE           0x6c000
+#define REGISTER_LOCATION       0x00000000
+#define REGISTER_SIZE           0x00000800
 
-#define DRAM_LOCATION           0x400000
-#define DRAM_SIZE               0x50000
+#define DRAM_LOCATION           0x00400000
+#define DRAM_SIZE               0x00070000
 
-#define IRAM_LOCATION           0x980000
-#define IRAM_SIZE               0x38000
+#define IRAM_LOCATION           0x00980000
+#define IRAM_SIZE               0x00038000
 
-#define TOTAL_DUMP_SIZE         REGISTER_SIZE + DRAM_SIZE + IRAM_SIZE
-#define PCIE_READ_LIMIT         0x5000
+#define AXI_LOCATION            0x000a0000
+#define AXI_SIZE                0x00018000
+
+#define CE7_LOCATION            0x00036000
+#define CE_USEFUL_SIZE          0x00000058
+
+#define TOTAL_DUMP_SIZE         0x00200000
+#define PCIE_READ_LIMIT         0x00005000
 
 void ol_target_coredump(void *instance, void* memoryBlock,
                         u_int32_t blockLength);
@@ -69,4 +76,5 @@ int ol_diag_read(struct ol_softc *scn, u_int8_t* buffer,
 int ol_download_firmware(struct ol_softc *scn);
 int ol_configure_target(struct ol_softc *scn);
 void ol_target_failure(void *instance, A_STATUS status);
+u_int8_t ol_get_number_of_peers_supported(struct ol_softc *scn);
 #endif /* _OL_FW_H_ */

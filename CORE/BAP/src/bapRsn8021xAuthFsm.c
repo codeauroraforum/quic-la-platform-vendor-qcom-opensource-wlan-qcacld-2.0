@@ -24,11 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /*
- * Woodside Networks, Inc proprietary. All rights reserved.
- * $File: //depot/software/projects/feature_branches/gen5_phase1/os/linux/classic/ap/apps/ssm/auth8021x/ani8021xAuthRsnFsm.c $
- *
  * Contains definitions for the RSN EAPOL-Key FSM on the
  * authenticator side. This is based on 802.11i.
  *
@@ -1021,7 +1017,11 @@ int derivePtk(tAuthRsnFsm *fsm, tAniEapolKeyAvailEventData *data)
     v_U32_t prfLen;
     tAniEapolRsnKeyDesc *rxDesc;
 
-    VOS_ASSERT(fsm->staCtx->pmk);
+    if (NULL == fsm->staCtx->pmk)
+    {
+       VOS_ASSERT(0);
+       return ANI_E_NULL_VALUE;
+    }
 
     switch (fsm->staCtx->pwCipherType) 
     {

@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /**
  * @file htt_h2t.c
  * @brief Provide functions to send host->target HTT messages.
@@ -576,7 +575,6 @@ htt_h2t_sync_msg(struct htt_pdev_t *pdev, u_int8_t sync_cnt)
     return A_OK;
 }
 
-#if defined(TEMP_AGGR_CFG)
 int
 htt_h2t_aggr_cfg_msg(struct htt_pdev_t *pdev,
                      int max_subfrms_ampdu, 
@@ -637,4 +635,3 @@ htt_h2t_aggr_cfg_msg(struct htt_pdev_t *pdev,
     HTCSendPkt(pdev->htc_pdev, &pkt->htc_pkt);
     return 0;
 }
-#endif

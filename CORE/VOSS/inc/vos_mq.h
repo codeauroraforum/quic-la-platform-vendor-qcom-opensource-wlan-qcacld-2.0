@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #if !defined( __VOS_MQ_H )
 #define __VOS_MQ_H
 
@@ -35,10 +34,6 @@
   \brief virtual Operating System Services (vOSS) message queue APIs
 
    Message Queue Definitions and API
-
-   Copyright 2008 (c) Qualcomm Technologies, Inc.  All Rights Reserved.
-
-   Qualcomm Technologies Confidential and Proprietary.
 
   ========================================================================*/
 
@@ -82,9 +77,15 @@ typedef struct vos_msg_s
      * Messages should use either bodyptr or bodyval; not both !!!.
      */
     void *bodyptr;
-    
-    v_U32_t bodyval;    
-    
+
+    v_U32_t bodyval;
+
+    /*
+     * Some messages provide a callback function.  The function signature
+     * must be agreed upon between the two entities exchanging the message
+     */
+    void *callback;
+
 } vos_msg_t;
 
 

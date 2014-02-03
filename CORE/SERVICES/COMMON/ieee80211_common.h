@@ -24,7 +24,9 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
+/*
+ * 
+ */
 
 #ifndef EXTERNAL_USE_ONLY
 #include "osdep.h"
@@ -1859,6 +1861,9 @@ enum {
 #define IEEE80211_WEP_EXTIV      0x20
 #define IEEE80211_WEP_EXTIVLEN      4   /* extended IV length */
 #define IEEE80211_WEP_MICLEN        8   /* trailing MIC */
+
+#define IEEE80211_CCMP_HEADERLEN    8
+#define IEEE80211_CCMP_MICLEN       8
 
 #define IEEE80211_CRC_LEN           4
 

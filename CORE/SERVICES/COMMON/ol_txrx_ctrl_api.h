@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /**
  * @file ol_txrx_ctrl_api.h
  * @brief Define the host data API functions called by the host control SW.
@@ -271,8 +270,8 @@ ol_txrx_tx_release(
 /**
  * @brief Suspend all tx data for the specified virtual device.
  * @details
- *  This function applies only to HL systems - in LL systems, tx flow control
- *  is handled entirely within the target FW.
+ *  This function applies primarily to HL systems, but also applies to
+ *  LL systems that use per-vdev tx queues for MCC or thermal throttling.
  *  As an example, this function could be used when a single-channel physical
  *  device supports multiple channels by jumping back and forth between the
  *  channels in a time-shared manner.  As the device is switched from channel
@@ -289,10 +288,29 @@ ol_txrx_vdev_pause(ol_txrx_vdev_handle data_vdev);
 #endif /* CONFIG_HL_SUPPORT */
 
 /**
+ * @brief Drop all tx data for the specified virtual device.
+ * @details
+ *  This function applies primarily to HL systems, but also applies to
+ *  LL systems that use per-vdev tx queues for MCC or thermal throttling.
+ *  This function would typically be used by the ctrl SW after it parks
+ *  a STA vdev and then resumes it, but to a new AP.  In this case, though
+ *  the same vdev can be used, any old tx frames queued inside it would be
+ *  stale, and would need to be discarded.
+ *
+ * @param data_vdev - the virtual device being flushed
+ */
+#if defined(CONFIG_HL_SUPPORT) || defined(QCA_SUPPORT_TXRX_VDEV_PAUSE_LL)
+void
+ol_txrx_vdev_flush(ol_txrx_vdev_handle data_vdev);
+#else
+#define ol_txrx_vdev_flush(data_vdev) /* no-op */
+#endif /* CONFIG_HL_SUPPORT */
+
+/**
  * @brief Resume tx for the specified virtual device.
  * @details
- *  This function applies only to HL systems - in LL systems, tx flow control
- *  is handled entirely within the target FW.
+ *  This function applies primarily to HL systems, but also applies to
+ *  LL systems that use per-vdev tx queues for MCC or thermal throttling.
  *
  * @param data_vdev - the virtual device being unpaused
  */
@@ -512,7 +530,8 @@ ol_txrx_mgmt_send(
     ol_txrx_vdev_handle vdev,
     adf_nbuf_t tx_mgmt_frm,
     u_int8_t type,
-    u_int8_t use_6mbps);
+    u_int8_t use_6mbps,
+    u_int16_t chanfreq);
 
 /**
  * @brief Setup the monitor mode vap (vdev) for this pdev
@@ -938,5 +957,42 @@ ol_tx_delay_hist(ol_txrx_pdev_handle pdev, u_int16_t *bin_values,
         bin_values, QCA_TX_DELAY_HIST_REPORT_BINS * sizeof(*bin_values));
 }
 #endif
+
+#if defined(QCA_SUPPORT_TX_THROTTLE_LL)
+/**
+ * @brief Set the thermal mitgation throttling level.
+ * @details
+ *  This function applies only to LL systems. This function is used set the
+ *  tx throttle level used for thermal mitigation
+ *
+ * @param pdev - the physics device being throttled
+ */
+void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level);
+#else
+static inline void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev,
+    int level)
+{
+    /* no-op */
+}
+#endif /* QCA_SUPPORT_TX_THROTTLE_LL */
+
+#if defined(QCA_SUPPORT_TX_THROTTLE_LL)
+/**
+ * @brief Configure the thermal mitgation throttling period.
+ * @details
+ *  This function applies only to LL systems. This function is used set the
+ *  period over which data will be throttled
+ *
+ * @param pdev - the physics device being throttled
+ */
+void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev, int period);
+#else
+static inline void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev,
+    int period)
+{
+    /* no-op */
+}
+#endif /* QCA_SUPPORT_TX_THROTTLE_LL */
+
 
 #endif /* _OL_TXRX_CTRL_API__H_ */

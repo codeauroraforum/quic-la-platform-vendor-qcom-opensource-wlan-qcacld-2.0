@@ -44,6 +44,7 @@
 #endif
 #include "adf_nbuf.h"
 #include "wma_api.h"
+#include "vos_utils.h"
 
 #define ENTER() VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO, "Enter:%s", __func__)
 
@@ -332,9 +333,9 @@ static void tlshim_mgmt_rx_dxe_handler(void *context, adf_nbuf_t buflist)
 		 * that has to be delivered to UMAC
 		 */
 		rx_packet =
-			(vos_pkt_t *)vos_mem_malloc(sizeof(vos_pkt_t));
+			(vos_pkt_t *)adf_os_mem_alloc(NULL, sizeof(vos_pkt_t));
 
-		if(rx_packet == NULL) {
+		if(!rx_packet) {
 			TLSHIM_LOGE("Rx Packet Mem Alloc Failed");
 			adf_nbuf_free(cur);
 			goto next_nbuf;
@@ -390,18 +391,28 @@ next_nbuf:
 #define TLSHIM_TGT_NOISE_FLOOR_DBM (-96)
 
 static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
-				       u_int32_t data_len, bool saved_beacon)
+				       u_int32_t data_len, bool saved_beacon, u_int32_t vdev_id)
 {
 	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, NULL);
 	struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
 							   vos_ctx);
 	WMI_MGMT_RX_EVENTID_param_tlvs *param_tlvs = NULL;
 	wmi_mgmt_rx_hdr *hdr = NULL;
+#ifdef WLAN_FEATURE_11W
+        struct wma_txrx_node *iface = NULL;
+	tp_wma_handle wma;
+	u_int8_t *efrm, *orig_hdr;
+#endif /* WLAN_FEATURE_11W */
 
 	vos_pkt_t *rx_pkt;
 	adf_nbuf_t wbuf;
 	struct ieee80211_frame *wh;
 	u_int8_t mgt_type, mgt_subtype;
+
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s: Failed to get TLSHIM context", __func__);
+		return 0;
+	}
 
 	param_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *) data;
 	if (!param_tlvs) {
@@ -410,7 +421,7 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 	}
 
 	hdr = param_tlvs->hdr;
-	if (hdr == NULL) {
+	if (!hdr) {
 		TLSHIM_LOGE("Rx event is NULL");
 		return 0;
 	}
@@ -502,7 +513,7 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 	mgt_type    = (wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 	mgt_subtype = (wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 
-	if (mgt_type == IEEE80211_FC0_TYPE_MGT &&
+	if (!saved_beacon && mgt_type == IEEE80211_FC0_TYPE_MGT &&
 		(mgt_subtype == IEEE80211_FC0_SUBTYPE_BEACON || mgt_subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP))
 	{
 	    /* remember this beacon to be used later for better_ap event */
@@ -516,28 +527,100 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 			tl_shim->last_beacon_len = data_len;
 	    }
 	}
+
+#ifdef WLAN_FEATURE_11W
+	wma = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+	if (wma)
+	        iface = &wma->interfaces[vdev_id];
+	if (iface && iface->rmfEnabled && mgt_type == IEEE80211_FC0_TYPE_MGT &&
+		(mgt_subtype == IEEE80211_FC0_SUBTYPE_DISASSOC ||
+		 mgt_subtype == IEEE80211_FC0_SUBTYPE_DEAUTH ||
+		 mgt_subtype == IEEE80211_FC0_SUBTYPE_ACTION))
+	{
+		if ((wh)->i_fc[1] & IEEE80211_FC1_WEP)
+		{
+			orig_hdr = (u_int8_t*) adf_nbuf_data(wbuf);
+
+			/* Strip privacy headers (and trailer)
+			   for a received frame */
+			vos_mem_move(orig_hdr + IEEE80211_CCMP_HEADERLEN,
+					wh, sizeof(*wh));
+			adf_nbuf_pull_head(wbuf, IEEE80211_CCMP_HEADERLEN);
+			adf_nbuf_trim_tail(wbuf, IEEE80211_CCMP_MICLEN);
+
+			rx_pkt->pkt_meta.mpdu_hdr_ptr = adf_nbuf_data(wbuf);
+			rx_pkt->pkt_meta.mpdu_len = adf_nbuf_len(wbuf);
+			rx_pkt->pkt_meta.mpdu_data_len =
+				rx_pkt->pkt_meta.mpdu_len -
+				rx_pkt->pkt_meta.mpdu_hdr_len;
+			rx_pkt->pkt_meta.mpdu_data_ptr =
+				rx_pkt->pkt_meta.mpdu_hdr_ptr +
+				rx_pkt->pkt_meta.mpdu_hdr_len;
+			rx_pkt->pkt_buf = wbuf;
+		}
+		else
+		{
+			if (IEEE80211_IS_BROADCAST(wh->i_addr1) ||
+				 IEEE80211_IS_MULTICAST(wh->i_addr1))
+			{
+				efrm = adf_nbuf_data(wbuf) + adf_nbuf_len(wbuf);
+				if (vos_is_mmie_valid(iface->key.key,
+					 iface->key.ipn,
+					 (u_int8_t *)wh, efrm))
+				{
+					TLSHIM_LOGD("Protected BC/MC frame MMIE"
+						" validation successful");
+
+					/* Remove MMIE */
+					adf_nbuf_trim_tail(wbuf,
+						vos_get_mmie_size());
+				}
+				else
+				{
+					TLSHIM_LOGE("BC/MC MIC error or MMIE"
+					" not present, dropping the frame");
+					vos_pkt_return_packet(rx_pkt);
+					return 0;
+				}
+			}
+			else
+			{
+				TLSHIM_LOGD("Rx unprotected unicast mgmt frame");
+				rx_pkt->pkt_meta.dpuFeedback =
+					 DPU_FEEDBACK_UNPROTECTED_ERROR;
+			}
+
+		}
+	}
+#endif /* WLAN_FEATURE_11W */
 	return tl_shim->mgmt_rx(vos_ctx, rx_pkt);
 }
 
 static int tlshim_mgmt_rx_wmi_handler(void *context, u_int8_t *data,
 				       u_int32_t data_len)
 {
-	return (tlshim_mgmt_rx_process(context, data, data_len, FALSE));
+	return (tlshim_mgmt_rx_process(context, data, data_len, FALSE, 0));
 }
 #endif
 /*
  * tlshim_mgmt_roam_event_ind() is called from WMA layer when
  * BETTER_AP_FOUND event is received from roam engine.
  */
-int tlshim_mgmt_roam_event_ind(void *context)
+int tlshim_mgmt_roam_event_ind(void *context, u_int32_t vdev_id)
 {
 	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, NULL);
 	struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
 							   vos_ctx);
 	VOS_STATUS ret = VOS_STATUS_SUCCESS;
+
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s: Failed to get TLSHIM context", __func__);
+		return ret;
+	}
+
 	if (tl_shim->last_beacon_data && tl_shim->last_beacon_len)
 	{
-		ret = tlshim_mgmt_rx_process(context, tl_shim->last_beacon_data, tl_shim->last_beacon_len, TRUE);
+		ret = tlshim_mgmt_rx_process(context, tl_shim->last_beacon_data, tl_shim->last_beacon_len, TRUE, vdev_id);
 	}
 	return ret;
 }
@@ -574,6 +657,36 @@ static void tl_shim_flush_rx_frames(void *vos_ctx,
 	clear_bit(TLSHIM_FLUSH_CACHE_IN_PROGRESS, &sta_info->flags);
 }
 
+static VOS_STATUS tlshim_data_rx_cb(struct txrx_tl_shim_ctx *tl_shim,
+				    adf_nbuf_t buf, u_int16_t staid)
+{
+	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, tl_shim);
+	struct tlshim_sta_info *sta_info;
+	VOS_STATUS ret;
+
+	if (!vos_ctx)
+		return VOS_STATUS_E_FAILURE;
+	sta_info = &tl_shim->sta_info[staid];
+	if (unlikely(!sta_info->registered)) {
+		adf_nbuf_free(buf);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	adf_os_spin_lock_bh(&tl_shim->bufq_lock);
+	sta_info->suspend_flush = 1;
+	adf_os_spin_unlock_bh(&tl_shim->bufq_lock);
+
+	/* Flush the cached frames to HDD before passing new rx frame */
+	tl_shim_flush_rx_frames(vos_ctx, tl_shim, staid, 0);
+	ret = sta_info->data_rx(vos_ctx, buf, staid);
+	if (ret != VOS_STATUS_SUCCESS) {
+		TLSHIM_LOGW("Frame Rx to HDD failed");
+		adf_nbuf_free(buf);
+		return VOS_STATUS_E_FAILURE;
+	}
+	return VOS_STATUS_SUCCESS;
+}
+
 /*
  * Rx callback from txrx module for data reception.
  */
@@ -581,7 +694,10 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 				   adf_nbuf_t rx_buf_list)
 {
 	struct txrx_tl_shim_ctx *tl_shim;
+#if defined(IPA_OFFLOAD) || \
+    (defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD))
 	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, context);
+#endif
 	struct tlshim_sta_info *sta_info;
 	adf_nbuf_t buf, next_buf;
 
@@ -623,6 +739,7 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 		 * there is no cached frames have any significant impact on
 		 * performance.
 		 */
+#ifdef IPA_OFFLOAD
 		VOS_STATUS ret;
 		adf_os_spin_lock_bh(&tl_shim->bufq_lock);
 		sta_info->suspend_flush = 1;
@@ -630,7 +747,6 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 
 		/* Flush the cached frames to HDD before passing new rx frame */
 		tl_shim_flush_rx_frames(vos_ctx, tl_shim, staid, 0);
-#ifdef IPA_OFFLOAD
 		ret = sta_info->data_rx(vos_ctx, rx_buf_list, staid);
 		if (ret == VOS_STATUS_E_INVAL) {
 #endif
@@ -639,26 +755,59 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 			next_buf = adf_nbuf_queue_next(buf);
 
 #if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
-        /*
-         * in case following returns true, a defered task was created
-         * inside function, which does following:
-         * 1) create vos packet
-         * 2) send to PE/LIM
-         * 3) free the involved sk_buff
-         */
-        if(tlshim_check_n_process_iapp_frame(vos_ctx, buf, staid)) {
-            buf = next_buf;
-            continue;
-        }
+			/*
+			 * in case following returns true, a defered task was created
+			 * inside function, which does following:
+			 * 1) create vos packet
+			 * 2) send to PE/LIM
+			 * 3) free the involved sk_buff
+			 */
+			if(tlshim_check_n_process_iapp_frame(vos_ctx,
+							buf, staid)) {
+				buf = next_buf;
+				continue;
+			}
+
+			/*
+			 * above returned false, the packet was not IAPP.
+			 * process normally
+			 */
 #endif
-            /*
-             * above returned false, the packet was not IAPP.
-             * process normally
-             */
-            ret = sta_info->data_rx(vos_ctx, buf, staid);
-            if (ret != VOS_STATUS_SUCCESS)
-                adf_nbuf_free(buf);
-            buf = next_buf;
+#ifdef QCA_CONFIG_SMP
+			/*
+			 * If the kernel is SMP, schedule rx thread to
+			 * better use multicores.
+			 */
+			if (!tl_shim->enable_rxthread) {
+				tlshim_data_rx_cb(tl_shim, buf, staid);
+			} else {
+				pVosSchedContext sched_ctx =
+						get_vos_sched_ctxt();
+				struct VosTlshimPkt *pkt;
+
+				if (unlikely(!sched_ctx)) {
+					adf_nbuf_free(buf);
+					buf = next_buf;
+					continue;
+				}
+				pkt = vos_alloc_tlshim_pkt(sched_ctx);
+				if (!pkt) {
+					TLSHIM_LOGW("No available Rx message buffer");
+					adf_nbuf_free(buf);
+					buf = next_buf;
+					continue;
+				}
+				pkt->callback = (vos_tlshim_cb)
+						tlshim_data_rx_cb;
+				pkt->context = (void *) tl_shim;
+				pkt->Rxpkt = (void *) buf;
+				pkt->staId = staid;
+				vos_indicate_rxpkt(sched_ctx, pkt);
+			}
+#else /* QCA_CONFIG_SMP */
+			tlshim_data_rx_cb(tl_shim, buf, staid);
+#endif /* QCA_CONFIG_SMP */
+			buf = next_buf;
 		}
 #ifdef IPA_OFFLOAD
 	}
@@ -717,6 +866,12 @@ void WLANTL_RegisterVdev(void *vos_ctx, void *vdev)
 	struct ol_txrx_vdev_t *vdev_handle = (struct ol_txrx_vdev_t  *) vdev;
 
 	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s: Failed to get TLSHIM context", __func__);
+		return;
+	}
+
 	txrx_ops.rx.std = tlshim_data_rx_handler;
 	wdi_in_osif_vdev_register(vdev_handle, tl_shim, &txrx_ops);
 	/* TODO: Keep vdev specific tx callback, if needed */
@@ -737,6 +892,15 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 	struct ol_txrx_peer_t *peer;
 
 	ENTER();
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return skb;
+	}
+
+	if (!adf_ctx) {
+		TLSHIM_LOGE("adf_ct is NULL");
+		return skb;
+	}
 
 	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_TL, NULL)) {
 		TLSHIM_LOGP("%s: Driver load/unload in progress", __func__);
@@ -943,22 +1107,26 @@ VOS_STATUS WLANTL_EnableUAPSDForAC(void *vos_ctx, u_int8_t sta_id,
 {
 	tp_wma_handle wma_handle;
 	t_wma_trigger_uapsd_params uapsd_params;
+	struct txrx_tl_shim_ctx *tl_shim;
 
 	ENTER();
 
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+	if (!wma_handle) {
+		TLSHIM_LOGE("wma_handle is NULL");
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return VOS_STATUS_E_FAILURE;
+	}
 
 	uapsd_params.wmm_ac = ac;
 	uapsd_params.user_priority = pri;
 	uapsd_params.service_interval = srvc_int;
-
-	/*
-	 * Since Delayed Interval is not available
-	 * use suspend interval for delayed interval
-	 * for now.
-	 * TODO: Need to pass Delayed Interval as well
-	 */
-	uapsd_params.delay_interval = sus_int;
+	uapsd_params.delay_interval = tl_shim->delay_interval;
 	uapsd_params.suspend_interval = sus_int;
 
 	if(VOS_STATUS_SUCCESS !=
@@ -974,7 +1142,38 @@ VOS_STATUS WLANTL_EnableUAPSDForAC(void *vos_ctx, u_int8_t sta_id,
 VOS_STATUS WLANTL_DisableUAPSDForAC(void *vos_ctx, u_int8_t sta_id,
 				    WLANTL_ACEnumType ac, v_U32_t sessionId)
 {
-	/* TBD */
+	tp_wma_handle wma_handle;
+	enum uapsd_ac access_category;
+	ENTER();
+
+	switch (ac) {
+		case WLANTL_AC_BK:
+			access_category = UAPSD_BK;
+			break;
+		case WLANTL_AC_BE:
+			access_category = UAPSD_BE;
+			break;
+		case WLANTL_AC_VI:
+			access_category = UAPSD_VI;
+			break;
+		case WLANTL_AC_VO:
+			access_category = UAPSD_VO;
+			break;
+		default:
+			return VOS_STATUS_E_FAILURE;
+	}
+
+	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+	if (!wma_handle) {
+		TLSHIM_LOGE("wma handle is NULL");
+		return VOS_STATUS_E_FAILURE;
+	}
+	if (VOS_STATUS_SUCCESS !=
+	wma_disable_uapsd_per_ac(wma_handle, sessionId, access_category)) {
+		TLSHIM_LOGE("Failed to disable uapsd for ac %d for sessionId %d",
+					ac, sessionId);
+		return VOS_STATUS_E_FAILURE;
+	}
 	return VOS_STATUS_SUCCESS;
 }
 
@@ -987,6 +1186,7 @@ VOS_STATUS WLANTL_DeRegisterMgmtFrmClient(void *vos_ctx)
 #else
 	tp_wma_handle wma_handle;
 #endif
+	ENTER();
 
 #ifdef QCA_WIFI_FTM
 	if (vos_get_conparam() == VOS_FTM_MODE)
@@ -995,10 +1195,19 @@ VOS_STATUS WLANTL_DeRegisterMgmtFrmClient(void *vos_ctx)
 
 	tl_shim = vos_get_context(VOS_MODULE_ID_TL,
 				  vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s: Failed to get TLSHIM context", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 
 #ifdef QCA_WIFI_ISOC
 	txrx_pdev = vos_get_context(VOS_MODULE_ID_TXRX,
 				    vos_ctx);
+	if (!txrx_pdev) {
+		TLSHIM_LOGE("%s: Failed to get TXRX context", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+
 	htt_dxe_pdev = txrx_pdev->htt_pdev;
 
 	if (dmux_dxe_register_callback_rx_mgmt(htt_dxe_pdev->dmux_dxe_pdev,
@@ -1008,6 +1217,10 @@ VOS_STATUS WLANTL_DeRegisterMgmtFrmClient(void *vos_ctx)
 	}
 #else
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+	if (!wma_handle) {
+		TLSHIM_LOGE("%s: Failed to get WMA context", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 
 	if (wmi_unified_unregister_event_handler(wma_handle->wmi_handle,
 						 WMI_MGMT_RX_EVENTID) != 0) {
@@ -1026,10 +1239,18 @@ VOS_STATUS WLANTL_RegisterMgmtFrmClient(void *vos_ctx,
 							   vos_ctx);
 
 #ifdef QCA_WIFI_ISOC
-	 ol_txrx_pdev_handle txrx_pdev = vos_get_context(VOS_MODULE_ID_TXRX,
+	ol_txrx_pdev_handle txrx_pdev = vos_get_context(VOS_MODULE_ID_TXRX,
 							 vos_ctx);
-	 struct htt_dxe_pdev_t *htt_dxe_pdev = txrx_pdev->htt_pdev;
+	struct htt_dxe_pdev_t *htt_dxe_pdev = txrx_pdev->htt_pdev;
+#else
+	tp_wma_handle wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+#endif
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s: Failed to get TLSHIM context", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 
+#ifdef QCA_WIFI_ISOC
 	if (dmux_dxe_register_callback_rx_mgmt(htt_dxe_pdev->dmux_dxe_pdev,
 					       tlshim_mgmt_rx_dxe_handler,
 					       tl_shim) != 0) {
@@ -1037,8 +1258,10 @@ VOS_STATUS WLANTL_RegisterMgmtFrmClient(void *vos_ctx,
 		return VOS_STATUS_E_FAILURE;
 	}
 #else
-	tp_wma_handle wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
-
+	if (!wma_handle) {
+		TLSHIM_LOGE("%s: Failed to get WMA context", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 	if (wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					       WMI_MGMT_RX_EVENTID,
 					       tlshim_mgmt_rx_wmi_handler)
@@ -1055,10 +1278,27 @@ VOS_STATUS WLANTL_RegisterMgmtFrmClient(void *vos_ctx,
 /*
  * Return the data rssi for the given peer.
  */
-VOS_STATUS WLANTL_GetRssi(void *vos_ctx, u_int8_t sta_id, v_S7_t *rssi)
+VOS_STATUS WLANTL_GetRssi(void *vos_ctx, u_int8_t sta_id, v_S7_t *rssi, void *pGetRssiReq)
 {
-	/* TBD */
-	return VOS_STATUS_SUCCESS;
+	tp_wma_handle wma_handle;
+
+	ENTER();
+
+	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+	if (!wma_handle) {
+		TLSHIM_LOGE("wma_handle is NULL");
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	if(VOS_STATUS_SUCCESS !=
+		wma_send_snr_request(wma_handle, pGetRssiReq))
+	{
+		TLSHIM_LOGE("Failed to Trigger wma stats request");
+		return VOS_STATUS_E_FAILURE;
+	}
+	/* dont send success, otherwise call back
+	 * will released with out values */
+	return VOS_STATUS_E_BUSY;
 }
 
 /*
@@ -1146,7 +1386,20 @@ VOS_STATUS WLANTL_ClearSTAClient(void *vos_ctx, u_int8_t sta_id)
 	}
 
 	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s: Failed to get TLSHIM context", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 	tl_shim->sta_info[sta_id].registered = 0;
+
+#ifdef QCA_CONFIG_SMP
+	{
+		pVosSchedContext sched_ctx = get_vos_sched_ctxt();
+		/* Drop pending Rx frames in VOSS */
+		if (sched_ctx)
+			vos_drop_rxpkt_by_staid(sched_ctx, sta_id);
+	}
+#endif
 
 	/* Purge the cached rx frame queue */
 	tl_shim_flush_rx_frames(vos_ctx, tl_shim, sta_id, 1);
@@ -1187,6 +1440,10 @@ VOS_STATUS WLANTL_RegisterSTAClient(void *vos_ctx,
 		return VOS_STATUS_E_FAULT;
 
 	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return VOS_STATUS_E_FAULT;
+	}
 	tl_shim->sta_info[sta_desc->ucSTAId].data_rx = rxcb;
 	tl_shim->sta_info[sta_desc->ucSTAId].registered = true;
 	param.qos_capable =  sta_desc->ucQosEnabled;
@@ -1236,13 +1493,15 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 
 	ENTER();
 	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return VOS_STATUS_E_FAILURE;
+	}
 
-#ifdef WLAN_OPEN_SOURCE
 #ifdef FEATURE_WLAN_CCX
-	cancel_work_sync(&tl_shim->iapp_work.deferred_work);
+	vos_flush_work(&tl_shim->iapp_work.deferred_work);
 #endif
-	cancel_work_sync(&tl_shim->cache_flush_work);
-#endif
+	vos_flush_work(&tl_shim->cache_flush_work);
 
 	wdi_in_pdev_detach(((pVosContextType) vos_ctx)->pdev_txrx_ctx, 1);
 	// Delete beacon buffer hanging off tl_shim
@@ -1298,6 +1557,8 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	 */
 
 	tl_shim->ip_checksum_offload = tl_cfg->ip_checksum_offload;
+	tl_shim->delay_interval = tl_cfg->uDelayedTriggerFrmInt;
+	tl_shim->enable_rxthread = tl_cfg->enable_rxthread;
 	return status;
 }
 

@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 #ifndef __CEPCI_H__
 #define __CEPCI_H__
 

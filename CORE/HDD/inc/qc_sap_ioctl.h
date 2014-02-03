@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #ifndef _QC_SAP_IOCTL_H_
 #define _QC_SAP_IOCTL_H_
 
@@ -242,6 +241,8 @@ typedef struct
 #define QCSAP_IOCTL_SET_TX_POWER        (SIOCIWFIRSTPRIV+20) 
 #define QCSAP_IOCTL_GET_STA_INFO        (SIOCIWFIRSTPRIV+21)
 #define QCSAP_IOCTL_SET_MAX_TX_POWER    (SIOCIWFIRSTPRIV+22)
+#define QCSAP_IOCTL_DATAPATH_SNAP_SHOT  (SIOCIWFIRSTPRIV+23)
+#define QCSAP_IOCTL_SET_TRAFFIC_MONITOR (SIOCIWFIRSTPRIV+24)
 
 #define MAX_VAR_ARGS         7
 #define QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED (SIOCIWFIRSTPRIV + 31)
@@ -270,8 +271,10 @@ typedef struct
 #define QCASAP_TXRX_FWSTATS_RESET          41
 #define QCSAP_PARAM_SETRTSCTS              42
 #define QCSAP_PARAM_GETRTSCTS              43
-#define QCASAP_SET_11N_RATE                45
-#define QCASAP_SET_VHT_RATE                46
+#define QCASAP_SET_11N_RATE                44
+#define QCASAP_SET_VHT_RATE                45
+#define QCASAP_SET_SHORT_GI                46
+#define QCASAP_GET_SHORT_GI                47
 #endif /* QCA_WIFI_2_0 */
 
 enum { 
@@ -283,6 +286,9 @@ enum {
     QCSAP_PARAM_HIDE_SSID = 8,
     QCSAP_PARAM_AUTO_CHANNEL = 9,
     QCSAP_PARAM_SET_MC_RATE = 10,
+    QCSAP_PARAM_SET_TXRX_FW_STATS=11,
+    QCSAP_PARAM_SET_MCC_CHANNEL_LATENCY = 12,
+    QCSAP_PARAM_SET_MCC_CHANNEL_QUOTA = 13,
 };
 
 int iw_softap_get_channel_list(struct net_device *dev, 

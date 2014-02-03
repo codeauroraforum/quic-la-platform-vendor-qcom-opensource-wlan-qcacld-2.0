@@ -24,16 +24,11 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /******************************************************************************
 *
 * Name:  pmc.h
 *
 * Description: Power Management Control (PMC) internal definitions.
-*
-* Copyright 2008 (c) Qualcomm Technologies, Inc.  
-  All Rights Reserved.
-* Qualcomm Technologies Confidential and Proprietary.
 *
 ******************************************************************************/
 
@@ -55,6 +50,10 @@
 
 /* Auto Ps Entry Timer Default value - 1000 ms */
 #define AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE 1000
+
+/* Auto Deferred Ps Entry Timer value - 5000 ms */
+#define AUTO_DEFERRED_PS_ENTRY_TIMER_DEFAULT_VALUE 5000
+
 
 /* Host power sources. */
 typedef enum ePowerSource
@@ -159,12 +158,12 @@ typedef struct sPmcInfo
     void (*impsCallbackRoutine) (void *callbackContext, eHalStatus status);  /* routine to call when IMPS period
                                                                                 has finished */ 
     void *impsCallbackContext;  /* value to be passed as parameter to routine specified above */
-    tPalTimerHandle hImpsTimer;  /* timer to use with IMPS */
+    vos_timer_t hImpsTimer;  /* timer to use with IMPS */
     vos_timer_t hTrafficTimer;  /* timer to measure traffic for BMPS */
 #ifdef FEATURE_WLAN_DIAG_SUPPORT    
-    tPalTimerHandle hDiagEvtTimer;  /* timer to report PMC state through DIAG event */
+    vos_timer_t hDiagEvtTimer;  /* timer to report PMC state through DIAG event */
 #endif
-    tPalTimerHandle hExitPowerSaveTimer;  /* timer for deferred exiting of power save mode */
+    vos_timer_t hExitPowerSaveTimer;  /* timer for deferred exiting of power save mode */
     tDblLinkList powerSaveCheckList; /* power save check routine list */
     tDblLinkList requestFullPowerList; /* request full power callback routine list */
     tANI_U32 cLastTxUnicastFrames;  /* transmit unicast frame count at last BMPS traffic timer expiration */
@@ -212,6 +211,17 @@ typedef struct sPmcInfo
     v_BOOL_t    ImpsReqTimerFailed;
     tANI_U8     ImpsReqFailCnt;
     tANI_U8     ImpsReqTimerfailCnt;
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+   /*HDD callback to be called after receiving SET BATCH SCAN RSP from FW*/
+   hddSetBatchScanReqCallback setBatchScanReqCallback;
+   void * setBatchScanReqCallbackContext;
+   /*HDD callback to be called after receiving BATCH SCAN iRESULT IND from FW*/
+   hddTriggerBatchScanResultIndCallback batchScanResultCallback;
+   void * batchScanResultCallbackContext;
+#endif
+
+
 } tPmcInfo, *tpPmcInfo;
 
 
@@ -281,6 +291,9 @@ typedef struct sPsOffloadPerSessionInfo
     /* TRUE if Sta Mode Ps is Enabled */
     tANI_BOOLEAN configStaPsEnabled;
 
+    /* TRUE if deferred Sta Mode Ps is Enabled */
+    tANI_BOOLEAN configDefStaPsEnabled;
+
     /*
      * Indicates current uapsd status
      * Enabled/Disabled/Required
@@ -337,6 +350,7 @@ typedef struct sPsOffloadPerSessionInfo
 #ifdef FEATURE_WLAN_TDLS
     v_BOOL_t isTdlsPowerSaveProhibited;
 #endif
+    tANI_BOOLEAN UapsdEnabled;
 }tPsOffloadPerSessionInfo,*tpPsOffloadPerSessionInfo;
 
 typedef struct sPmcOffloadInfo
@@ -417,9 +431,9 @@ eHalStatus pmcOffloadClosePerSession(tHalHandle hHal, tANI_U32 sessionId);
 eHalStatus pmcOffloadStartPerSession(tHalHandle hHal, tANI_U32 sessionId);
 eHalStatus pmcOffloadStopPerSession(tHalHandle hHal, tANI_U32 sessionId);
 
-
 eHalStatus pmcOffloadStartAutoStaPsTimer (tpAniSirGlobal pMac,
-                                          tANI_U32 sessionId);
+                                          tANI_U32 sessionId,
+                                          tANI_U32 timerValue);
 
 void pmcOffloadStopAutoStaPsTimer(tpAniSirGlobal pMac, tANI_U32 sessionId);
 

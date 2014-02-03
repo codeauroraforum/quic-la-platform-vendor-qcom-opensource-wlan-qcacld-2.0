@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #include <adf_nbuf.h>         /* adf_nbuf_t */
 
 #include <ol_htt_rx_api.h>    /* htt_rx_pn_t, etc. */
@@ -186,7 +185,7 @@ ol_rx_pn_check_base(
                 pdev->ctrl_pdev,
                 vdev->vdev_id, peer->mac_addr.raw, tid,
                 htt_rx_mpdu_desc_tsf32(pdev->htt_pdev, rx_desc),
-                OL_RX_ERR_PN, mpdu);
+                OL_RX_ERR_PN, mpdu, NULL, 0);
             /* free all MSDUs within this MPDU */
             do {
                 adf_nbuf_t next_msdu;

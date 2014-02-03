@@ -55,6 +55,7 @@ typedef void __iomem *A_target_id_t;
 #define HIF_TYPE_AR6004 5
 #define HIF_TYPE_AR9888 6
 #define HIF_TYPE_AR6320 7
+#define HIF_TYPE_AR6320V2 8
 /* For attaching Peregrine 2.0 board host_reg_tbl only */
 #define HIF_TYPE_AR9888V2 8
 
@@ -641,6 +642,8 @@ extern void HIFTargetSleepStateAdjust(A_target_id_t targid, A_BOOL sleep_ok, A_B
 extern void
 HIFSetTargetSleep(HIF_DEVICE *hif_device, A_BOOL sleep_ok, A_BOOL wait_for_it);
 extern A_BOOL HIFTargetForcedAwake(A_target_id_t targid);
+extern void
+HIFCancelDeferredTargetSleep(HIF_DEVICE *hif_device);
 
 #define A_TARGET_ID(hifDevice)                HIFGetTargetId(hifDevice)
 

@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /* standard header files */
 #include <adf_nbuf.h>         /* adf_nbuf_map */
 #include <adf_os_mem.h>       /* adf_os_mem_cmp */
@@ -185,6 +184,10 @@ ol_rx_fwd_check(
              * from the target, so we can locate the tx vdev.
              */
             tx_vdev = vdev;
+            /* Copying TID value of RX packet to forwarded
+             * packet
+             */
+            adf_nbuf_set_tid(msdu, tid);
             /*
              * This MSDU needs to be forwarded to the tx path.
              * Check whether it also needs to be sent to the OS shim,

@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /******************************************************************************
  * wlan_ptt_sock_svc.c
  *
@@ -134,6 +133,11 @@ static void ptt_sock_proc_reg_req(tAniHdr *wmsg, int radio)
    //send reg response message to the application
    rspmsg.ret = ANI_NL_MSG_OK;
    rspmsg.regReq.type = reg_req->type;
+#ifdef WLAN_KD_READY_NOTIFIER
+   /* NL client try to registration
+    * to make sure connection, broadcast READY notification */
+   nl_srv_nl_ready_indication();
+#endif /* WLAN_KD_READY_NOTIFIER */
    /*Save the pid*/    
    pAdapterHandle->ptt_pid = reg_req->pid;   
    rspmsg.regReq.pid= reg_req->pid;
@@ -192,24 +196,24 @@ static void ptt_proc_quarky_msg(tAniNlHdr *wnl, tAniHdr *wmsg, int radio)
       {
          case PTT_MSG_READ_REGISTER:
             reg_addr = *(v_U32_t*) ((char*)wmsg + 8);
-            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_READ_REGISTER [0x%08lX]\n",
+            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_READ_REGISTER [0x%08X]\n",
                __func__, reg_addr);
             vosStatus = sme_DbgReadRegister(pAdapterHandle->hHal, reg_addr, &reg_val);
             *(v_U32_t*) ((char*)wmsg + 12) = reg_val;
             if(vosStatus != VOS_STATUS_SUCCESS)
-               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Read Register [0x%08lX] failed!!\n",
+               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Read Register [0x%08X] failed!!\n",
                __func__, reg_addr);
             ptt_sock_send_msg_to_app(wmsg, 0, ANI_NL_MSG_PUMAC, wnl->nlh.nlmsg_pid);
             break;
          case PTT_MSG_WRITE_REGISTER:
             reg_addr = *(v_U32_t*) ((const unsigned char*)wmsg + 8);
             reg_val = *(v_U32_t*)((const unsigned char*)wmsg + 12);
-            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_WRITE_REGISTER Addr [0x%08lX] value [0x%08lX]\n",
+            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_WRITE_REGISTER Addr [0x%08X] value [0x%08X]\n",
                __func__, reg_addr, reg_val);
             vosStatus = sme_DbgWriteRegister(pAdapterHandle->hHal, reg_addr, reg_val);
             if(vosStatus != VOS_STATUS_SUCCESS)
             {
-               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Write Register [0x%08lX] value [0x%08lX] failed!!\n",
+               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Write Register [0x%08X] value [0x%08X] failed!!\n",
                   __func__, reg_addr, reg_val);
             }
             //send message to the app
@@ -218,12 +222,12 @@ static void ptt_proc_quarky_msg(tAniNlHdr *wnl, tAniHdr *wmsg, int radio)
          case PTT_MSG_READ_MEMORY:
             reg_addr = *(v_U32_t*) ((char*)wmsg + 8);
             len_payload = *(v_U32_t*) ((char*)wmsg + 12);
-            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_READ_MEMORY addr [0x%08lX] bytes [0x%08lX]\n",
+            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_READ_MEMORY addr [0x%08X] bytes [0x%08X]\n",
                __func__, reg_addr, len_payload);
             buf = (v_U8_t*)wmsg + 16;
             vosStatus = sme_DbgReadMemory(pAdapterHandle->hHal, reg_addr, buf, len_payload);
             if(vosStatus != VOS_STATUS_SUCCESS) {
-               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Memory read failed for [0x%08lX]!!\n",
+               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Memory read failed for [0x%08X]!!\n",
                   __func__, reg_addr);
             }
             ptt_sock_swap_32(buf, len_payload);
@@ -233,14 +237,14 @@ static void ptt_proc_quarky_msg(tAniNlHdr *wnl, tAniHdr *wmsg, int radio)
          case PTT_MSG_WRITE_MEMORY:
             reg_addr = *(v_U32_t*) ((char*)wmsg + 8);
             len_payload = *(v_U32_t*) ((char*)wmsg + 12);
-            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_DBG_WRITE_MEMORY addr [0x%08lX] bytes [0x%08lX]\n",
+            PTT_TRACE(VOS_TRACE_LEVEL_INFO, "%s: PTT_MSG_DBG_WRITE_MEMORY addr [0x%08X] bytes [0x%08X]\n",
                __func__, reg_addr, len_payload);
             buf = (v_U8_t*)wmsg + 16;
             ptt_sock_swap_32(buf, len_payload);
             vosStatus = sme_DbgWriteMemory(pAdapterHandle->hHal, reg_addr, buf, len_payload);
             if(vosStatus != VOS_STATUS_SUCCESS)
             {
-               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Memory write failed for addr [0x%08lX]!!\n",
+               PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: Memory write failed for addr [0x%08X]!!\n",
                   __func__, reg_addr);
             }
             //send message to the app
@@ -300,6 +304,9 @@ int ptt_sock_activate_svc(void *pAdapter)
    pAdapterHandle = (struct hdd_context_s*)pAdapter;
    nl_srv_register(ANI_NL_MSG_PUMAC, ptt_sock_rx_nlink_msg);
    nl_srv_register(ANI_NL_MSG_PTT, ptt_sock_rx_nlink_msg);
+#ifdef WLAN_KD_READY_NOTIFIER
+   nl_srv_nl_ready_indication();
+#endif /* WLAN_KD_READY_NOTIFIER */
    return 0;
 }
 #endif //PTT_SOCK_SVC_ENABLE

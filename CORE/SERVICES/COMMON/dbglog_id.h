@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 #ifndef _DBGLOG_ID_H_
 #define _DBGLOG_ID_H_
 
@@ -137,6 +136,8 @@ extern "C" {
 #define PS_STA_SET_PARAM                            6
 #define PS_STA_SPECPOLL_TIMER_STARTED               7
 #define PS_STA_SPECPOLL_TIMER_STOPPED               8
+#define PS_STA_AVG_CHANNEL_CONGESTION               9
+#define PS_STA_DEFINITION_END                       10
 
 /** RESMGR dbg ids */
 /* TODO: 1. Segregate IDs as per sub-module. (Give 100 per sub-module?)
@@ -203,7 +204,8 @@ extern "C" {
 #define RESMGR_DYN_SCH_HOME_CH_QUOTA                57
 #define RESMGR_OCS_REG_RECAL_QUOTA_NOTIF            58
 #define RESMGR_OCS_DEREG_RECAL_QUOTA_NOTIF          59
-#define RESMGR_DEFINITION_END                       60
+#define RESMGR_DYN_SCH_CH_STATS_END                 60
+#define RESMGR_DEFINITION_END                       61
 
 /* RESMGR CHNMGR debug ids */
 #define RESMGR_CHMGR_DEFINITION_START               0
@@ -236,7 +238,8 @@ extern "C" {
 #define VDEV_MGR_VDEV_PAUSE_DELAY_UPDATE            16
 #define VDEV_MGR_VDEV_PAUSE_FAIL                    17
 #define VDEV_MGR_GEN_PERIODIC_NOA                   18
-#define VDEV_MGR_DEFINITION_END                     19
+#define VDEV_MGR_OFF_CHAN_GO_CH_REQ_SETUP           19
+#define VDEV_MGR_DEFINITION_END                     20
 
 /* WHAL debug identifier definitions */
 #define WHAL_DBGID_DEFINITION_START                 0
@@ -277,7 +280,12 @@ extern "C" {
 #define WHAL_ERROR_INTERRUPT_BB_PANIC              35
 #define WHAL_ERROR_PAPRD_MAXGAIN_ABOVE_WINDOW      36
 #define WHAL_ERROR_QCU_HW_PAUSE_MISMATCH           37
-#define WHAL_DBGID_DEFINITION_END                  38
+#define WHAL_ERROR_POWER_RFLP_CONFIG               38
+#define WHAL_ERROR_POWER_RFLP_SYNTHBYPASS_CONFIG   39
+#define WHAL_ERROR_POWER_RFLP_BIAS2X_CONFIG        40
+#define WHAL_ERROR_POWER_RFLP_PLLBYPASS_CONFIG     41
+#define WHAL_ERROR_POWER_RFLP_OFF1CHAN_CONFIG      42
+#define WHAL_DBGID_DEFINITION_END                  43
 
 #define COEX_DEBUGID_START              0
 #define BTCOEX_DBG_MCI_1                            1
@@ -520,7 +528,24 @@ extern "C" {
 #define COEX_MWS_ERROR                              236
 #define COEX_MWS_ANT_DIVERSITY                      237
 
-#define COEX_DEBUG_ID_END                           238
+#define COEX_P2P_GO                                 238
+#define COEX_P2P_CLIENT                             239
+#define COEX_SCC_1                                  240
+#define COEX_SCC_2                                  241
+#define COEX_MCC_1                                  242
+#define COEX_MCC_2                                  243
+#define COEX_TRF_SHAPE_NOA                          244
+#define COEX_NOA_ONESHOT                            245
+#define COEX_NOA_PERIODIC                           246
+#define COEX_LE_1                                   247
+#define COEX_LE_2                                   248
+#define COEX_ANT_1                                  249
+#define COEX_ANT_2                                  250
+#define COEX_ENTER_NOA                              251
+#define COEX_EXIT_NOA                               252
+#define COEX_BT_SCAN_PROTECT                        253
+
+#define COEX_DEBUG_ID_END                           254
 
 #define SCAN_START_COMMAND_FAILED                   0
 #define SCAN_STOP_COMMAND_FAILED                    1
@@ -540,6 +565,9 @@ extern "C" {
 #define BEACON_EVENT_EARLY_RX_SLEEP_SLOP            2
 #define BEACON_EVENT_EARLY_RX_CONT_BMISS_TIMEOUT    3
 #define BEACON_EVENT_EARLY_RX_PAUSE_SKIP_BCN_NUM    4
+#define BEACON_EVENT_EARLY_RX_CLK_DRIFT             5
+#define BEACON_EVENT_EARLY_RX_AP_DRIFT              6
+#define BEACON_EVENT_EARLY_RX_BCN_TYPE              7
 
 #define RATECTRL_DBGID_DEFINITION_START             0
 #define RATECTRL_DBGID_ASSOC                        1
@@ -665,7 +693,10 @@ extern "C" {
 #define OFFLOADMGR_NO_REG_DATA_HANDLERS                3
 #define OFFLOADMGR_NO_REG_EVENT_HANDLERS               4
 #define OFFLOADMGR_REG_OFFLOAD_FAILED                  5
-#define OFFLOADMGR_DBGID_DEFINITION_END                6
+#define OFFLOADMGR_DEREG_OFFLOAD_FAILED                6
+#define OFFLOADMGR_ENTER_FAILED                        7
+#define OFFLOADMGR_EXIT_FAILED                         8
+#define OFFLOADMGR_DBGID_DEFINITION_END                9
 
 /*Resource Debug IDs*/
 #define RESOURCE_DBGID_DEFINITION_START             0
@@ -720,7 +751,8 @@ extern "C" {
 #define P2P_GO_GET_NOA_INFO                                 35
 #define P2P_GO_ADD_ONE_SHOT_NOA                             36
 #define P2P_GO_GET_NOA_IE                                   37
-#define P2P_DBGID_DEFINITION_END                            38
+#define P2P_GO_BCN_TX_COMP                                  38
+#define P2P_DBGID_DEFINITION_END                            39
 
 
 //CSA modules DBGIDs
@@ -753,7 +785,9 @@ extern "C" {
 #define WLAN_CHATTER_MC_FILTER_DEL  10
 #define WLAN_CHATTER_MC_FILTER_ALLOW  11
 #define WLAN_CHATTER_MC_FILTER_DROP  12
-#define WLAN_CHATTER_DBGID_DEFINITION_END 13
+#define WLAN_CHATTER_COALESCING_FILTER_ADD      13
+#define WLAN_CHATTER_COALESCING_FILTER_DEL      14
+#define WLAN_CHATTER_DBGID_DEFINITION_END       15
 
 #define WOW_DBGID_DEFINITION_START 0
 #define WOW_ENABLE_CMDID 1
@@ -905,6 +939,37 @@ extern "C" {
 #define WLAN_HB_DBGID_UDP_TX                            13
 #define WLAN_HB_DBGID_TCP_TX                            14
 #define WLAN_HB_DBGID_DEFINITION_END                    15
+
+/* Thermal Manager DBGIDs*/
+#define THERMAL_MGR_NEW_THRESH        0
+#define THERMAL_MGR_THRESH_CROSSED    1
+
+/* WLAN PHYERR DFS(parse/filter) DBGIDs */
+#define WLAN_PHYERR_DFS_DBGID_DEFINITION_START    0
+#define WLAN_PHYERR_DFS_PHYERR_INFO_CHAN_BUFLEN   1
+#define WLAN_PHYERR_DFS_PHYERR_INFO_PPDU          2
+#define WLAN_PHYERR_DFS_DBDID_RADAR_SUMMARY       3
+#define WLAN_PHYERR_DFS_DBDID_SEARCH_FFT          4
+#define WLAN_PHTERR_DFS_DBDID_FILTER_STATUS       5
+
+/* RMC DBGIDs */
+#define RMC_DBGID_DEFINITION_START             0
+#define RMC_SM_INIT_ERR                        1
+#define RMC_VDEV_ALLOC_ERR                     2
+#define RMC_CREATE_INSTANCE                    3
+#define RMC_DELETE_INSTANCE                    4
+#define RMC_NEW_PRI_LEADER                     5
+#define RMC_NEW_SEC_LEADER                     6
+#define RMC_NO_LDR_CHANGE                      7
+#define RMC_LDR_INFORM_SENT                    8
+#define RMC_PEER_ADD                           9
+#define RMC_PEER_DELETE                        10
+#define RMC_PEER_UNKNOWN                       11
+#define RMC_PRI_LDR_RSSI_UPDATE                12
+#define RMC_SEC_LDR_RSSI_UPDATE                13
+#define RMC_SET_MODE                           14
+#define RMC_SET_ACTION_PERIOD                  15
+#define RMC_DBGID_DEFINITION_END               16
 
 #ifdef __cplusplus
 }

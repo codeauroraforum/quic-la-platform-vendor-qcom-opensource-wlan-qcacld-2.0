@@ -25,6 +25,7 @@
  * to the Linux Foundation.
  */
 
+
 /**
  * @defgroup adf_nbuf_public network buffer API
  */ 
@@ -989,6 +990,19 @@ static inline a_uint8_t
 adf_nbuf_get_tid(adf_nbuf_t buf)
 {
     return __adf_nbuf_get_tid(buf);
+}
+
+/**
+ * @brief This function sets the TID value in nbuf
+ *
+ * @param[in] buf   buffer
+ *
+ * @param[in] tid  TID value
+ */
+static inline void
+adf_nbuf_set_tid(adf_nbuf_t buf, a_uint8_t tid)
+{
+    __adf_nbuf_set_tid(buf, tid);
 }
 
 /**

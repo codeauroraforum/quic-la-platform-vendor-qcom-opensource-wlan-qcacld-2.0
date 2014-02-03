@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /** ------------------------------------------------------------------------- *
     ------------------------------------------------------------------------- *
 
@@ -33,7 +32,6 @@
 
     Define internal data structure for MAC.
 
-    Copyright (C) 2006 Airgo Networks, Incorporated
    ========================================================================== */
 #ifndef CSRINTERNAL_H__
 #define CSRINTERNAL_H__
@@ -65,11 +63,13 @@
 #define CSR_SCAN_RETURN_AFTER_EITHER_BAND_11d_FOUND ( CSR_SCAN_RETURN_AFTER_5_BAND_11d_FOUND | CSR_SCAN_RETURN_AFTER_24_BAND_11d_FOUND )
 #define CSR_NUM_RSSI_CAT        15
 #define CSR_MAX_STATISTICS_REQ        10
+#define CSR_ROAM_SCAN_CHANNEL_SWITCH_TIME        3
 
 //Support for multiple session
 #define CSR_SESSION_ID_INVALID    0xFF   // session ID invalid
 #define CSR_ROAM_SESSION_MAX      5   // No of sessions to be supported, and a
                                       // session is for Infra, IBSS or BT-AMP
+#define CSR_SESSION_ID_ANY        50
 
 #define CSR_IS_SESSION_VALID( pMac, sessionId ) ( ( (sessionId) < CSR_ROAM_SESSION_MAX ) \
                                                   && ( (pMac)->roam.roamSession[(sessionId)].sessionActive ) )
@@ -78,6 +78,12 @@
     (sessionId < CSR_ROAM_SESSION_MAX) ? \
      (&(pMac)->roam.roamSession[(sessionId)]) :\
      NULL \
+)
+
+#define CSR_IS_SESSION_ANY(sessionId) (sessionId == CSR_SESSION_ID_ANY)
+#define CSR_IS_SELECT_5GHZ_MARGIN( pMac ) \
+( \
+   (((pMac)->roam.configParam.nSelect5GHzMargin)?eANI_BOOLEAN_TRUE:eANI_BOOLEAN_FALSE) \
 )
 
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
@@ -95,6 +101,11 @@
 #define CSR_IS_ROAM_SCAN_OFFLOAD_ENABLED( pMac ) \
 ( \
    (((pMac)->roam.configParam.isRoamOffloadScanEnabled)?eANI_BOOLEAN_TRUE:eANI_BOOLEAN_FALSE) \
+)
+
+#define CSR_IS_FASTROAM_IN_CONCURRENCY_INI_FEATURE_ENABLED( pMac ) \
+( \
+   (((pMac)->roam.configParam.bFastRoamInConIniFeatureEnabled)?eANI_BOOLEAN_TRUE:eANI_BOOLEAN_FALSE) \
 )
 #endif
 
@@ -443,10 +454,12 @@ typedef struct tagWmStatusChangeCmd
 
 }tWmStatusChangeCmd;
 
+
 typedef struct tagAddStaForSessionCmd
 {
    //Session self mac addr
    tSirMacAddr selfMacAddr;
+   tVOS_CON_MODE currDeviceMode;
    tANI_U32        type;
    tANI_U32        subType;
    tANI_U8         sessionId;
@@ -497,6 +510,8 @@ typedef struct tagCsrNeighborRoamConfig
     tANI_U8        nMaxNeighborRetries;
     tANI_U16       nNeighborResultsRefreshPeriod;
     tANI_U16       nEmptyScanRefreshPeriod;
+    tANI_U8        nOpportunisticThresholdDiff;
+    tANI_U8        nRoamRescanRssiDiff;
 }tCsrNeighborRoamConfig;
 #endif
 
@@ -563,14 +578,17 @@ typedef struct tagCsrConfig
 
     tANI_U32  nActiveMinChnTimeBtc;     //in units of milliseconds
     tANI_U32  nActiveMaxChnTimeBtc;     //in units of milliseconds
+    tANI_U8   disableAggWithBtc;
 #ifdef WLAN_AP_STA_CONCURRENCY
     tANI_U32  nPassiveMinChnTimeConc;    //in units of milliseconds
     tANI_U32  nPassiveMaxChnTimeConc;    //in units of milliseconds
     tANI_U32  nActiveMinChnTimeConc;     //in units of milliseconds
     tANI_U32  nActiveMaxChnTimeConc;     //in units of milliseconds
     tANI_U32  nRestTimeConc;             //in units of milliseconds
-    tANI_U8   nNumChanCombinedConc;      //number of channels combined
-                                         //in each split scan operation
+    tANI_U8   nNumStaChanCombinedConc;   //number of channels combined for
+                                         //Sta in each split scan operation
+    tANI_U8   nNumP2PChanCombinedConc;   //number of channels combined for
+                                         //P2P in each split scan operation
 #endif
 
     tANI_BOOLEAN IsIdleScanEnabled;
@@ -588,9 +606,11 @@ typedef struct tagCsrConfig
 #endif
 
 #ifdef FEATURE_WLAN_LFR
-    tANI_U8   isFastRoamIniFeatureEnabled;
+    tANI_U8      isFastRoamIniFeatureEnabled;
+    tANI_U8      MAWCEnabled;
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
-    tANI_U8   isRoamOffloadScanEnabled;
+    tANI_U8      isRoamOffloadScanEnabled;
+    tANI_BOOLEAN bFastRoamInConIniFeatureEnabled;
 #endif
 #endif
 
@@ -606,6 +626,8 @@ typedef struct tagCsrConfig
     tANI_BOOLEAN  nRoamIntraBand;
     tANI_BOOLEAN  isWESModeEnabled;
     tANI_BOOLEAN  nRoamScanControl;
+    tANI_U8       nProbes;
+    tANI_U16      nRoamScanHomeAwayTime;
 #endif
 
 #ifdef WLAN_FEATURE_NEIGHBOR_ROAMING
@@ -638,8 +660,13 @@ typedef struct tagCsrConfig
     tANI_U8   htSmps;
     tANI_U8   txLdpcEnable;
 
+    /*
+     * Enable/Disable heartbeat offload
+     */
+    tANI_BOOLEAN enableHeartBeatOffload;
+    tANI_U8 isAmsduSupportInAMPDU;
+    tANI_U8 nSelect5GHzMargin;
     tANI_U8 isCoalesingInIBSSAllowed;
-
 }tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo
@@ -675,13 +702,13 @@ typedef struct tagCsrScanStruct
     tDblLinkList tempScanResults;
     tANI_BOOLEAN fScanEnable;
     tANI_BOOLEAN fFullScanIssued;
-    tPalTimerHandle hTimerGetResult;
+    vos_timer_t hTimerGetResult;
 #ifdef WLAN_AP_STA_CONCURRENCY
-    tPalTimerHandle hTimerStaApConcTimer;
+    vos_timer_t hTimerStaApConcTimer;
 #endif
-    tPalTimerHandle hTimerIdleScan;
-    tPalTimerHandle hTimerResultAging;
-    tPalTimerHandle hTimerResultCfgAging;
+    vos_timer_t hTimerIdleScan;
+    vos_timer_t hTimerResultAging;
+    vos_timer_t hTimerResultCfgAging;
     tPalTimerHandle hTimerBgScan;
     //changes on every scan, it is used as a flag for whether 11d info is found on every scan
     tANI_U8 channelOf11dInfo;
@@ -708,6 +735,7 @@ typedef struct tagCsrScanStruct
     tANI_U8 countryCode11d[WNI_CFG_COUNTRY_CODE_LEN];
     v_REGDOMAIN_t domainIdDefault;  //default regulatory domain
     v_REGDOMAIN_t domainIdCurrent;  //current regulatory domain
+    tCsrBssid currentCountryBssid;  // Bssid for current country code
     tANI_BOOLEAN f11dInfoApplied;
     tANI_BOOLEAN fCancelIdleScan;
 #ifdef FEATURE_WLAN_WAPI
@@ -749,6 +777,8 @@ typedef struct tagCsrScanStruct
     tDblLinkList scanCmdPendingList;
 #endif
     tCsrChannel occupiedChannels;   //This includes all channels on which candidate APs are found
+    tANI_S8     inScanResultBestAPRssi;
+    eCsrBand  scanBandPreference;  //This defines the band perference for scan
 }tCsrScanStruct;
 
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
@@ -812,6 +842,7 @@ typedef struct tagCsrPeStatsReqInfo
    tpAniSirGlobal         pMac;
    /* To remember if the peStats timer is stopped successfully or not */
    tANI_BOOLEAN           timerStopFailed;
+   tANI_U8                sessionId;
 
 }tCsrPeStatsReqInfo;
 
@@ -828,13 +859,14 @@ typedef struct tagCsrStatsClientReqInfo
    vos_timer_t            timer;
    tANI_BOOLEAN           timerExpired;
    tpAniSirGlobal         pMac; // TODO: Confirm this change BTAMP
+   tANI_U8                sessionId;
 }tCsrStatsClientReqInfo;
 
 typedef struct tagCsrTlStatsReqInfo
 {
    tANI_U32               periodicity;
    tANI_BOOLEAN           timerRunning;
-   tPalTimerHandle        hTlStatsTimer;
+   vos_timer_t            hTlStatsTimer;
    tANI_U8                numClient;
 }tCsrTlStatsReqInfo;
 
@@ -884,10 +916,7 @@ typedef struct tagCsrRoamSession
     tCsrTimerInfo roamingTimerInfo;
     eCsrRoamingReason roamingReason;
     tANI_BOOLEAN fCancelRoaming;
-    tPalTimerHandle hTimerRoaming;
-    tPalTimerHandle hTimerIbssJoining;
-    tCsrTimerInfo ibssJoinTimerInfo;
-    tANI_BOOLEAN ibss_join_pending;
+    vos_timer_t hTimerRoaming;
     eCsrRoamResult roamResult;  //the roamResult that is used when the roaming timer fires
     tCsrRoamJoinStatus joinFailStatusCode;    //This is the reason code for join(assoc) failure
     //The status code returned from PE for deauth or disassoc (in case of lostlink), or our own dynamic roaming
@@ -901,7 +930,7 @@ typedef struct tagCsrRoamSession
     tANI_BOOLEAN fWMMConnection;
 #ifdef FEATURE_WLAN_BTAMP_UT_RF
     //To retry a join later when it fails if so desired
-    tPalTimerHandle hTimerJoinRetry;
+    vos_timer_t hTimerJoinRetry;
     tCsrTimerInfo joinRetryTimerInfo;
     tANI_U32 maxRetryCount;
 #endif
@@ -913,6 +942,9 @@ typedef struct tagCsrRoamSession
     tANI_U8 prevOpChannel;
     tANI_U16 clientDissSecs;
     tANI_U32 roamTS1;
+#if defined(FEATURE_WLAN_CCX_UPLOAD)
+    tCsrCcxCckmIe suppCckmIeInfo;
+#endif
 #endif
     tANI_U8 bRefAssocStartCnt;   //Tracking assoc start indication
    /* to force the AP initiate fresh 802.1x authentication after re-association need to clear
@@ -944,7 +976,7 @@ typedef struct tagCsrRoamStruct
     tANI_U32 numValidChannels; //total number of channels in CFG
 
     tANI_S32 sPendingCommands;
-    tPalTimerHandle hTimerWaitForKey;  //To support timeout for WaitForKey state
+    vos_timer_t hTimerWaitForKey;  //To support timeout for WaitForKey state
     tCsrSummaryStatsInfo       summaryStatsInfo;
     tCsrGlobalClassAStatsInfo  classAStatsInfo;
     tCsrGlobalClassBStatsInfo  classBStatsInfo;
@@ -1106,10 +1138,6 @@ void csrScanSuspendIMPS( tpAniSirGlobal pMac );
 void csrScanResumeIMPS( tpAniSirGlobal pMac );
 
 eHalStatus csrInitGetChannels(tpAniSirGlobal pMac);
-// Getting the 5GHz Channel list
-eHalStatus csrGet5GChannels(tpAniSirGlobal pMac);
-// Getting the 2.4GHz Channel list
-eHalStatus csrGet24GChannels(tpAniSirGlobal pMac);
 
 eHalStatus csrSetModifyProfileFields(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                      tCsrRoamModifyProfileFields *pModifyProfileFields);
@@ -1190,17 +1218,43 @@ eHalStatus csrRoamRegisterLinkQualityIndCallback(tpAniSirGlobal pMac,
     \param cache - If requester is happy with cached stats
     \param staId - The station ID for which the stats is requested for
     \param pContext - user context to be passed back along with the callback
-
+    \param sessionId - sme session Id.
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus csrGetStatistics(tpAniSirGlobal pMac, eCsrStatsRequesterType requesterId,
                             tANI_U32 statsMask,
                             tCsrStatsCallback callback,
                             tANI_U32 periodicity, tANI_BOOLEAN cache,
-                            tANI_U8 staId, void *pContext);
+                            tANI_U8 staId, void *pContext,
+                            tANI_U8 sessionId);
 
+/* ---------------------------------------------------------------------------
+    \fn csrGetTLSTAState
+    \helper function to get the TL STA State whenever the function is called.
+
+    \param staId - The staID to be passed to the TL
+            to get the relevant TL STA State
+    \return the state as tANI_U16
+  ---------------------------------------------------------------------------*/
+tANI_U16 csrGetTLSTAState(tpAniSirGlobal pMac, tANI_U8 staId);
 
 eHalStatus csrGetRssi(tpAniSirGlobal pMac,tCsrRssiCallback callback,tANI_U8 staId,tCsrBssid bssId,void * pContext,void * pVosContext);
+
+/* ---------------------------------------------------------------------------
+    \fn csrGetSnr
+    \brief csr function that client calls to register a callback to get
+     SNR stored in TL
+
+    \param callback - SME sends back the requested stats using the callback
+    \param staId - The station ID for which the stats is requested for
+    \param bssid - The bssid for the connected session
+    \param pContext - user context to be passed back along with the callback
+
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
+eHalStatus csrGetSnr(tpAniSirGlobal pMac, tCsrSnrCallback callback,
+                     tANI_U8 staId, tCsrBssid bssId, void *pContext);
+
 #if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
 eHalStatus csrGetRoamRssi(tpAniSirGlobal pMac,
                           tCsrRssiCallback callback,
@@ -1209,7 +1263,20 @@ eHalStatus csrGetRoamRssi(tpAniSirGlobal pMac,
                           void * pContext,
                           void * pVosContext);
 #endif
-eHalStatus csrRoamRegisterCallback(tpAniSirGlobal pMac, csrRoamCompleteCallback callback, void *pContext);
+
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+eHalStatus csrGetTsmStats(tpAniSirGlobal pMac,
+                          tCsrTsmStatsCallback callback,
+                          tANI_U8 staId,
+                          tCsrBssid bssId,
+                          void *pContext,
+                          void* pVosContext,
+                          tANI_U8 tid);
+#endif  /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
+
+eHalStatus csrRoamRegisterCallback(tpAniSirGlobal pMac,
+                                   csrRoamCompleteCallback callback,
+                                   void *pContext);
 /* ---------------------------------------------------------------------------
     \fn csrGetConfigParam
     \brief HDD calls this function to get the global settings currently maintained by CSR.
@@ -1268,7 +1335,7 @@ eHalStatus csrStart(tpAniSirGlobal pMac);
     \brief To stop CSR. CSR still keeps its current setting.
     \return eHalStatus
   -------------------------------------------------------------------------------*/
-eHalStatus csrStop(tpAniSirGlobal pMac);
+eHalStatus csrStop(tpAniSirGlobal pMac, tHalStopType stopType);
 /* ---------------------------------------------------------------------------
     \fn csrReady
     \brief To let CSR is ready to operate
@@ -1337,6 +1404,8 @@ tANI_BOOLEAN csrRoamIs11rAssoc(tpAniSirGlobal pMac);
 #ifdef FEATURE_WLAN_CCX
 //Returns whether the current association is a CCX assoc or not
 tANI_BOOLEAN csrRoamIsCCXAssoc(tpAniSirGlobal pMac);
+tANI_BOOLEAN csrRoamIsCcxIniFeatureEnabled(tpAniSirGlobal pMac);
+tANI_BOOLEAN csrNeighborRoamIsCCXAssoc(tpAniSirGlobal pMac);
 #endif
 
 //Remove this code once SLM_Sessionization is supported
@@ -1354,7 +1423,22 @@ VOS_STATUS csrAddToChannelListFront( tANI_U8 *pChannelList, int  numChannels, tA
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 eHalStatus csrScanRequestLfrResult(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                    csrScanCompleteCallback callback, void *pContext);
+eHalStatus csrRoamOffloadScanRspHdlr(tpAniSirGlobal pMac, tANI_U8 reason);
+eHalStatus csrHandoffRequest(tpAniSirGlobal pMac, tCsrHandoffRequest *pHandoffInfo);
 #endif
 tANI_BOOLEAN csrRoamIsStaMode(tpAniSirGlobal pMac, tANI_U32 sessionId);
 #endif
+
+
+/* Post Channel Change Indication */
+eHalStatus csrRoamChannelChangeReq(tpAniSirGlobal pMac, tANI_U32 sessionId,
+                        tANI_U8 targetChannel, tANI_U8 cbMode);
+
+/* Post Beacon Tx Start Indication */
+eHalStatus csrRoamStartBeaconReq( tpAniSirGlobal pMac,
+                     tANI_U32 sessionId, tANI_U8 dfsCacWaitStatus);
+
+eHalStatus
+csrRoamSendChanSwIERequest(tpAniSirGlobal pMac, tANI_U8 sessionId,
+                     tANI_U8 targetChannel, tANI_U8 csaIeReqd);
 #endif

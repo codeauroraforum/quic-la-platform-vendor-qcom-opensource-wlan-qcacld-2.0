@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 #ifndef __BMI_MSG_H__
 #define __BMI_MSG_H__
 
@@ -250,6 +249,7 @@ PREPACK struct bmi_target_info {
 #define TARGET_TYPE_AR9888    7
 #define TARGET_TYPE_AR6320    8
 #define TARGET_TYPE_AR900B    9
+#define TARGET_TYPE_AR6320V2  10
 /* For attach Peregrine 2.0 board target_reg_tbl only */
 #define TARGET_TYPE_AR9888V2  10
 

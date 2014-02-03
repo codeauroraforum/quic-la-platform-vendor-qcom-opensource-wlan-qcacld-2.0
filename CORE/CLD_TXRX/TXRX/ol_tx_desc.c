@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #include <adf_net_types.h> /* ADF_NBUF_EXEMPT_NO_EXEMPTION, etc. */
 #include <adf_nbuf.h>      /* adf_nbuf_t, etc. */
 #include <adf_os_util.h>   /* adf_os_assert */
@@ -41,6 +40,10 @@
 #include <ol_txrx_internal.h>
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 #include <ol_txrx_encap.h>  /* OL_TX_RESTORE_HDR, etc*/
+#endif
+
+#ifdef QCA_SUPPORT_TXDESC_SANITY_CHECKS
+extern u_int32_t *g_dbg_htt_desc_end_addr, *g_dbg_htt_desc_start_addr;
 #endif
 
 #ifdef QCA_COMPUTE_TX_DELAY
@@ -63,8 +66,34 @@ ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev)
         pdev->tx_desc.num_free--;
         tx_desc = &pdev->tx_desc.freelist->tx_desc;
         pdev->tx_desc.freelist = pdev->tx_desc.freelist->next;
+#ifdef QCA_SUPPORT_TXDESC_SANITY_CHECKS
+        if (tx_desc->pkt_type != 0xff
+#ifdef QCA_COMPUTE_TX_DELAY
+            || tx_desc->entry_timestamp_ticks != 0xffffffff
+#endif
+           ) {
+            TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+                       "%s Potential tx_desc corruption pkt_type:0x%x pdev:0x%p",
+                         __func__, tx_desc->pkt_type, pdev);
+#ifdef QCA_COMPUTE_TX_DELAY
+            TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s Timestamp:0x%x\n",
+                       __func__, tx_desc->entry_timestamp_ticks);
+#endif
+            adf_os_assert(0);
+        }
+        if ((u_int32_t *) tx_desc->htt_tx_desc < g_dbg_htt_desc_start_addr ||
+            (u_int32_t *) tx_desc->htt_tx_desc > g_dbg_htt_desc_end_addr) {
+            TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+                       "%s Potential htt_desc curruption:0x%p pdev:0x%p\n",
+                       __func__, tx_desc->htt_tx_desc, pdev);
+            adf_os_assert(0);
+        }
+#endif
     }
     adf_os_spin_unlock_bh(&pdev->tx_mutex);
+    if (!tx_desc) {
+        return NULL;
+    }
 
     OL_TX_TIMESTAMP_SET(tx_desc);
 
@@ -96,6 +125,12 @@ void
 ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
 {
     adf_os_spin_lock_bh(&pdev->tx_mutex);
+#ifdef QCA_SUPPORT_TXDESC_SANITY_CHECKS
+    tx_desc->pkt_type = 0xff;
+#ifdef QCA_COMPUTE_TX_DELAY
+    tx_desc->entry_timestamp_ticks = 0xffffffff;
+#endif
+#endif
     ((union ol_tx_desc_list_elem_t *) tx_desc)->next = pdev->tx_desc.freelist;
     pdev->tx_desc.freelist = (union ol_tx_desc_list_elem_t *) tx_desc;
     pdev->tx_desc.num_free++;
@@ -153,6 +188,8 @@ ol_tx_desc_ll(
      * during the call to htt_tx_desc_init above.
      */
     num_frags = adf_nbuf_get_num_frags(netbuf);
+    /* num_frags are expected to be 2 max */
+    num_frags = (num_frags > CVG_NBUF_MAX_EXTRA_FRAGS) ? CVG_NBUF_MAX_EXTRA_FRAGS : num_frags;
     htt_tx_desc_num_frags(pdev->htt_pdev, tx_desc->htt_tx_desc, num_frags-1);
     for (i = 1; i < num_frags; i++) {
         adf_os_size_t frag_len;

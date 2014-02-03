@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 #ifndef __TARGADDRS_H__
 #define __TARGADDRS_H__
 
@@ -601,8 +600,9 @@ PREPACK64 struct host_interest_s {
         (((TargetType) == TARGET_TYPE_AR6006) ? AR6006_HOST_INTEREST_ITEM_ADDRESS(item) : \
         (((TargetType) == TARGET_TYPE_AR9888) ? AR9888_HOST_INTEREST_ITEM_ADDRESS(item) : \
         (((TargetType) == TARGET_TYPE_AR6320) ? AR6320_HOST_INTEREST_ITEM_ADDRESS(item) : \
+        (((TargetType) == TARGET_TYPE_AR6320V2) ? AR6320_HOST_INTEREST_ITEM_ADDRESS(item) : \
         (((TargetType) == TARGET_TYPE_AR900B) ? AR900B_HOST_INTEREST_ITEM_ADDRESS(item) : \
-           0)))))))
+           0))))))))
 
 #define AR6002_BOARD_DATA_SZ 768
 #define AR6002_BOARD_EXT_DATA_SZ 0

@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #ifndef _OL_TXRX_INTERNAL__H_
 #define _OL_TXRX_INTERNAL__H_
 
@@ -657,6 +656,10 @@ do {                                                                            
 
 #ifndef DEBUG_HTT_CREDIT
 #define DEBUG_HTT_CREDIT 0
+#endif
+
+#if defined(QCA_SUPPORT_TXRX_VDEV_PAUSE_LL) || defined(QCA_SUPPORT_TX_THROTTLE_LL)
+#define QCA_SUPPORT_TXRX_VDEV_LL_TXQ
 #endif
 
 #endif /* _OL_TXRX_INTERNAL__H_ */

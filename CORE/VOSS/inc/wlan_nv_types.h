@@ -24,27 +24,24 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+#if !defined __WLAN_NV_TYPES_H
+#define __WLAN_NV_TYPES_H
 
-/**
- * @file htt_fw_stats.c
- * @brief Provide functions to process FW status retrieved from FW.
- */
+#include "halLegacyPalTypes.h"
+#include "halCompiler.h"
+#include "vos_status.h"
+#include <linux/string.h>
 
-#include <ol_htt_api.h>
+typedef char tANI_BOOL;
 
-void
-htt_t2h_dbg_stats_hdr_parse(
-    u_int8_t *stats_info_list,
-    enum htt_dbg_stats_type *type,
-    enum htt_dbg_stats_status *status,
-    int *length,
-    u_int8_t **stats_data)
-{
-}
+#ifndef TRUE
+#define TRUE 1
+#endif
 
-void
-htt_t2h_stats_print(u_int8_t *stats_data, int concise)
-{
-}
+#ifndef FALSE
+#define FALSE 0
+#endif
 
+#define nul '\0'
 
+#endif

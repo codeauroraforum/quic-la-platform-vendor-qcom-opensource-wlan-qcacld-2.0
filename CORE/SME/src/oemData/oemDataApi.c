@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #ifdef FEATURE_OEM_DATA_SUPPORT
 /** ------------------------------------------------------------------------- *
     ------------------------------------------------------------------------- *
@@ -33,9 +32,6 @@
     \file oemDataApi.c
 
     Implementation for the OEM DATA REQ/RSP interfaces.
-
-    Copyright (C) 2010 Qualcomm Technologies, Inc.
-
 
    ========================================================================== */
 #include "aniGlobal.h"
@@ -114,8 +110,10 @@ eHalStatus oemData_OemDataReqClose(tHalHandle hHal)
   -------------------------------------------------------------------------------*/
 void oemData_ReleaseOemDataReqCommand(tpAniSirGlobal pMac, tSmeCmd *pOemDataCmd, eOemDataReqStatus oemDataReqStatus)
 {
+#ifndef QCA_WIFI_2_0
     //Do the callback
     pOemDataCmd->u.oemDataCmd.callback(pMac, pOemDataCmd->u.oemDataCmd.pContext, pOemDataCmd->u.oemDataCmd.oemDataReqID, oemDataReqStatus);
+#endif
 
     //First take this command out of the active list
     if(csrLLRemoveEntry(&pMac->sme.smeCmdActiveList, &pOemDataCmd->Link, LL_ACCESS_LOCK))
@@ -164,7 +162,9 @@ eHalStatus oemData_OemDataReq(tHalHandle hHal,
         pMac->oemData.pContext = pContext;
         pMac->oemData.oemDataReqID = *(pOemDataReqID);
 
-        vos_mem_copy((v_VOID_t*)(pMac->oemData.oemDataReqConfig.oemDataReq), (v_VOID_t*)(oemDataReqConfig->oemDataReq), OEM_DATA_REQ_SIZE);
+        vos_mem_copy((v_VOID_t*)(pMac->oemData.oemDataReqConfig.oemDataReq),
+                     (v_VOID_t*)(oemDataReqConfig->oemDataReq),
+                     OEM_DATA_REQ_SIZE);
 
         pMac->oemData.oemDataReqActive = eANI_BOOLEAN_FALSE;
 
@@ -181,7 +181,8 @@ eHalStatus oemData_OemDataReq(tHalHandle hHal,
             //set the oem data request
             pOemDataCmd->u.oemDataCmd.oemDataReq.sessionId = pMac->oemData.oemDataReqConfig.sessionId;
             vos_mem_copy((v_VOID_t*)(pOemDataCmd->u.oemDataCmd.oemDataReq.oemDataReq),
-                                    (v_VOID_t*)(pMac->oemData.oemDataReqConfig.oemDataReq), OEM_DATA_REQ_SIZE);
+                         (v_VOID_t*)(pMac->oemData.oemDataReqConfig.oemDataReq),
+                         OEM_DATA_REQ_SIZE);
         }
         else
         {
@@ -223,22 +224,19 @@ eHalStatus oemData_SendMBOemDataReq(tpAniSirGlobal pMac, tOemDataReq *pOemDataRe
 
     msgLen = (tANI_U16)(sizeof(tSirOemDataReq));
 
-    status = palAllocateMemory(pMac->hHdd, (void**)&pMsg, msgLen);
+    pMsg = vos_mem_malloc(msgLen);
+    if ( NULL == pMsg )
+       status = eHAL_STATUS_FAILURE;
+    else
+       status = eHAL_STATUS_SUCCESS;
     if(HAL_STATUS_SUCCESS(status))
     {
-        palZeroMemory(pMac->hHdd, pMsg, msgLen);
+        vos_mem_set(pMsg, msgLen, 0);
         pMsg->messageType = pal_cpu_to_be16((tANI_U16)eWNI_SME_OEM_DATA_REQ);
-        palCopyMemory(pMac->hHdd, pMsg->selfMacAddr, pSession->selfMacAddr, sizeof(tSirMacAddr) );
-        status = palCopyMemory(pMac->hHdd, pMsg->oemDataReq, pOemDataReq->oemDataReq, OEM_DATA_REQ_SIZE);
-        if(HAL_STATUS_SUCCESS(status))
-        {
-            smsLog(pMac, LOGW, "OEM_DATA: sending message to pe%s", __func__);
-            status = palSendMBMessage(pMac->hHdd, pMsg);
-        }
-        else
-        {
-            palFreeMemory(pMac->hHdd, pMsg);
-        }
+        vos_mem_copy(pMsg->selfMacAddr, pSession->selfMacAddr, sizeof(tSirMacAddr) );
+        vos_mem_copy(pMsg->oemDataReq, pOemDataReq->oemDataReq, OEM_DATA_REQ_SIZE);
+        smsLog(pMac, LOGW, "OEM_DATA: sending message to pe%s", __func__);
+        status = palSendMBMessage(pMac->hHdd, pMsg);
     }
 
     smsLog(pMac, LOGW, "OEM_DATA: exiting Function %s", __func__);
@@ -295,6 +293,10 @@ eHalStatus sme_HandleOemDataRsp(tHalHandle hHal, tANI_U8* pMsg)
     tListElem                          *pEntry = NULL;
     tSmeCmd                            *pCommand = NULL;
     tSirOemDataRsp*                    pOemDataRsp = NULL;
+#ifdef QCA_WIFI_2_0
+    tANI_U32                           *msgSubType;
+#endif
+
     pMac = PMAC_STRUCT(hHal);
 
     smsLog(pMac, LOG1, "%s: OEM_DATA Entering", __func__);
@@ -339,7 +341,9 @@ eHalStatus sme_HandleOemDataRsp(tHalHandle hHal, tANI_U8* pMsg)
                 }
 
                 smsLog(pMac, LOGE, "Before memory copy");
-                vos_mem_copy((v_VOID_t*)(pMac->oemData.pOemDataRsp), (v_VOID_t*)(&pOemDataRsp->oemDataRsp), sizeof(tOemDataRsp));
+                vos_mem_copy((v_VOID_t*)(pMac->oemData.pOemDataRsp),
+                             (v_VOID_t*)(&pOemDataRsp->oemDataRsp),
+                             sizeof(tOemDataRsp));
                 smsLog(pMac, LOGE, "after memory copy");
                 sme_ReleaseGlobalLock(&pMac->sme);
             }
@@ -385,8 +389,20 @@ eHalStatus sme_HandleOemDataRsp(tHalHandle hHal, tANI_U8* pMsg)
 
         pOemDataRsp = (tSirOemDataRsp *)pMsg;
 
-        smsLog(pMac, LOG1, "calling send_oem_data_rsp_msg");
-        send_oem_data_rsp_msg(sizeof(tOemDataRsp), &pOemDataRsp->oemDataRsp[0]);
+        /* check if message is to be forwarded to oem application or not */
+        msgSubType = (tANI_U32 *) (&pOemDataRsp->oemDataRsp[0]);
+        if (*msgSubType != OEM_MESSAGE_SUBTYPE_INTERNAL)
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                      "%s: calling send_oem_data_rsp_msg, msgSubType(0x%x)",
+                      __func__, *msgSubType);
+            send_oem_data_rsp_msg(sizeof(tOemDataRsp),
+                                  &pOemDataRsp->oemDataRsp[0]);
+        }
+        else
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                      "%s: received internal oem data resp, msgSubType (0x%x)",
+                      __func__, *msgSubType);
 #endif /* QCA_WIFI_2_0 */
     } while(0);
 
