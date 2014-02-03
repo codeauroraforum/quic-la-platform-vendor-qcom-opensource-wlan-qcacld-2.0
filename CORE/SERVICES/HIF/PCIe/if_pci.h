@@ -1,8 +1,7 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,6 +23,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 
 #ifndef __ATH_PCI_H__
 #define __ATH_PCI_H__
@@ -86,6 +86,7 @@ struct hif_pci_softc {
     struct targetdef_s *targetdef;
     struct hostdef_s *hostdef;
     atomic_t tasklet_from_intr;
+    bool hif_init_done;
 };
 #define TARGID(sc) ((A_target_id_t)(&(sc)->mem))
 #define TARGID_TO_HIF(targid) (((struct hif_pci_softc *)((char *)(targid) - (char *)&(((struct hif_pci_softc *)0)->mem)))->hif_device)
@@ -118,6 +119,8 @@ extern int pktlogmod_init(void *context);
 extern void pktlogmod_exit(void *context);
 #endif
 
+void hif_pci_check_soc_status(struct hif_pci_softc *sc);
+
 /*
  * A firmware interrupt to the Host is indicated by the
  * low bit of SCRATCH_3_ADDRESS being set.
@@ -131,4 +134,20 @@ extern void pktlogmod_exit(void *context);
  * MSI allocation fails
  */
 #define LEGACY_INTERRUPTS(sc) ((sc)->num_msi_intrs == 0)
+
+/*
+ * There may be some pending tx frames during platform suspend.
+ * Suspend operation should be delayed until those tx frames are
+ * transfered from the host to target. This macro specifies how
+ * long suspend thread has to sleep before checking pending tx
+ * frame count.
+ */
+#define OL_ATH_TX_DRAIN_WAIT_DELAY     50 /* ms */
+
+/*
+ * Wait time (in unit of OL_ATH_TX_DRAIN_WAIT_DELAY) for pending
+ * tx frame completion before suspend. Refer: hif_pci_suspend()
+ */
+#define OL_ATH_TX_DRAIN_WAIT_CNT       10
+
 #endif /* __ATH_PCI_H__ */

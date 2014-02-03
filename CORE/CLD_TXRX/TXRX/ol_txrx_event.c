@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #include "ol_txrx_types.h"
 
 #ifdef WDI_EVENT_ENABLE
@@ -209,12 +208,13 @@ wdi_event_detach(struct ol_txrx_pdev_t *txrx_pdev)
     }
     for (i = 0; i < WDI_NUM_EVENTS; i++) {
         wdi_sub = txrx_pdev->wdi_event_list[i];
-        /* Delete all the subscribers */
-        wdi_event_del_subs(wdi_sub, i); 
+        if (wdi_sub) {
+            /* Delete all the subscribers */
+            wdi_event_del_subs(wdi_sub, i);
+        }
     }
-    if (txrx_pdev->wdi_event_list) {
-        adf_os_mem_free(txrx_pdev->wdi_event_list);
-    }
+    /* txrx_pdev->wdi_event_list would be non-null */
+    adf_os_mem_free(txrx_pdev->wdi_event_list);
     return A_OK;
 }
 

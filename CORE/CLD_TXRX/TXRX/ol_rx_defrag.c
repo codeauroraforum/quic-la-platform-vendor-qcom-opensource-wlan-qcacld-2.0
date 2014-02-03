@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /*-
 * Copyright (c) 2002-2007 Sam Leffler, Errno Consulting
 * All rights reserved.
@@ -503,7 +502,7 @@ ol_rx_defrag(
             ol_rx_err(
                 pdev->ctrl_pdev,
                 vdev->vdev_id, peer->mac_addr.raw, tid, 0, OL_RX_DEFRAG_ERR,
-                msdu);
+                msdu, NULL, 0);
             TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
                 "\n ol_rx_defrag: TKIP demic failed\n");
             return;

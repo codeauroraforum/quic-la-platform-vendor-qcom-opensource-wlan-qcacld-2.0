@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /** ------------------------------------------------------------------------- * 
     ------------------------------------------------------------------------- *  
 
@@ -34,13 +33,12 @@
     Exports and types for the neighbor roaming algorithm which is sepcifically 
     designed for Android.
   
-   Copyright (C) 2006 Airgo Networks, Incorporated
-   
 ========================================================================== */
 #ifndef CSR_NEIGHBOR_ROAM_H
 #define CSR_NEIGHBOR_ROAM_H
 
 #ifdef WLAN_FEATURE_NEIGHBOR_ROAMING
+#include "sme_Api.h"
 
 /* Enumeration of various states in neighbor roam algorithm */
 typedef enum
@@ -70,10 +68,9 @@ typedef struct sCsrNeighborRoamCfgParams
     tANI_U32        minChannelScanTime;
     tANI_U32        maxChannelScanTime;
     tANI_U16        neighborResultsRefreshPeriod;
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
-    tCsrCountryChannelInfo countryChannelInfo;
-#endif
     tANI_U16        emptyScanRefreshPeriod;
+    tANI_U8         nOpportunisticThresholdDiff;
+    tANI_U8         nRoamRescanRssiDiff;
 } tCsrNeighborRoamCfgParams, *tpCsrNeighborRoamCfgParams;
 
 #define CSR_NEIGHBOR_ROAM_INVALID_CHANNEL_INDEX    255
@@ -168,12 +165,14 @@ typedef struct sCsrNeighborRoamControlInfo
     tCsrNeighborRoamCfgParams   cfgParams;
     tCsrBssid                   currAPbssid; // current assoc AP
     tANI_U8                     currAPoperationChannel; // current assoc AP
-    tPalTimerHandle             neighborScanTimer;
-    tPalTimerHandle             neighborResultsRefreshTimer;
-    tPalTimerHandle             emptyScanRefreshTimer;
+    vos_timer_t                 neighborScanTimer;
+    vos_timer_t                 neighborResultsRefreshTimer;
+    vos_timer_t                 emptyScanRefreshTimer;
     tCsrTimerInfo               neighborScanTimerInfo;
     tCsrNeighborRoamChannelInfo roamChannelInfo;
     tANI_U8                     currentNeighborLookupThreshold;
+    tANI_U8                     currentOpportunisticThresholdDiff;
+    tANI_U8                     currentRoamRescanRssiDiff;
     tANI_BOOLEAN                scanRspPending;
     tANI_TIMESTAMP              scanRequestTimeStamp;
     tDblLinkList                roamableAPList;    // List of current FT candidates
@@ -196,7 +195,16 @@ typedef struct sCsrNeighborRoamControlInfo
                                                     we re-initialize occupied channel list */
     tANI_S8                     lookupDOWNRssi;
     tANI_U8                     uScanMode;
+    tANI_U8                     uOsRequestedHandoff; /* upper layer requested
+                                                        a reassoc */
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+    tCsrHandoffRequest          handoffReqInfo; /* handoff related info came
+                                                   with upper layer's req for
+                                                   reassoc */
 #endif
+#endif
+    tSmeFastRoamTrigger         cfgRoamEn;
+    tSirMacAddr                 cfgRoambssId;
 } tCsrNeighborRoamControlInfo, *tpCsrNeighborRoamControlInfo;
 
 
@@ -222,15 +230,31 @@ tANI_BOOLEAN csrNeighborRoamStatePreauthDone(tpAniSirGlobal pMac);
 tANI_BOOLEAN csrNeighborRoamScanRspPending(tHalHandle hHal);
 tANI_BOOLEAN csrNeighborMiddleOfRoaming(tHalHandle hHal);
 VOS_STATUS csrNeighborRoamSetLookupRssiThreshold(tpAniSirGlobal pMac, v_U8_t neighborLookupRssiThreshold);
+VOS_STATUS
+csrNeighborRoamSetOpportunisticScanThresholdDiff(tpAniSirGlobal pMac,
+                                        v_U8_t nOpportunisticThresholdDiff);
+VOS_STATUS
+csrNeighborRoamSetRoamRescanRssiDiff(tpAniSirGlobal pMac,
+                                     v_U8_t nRoamRescanRssiDiff);
 VOS_STATUS csrNeighborRoamUpdateFastRoamingEnabled(tpAniSirGlobal pMac, const v_BOOL_t fastRoamEnabled);
 VOS_STATUS csrNeighborRoamUpdateCcxModeEnabled(tpAniSirGlobal pMac, const v_BOOL_t ccxMode);
 VOS_STATUS csrNeighborRoamChannelsFilterByCurrentBand(
                       tpAniSirGlobal pMac,
                       tANI_U8*  pInputChannelList,
-                      int       inputNumOfChannels,
+                      tANI_U8   inputNumOfChannels,
                       tANI_U8*  pOutputChannelList,
-                      int*      pMergedOutputNumOfChannels
+                      tANI_U8*  pMergedOutputNumOfChannels
                       );
+VOS_STATUS csrNeighborRoamReassocIndCallback(v_PVOID_t pAdapter,
+                                             v_U8_t trafficStatus,
+                                             v_PVOID_t pUserCtxt,
+                                             v_S7_t   avgRssi);
+VOS_STATUS csrNeighborRoamMergeChannelLists(tpAniSirGlobal pMac,
+                                    tANI_U8  *pInputChannelList,
+                                    tANI_U8  inputNumOfChannels,
+                                    tANI_U8  *pOutputChannelList,
+                                    tANI_U8  outputNumOfChannels,
+                                    tANI_U8  *pMergedOutputNumOfChannels);
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 #define ROAM_SCAN_OFFLOAD_START                     1
 #define ROAM_SCAN_OFFLOAD_STOP                      2
@@ -249,12 +273,29 @@ VOS_STATUS csrNeighborRoamChannelsFilterByCurrentBand(
 #define REASON_EMPTY_SCAN_REF_PERIOD_CHANGED        10
 #define REASON_PREAUTH_FAILED_FOR_ALL               11
 #define REASON_NO_CAND_FOUND_OR_NOT_ROAMING_NOW     12
-
+#define REASON_NPROBES_CHANGED                      13
+#define REASON_HOME_AWAY_TIME_CHANGED               14
+#define REASON_OS_REQUESTED_ROAMING_NOW             15
+#define REASON_SCAN_CH_TIME_CHANGED                 16
+#define REASON_SCAN_HOME_TIME_CHANGED               17
+#define REASON_OPPORTUNISTIC_THRESH_DIFF_CHANGED    18
+#define REASON_ROAM_RESCAN_RSSI_DIFF_CHANGED        19
 eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reason);
 eHalStatus csrNeighborRoamCandidateFoundIndHdlr(tpAniSirGlobal pMac, void* pMsg);
+eHalStatus csrNeighborRoamHandoffReqHdlr(tpAniSirGlobal pMac, void* pMsg);
+eHalStatus csrNeighborRoamProceedWithHandoffReq(tpAniSirGlobal pMac);
+eHalStatus csrNeighborRoamSssidScanDone(tpAniSirGlobal pMac, eHalStatus status);
+eHalStatus csrNeighborRoamStartLfrScan(tpAniSirGlobal pMac);
 #endif
 
+#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+VOS_STATUS csrSetCCKMIe(tpAniSirGlobal pMac, const tANI_U8 sessionId,
+                            const tANI_U8 *pCckmIe,
+                            const tANI_U8 ccKmIeLen);
+VOS_STATUS csrRoamReadTSF(tpAniSirGlobal pMac, tANI_U8 *pTimestamp);
+#endif /*FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
 
 #endif /* WLAN_FEATURE_NEIGHBOR_ROAMING */
 
 #endif /* CSR_NEIGHBOR_ROAM_H */
+

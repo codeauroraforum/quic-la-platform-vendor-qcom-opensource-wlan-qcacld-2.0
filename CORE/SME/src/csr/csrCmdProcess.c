@@ -24,14 +24,11 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /** ------------------------------------------------------------------------- *
     ------------------------------------------------------------------------- *
     \file csrCmdProcess.c
 
     Implementation for processing various commands.
-
-    Copyright (C) 2006 Airgo Networks, Incorporated
 
    ========================================================================== */
 
@@ -127,7 +124,11 @@ tANI_BOOLEAN csrCheckPSReady(void *pv)
 {
     tpAniSirGlobal pMac = PMAC_STRUCT( pv );
 
-    VOS_ASSERT( pMac->roam.sPendingCommands >= 0 );
+    if (pMac->roam.sPendingCommands < 0)
+    {
+       VOS_ASSERT( pMac->roam.sPendingCommands >= 0 );
+       return 0;
+    }
     return (pMac->roam.sPendingCommands == 0);
 }
 
@@ -171,3 +172,5 @@ void csrFullPowerOffloadCallback(void *pv, tANI_U32 sessionId, eHalStatus status
     }
 
 }
+
+

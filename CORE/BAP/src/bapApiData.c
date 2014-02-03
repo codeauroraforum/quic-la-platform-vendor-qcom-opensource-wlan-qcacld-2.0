@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /*===========================================================================
 
                       b a p A p i D a t a . C
@@ -41,10 +40,6 @@
 
   Are listed for each API below. 
   
-  
-  Copyright (c) 2008 Qualcomm Technologies, Inc.
-  All Rights Reserved.
-  Qualcomm Technologies Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -308,7 +303,7 @@ WLANBAP_XlateTxDataPkt
     ptBtampContext           pBtampCtx = (ptBtampContext) btampHandle; 
     tpBtampLogLinkCtx        pLogLinkContext;
     WLANBAP_8023HeaderType   w8023Header;
-    WLANBAP_HCIACLHeaderType hciACLHeader;
+    WLANBAP_HCIACLHeaderType hciACLHeader = { 0 };
     v_U8_t                   aucLLCHeader[WLANBAP_LLC_HEADER_LEN];
     VOS_STATUS               vosStatus;
     v_U8_t                   ucSTAId;  /* The StaId (used by TL, PE, and HAL) */

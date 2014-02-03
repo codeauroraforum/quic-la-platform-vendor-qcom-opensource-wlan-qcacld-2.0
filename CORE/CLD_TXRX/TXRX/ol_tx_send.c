@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #include <adf_os_atomic.h>    /* adf_os_atomic_inc, etc. */
 #include <adf_os_lock.h>      /* adf_os_spinlock */
 #include <adf_os_time.h>      /* adf_os_ticks, etc. */
@@ -483,6 +482,12 @@ ol_tx_completion_handler(
                 pdev, tx_desc, tx_descs, netbuf,
                 lcl_freelist, tx_desc_last, status);
         }
+#ifdef QCA_SUPPORT_TXDESC_SANITY_CHECKS
+        tx_desc->pkt_type = 0xff;
+#ifdef QCA_COMPUTE_TX_DELAY
+        tx_desc->entry_timestamp_ticks = 0xffffffff;
+#endif
+#endif
     }
 
     /* One shot protected access to pdev freelist, when setup */

@@ -19,6 +19,11 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
+ */
 #ifndef WMA_STUB
 #define WMA_STUB
 
@@ -55,12 +60,6 @@ static inline tANI_U8 WMA_getFwWlanFeatCaps(tANI_U8 featEnumValue)
 
 static inline void WMA_disableCapablityFeature(tANI_U8 feature_index) {
 	return;
-}
-
-static inline VOS_STATUS WMA_GetWcnssSoftwareVersion(v_PVOID_t pvosGCtx,
-		tANI_U8 *pVersion,
-		tANI_U32 versionBufferSize){
-	return VOS_STATUS_SUCCESS;
 }
 
 static inline VOS_STATUS WMA_HALDumpCmdReq(tpAniSirGlobal   pMac, tANI_U32  cmd,

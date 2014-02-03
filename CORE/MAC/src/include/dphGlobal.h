@@ -24,11 +24,9 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /*
  *
 
- * Airgo Networks, Inc proprietary. All rights reserved.
  * Author:      Sandesh Goel
 
  * Date:        02/25/02
@@ -606,6 +604,11 @@ typedef struct sDphHashNode
 
     tANI_U8 htLdpcCapable;
     tANI_U8 vhtLdpcCapable;
+
+#ifdef FEATURE_WLAN_TDLS
+    tANI_U16 ht_caps;
+    tANI_U32 vht_caps;
+#endif
 
     /* When a station with already an existing dph entry tries to 
 

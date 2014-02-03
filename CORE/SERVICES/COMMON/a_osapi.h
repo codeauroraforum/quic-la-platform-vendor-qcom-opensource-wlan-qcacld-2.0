@@ -25,6 +25,13 @@
  * to the Linux Foundation.
  */
 
+//==============================================================================
+// This file contains the definitions of the basic atheros data types.
+// It is used to map the data types in atheros files to a platform specific
+// type.
+//
+// Author(s): ="Atheros"
+//==============================================================================
 #ifndef _A_OSAPI_H_
 #define _A_OSAPI_H_
 

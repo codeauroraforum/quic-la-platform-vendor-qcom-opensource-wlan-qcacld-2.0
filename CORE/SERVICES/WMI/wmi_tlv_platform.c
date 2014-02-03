@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 /*
  * LMAC offload interface functions for WMI TLV Interface
  */

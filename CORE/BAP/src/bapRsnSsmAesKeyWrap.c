@@ -24,11 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /*
- * Airgo Networks, Inc proprietary. All rights reserved.
- * $File: //depot/software/projects/feature_branches/gen5_phase1/os/linux/classic/ap/apps/ssm/lib/aniSsmAesKeyWrap.c $
- *
  * Contains definitions for the AES Key Wrap algorithm from RFC 3394.
  *
  * Author:      Mayank D. Upadhyay
@@ -277,8 +273,6 @@ aes(v_U32_t cryptHandle, tANI_U8 *keyBytes, tANI_U32 keyLen,
     tANI_U8 in[AES_BLOCK_SIZE];
     tANI_U8 *out;
 
-    VOS_ASSERT (AES_BLOCK_SIZE == ANI_SSM_AES_KEY_WRAP_BLOCK_SIZE*2);
-
     // Concatenate A and R[i]
     vos_mem_copy(in, a, ANI_SSM_AES_KEY_WRAP_BLOCK_SIZE);
     vos_mem_copy(in + ANI_SSM_AES_KEY_WRAP_BLOCK_SIZE, 
@@ -320,8 +314,6 @@ aes_1(v_U32_t cryptHandle, tANI_U8 *keyBytes, tANI_U32 keyLen,
 
     tANI_U8 in[AES_BLOCK_SIZE];
     tANI_U8 *out;
-
-    VOS_ASSERT (AES_BLOCK_SIZE == ANI_SSM_AES_KEY_WRAP_BLOCK_SIZE*2);
 
     // Concatenate A and R[i]
     vos_mem_copy(in, at, ANI_SSM_AES_KEY_WRAP_BLOCK_SIZE);

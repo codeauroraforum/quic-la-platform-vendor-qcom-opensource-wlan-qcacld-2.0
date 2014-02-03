@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 #include "ol_if_athvar.h"
 #include "htc_internal.h"
 #include <adf_nbuf.h>     /* adf_nbuf_t */
@@ -780,5 +779,13 @@ void HTCSetTargetToSleep(void *context)
 
     HIFSetTargetSleep(sc->hif_hdl, true, false);
 #endif
+#endif
+}
+
+void HTCCancelDeferredTargetSleep(void *context)
+{
+#if CONFIG_ATH_PCIE_MAX_PERF == 0
+    struct ol_softc *sc = (struct ol_softc *)context;
+    HIFCancelDeferredTargetSleep(sc->hif_hdl);
 #endif
 }

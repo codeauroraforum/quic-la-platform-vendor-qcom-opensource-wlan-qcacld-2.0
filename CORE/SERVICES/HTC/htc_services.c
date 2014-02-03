@@ -25,6 +25,7 @@
  * to the Linux Foundation.
  */
 
+
 #include "htc_internal.h"
 #include <adf_nbuf.h>  /* adf_nbuf_t */
 
@@ -90,7 +91,12 @@ A_STATUS HTCConnectService(HTC_HANDLE               HTCHandle,
                 /* assemble connect service message */
             adf_nbuf_put_tail(netbuf, length);
             pConnectMsg = (HTC_CONNECT_SERVICE_MSG *)adf_nbuf_data(netbuf);
-            AR_DEBUG_ASSERT(pConnectMsg != NULL);
+
+            if (NULL == pConnectMsg) {
+                AR_DEBUG_ASSERT(0);
+                status = A_EFAULT;
+                break;
+            }
 
             A_MEMZERO(pConnectMsg,sizeof(HTC_CONNECT_SERVICE_MSG));
 

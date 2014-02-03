@@ -25,7 +25,6 @@
  * to the Linux Foundation.
  */
 
-
 #ifndef __TARGCFG_H__
 #define __TARGCFG_H__
 

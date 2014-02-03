@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /******************************************************************************
 
 *
@@ -34,11 +33,6 @@
 *
 
 * Description: Power Management Control (PMC) API definitions.
-* Copyright 2008 (c) Qualcomm Technologies, Inc.  
-
-* All Rights Reserved.
-
-* Qualcomm Technologies Confidential and Proprietary.
 
 *
 
@@ -488,6 +482,68 @@ extern eHalStatus pmcGetGTKOffload(tHalHandle hHal,
                                    void *callbackContext, tANI_U8 sessionId);
 #endif // WLAN_FEATURE_GTK_OFFLOAD
 
+#ifdef FEATURE_WLAN_BATCH_SCAN
+/*Set batch scan request Cb declaration*/
+typedef void(*hddSetBatchScanReqCallback)(void *callbackContext,
+     tSirSetBatchScanRsp *pRsp);
+
+/*Trigger batch scan result indication Cb declaration*/
+typedef void(*hddTriggerBatchScanResultIndCallback)(void *callbackContext,
+     void *pRsp);
+
+/* -----------------------------------------------------------------------------
+    \fn pmcSetBatchScanReq
+    \brief  Setting batch scan request in FW
+    \param  hHal - The handle returned by macOpen.
+    \param  sessionId - session id
+    \param  callbackRoutine - Pointer to set batch scan request callback routine
+    \param  calbackContext - callback context
+    \return eHalStatus
+             eHAL_STATUS_FAILURE  Cannot set batch scan request
+             eHAL_STATUS_SUCCESS  Request accepted.
+ -----------------------------------------------------------------------------*/
+extern eHalStatus pmcSetBatchScanReq(tHalHandle hHal, tSirSetBatchScanReq
+       *pRequest, tANI_U8 sessionId, hddSetBatchScanReqCallback callbackRoutine,
+       void *callbackContext);
+
+/* -----------------------------------------------------------------------------
+    \fn pmcTriggerBatchScanResultInd
+    \brief  API to pull batch scan result from FW
+    \param  hHal - The handle returned by macOpen.
+    \param  sessionId - session id
+    \param  callbackRoutine - Pointer to get batch scan request callback routine
+    \param  calbackContext - callback context
+    \return eHalStatus
+             eHAL_STATUS_FAILURE  Cannot set batch scan request
+             eHAL_STATUS_SUCCESS  Request accepted.
+ -----------------------------------------------------------------------------*/
+extern eHalStatus pmcTriggerBatchScanResultInd
+(
+    tHalHandle hHal, tSirTriggerBatchScanResultInd *pRequest, tANI_U8 sessionId,
+    hddTriggerBatchScanResultIndCallback callbackRoutine, void *callbackContext
+);
+
+
+/* -----------------------------------------------------------------------------
+    \fn pmcStopBatchScanInd
+    \brief  Stoping batch scan request in FW
+    \param  hHal - The handle returned by macOpen.
+    \param  pInd - Pointer to stop batch scan indication
+    \return eHalStatus
+             eHAL_STATUS_FAILURE  Cannot set batch scan request
+             eHAL_STATUS_SUCCESS  Request accepted.
+ -----------------------------------------------------------------------------*/
+
+extern eHalStatus pmcStopBatchScanInd
+(
+    tHalHandle hHal,
+    tSirStopBatchScanInd *pInd,
+    tANI_U8 sessionId
+);
+
+#endif // FEATURE_WLAN_BATCH_SCAN
+
+
 /* Power Save Offload Changes */
 typedef enum eUapsdStatus
 {
@@ -571,5 +627,14 @@ eHalStatus pmcOffloadSetTdlsProhibitBmpsStatus(tHalHandle hHal,
                                                tANI_U32 sessionId,
                                                v_BOOL_t val);
 #endif
+
+tANI_BOOLEAN pmcOffloadIsPowerSaveEnabled (tHalHandle hHal, tANI_U32 sessionId,
+                                           tPmcPowerSavingMode psMode);
+
+eHalStatus PmcOffloadEnableDeferredStaModePowerSave(tHalHandle hHal,
+                                            tANI_U32 sessionId);
+
+eHalStatus PmcOffloadDisableDeferredStaModePowerSave(tHalHandle hHal,
+                                             tANI_U32 sessionId);
 #endif
 

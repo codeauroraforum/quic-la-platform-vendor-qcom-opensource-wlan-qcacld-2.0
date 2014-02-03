@@ -24,11 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /*
- * Woodside Networks, Inc proprietary. All rights reserved.
- * $File: //depot/software/projects/feature_branches/gen5_phase1/os/linux/classic/ap/apps/ssm/auth8021x/ani8021xPrf.c $
- *
  * Contains definitions for routines to calculate the 802.11i PRF
  * functions.
  *
@@ -253,8 +249,12 @@ aagPrf(v_U32_t cryptHandle,
 
     for (i = 0; i < numLoops; i++) 
     {
-        VOS_ASSERT((resultOffset - result + VOS_DIGEST_SHA1_SIZE)
-               <= AAG_PRF_MAX_OUTPUT_SIZE);
+        if ((resultOffset - result + VOS_DIGEST_SHA1_SIZE) > AAG_PRF_MAX_OUTPUT_SIZE)
+        {
+            VOS_ASSERT(0);
+            return ANI_ERROR;
+        }
+
         hmacText[loopCtrPos] = i;
         if( VOS_IS_STATUS_SUCCESS( vos_sha1_hmac_str(cryptHandle, hmacText, loopCtrPos + 1, key, keyLen, resultOffset) ) )
         {

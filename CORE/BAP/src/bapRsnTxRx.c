@@ -24,20 +24,14 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 /**=============================================================================
   
-  vos_list.c
+  bapRsnTxRx.c
   
   \brief
   
   Description...
     
-  
-               Copyright 2008 (c) Qualcomm Technologies, Inc.
-               All Rights Reserved.
-               Qualcomm Technologies Confidential and Proprietary.
-  
   ============================================================================== */
 /* $HEADER$ */
 #include "bapRsnTxRx.h"
@@ -79,7 +73,7 @@ void bapRsnClearTxRxCallbacks(void)
 static VOS_STATUS bapRsnAcquirePacket( vos_pkt_t **ppPacket, v_U8_t **ppData, v_U16_t size )
 {
     VOS_STATUS status;
-    vos_pkt_t *pPacket;
+    vos_pkt_t *pPacket = NULL;
 
     status = vos_pkt_get_packet( &pPacket, VOS_PKT_TYPE_TX_802_11_MGMT, size, 1, 
                                     VOS_TRUE, NULL, NULL );
@@ -209,8 +203,8 @@ static VOS_STATUS bapRsnTxFrame( v_PVOID_t pvosGCtx, vos_pkt_t *pPacket )
 VOS_STATUS bapRsnSendEapolFrame( v_PVOID_t pvosGCtx, tAniPacket *pAniPkt )
 {
     VOS_STATUS status;
-    vos_pkt_t *pPacket;
-    v_U8_t *pData, *pSrc;
+    vos_pkt_t *pPacket = NULL;
+    v_U8_t *pData = NULL, *pSrc = NULL;
     int pktLen = aniAsfPacketGetBytes( pAniPkt, &pSrc );
 
     if( pktLen <= 0 )
@@ -218,7 +212,7 @@ VOS_STATUS bapRsnSendEapolFrame( v_PVOID_t pvosGCtx, tAniPacket *pAniPkt )
         return VOS_STATUS_E_EMPTY;
     }
     status = bapRsnAcquirePacket( &pPacket, &pData, pktLen );
-    if( VOS_IS_STATUS_SUCCESS( status ) )
+    if( VOS_IS_STATUS_SUCCESS( status ) && ( NULL != pPacket ))
     {
         vos_mem_copy( pData, pSrc, pktLen );
         //Send the packet, need to check whether we have an outstanding packet first.

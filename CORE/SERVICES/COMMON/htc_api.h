@@ -24,7 +24,6 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #ifndef _HTC_API_H_
 #define _HTC_API_H_
 
@@ -686,4 +685,5 @@ struct s_htc_msg{
 
 void *htc_get_targetdef(HTC_HANDLE htc_handle);
 void HTCSetTargetToSleep(void *context);
+void HTCCancelDeferredTargetSleep(void *context);
 #endif /* _HTC_API_H_ */

@@ -24,21 +24,33 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
-
 #if !defined( HDD_CONNECTION_H__ ) 
 #define HDD_CONNECTION_H__
 #include <wlan_hdd_mib.h>
-#define HDD_MAX_NUM_IBSS_STA ( 9 )
+#define HDD_MAX_NUM_IBSS_STA ( 32 )
 #ifdef FEATURE_WLAN_TDLS
-#define HDD_MAX_NUM_TDLS_STA ( HDD_MAX_NUM_IBSS_STA - 1 ) // up to 3 as 1 is assigned to AP
+#define HDD_MAX_NUM_TDLS_STA ( 8 )
+#ifdef QCA_WIFI_2_0
+#define TDLS_STA_INDEX_VALID(staId) \
+                          (((staId) >= 1) && ((staId) < 0xFF))
+#else
 #define TDLS_STA_INDEX_VALID(staId) \
                           (((staId) >= 4) && ((staId) < 0xFF))
+#endif
 #endif
 #define TKIP_COUNTER_MEASURE_STARTED 1
 #define TKIP_COUNTER_MEASURE_STOPED  0 
 /* Timeout (in ms) for Link to Up before Registering Station */
 #define ASSOC_LINKUP_TIMEOUT 60
+
+/* In pronto case, IBSS owns the first peer for bss peer.
+   In Rome case, IBSS uses the 2nd peer as bss peer */
+#ifdef CONFIG_QCA_WIFI_ISOC
+#define IBSS_BROADCAST_STAID 0
+#else
 #define IBSS_BROADCAST_STAID 1
+#endif
+
 typedef enum 
 {
    /** Not associated in Infra or participating in an IBSS / Ad-hoc network.*/
@@ -111,6 +123,13 @@ typedef struct hdd_station_ctx hdd_station_ctx_t;
 typedef struct hdd_ap_ctx_s  hdd_ap_ctx_t;
 typedef struct hdd_mon_ctx_s  hdd_mon_ctx_t;
 
+#ifdef QCA_WIFI_2_0
+typedef enum
+{
+   ePeerConnected = 1,
+   ePeerDisconnected
+}ePeerStatus;
+#endif /* QCA_WIFI_2_0 */
 
 extern v_BOOL_t hdd_connIsConnected( hdd_station_ctx_t *pHddStaCtx );
 extern eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, v_U32_t roamId, 
@@ -127,4 +146,12 @@ int hdd_set_csr_auth_type( hdd_adapter_t *pAdapter, eCsrAuthType RSNAuthType );
 VOS_STATUS hdd_roamRegisterTDLSSTA( hdd_adapter_t *pAdapter,
                                     tANI_U8 *peerMac, tANI_U16 staId, tANI_U8 ucastSig);
 void hdd_PerformRoamSetKeyComplete(hdd_adapter_t *pAdapter);
+
+#ifdef QCA_WIFI_2_0
+void hdd_SendPeerStatusIndToOemApp(v_MACADDR_t *peerMac,
+                                   tANI_U8 peerStatus,
+                                   tANI_U8 peerTimingMeasCap,
+                                   tANI_U8 sessionId,
+                                   tANI_U8 chanId);
+#endif /* QCA_WIFI_2_0 */
 #endif
