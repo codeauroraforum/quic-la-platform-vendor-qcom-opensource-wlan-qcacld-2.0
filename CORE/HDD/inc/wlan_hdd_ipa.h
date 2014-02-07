@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -42,7 +42,7 @@
   Include files
   -------------------------------------------------------------------------*/
 #ifdef IPA_OFFLOAD
-#include <mach/ipa.h>
+#include <linux/ipa.h>
 
 VOS_STATUS hdd_ipa_init(hdd_context_t *pHddCtx);
 VOS_STATUS hdd_ipa_cleanup(hdd_context_t *pHddCtx);
