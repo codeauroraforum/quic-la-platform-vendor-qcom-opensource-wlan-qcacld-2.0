@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 #if defined(CONFIG_ATH_PROCFS_DIAG_SUPPORT)
 #include <linux/module.h>	/* Specifically, a module */
 #include <linux/kernel.h>	/* We're doing kernel work */
@@ -60,7 +61,7 @@ static ssize_t ath_procfs_diag_read(struct file *file, char __user *buf,
 #else
 	scn = (struct hif_pci_softc *)(PDE(file->f_path.dentry->d_inode)->data);
 #endif
-	pr_debug("rd buff 0x%p cnt %d offset 0x%x buf 0x%p\n",
+	pr_debug("rd buff 0x%p cnt %zu offset 0x%x buf 0x%p\n",
 			read_buffer,count,
 			(int)*pos, buf);
 

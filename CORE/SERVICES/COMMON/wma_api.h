@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /**========================================================================
 
   \file     wma.c
@@ -97,6 +98,8 @@ VOS_STATUS wma_start(v_VOID_t *vos_context);
 VOS_STATUS wma_stop(v_VOID_t *vos_context, tANI_U8 reason);
 
 VOS_STATUS wma_close(v_VOID_t *vos_context);
+
+VOS_STATUS wma_wmi_service_close(v_VOID_t *vos_context);
 
 v_VOID_t wma_rx_ready_event(WMA_HANDLE handle, v_VOID_t *ev);
 

@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) . The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 
 
 #ifndef __ATH_PCI_H__
@@ -119,7 +121,7 @@ extern int pktlogmod_init(void *context);
 extern void pktlogmod_exit(void *context);
 #endif
 
-void hif_pci_check_soc_status(struct hif_pci_softc *sc);
+int hif_pci_check_soc_status(struct hif_pci_softc *sc);
 
 /*
  * A firmware interrupt to the Host is indicated by the

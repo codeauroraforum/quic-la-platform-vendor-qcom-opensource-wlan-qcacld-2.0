@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /**=========================================================================
 
   \file  vos_api.c
@@ -31,7 +32,7 @@
   \brief Stub file for all virtual Operating System Services (vOSS) APIs
 
   ========================================================================*/
- /*=========================================================================== 
+ /*===========================================================================
 
                        EDIT HISTORY FOR FILE 
    
@@ -689,7 +690,7 @@ VOS_STATUS vos_preStart( v_CONTEXT_t vosContext )
       if ( vStatus == VOS_STATUS_E_TIMEOUT )
       {
          VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-          "%s: Timeout occurred before WDA complete\n", __func__);
+          "%s: Timeout occurred before WDA complete", __func__);
       }
       else
       {
@@ -1114,6 +1115,15 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
       gpVosContext->htc_ctx = NULL;
   }
 #endif
+
+  vosStatus = wma_wmi_service_close( vosContext );
+  if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+  {
+     VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+         "%s: Failed to close wma_wmi_service", __func__);
+     VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
+  }
+
 
 #ifndef QCA_WIFI_2_0
   /* Let DXE return packets in WDA_close and then free them here */
@@ -2454,7 +2464,7 @@ v_VOID_t vos_fwDumpReq(tANI_U32 cmd, tANI_U32 arg1, tANI_U32 arg2,
       if (vStatus == VOS_STATUS_E_TIMEOUT)
       {
          VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-          "%s: Timeout occurred before WDA HAL DUMP complete\n", __func__);
+          "%s: Timeout occurred before WDA HAL DUMP complete", __func__);
       }
       else
       {

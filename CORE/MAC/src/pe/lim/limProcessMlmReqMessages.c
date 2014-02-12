@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /*
  * This file limProcessMlmMessages.cc contains the code
  * for processing MLM request messages.
@@ -4384,9 +4385,8 @@ limProcessAssocFailureTimeout(tpAniSirGlobal pMac, tANI_U32 MsgType)
             //To remove the preauth node in case of fail to associate
             if (limSearchPreAuthList(pMac, psessionEntry->bssId))
             {
-                PELOG1(limLog(pMac, LOG1, FL(" delete pre auth node for %02X-%02X-%02X-%02X-%02X-%02X"),
-                    psessionEntry->bssId[0], psessionEntry->bssId[1], psessionEntry->bssId[2], 
-                    psessionEntry->bssId[3], psessionEntry->bssId[4], psessionEntry->bssId[5]);)
+                PELOG1(limLog(pMac, LOG1, FL(" delete pre auth node for "
+                       MAC_ADDRESS_STR), MAC_ADDR_ARRAY(psessionEntry->bssId));)
                 limDeletePreAuthNode(pMac, psessionEntry->bssId);
             }
 

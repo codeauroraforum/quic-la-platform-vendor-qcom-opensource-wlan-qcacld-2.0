@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /*
  *
  * This file limProcessAuthFrame.cc contains the code
@@ -559,15 +560,10 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                                          (tANI_U8 *) &pMlmDisassocReq->peerMacAddr,
                                           sizeof(tSirMacAddr))))
                 {
-                    PELOGE(limLog(pMac, LOGE, FL("\nTODO:Ack for disassoc "
-                                "frame is pending Issue delsta for"
-                                " %02x:%02x:%02x:%02x:%02x:%02x"),
-                                pMlmDisassocReq->peerMacAddr[0],
-                                pMlmDisassocReq->peerMacAddr[1],
-                                pMlmDisassocReq->peerMacAddr[2],
-                                pMlmDisassocReq->peerMacAddr[3],
-                                pMlmDisassocReq->peerMacAddr[4],
-                                pMlmDisassocReq->peerMacAddr[5]);)
+                    PELOGE(limLog(pMac, LOGE, FL("TODO:Ack for disassoc "
+                                "frame is pending Issue delsta for "
+                                MAC_ADDRESS_STR),
+                                MAC_ADDR_ARRAY(pMlmDisassocReq->peerMacAddr));)
                     limProcessDisassocAckTimeout(pMac);
                 }
                 pMlmDeauthReq = pMac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq;
@@ -576,16 +572,10 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                                          (tANI_U8 *) &pMlmDeauthReq->peerMacAddr,
                                          sizeof(tSirMacAddr))))
                 {
-                    PELOGE(limLog(pMac, LOGE, FL("\nTODO:Ack for deauth frame "
+                    PELOGE(limLog(pMac, LOGE, FL("TODO:Ack for deauth frame "
                                 "is pending Issue delsta for "
-                                "%02x:%02x:%02x:%02x:%02x:%02x"),
-                                pMlmDeauthReq->peerMacAddr[0],
-                                pMlmDeauthReq->peerMacAddr[1],
-                                pMlmDeauthReq->peerMacAddr[2],
-                                pMlmDeauthReq->peerMacAddr[3],
-                                pMlmDeauthReq->peerMacAddr[4],
-                                pMlmDeauthReq->peerMacAddr[5]
-                                );)
+                                MAC_ADDRESS_STR),
+                                MAC_ADDR_ARRAY(pMlmDeauthReq->peerMacAddr));)
                     limProcessDeauthAckTimeout(pMac);
                 }
             }

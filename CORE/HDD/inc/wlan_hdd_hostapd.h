@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 #if !defined( WLAN_HDD_HOSTAPD_H )
 #define WLAN_HDD_HOSTAPD_H
 
@@ -52,7 +53,7 @@
   -------------------------------------------------------------------------*/
 
 /* max length of command string in hostapd ioctl */
-#define HOSTAPD_IOCTL_COMMAND_STRLEN_MAX   2048
+#define HOSTAPD_IOCTL_COMMAND_STRLEN_MAX   4096
 
 hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAddr, tANI_U8 *name);
 
