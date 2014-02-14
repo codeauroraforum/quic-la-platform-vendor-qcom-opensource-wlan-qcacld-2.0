@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /* AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY */
 /**
  *   @addtogroup WDIAPI
@@ -1198,18 +1199,11 @@ ol_tx_queue_log_display(ol_txrx_pdev_handle pdev);
 #define wdi_in_peer_attach ol_txrx_peer_attach
 #define wdi_in_peer_update ol_txrx_peer_update
 #define wdi_in_peer_pause ol_txrx_peer_pause
-#define wdi_in_peer_pause ol_txrx_peer_pause
-#define wdi_in_peer_tid_unpause ol_txrx_peer_tid_unpause
 #define wdi_in_peer_tid_unpause ol_txrx_peer_tid_unpause
 #define wdi_in_tx_release ol_txrx_tx_release
-#define wdi_in_tx_release ol_txrx_tx_release
-#define wdi_in_vdev_pause ol_txrx_vdev_pause
 #define wdi_in_vdev_pause ol_txrx_vdev_pause
 #define wdi_in_vdev_unpause ol_txrx_vdev_unpause
-#define wdi_in_vdev_unpause ol_txrx_vdev_unpause
 #define wdi_in_pdev_pause ol_txrx_pdev_pause
-#define wdi_in_pdev_pause ol_txrx_pdev_pause
-#define wdi_in_pdev_unpause ol_txrx_pdev_unpause
 #define wdi_in_pdev_unpause ol_txrx_pdev_unpause
 #define wdi_in_tx_sync ol_txrx_tx_sync
 #define wdi_in_peer_detach ol_txrx_peer_detach

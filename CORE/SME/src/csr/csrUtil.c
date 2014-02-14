@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,15 +24,14 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /** ------------------------------------------------------------------------- *
     ------------------------------------------------------------------------- *
 
 
     \file csrUtil.c
 
-    Implementation supporting routines for CSR.
-
-   ========================================================================== */
+    Implementation supporting routines for CSR.========================================================================== */
 
 
 #include "aniGlobal.h"
@@ -3731,8 +3730,8 @@ tANI_BOOLEAN csrLookupPMKID( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U8 *p
     {
         for( Index=0; Index < pSession->NumPmkidCache; Index++ )
         {
-            smsLog(pMac, LOGW, "match PMKID %02X-%02X-%02X-%02X-%02X-%02X to ",
-                pBSSId[0], pBSSId[1], pBSSId[2], pBSSId[3], pBSSId[4], pBSSId[5]);
+            smsLog(pMac, LOGW, "match PMKID "MAC_ADDRESS_STR " to ",
+                   MAC_ADDR_ARRAY(pBSSId));
             if( vos_mem_compare(pBSSId, pSession->PmkidCacheInfo[Index].BSSID, sizeof(tCsrBssid)) )
             {
                 // match found
@@ -4017,8 +4016,8 @@ tANI_BOOLEAN csrLookupBKID( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U8 *pB
     {
         for( Index=0; Index < pSession->NumBkidCache; Index++ )
         {
-            smsLog(pMac, LOGW, "match BKID %02X-%02X-%02X-%02X-%02X-%02X to ",
-                pBSSId[0], pBSSId[1], pBSSId[2], pBSSId[3], pBSSId[4], pBSSId[5]);
+            smsLog(pMac, LOGW, "match BKID "MAC_ADDRESS_STR" to ",
+                   MAC_ADDR_ARRAY(pBSSId));
             if (vos_mem_compare(pBSSId, pSession->BkidCacheInfo[Index].BSSID, sizeof(tCsrBssid) ) )
             {
                 // match found

@@ -1,5 +1,5 @@
-# We can build either as part of a standalone Kernel build or part
-# of an Android build.  Determine which mechanism is being used
+# We can build either as part of a standalone Kernel build or as
+# an external module.  Determine which mechanism is being used
 ifeq ($(MODNAME),)
 	KERNEL_BUILD := 1
 else
@@ -7,10 +7,11 @@ else
 endif
 
 ifeq ($(KERNEL_BUILD),1)
-	# These are provided in Android-based builds
+	# These are provided in external module based builds
 	# Need to explicitly define for Kernel-based builds
 	MODNAME := wlan
-	WLAN_ROOT := drivers/staging/prima
+	WLAN_ROOT := drivers/staging/qcacld-2.0
+	WLAN_OPEN_SOURCE := 1
 endif
 
 ifeq ($(KERNEL_BUILD), 0)
@@ -35,15 +36,14 @@ ifeq ($(KERNEL_BUILD), 0)
 	#Flag to enable Fast Transition (11r) feature
 	CONFIG_QCOM_VOWIFI_11R := y
 
-	#Flag to enable Protected Managment Frames (11w) feature
-	ifneq ($(CONFIG_QCA_CLD_WLAN),)
-		ifeq ($(CONFIG_CNSS),y)
-		CONFIG_WLAN_FEATURE_11W := y
-		endif
-	endif
-
-	#Flag to enable LTE CoEx feature
-	CONFIG_QCOM_LTE_COEX := y
+        ifneq ($(CONFIG_QCA_CLD_WLAN),)
+                ifeq ($(CONFIG_CNSS),y)
+        #Flag to enable Protected Managment Frames (11w) feature
+                CONFIG_WLAN_FEATURE_11W := y
+        #Flag to enable LTE CoEx feature
+                CONFIG_QCOM_LTE_COEX := y
+                endif
+        endif
 
 	#Flag to enable new Linux Regulatory implementation
 	CONFIG_ENABLE_LINUX_REG := y
@@ -972,11 +972,7 @@ ifeq ($(RE_ENABLE_WIFI_ON_WDI_TIMEOUT),1)
 CDEFINES += -DWDI_RE_ENABLE_WIFI_ON_WDI_TIMEOUT
 endif
 
-ifeq ($(KERNEL_BUILD),1)
-CDEFINES += -DWLAN_OPEN_SOURCE
-endif
-
-ifeq ($(findstring opensource, $(WLAN_ROOT)), opensource)
+ifeq ($(WLAN_OPEN_SOURCE), 1)
 CDEFINES += -DWLAN_OPEN_SOURCE
 endif
 

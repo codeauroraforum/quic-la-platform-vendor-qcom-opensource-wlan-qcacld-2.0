@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /*=== includes ===*/
 /* header files for OS primitives */
 #include <osdep.h>         /* u_int32_t, etc. */
@@ -826,6 +827,7 @@ ol_txrx_vdev_attach(
     }
     #endif /* defined(CONFIG_HL_SUPPORT) */
 
+    adf_os_spinlock_init(&vdev->ll_pause.mutex);
     vdev->ll_pause.is_paused = A_FALSE;
     vdev->ll_pause.txq.head = vdev->ll_pause.txq.tail = NULL;
     vdev->ll_pause.txq.depth = 0;
@@ -932,6 +934,9 @@ ol_txrx_vdev_detach(
     adf_os_timer_free(&vdev->ll_pause.timer);
     while (vdev->ll_pause.txq.head) {
         adf_nbuf_t next = adf_nbuf_next(vdev->ll_pause.txq.head);
+        adf_nbuf_set_next(vdev->ll_pause.txq.head, NULL);
+        adf_nbuf_unmap(pdev->osdev, vdev->ll_pause.txq.head,
+                       ADF_OS_DMA_TO_DEVICE);
         adf_nbuf_tx_free(vdev->ll_pause.txq.head, 1 /* error */);
         vdev->ll_pause.txq.head = next;
     }

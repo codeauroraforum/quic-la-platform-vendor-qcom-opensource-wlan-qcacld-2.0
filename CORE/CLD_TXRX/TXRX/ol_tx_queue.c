@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 #include <adf_nbuf.h>         /* adf_nbuf_t, etc. */
 #include <adf_os_atomic.h>    /* adf_os_atomic_add, etc. */
 #include <ol_cfg.h>           /* ol_cfg_addba_retry */
@@ -520,8 +521,11 @@ ol_txrx_vdev_unpause(ol_txrx_vdev_handle vdev)
         adf_os_spin_unlock(&pdev->tx_queue_spinlock);
 #endif /* defined(CONFIG_HL_SUPPORT) */
     } else {
-        vdev->ll_pause.is_paused = A_FALSE;
-        ol_tx_vdev_ll_pause_queue_send(vdev);
+        if (vdev->ll_pause.is_paused)
+        {
+            vdev->ll_pause.is_paused = A_FALSE;
+            ol_tx_vdev_ll_pause_queue_send(vdev);
+        }
     }
     TX_SCHED_DEBUG_PRINT("Leave %s\n", __func__);
 }
@@ -538,6 +542,9 @@ ol_txrx_vdev_flush(ol_txrx_vdev_handle vdev)
         adf_os_timer_cancel(&vdev->ll_pause.timer);
         while (vdev->ll_pause.txq.head) {
             adf_nbuf_t next = adf_nbuf_next(vdev->ll_pause.txq.head);
+            adf_nbuf_set_next(vdev->ll_pause.txq.head, NULL);
+            adf_nbuf_unmap(vdev->pdev->osdev, vdev->ll_pause.txq.head,
+                           ADF_OS_DMA_TO_DEVICE);
             adf_nbuf_tx_free(vdev->ll_pause.txq.head, 1 /* error */);
             vdev->ll_pause.txq.head = next;
         }

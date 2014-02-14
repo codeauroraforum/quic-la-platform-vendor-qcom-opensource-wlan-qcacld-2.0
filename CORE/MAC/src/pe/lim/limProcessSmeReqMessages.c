@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -20,10 +20,13 @@
  */
 
 /*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
+ * Copyright (c) 2012-2014 Qualcomm Atheros, Inc.
+ * All Rights Reserved.
+ * Qualcomm Atheros Confidential and Proprietary.
+ *
  */
+
+
 /*
  * This file limProcessSmeReqMessages.cc contains the code
  * for processing SME request messages.
@@ -1991,14 +1994,9 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                psessionEntry->ssId.ssId[3],
                psessionEntry->ssId.ssId[4],
                psessionEntry->ssId.ssId[5]);
-        limLog(pMac, LOG1, FL("Channel %d, BSSID %x:%x:%x:%x:%x:%x"),
+        limLog(pMac, LOG1, FL("Channel %d, BSSID "MAC_ADDRESS_STR),
                psessionEntry->currentOperChannel,
-               psessionEntry->bssId[0],
-               psessionEntry->bssId[1],
-               psessionEntry->bssId[2],
-               psessionEntry->bssId[3],
-               psessionEntry->bssId[4],
-               psessionEntry->bssId[5]);)
+               MAC_ADDR_ARRAY(psessionEntry->bssId));)
 
         /* Indicate whether spectrum management is enabled*/
         psessionEntry->spectrumMgtEnabled = 
@@ -3357,13 +3355,8 @@ void limProcessSmeGetAssocSTAsInfo(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             pAssocStasTemp->Support40Mhz = pStaDs->htDsssCckRate40MHzSupport;
 
             limLog(pMac, LOG1, FL("dph Station Number = %d"), staCount+1);
-            limLog(pMac, LOG1, FL("MAC = %02x:%02x:%02x:%02x:%02x:%02x"),
-                                        pStaDs->staAddr[0],
-                                        pStaDs->staAddr[1],
-                                        pStaDs->staAddr[2],
-                                        pStaDs->staAddr[3],
-                                        pStaDs->staAddr[4],
-                                        pStaDs->staAddr[5]);
+            limLog(pMac, LOG1, FL("MAC = " MAC_ADDRESS_STR),
+                                        MAC_ADDR_ARRAY(pStaDs->staAddr));
             limLog(pMac, LOG1, FL("Association Id = %d"),pStaDs->assocId);
             limLog(pMac, LOG1, FL("Station Index = %d"),pStaDs->staIndex);
 
@@ -4020,9 +4013,9 @@ __limProcessSmeDeltsReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         return;
     }
 
-    PELOG1(limLog(pMac, LOG1, FL("Sent DELTS request to station with assocId = %d MacAddr = %x:%x:%x:%x:%x:%x"),
-              pDeltsReq->aid, peerMacAddr[0], peerMacAddr[1], peerMacAddr[2],
-              peerMacAddr[3], peerMacAddr[4], peerMacAddr[5]);)
+    PELOG1(limLog(pMac, LOG1, FL("Sent DELTS request to station with "
+                  "assocId = %d MacAddr = "MAC_ADDRESS_STR),
+                  pDeltsReq->aid, MAC_ADDR_ARRAY(peerMacAddr));)
 
     limSendDeltsReqActionFrame(pMac, peerMacAddr, pDeltsReq->req.wmeTspecPresent, &pDeltsReq->req.tsinfo, &pDeltsReq->req.tspec,
               psessionEntry);
@@ -5349,13 +5342,7 @@ eHalStatus limProcessSmeTeardownReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     }
     
     VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-            "Teardown for peer = %02x,%02x,%02x,%02x,%02x,%02x",
-                                             teardownReq->peerMac[0],
-                                             teardownReq->peerMac[1],
-                                             teardownReq->peerMac[2],
-                                             teardownReq->peerMac[3],
-                                             teardownReq->peerMac[4],
-                                             teardownReq->peerMac[5]) ;
+            "Teardown for peer = " MAC_ADDRESS_STR, MAC_ADDR_ARRAY(teardownReq->peerMac));
     /*
      * Now, go ahead and transmit TDLS teardown request, and save teardown info
      * info for future reference.

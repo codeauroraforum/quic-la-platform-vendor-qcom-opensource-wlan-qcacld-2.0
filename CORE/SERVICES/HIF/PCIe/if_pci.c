@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) . The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 
 
 #include <osdep.h>
@@ -100,11 +102,12 @@ hif_pci_interrupt_handler(int irq, void *arg)
 {
     struct hif_pci_softc *sc = (struct hif_pci_softc *) arg;
     struct HIF_CE_state *hif_state = (struct HIF_CE_state *)sc->hif_device;
-    A_target_id_t targid = hif_state->targid;
     volatile int tmp;
 
     if (LEGACY_INTERRUPTS(sc)) {
-        A_TARGET_ACCESS_BEGIN(targid);
+
+        if (sc->hif_init_done == TRUE)
+           A_TARGET_ACCESS_BEGIN(hif_state->targid);
 
         /* Clear Legacy PCI line interrupts */
         /* IMPORTANT: INTR_CLR regiser has to be set after INTR_ENABLE is set to 0, */
@@ -118,8 +121,8 @@ hif_pci_interrupt_handler(int irq, void *arg)
             printk(KERN_ERR "BUG(%s): SoC returns 0xdeadbeef!!\n", __func__);
             VOS_BUG(0);
         }
-
-        A_TARGET_ACCESS_END(targid);
+        if (sc->hif_init_done == TRUE)
+          A_TARGET_ACCESS_END(hif_state->targid);
     }
     /* TBDXXX: Add support for WMAC */
 
@@ -327,8 +330,8 @@ hif_pci_device_warm_reset(struct hif_pci_softc *sc)
 
 }
 
-void
-hif_pci_check_soc_status(struct hif_pci_softc *sc)
+
+int hif_pci_check_soc_status(struct hif_pci_softc *sc)
 {
     u_int16_t device_id;
     u_int32_t val;
@@ -338,7 +341,7 @@ hif_pci_check_soc_status(struct hif_pci_softc *sc)
     pci_read_config_word(sc->pdev, PCI_DEVICE_ID, &device_id);
     if(device_id != sc->devid) {
         printk(KERN_ERR "PCIe link is down!\n");
-        return;
+        return -EACCES;
     }
 
     /* Check PCIe local register for bar/memory access */
@@ -361,7 +364,7 @@ hif_pci_check_soc_status(struct hif_pci_softc *sc)
                 A_PCI_READ32(sc->mem + PCIE_LOCAL_BASE_ADDRESS +
                 RTC_STATE_ADDRESS), A_PCI_READ32(sc->mem +
                 PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS));
-            return;
+            return -EACCES;
         }
 
         A_PCI_WRITE32(sc->mem + PCIE_LOCAL_BASE_ADDRESS +
@@ -374,6 +377,7 @@ hif_pci_check_soc_status(struct hif_pci_softc *sc)
     /* Check BAR + 0x10c register for SoC internal bus issues */
     val = A_PCI_READ32(sc->mem + 0x10c);
     printk("BAR + 0x10c is %08x\n", val);
+    return EOK;
 }
 
 /*
@@ -406,7 +410,6 @@ wlan_tasklet(unsigned long data)
 {
     struct hif_pci_softc *sc = (struct hif_pci_softc *) data;
     struct HIF_CE_state *hif_state = (struct HIF_CE_state *)sc->hif_device;
-    A_target_id_t targid = hif_state->targid;
     volatile int tmp;
 
     if (sc->hif_init_done == FALSE) {
@@ -427,7 +430,9 @@ wlan_tasklet(unsigned long data)
     }
 irq_handled:
     if (LEGACY_INTERRUPTS(sc)) {
-        A_TARGET_ACCESS_BEGIN(targid);
+
+        if (sc->hif_init_done == TRUE)
+            A_TARGET_ACCESS_BEGIN(hif_state->targid);
 
         /* Enable Legacy PCI line interrupts */
         A_PCI_WRITE32(sc->mem+(SOC_CORE_BASE_ADDRESS | PCIE_INTR_ENABLE_ADDRESS), 
@@ -435,7 +440,8 @@ irq_handled:
         /* IMPORTANT: this extra read transaction is required to flush the posted write buffer */
         tmp = A_PCI_READ32(sc->mem+(SOC_CORE_BASE_ADDRESS | PCIE_INTR_ENABLE_ADDRESS));
 
-        A_TARGET_ACCESS_END(targid);
+        if (sc->hif_init_done == TRUE)
+           A_TARGET_ACCESS_END(hif_state->targid);
     }
 }
 
