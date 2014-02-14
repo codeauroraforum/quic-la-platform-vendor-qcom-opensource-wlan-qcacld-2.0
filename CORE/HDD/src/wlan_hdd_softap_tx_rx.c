@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,16 +24,18 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /**===========================================================================
-  
+
   \file  wlan_hdd_softap_tx_rx.c
-  
+
   \brief Linux HDD Tx/RX APIs
+
   ==========================================================================*/
 
-/*--------------------------------------------------------------------------- 
+/*---------------------------------------------------------------------------
   Include files
-  -------------------------------------------------------------------------*/ 
+  -------------------------------------------------------------------------*/
 #include <linux/semaphore.h>
 #include <wlan_hdd_tx_rx.h>
 #include <wlan_hdd_softap_tx_rx.h>
@@ -1767,29 +1769,14 @@ VOS_STATUS hdd_softap_RegisterSTA( hdd_adapter_t *pAdapter,
    VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO,
               "register station \n");
    VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO,
-              "station mac %02x:%02x:%02x:%02x:%02x:%02x",
-              staDesc.vSTAMACAddress.bytes[0],
-              staDesc.vSTAMACAddress.bytes[1],
-              staDesc.vSTAMACAddress.bytes[2],
-              staDesc.vSTAMACAddress.bytes[3],
-              staDesc.vSTAMACAddress.bytes[4],
-              staDesc.vSTAMACAddress.bytes[5]);
+              "station mac " MAC_ADDRESS_STR,
+              MAC_ADDR_ARRAY(staDesc.vSTAMACAddress.bytes));
    VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO,
-              "BSSIDforIBSS %02x:%02x:%02x:%02x:%02x:%02x",
-              staDesc.vBSSIDforIBSS.bytes[0],
-              staDesc.vBSSIDforIBSS.bytes[1],
-              staDesc.vBSSIDforIBSS.bytes[2],
-              staDesc.vBSSIDforIBSS.bytes[3],
-              staDesc.vBSSIDforIBSS.bytes[4],
-              staDesc.vBSSIDforIBSS.bytes[5]);
+              "BSSIDforIBSS " MAC_ADDRESS_STR,
+              MAC_ADDR_ARRAY(staDesc.vBSSIDforIBSS.bytes));
    VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO,
-              "SOFTAP SELFMAC %02x:%02x:%02x:%02x:%02x:%02x",
-              staDesc.vSelfMACAddress.bytes[0],
-              staDesc.vSelfMACAddress.bytes[1],
-              staDesc.vSelfMACAddress.bytes[2],
-              staDesc.vSelfMACAddress.bytes[3],
-              staDesc.vSelfMACAddress.bytes[4],
-              staDesc.vSelfMACAddress.bytes[5]);
+              "SOFTAP SELFMAC " MAC_ADDRESS_STR,
+              MAC_ADDR_ARRAY(staDesc.vSelfMACAddress.bytes));
 
    vosStatus = hdd_softap_init_tx_rx_sta(pAdapter, staId, &staDesc.vSTAMACAddress);
 

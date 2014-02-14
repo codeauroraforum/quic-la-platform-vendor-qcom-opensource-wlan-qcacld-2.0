@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,8 +24,12 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 #ifndef TXRX_TL_SHIM_H
 #define TXRX_TL_SHIM_H
+
+#include <ol_txrx_osif_api.h>
+#include <adf_os_lock.h>
 
 #ifdef FEATURE_WLAN_CCX
 typedef struct deferred_iapp_work {
@@ -85,5 +89,7 @@ VOS_STATUS tl_shim_get_vdevid(struct ol_txrx_peer_t *peer, u_int8_t *vdev_id);
  * BETTER_AP_FOUND event is received from roam engine.
  */
 int tlshim_mgmt_roam_event_ind(void *context, u_int32_t vdev_id);
+void *tl_shim_get_vdev_by_addr(void *vos_context, uint8_t *mac_addr);
+void *tl_shim_get_vdev_by_sta_id(void *vos_context, uint8_t sta_id);
 
 #endif

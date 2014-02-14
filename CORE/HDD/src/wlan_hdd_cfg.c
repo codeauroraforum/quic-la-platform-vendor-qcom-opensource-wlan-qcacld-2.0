@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /**=========================================================================
 
                        EDIT HISTORY FOR FILE
@@ -3295,48 +3296,25 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [AutoBmpsTimerEnabled] Value = [%u]",pHddCtx->cfg_ini->fIsAutoBmpsTimerEnabled);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [nAutoBmpsTimerValue] Value = [%u]",pHddCtx->cfg_ini->nAutoBmpsTimerValue);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [nVccRssiTrigger] Value = [%u]",pHddCtx->cfg_ini->nVccRssiTrigger);
-  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gIbssBssid] Value =[0x%x 0x%x 0x%x 0x%x 0x%x 0x%x]",
-      pHddCtx->cfg_ini->IbssBssid.bytes[0],pHddCtx->cfg_ini->IbssBssid.bytes[1],
-      pHddCtx->cfg_ini->IbssBssid.bytes[2],pHddCtx->cfg_ini->IbssBssid.bytes[3],
-      pHddCtx->cfg_ini->IbssBssid.bytes[4],pHddCtx->cfg_ini->IbssBssid.bytes[5]);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+            "Name = [gIbssBssid] Value =["MAC_ADDRESS_STR"]",
+            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->IbssBssid.bytes));
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-          "Name = [Intf0MacAddress] Value =[0x%x 0x%x 0x%x 0x%x 0x%x 0x%x]",
-                                  pHddCtx->cfg_ini->intfMacAddr[0].bytes[0],
-                                  pHddCtx->cfg_ini->intfMacAddr[0].bytes[1],
-                                  pHddCtx->cfg_ini->intfMacAddr[0].bytes[2],
-                                  pHddCtx->cfg_ini->intfMacAddr[0].bytes[3],
-                                  pHddCtx->cfg_ini->intfMacAddr[0].bytes[4],
-                                  pHddCtx->cfg_ini->intfMacAddr[0].bytes[5]);
-
+            "Name = [Intf0MacAddress] Value =["MAC_ADDRESS_STR"]",
+            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[0].bytes));
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-          "Name = [Intf1MacAddress] Value =[0x%x 0x%x 0x%x 0x%x 0x%x 0x%x]",
-                                  pHddCtx->cfg_ini->intfMacAddr[1].bytes[0],
-                                  pHddCtx->cfg_ini->intfMacAddr[1].bytes[1],
-                                  pHddCtx->cfg_ini->intfMacAddr[1].bytes[2],
-                                  pHddCtx->cfg_ini->intfMacAddr[1].bytes[3],
-                                  pHddCtx->cfg_ini->intfMacAddr[1].bytes[4],
-                                  pHddCtx->cfg_ini->intfMacAddr[1].bytes[5]);
+            "Name = [Intf1MacAddress] Value =["MAC_ADDRESS_STR"]",
+            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[1].bytes));
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-          "Name = [Intf2MacAddress] Value =[0x%x 0x%x 0x%x 0x%x 0x%x 0x%x]",
-                                  pHddCtx->cfg_ini->intfMacAddr[2].bytes[0],
-                                  pHddCtx->cfg_ini->intfMacAddr[2].bytes[1],
-                                  pHddCtx->cfg_ini->intfMacAddr[2].bytes[2],
-                                  pHddCtx->cfg_ini->intfMacAddr[2].bytes[3],
-                                  pHddCtx->cfg_ini->intfMacAddr[2].bytes[4],
-                                  pHddCtx->cfg_ini->intfMacAddr[2].bytes[5]);
+            "Name = [Intf2MacAddress] Value =["MAC_ADDRESS_STR"]",
+            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[2].bytes));
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-          "Name = [Intf3MacAddress] Value =[0x%x 0x%x 0x%x 0x%x 0x%x 0x%x]",
-                                  pHddCtx->cfg_ini->intfMacAddr[3].bytes[0],
-                                  pHddCtx->cfg_ini->intfMacAddr[3].bytes[1],
-                                  pHddCtx->cfg_ini->intfMacAddr[3].bytes[2],
-                                  pHddCtx->cfg_ini->intfMacAddr[3].bytes[3],
-                                  pHddCtx->cfg_ini->intfMacAddr[3].bytes[4],
-                                  pHddCtx->cfg_ini->intfMacAddr[3].bytes[5]);
-
+            "Name = [Intf3MacAddress] Value =["MAC_ADDRESS_STR"]",
+            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[3].bytes));
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gApEnableUapsd] value = [%u]\n",pHddCtx->cfg_ini->apUapsdEnabled);
 
@@ -3632,6 +3610,116 @@ static int parseHexDigit(char c)
   return 0;
 }
 
+/* convert string to 6 bytes mac address
+ * 00AA00BB00CC -> 0x00 0xAA 0x00 0xBB 0x00 0xCC
+ */
+static void update_mac_from_string(hdd_context_t *pHddCtx, tCfgIniEntry *macTable, int num)
+{
+   int i = 0, j = 0, res = 0;
+   char *candidate = NULL;
+   v_MACADDR_t macaddr[VOS_MAX_CONCURRENCY_PERSONA];
+
+   memset(macaddr, 0, sizeof(macaddr));
+
+   for (i = 0; i < num; i++)
+   {
+      candidate = macTable[i].value;
+      for (j = 0; j < VOS_MAC_ADDR_SIZE; j++) {
+         res = hex2bin(&macaddr[i].bytes[j], &candidate[(j<<1)], 1);
+         if (res < 0)
+            break;
+      }
+      if (res == 0 && !vos_is_macaddr_zero(&macaddr[i])) {
+         vos_mem_copy((v_U8_t *)&pHddCtx->cfg_ini->intfMacAddr[i].bytes[0],
+                      (v_U8_t *)&macaddr[i].bytes[0], VOS_MAC_ADDR_SIZE);
+      }
+   }
+}
+
+/*
+ * This function tries to update macaddress from cfg file.
+ * It overwrites the MAC address if config file exist.
+ */
+VOS_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
+{
+   int status, i = 0;
+   const struct firmware *fw = NULL;
+   char *line, *buffer = NULL;
+   char *name, *value;
+   tCfgIniEntry macTable[VOS_MAX_CONCURRENCY_PERSONA];
+
+   VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+
+   memset(macTable, 0, sizeof(macTable));
+   status = request_firmware(&fw, WLAN_MAC_FILE, pHddCtx->parent_dev);
+
+   if (status)
+   {
+      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: request_firmware failed %d\n",
+             __func__, status);
+      vos_status = VOS_STATUS_E_FAILURE;
+      goto config_exit;
+   }
+   if (!fw || !fw->data || !fw->size)
+   {
+      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: invalid firmware\n", __func__);
+      vos_status = VOS_STATUS_E_INVAL;
+      goto config_exit;
+   }
+
+   buffer = (char *)fw->data;
+
+   /* data format:
+    * Intf0MacAddress=00AA00BB00CC
+    * Intf1MacAddress=00AA00BB00CD
+    * END
+    */
+   while (buffer != NULL)
+   {
+      line = get_next_line(buffer);
+      buffer = i_trim(buffer);
+
+      if (strlen((char *)buffer) == 0 || *buffer == '#') {
+         buffer = line;
+         continue;
+      }
+      if (strncmp(buffer, "END", 3) == 0)
+         break;
+
+      name = buffer;
+      buffer = strchr(buffer, '=');
+      if (buffer) {
+         *buffer++ = '\0';
+         i_trim(name);
+         if (strlen(name) != 0) {
+            buffer = i_trim(buffer);
+            if (strlen(buffer) == 12) {
+               value = buffer;
+               macTable[i].name = name;
+               macTable[i++].value = value;
+               if (i >= VOS_MAX_CONCURRENCY_PERSONA)
+                  break;
+            }
+         }
+      }
+      buffer = line;
+   }
+   if (i <= VOS_MAX_CONCURRENCY_PERSONA) {
+      hddLog(VOS_TRACE_LEVEL_INFO, "%s: %d Mac addresses provided\n", __func__, i);
+   }
+   else {
+      hddLog(VOS_TRACE_LEVEL_ERROR, "%s: invalid number of Mac address provided, nMac = %d\n",
+             __func__, i);
+      vos_status = VOS_STATUS_E_INVAL;
+      goto config_exit;
+   }
+
+   update_mac_from_string(pHddCtx, &macTable[0], i);
+
+config_exit:
+   release_firmware(fw);
+   return vos_status;
+}
 
 static VOS_STATUS hdd_apply_cfg_ini( hdd_context_t *pHddCtx, tCfgIniEntry* iniTable, unsigned long entries)
 {
@@ -4243,9 +4331,8 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
       if ( VOS_FALSE == vos_is_macaddr_group( &pConfig->IbssBssid ))
       {
          VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_MED,
-                    "MAC Addr (IBSS BSSID) read from Registry is: %02x-%02x-%02x-%02x-%02x-%02x",
-                    pConfig->IbssBssid.bytes[0], pConfig->IbssBssid.bytes[1], pConfig->IbssBssid.bytes[2],
-                    pConfig->IbssBssid.bytes[3], pConfig->IbssBssid.bytes[4], pConfig->IbssBssid.bytes[5]);
+                    "MAC Addr (IBSS BSSID) read from Registry is: " MAC_ADDRESS_STR,
+                    MAC_ADDR_ARRAY(pConfig->IbssBssid.bytes));
          if (ccmCfgSetStr(pHddCtx->hHal, WNI_CFG_BSSID, pConfig->IbssBssid.bytes,
             sizeof(v_BYTE_t) * VOS_MAC_ADDR_SIZE, NULL, eANI_BOOLEAN_FALSE)==eHAL_STATUS_FAILURE)
          {

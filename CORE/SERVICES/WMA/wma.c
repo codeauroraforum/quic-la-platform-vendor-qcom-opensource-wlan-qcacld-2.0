@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /**========================================================================
 
   \file     wma.c
@@ -489,7 +490,8 @@ static void wma_vdev_start_rsp(tp_wma_handle wma,
 
 	bcn = wma->interfaces[resp_event->vdev_id].beacon;
 	if (!bcn) {
-		WMA_LOGE("%s: Failed alloc memory for beacon struct\n");
+		WMA_LOGE("%s: Failed alloc memory for beacon struct",
+			 __func__);
 		add_bss->status = VOS_STATUS_E_FAILURE;
 		goto send_fail_resp;
 	}
@@ -549,7 +551,7 @@ static int wma_vdev_start_resp_handler(void *handle, u_int8_t *cmd_param_info,
 		return -EINVAL;
 	}
 	vos_timer_stop(&req_msg->event_timeout);
-   iface = &wma->interfaces[resp_event->vdev_id];
+        iface = &wma->interfaces[resp_event->vdev_id];
 	if (req_msg->msg_type == WDA_CHNL_SWITCH_REQ) {
 		tpSwitchChannelParams params =
 			(tpSwitchChannelParams) req_msg->user_data;
@@ -576,6 +578,7 @@ static int wma_vdev_start_resp_handler(void *handle, u_int8_t *cmd_param_info,
 		wma_send_msg(wma, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
 	} else if (req_msg->msg_type == WDA_ADD_BSS_REQ) {
 		tpAddBssParams bssParams = (tpAddBssParams) req_msg->user_data;
+                vos_mem_copy(iface->bssid, bssParams->bssId, ETH_ALEN);
 		wma_vdev_start_rsp(wma, bssParams, resp_event);
 	}
 	vos_timer_destroy(&req_msg->event_timeout);
@@ -1346,15 +1349,14 @@ static void wma_update_noa(struct beacon_info *beacon,
 static void wma_update_probe_resp_noa(tp_wma_handle wma_handle,
 					struct p2p_sub_element_noa *noa_ie)
 {
-	tSirP2PNoaAttr *noa_attr = (tSirP2PNoaAttr *) adf_os_mem_alloc(
-						NULL, sizeof(tSirP2PNoaAttr));
+	tSirP2PNoaAttr *noa_attr = (tSirP2PNoaAttr *) vos_mem_malloc(sizeof(tSirP2PNoaAttr));
 	WMA_LOGD("Received update NoA event");
 	if (!noa_attr) {
 		WMA_LOGE("Failed to allocate memory for tSirP2PNoaAttr");
 		return;
 	}
 
-	adf_os_mem_set(noa_attr, 0, sizeof(tSirP2PNoaAttr));
+	vos_mem_zero(noa_attr, sizeof(tSirP2PNoaAttr));
 
 	noa_attr->index = noa_ie->index;
 	noa_attr->oppPsFlag = noa_ie->oppPS;
@@ -1477,8 +1479,8 @@ static void wma_send_bcn_buf_ll(tp_wma_handle wma,
 		noa_ie.ctwindow = (u_int8_t)WMI_UNIFIED_NOA_ATTR_CTWIN_GET(p2p_noa_info);
 		noa_ie.num_descriptors = (u_int8_t)WMI_UNIFIED_NOA_ATTR_NUM_DESC_GET(
 				p2p_noa_info);
-		WMA_LOGI("%s: index %lu, oppPs %lu, ctwindow %lu, "
-			"num_descriptors = %lu", __func__, noa_ie.index,
+		WMA_LOGI("%s: index %u, oppPs %u, ctwindow %u, "
+			"num_descriptors = %u", __func__, noa_ie.index,
 			noa_ie.oppPS, noa_ie.ctwindow, noa_ie.num_descriptors);
 		for(i = 0; i < noa_ie.num_descriptors; i++) {
 			noa_ie.noa_descriptors[i].type_count =
@@ -1489,8 +1491,8 @@ static void wma_send_bcn_buf_ll(tp_wma_handle wma,
 				p2p_noa_info->noa_descriptors[i].interval;
 			noa_ie.noa_descriptors[i].start_time =
 				p2p_noa_info->noa_descriptors[i].start_time;
-			WMA_LOGI("%s: NoA descriptor[%d] type_count %lu, "
-				"duration %lu, interval %lu, start_time = %lu",
+			WMA_LOGI("%s: NoA descriptor[%d] type_count %u, "
+				"duration %u, interval %u, start_time = %u",
 				__func__, i,
 				noa_ie.noa_descriptors[i].type_count,
 				noa_ie.noa_descriptors[i].duration,
@@ -1687,9 +1689,18 @@ static int wma_gtk_offload_status_event(void *handle, u_int8_t *event,
 		return -EINVAL;
 	}
 
-	WMA_LOGD("GTK: got target status with replaycouter %x. vdev %d. " \
+	WMA_LOGD("GTK: got target status with replay counter "
+		 "%02x%02x%02x%02x%02x%02x%02x%02x. vdev %d. "
 		 "Refresh GTK %d times exchanges since last set operation.",
-		 status->replay_counter, status->vdev_id, status->refresh_cnt);
+		 status->replay_counter[0],
+		 status->replay_counter[1],
+		 status->replay_counter[2],
+		 status->replay_counter[3],
+		 status->replay_counter[4],
+		 status->replay_counter[5],
+		 status->replay_counter[6],
+		 status->replay_counter[7],
+		 status->vdev_id, status->refresh_cnt);
 
 	WMA_LOGD("%s Exit", __func__);
 
@@ -1887,8 +1898,8 @@ static int wma_p2p_noa_event_handler(void *handle, u_int8_t *event, u_int32_t le
 		descriptors = WMI_UNIFIED_NOA_ATTR_NUM_DESC_GET(p2p_noa_info);
 		noa_ie.num_descriptors = (u_int8_t)descriptors;
 
-		WMA_LOGI("%s: index %lu, oppPs %lu, ctwindow %lu, "
-				"num_descriptors = %lu", __func__, noa_ie.index,
+		WMA_LOGI("%s: index %u, oppPs %u, ctwindow %u, "
+				"num_descriptors = %u", __func__, noa_ie.index,
 				noa_ie.oppPS, noa_ie.ctwindow, noa_ie.num_descriptors);
 		for(i = 0; i < noa_ie.num_descriptors; i++) {
 			noa_ie.noa_descriptors[i].type_count =
@@ -1899,8 +1910,8 @@ static int wma_p2p_noa_event_handler(void *handle, u_int8_t *event, u_int32_t le
 				p2p_noa_info->noa_descriptors[i].interval;
 			noa_ie.noa_descriptors[i].start_time =
 				p2p_noa_info->noa_descriptors[i].start_time;
-			WMA_LOGI("%s: NoA descriptor[%d] type_count %lu, "
-					"duration %lu, interval %lu, start_time = %lu",
+			WMA_LOGI("%s: NoA descriptor[%d] type_count %u, "
+					"duration %u, interval %u, start_time = %u",
 					__func__, i,
 					noa_ie.noa_descriptors[i].type_count,
 					noa_ie.noa_descriptors[i].duration,
@@ -2321,6 +2332,8 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 	INIT_LIST_HEAD(&wma_handle->vdev_resp_queue);
 	adf_os_spinlock_init(&wma_handle->vdev_respq_lock);
 
+        adf_os_spinlock_init(&wma_handle->vdev_detach_lock);
+
 	/* Register vdev start response event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   WMI_VDEV_START_RESP_EVENTID,
@@ -2635,7 +2648,7 @@ void wma_vdev_detach_callback(void *ctx)
 			 __func__, param->sessionId);
 		vos_timer_stop(&req_msg->event_timeout);
 		vos_timer_destroy(&req_msg->event_timeout);
-		vos_mem_free(req_msg);
+		adf_os_mem_free(req_msg);
 	}
 	if(iface->addBssStaContext)
                 adf_os_mem_free(iface->addBssStaContext);
@@ -2705,38 +2718,47 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 		return status;
 	}
 
-	/* remove the interface from ath_dev */
-	if (wma_unified_vdev_delete_send(wma_handle->wmi_handle, vdev_id)) {
-		WMA_LOGP("Unable to remove an interface for ath_dev.\n");
-		status = VOS_STATUS_E_FAILURE;
-		goto out;
-	}
 
-	if(!iface->handle) {
-		status = VOS_STATUS_E_FAILURE;
-		WMA_LOGP("handle of vdev_id %d is NULL", vdev_id);
-		goto out;
-	}
+        adf_os_spin_lock_bh(&wma_handle->vdev_detach_lock);
+        if(!iface->handle) {
+                WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed",
+                    vdev_id);
+                adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+		return status;
+        }
 
-	WMA_LOGA("vdev_id:%hu vdev_hdl:%p\n", vdev_id, iface->handle);
-	if (!generateRsp) {
-		WMA_LOGD("Call txrx detach w/o callback for vdev %d", vdev_id);
-		ol_txrx_vdev_detach(iface->handle, NULL, NULL);
-		goto out;
-	}
+        /* remove the interface from ath_dev */
+        if (wma_unified_vdev_delete_send(wma_handle->wmi_handle, vdev_id)) {
+                WMA_LOGE("Unable to remove an interface for ath_dev.\n");
+                status = VOS_STATUS_E_FAILURE;
+                adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+                goto out;
+        }
 
-	iface->del_staself_req = pdel_sta_self_req_param;
-	msg = wma_fill_vdev_req(wma_handle, vdev_id, WDA_DEL_STA_SELF_REQ,
-				WMA_TARGET_REQ_TYPE_VDEV_DEL, iface, 2000);
-	if (!msg) {
-		WMA_LOGP("%s: Failed to fill vdev request for vdev_id %d\n",
-			 __func__, vdev_id);
-		status = VOS_STATUS_E_NOMEM;
-		goto out;
-	}
-	WMA_LOGD("Call txrx detach with callback for vdev %d", vdev_id);
-	ol_txrx_vdev_detach(iface->handle, wma_vdev_detach_callback, iface);
-	return status;
+
+        WMA_LOGA("vdev_id:%hu vdev_hdl:%p\n", vdev_id, iface->handle);
+        if (!generateRsp) {
+                WMA_LOGE("Call txrx detach w/o callback for vdev %d", vdev_id);
+                ol_txrx_vdev_detach(iface->handle, NULL, NULL);
+                adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+                goto out;
+        }
+
+        iface->del_staself_req = pdel_sta_self_req_param;
+        msg = wma_fill_vdev_req(wma_handle, vdev_id, WDA_DEL_STA_SELF_REQ,
+                                WMA_TARGET_REQ_TYPE_VDEV_DEL, iface, 2000);
+        if (!msg) {
+                WMA_LOGE("%s: Failed to fill vdev request for vdev_id %d\n",
+                         __func__, vdev_id);
+                status = VOS_STATUS_E_NOMEM;
+                adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+                goto out;
+        }
+        WMA_LOGE("Call txrx detach with callback for vdev %d", vdev_id);
+        ol_txrx_vdev_detach(iface->handle, NULL, NULL);
+        wma_vdev_detach_callback(iface);
+        adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+        return status;
 out:
         if(iface->addBssStaContext)
                 adf_os_mem_free(iface->addBssStaContext);
@@ -2894,7 +2916,7 @@ static void wma_set_sap_keepalive(tp_wma_handle wma, u_int8_t vdev_id)
 						      wma->vos_context);
 
 	if (NULL == mac) {
-		WMA_LOGE("%s: Failed to get mac");
+		WMA_LOGE("%s: Failed to get mac", __func__);
 		return;
 	}
 
@@ -3258,10 +3280,10 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 						self_sta_req->selfMacAddr,
 						self_sta_req->sessionId,
 						txrx_vdev_type);
-#ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
+#ifdef QCA_SUPPORT_TXRX_VDEV_PAUSE_LL
 	WMA_LOGD("LL TX Pause Mutex init");
 	adf_os_spinlock_init(&txrx_vdev_handle->ll_pause.mutex);
-#endif /* QCA_SUPPORT_TXRX_VDEV_LL_TXQ */
+#endif /* QCA_SUPPORT_TXRX_VDEV_PAUSE_LL */
 
 	WMA_LOGA("vdev_id %hu, txrx_vdev_handle = %p", self_sta_req->sessionId,
 			txrx_vdev_handle);
@@ -3737,7 +3759,6 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq)
 		pRssiBkUp = adf_os_mem_alloc(NULL, sizeof(tAniGetRssiReq));
 		if(!pRssiBkUp) {
 			WMA_LOGE("Failed to allocate memory for tAniGetRssiReq");
-			vos_mem_free(pRssiBkUp);
 			wma_handle->pGetRssiReq = NULL;
 			return VOS_STATUS_E_FAILURE;
 		}
@@ -3751,6 +3772,8 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq)
 	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
 	if (!buf) {
 		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
+		adf_os_mem_free(pRssiBkUp);
+		wma_handle->pGetRssiReq = NULL;
 		return VOS_STATUS_E_FAILURE;
 	}
 
@@ -3761,7 +3784,7 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq)
 	if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,WMI_REQUEST_STATS_CMDID)) {
 		WMA_LOGE("Failed to send host stats request to fw");
 		wmi_buf_free(buf);
-		vos_mem_free(pRssiBkUp);
+		adf_os_mem_free(pRssiBkUp);
 		wma_handle->pGetRssiReq = NULL;
 		return VOS_STATUS_E_FAILURE;
 	}
@@ -3789,18 +3812,27 @@ VOS_STATUS wma_start_scan(tp_wma_handle wma_handle,
 		goto error1;
 	}
 
+	/* Start the timer for scan completion */
+	vos_status = vos_timer_start(&wma_handle->wma_scan_comp_timer,
+					WMA_HW_DEF_SCAN_MAX_DURATION);
+	if (vos_status != VOS_STATUS_SUCCESS ) {
+		WMA_LOGE("Failed to start the scan completion timer");
+		vos_status = VOS_STATUS_E_FAILURE;
+		goto error1;
+	}
+
 	/* Fill individual elements of wmi_start_scan_req and
 	 * TLV for channel list, bssid, ssid etc ... */
 	vos_status = wma_get_buf_start_scan_cmd(wma_handle, scan_req,
 			&buf, &len);
 	if (vos_status != VOS_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get buffer for start scan cmd");
-		goto error1;
+		goto error0;
 	}
 
 	if (NULL == buf) {
 		WMA_LOGE("Failed to get buffer for saving current scan info");
-		goto error1;
+		goto error0;
 	}
 
 	/* Save current scan info */
@@ -3826,14 +3858,6 @@ VOS_STATUS wma_start_scan(tp_wma_handle wma_handle,
 
 	WMA_LOGI("WMA --> WMI_START_SCAN_CMDID");
 
-	/* Start the timer for scan completion */
-	vos_status = vos_timer_start(&wma_handle->wma_scan_comp_timer,
-					WMA_HW_DEF_SCAN_MAX_DURATION);
-	if (vos_status != VOS_STATUS_SUCCESS ) {
-		WMA_LOGE("Failed to start the scan completion timer");
-		vos_status = VOS_STATUS_E_FAILURE;
-		goto error;
-	}
 	/* Update the scan parameters for handler */
 	wma_handle->wma_scan_timer_info.vdev_id = cmd->vdev_id;
 	wma_handle->wma_scan_timer_info.scan_id = cmd->scan_id;
@@ -3843,6 +3867,12 @@ error:
 	wma_reset_scan_info(wma_handle, cmd->vdev_id);
 	if (buf)
 		adf_nbuf_free(buf);
+error0:
+	/* Stop the timer for scan completion */
+	if (vos_timer_stop(&wma_handle->wma_scan_comp_timer)
+		!= VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to stop the scan completion timer");
+	}
 error1:
         /* Send completion event for only for start scan request */
         if (msg_type == WDA_START_SCAN_OFFLOAD_REQ) {
@@ -4721,7 +4751,8 @@ VOS_STATUS wma_process_roam_scan_req(tp_wma_handle wma_handle,
                     (vos_msg_t*)&vosMsg))
                 {
                     VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
-                               "Failed to post the rsp to UMAC" , __func__);
+                               "%s: Failed to post Scan Offload Rsp to UMAC",
+                               __func__);
                 }
             }
             break;
@@ -5171,7 +5202,8 @@ VOS_STATUS wma_process_lphb_conf_req(tp_wma_handle wma_handle,
 		return VOS_STATUS_E_FAILURE;
 	}
 
-	WMA_LOGI("%s : LPHB configuration cmd id is %d\n", __func__);
+	WMA_LOGI("%s : LPHB configuration cmd id is %d", __func__,
+							lphb_conf_req->cmd);
 	switch (lphb_conf_req->cmd) {
 	case LPHB_SET_EN_PARAMS_INDID:
 		vos_status = wma_lphb_conf_hbenable(wma_handle,
@@ -5589,7 +5621,7 @@ static struct wma_target_req *wma_fill_vdev_req(tp_wma_handle wma, u_int8_t vdev
 {
 	struct wma_target_req *req;
 
-	req = vos_mem_malloc(sizeof(*req));
+	req = adf_os_mem_alloc(NULL, sizeof(*req));
 	if (!req) {
 		WMA_LOGP("Failed to allocate memory for msg %d vdev %d\n",
 			 msg_type, vdev_id);
@@ -8686,11 +8718,11 @@ static void wma_set_bsskey(tp_wma_handle wma_handle, tpSetBssKeyParams key_info)
         ** So cache the BSS key in the wma_handle and re-use it when the STA key is been setup for a peer
         */
         if (wlan_op_mode_ibss == txrx_vdev->opmode) {
-          WMA_LOGD("Caching IBSS Key");
-          vos_mem_copy(&wma_handle->ibsskey_info, key_info, sizeof(tSetBssKeyParams));
           key_info->status = eHAL_STATUS_SUCCESS;
           if (wma_handle->ibss_started > 0)
              goto out;
+          WMA_LOGD("Caching IBSS Key");
+          vos_mem_copy(&wma_handle->ibsskey_info, key_info, sizeof(tSetBssKeyParams));
         }
 
 	adf_os_mem_set(&key_params, 0, sizeof(key_params));
@@ -9385,6 +9417,8 @@ static int wmi_unified_bcn_tmpl_send(tp_wma_handle wma,
 	int ret;
 	u_int8_t *p2p_ie;
 	u_int16_t p2p_ie_len = 0;
+	u_int64_t adjusted_tsf_le;
+	struct ieee80211_frame *wh;
 
 
 	WMA_LOGD("Send beacon template for vdev %d", vdev_id);
@@ -9410,6 +9444,15 @@ static int wmi_unified_bcn_tmpl_send(tp_wma_handle wma,
 
 	frm = bcn_info->beacon + bytes_to_strip;
 	tmpl_len_aligned = roundup(tmpl_len, sizeof(A_UINT32));
+	/*
+	 * Make the TSF offset negative so beacons in the same
+	 * staggered batch have the same TSF.
+	 */
+	adjusted_tsf_le = cpu_to_le64(0ULL -
+				      wma->interfaces[vdev_id].tsfadjust);
+	/* Update the timstamp in the beacon buffer with adjusted TSF */
+	wh = (struct ieee80211_frame *)frm;
+	A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 
 	wmi_buf_len = sizeof(wmi_bcn_tmpl_cmd_fixed_param) +
 	          sizeof(wmi_bcn_prb_info) + WMI_TLV_HDR_SIZE +
@@ -9534,11 +9577,8 @@ static int wma_tbttoffset_update_event_handler(void *handle, u_int8_t *event,
 	WMI_TBTTOFFSET_UPDATE_EVENTID_param_tlvs *param_buf;
 	wmi_tbtt_offset_event_fixed_param *tbtt_offset_event;
 	struct wma_txrx_node *intf = wma->interfaces;
-	struct ieee80211_frame *wh;
 	struct beacon_info *bcn;
 	tSendbeaconParams bcn_info;
-	u_int8_t *bcn_payload;
-	u_int64_t adjusted_tsf_le;
 	u_int32_t *adjusted_tsf;
 	u_int32_t if_id = 0, vdev_map;
 
@@ -9562,19 +9602,10 @@ static int wma_tbttoffset_update_event_handler(void *handle, u_int8_t *event,
 		}
 		/* Save the adjusted TSF */
 		intf[if_id].tsfadjust = adjusted_tsf[if_id];
-		/*
-		 * Make the TSF offset negative so beacons in the same
-		 * staggered batch have the same TSF.
-		 */
-		adjusted_tsf_le = cpu_to_le64(0ULL - intf[if_id].tsfadjust);
 
-		/* Update the timstamp in the beacon buffer with adjusted TSF */
 		adf_os_spin_lock_bh(&bcn->lock);
-		bcn_payload = adf_nbuf_data(bcn->buf);
-		wh = (struct ieee80211_frame *) bcn_payload;
-		A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 		vos_mem_zero(&bcn_info, sizeof(bcn_info));
-		bcn_info.beacon = bcn_payload;
+		bcn_info.beacon = adf_nbuf_data(bcn->buf);
 		bcn_info.p2pIeOffset = bcn->p2p_ie_offset;
 		bcn_info.beaconLength = bcn->len;
 		bcn_info.timIeOffset = bcn->tim_ie_offset;
@@ -9910,7 +9941,7 @@ static int32_t wma_set_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, u_int8_
 	ret = wmi_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					WMI_STA_PS_ENABLE_QPOWER, 0);
 	if (ret) {
-		WMA_LOGE("Disable QPower Failed vdevId", vdev_id);
+		WMA_LOGE("Disable QPower Failed vdevId %d", vdev_id);
 		return ret;
 	}
 	WMA_LOGD("QPower Disabled vdevId %d", vdev_id);
@@ -10033,7 +10064,7 @@ static int32_t wma_set_qpower_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, 
 					WMI_STA_PS_ENABLE_QPOWER, 1);
 
 	if (ret) {
-		WMA_LOGE("Enable QPower Failed vdevId", vdev_id);
+		WMA_LOGE("Enable QPower Failed vdevId %d", vdev_id);
 		return ret;
 	}
 	WMA_LOGD("QPower Enabled vdevId %d", vdev_id);
@@ -10547,8 +10578,9 @@ static VOS_STATUS wma_pno_start(tp_wma_handle wma, tpSirPNOScanReq pno)
 		vos_mem_copy(nlo_list[i].ssid.ssid.ssid,
 			     pno->aNetworks[i].ssId.ssId,
 			     nlo_list[i].ssid.ssid.ssid_len);
-		WMA_LOGD("index: %d ssid: %s len: %d", i,
-			 nlo_list[i].ssid.ssid.ssid,
+		WMA_LOGD("index: %d ssid: %.*s len: %d", i,
+			 nlo_list[i].ssid.ssid.ssid_len,
+			 (char *) nlo_list[i].ssid.ssid.ssid,
 			 nlo_list[i].ssid.ssid.ssid_len);
 
 		/* Copy rssi threshold */
@@ -12352,7 +12384,7 @@ VOS_STATUS wma_process_tsm_stats_req(tp_wma_handle wma_handler,
     tpAniGetTsmStatsReq pStats = (tpAniGetTsmStatsReq)pTsmStatsMsg;
     tpAniGetTsmStatsRsp pTsmRspParams = NULL;
 #else
-    tTSMStats pStats = (tTSMStats)pTsmStatsMsg;
+    tpTSMStats pStats = (tpTSMStats)pTsmStatsMsg;
 #endif
     int tid = pStats->tid;
     /*
@@ -12391,7 +12423,7 @@ VOS_STATUS wma_process_tsm_stats_req(tp_wma_handle wma_handler,
     pTsmRspParams->tsmStatsReq = pStats;
     pTsmMetric = &pTsmRspParams->tsmMetrics;
 #else
-    pTsmMetric = &pStats->tsmMetrics;
+    pTsmMetric = (tpAniTrafStrmMetrics)&pStats->tsmMetrics;
 #endif
     /* populate pTsmMetric */
     pTsmMetric->UplinkPktQueueDly = queue_delay_microsec;
@@ -12673,11 +12705,18 @@ static int wma_process_receive_filter_clear_filter_req(tp_wma_handle wma_handle,
 
 static void wma_data_tx_ack_work_handler(struct work_struct *ack_work)
 {
-	struct wma_tx_ack_work_ctx *work = container_of(ack_work,
-		struct wma_tx_ack_work_ctx, ack_cmp_work);
-	tp_wma_handle wma_handle = work->wma_handle;
-	pWDAAckFnTxComp ack_cb =
-		wma_handle->umac_data_ota_ack_cb;
+	struct wma_tx_ack_work_ctx *work;
+	tp_wma_handle wma_handle;
+	pWDAAckFnTxComp ack_cb;
+
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_WDA, NULL)) {
+		WMA_LOGE("%s: Driver load/unload in progress", __func__);
+		return;
+	}
+
+	work = container_of(ack_work, struct wma_tx_ack_work_ctx, ack_cmp_work);
+	wma_handle = work->wma_handle;
+	ack_cb = wma_handle->umac_data_ota_ack_cb;
 
 	WMA_LOGD("Data Tx Ack Cb Status %d",
 			work->status);
@@ -13564,8 +13603,8 @@ VOS_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 		mbpsx10_rate = pRateUpdateParams->mcastDataRate24GHz;
 		paramId = WMI_VDEV_PARAM_MCAST_DATA_RATE;
 	}
-	WMA_LOGD("%s: bssid = '%pM', vdev_id = %d, bcast = %ld, "
-			"mcast = %ld, NSS = %d, chanmode = %d\n",
+	WMA_LOGD("%s: bssid = '%pM', vdev_id = %d, bcast = %d, "
+			"mcast = %d, NSS = %d, chanmode = %d",
 			__func__, pRateUpdateParams->bssid, vdev_id,
 			pRateUpdateParams->bcastDataRate,
 			pRateUpdateParams->mcastDataRate24GHz,
@@ -13631,7 +13670,7 @@ VOS_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 			vdev_id, paramId, rate);
 
 	WMA_LOGD("%s:X, ret = %d, vdev_id = %d, chanmode = 0x%x, "
-		"in_rate = %ld, out_rate = 0x%x, NSS = %d\n",
+		"in_rate = %d, out_rate = 0x%x, NSS = %d",
 		__func__, ret, vdev_id, intr[vdev_id].chanmode,
 		mbpsx10_rate, rate, pRateUpdateParams->nss);
 
@@ -14166,13 +14205,16 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			break;
 		case WDA_START_SCAN_OFFLOAD_REQ:
 			wma_start_scan(wma_handle, msg->bodyptr, msg->type);
+                        vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_STOP_SCAN_OFFLOAD_REQ:
 			wma_stop_scan(wma_handle, msg->bodyptr);
+                        vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_UPDATE_CHAN_LIST_REQ:
 			wma_update_channel_list(wma_handle,
 					(tSirUpdateChanList *)msg->bodyptr);
+                        vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_SET_LINK_STATE:
 			wma_set_linkstate(wma_handle,
@@ -14208,6 +14250,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			wma_process_update_edca_param_req(
 						wma_handle,
 						(tEdcaParams *)msg->bodyptr);
+                        vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_SEND_BEACON_REQ:
 			wma_send_beacon(wma_handle,
@@ -14306,6 +14349,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 		case WDA_UPDATE_BEACON_IND:
 			wma_process_update_beacon_params(wma_handle,
 					(tUpdateBeaconParams *)msg->bodyptr);
+                        vos_mem_free(msg->bodyptr);
 			break;
 
 		case WDA_ADD_TS_REQ:
@@ -14451,6 +14495,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 
 	    case WDA_INIT_THERMAL_INFO_CMD:
 			wma_process_init_thermal_info(wma_handle, (t_thermal_mgmt *)msg->bodyptr);
+                        vos_mem_free(msg->bodyptr);
 			break;
 
 	    case WDA_SET_THERMAL_LEVEL:
@@ -14499,8 +14544,8 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 
 	scan_event->event = wmi_event->event;
 
-	WMA_LOGI("WMA <-- wmi_scan_event : event %lu, scan_id %lu, "
-			"freq %lu, reason %lu",
+	WMA_LOGI("WMA <-- wmi_scan_event : event %u, scan_id %u, "
+			"freq %u, reason %u",
 			wmi_event->event, wmi_event->scan_id,
 			wmi_event->channel_freq, wmi_event->reason);
 
@@ -14534,7 +14579,7 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 		break;
 	}
 	case WMI_SCAN_EVENT_RESTARTED:
-		WMA_LOGP("Unexpected Scan Event %lu", wmi_event->event);
+		WMA_LOGP("Unexpected Scan Event %u", wmi_event->event);
 		break;
 	}
 
@@ -14554,19 +14599,28 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 
 static void wma_mgmt_tx_ack_work_handler(struct work_struct *ack_work)
 {
-	struct wma_tx_ack_work_ctx *work = container_of(ack_work,
-		struct wma_tx_ack_work_ctx, ack_cmp_work);
-	pWDAAckFnTxComp ack_cb =
-		work->wma_handle->umac_ota_ack_cb[work->sub_type];
+	struct wma_tx_ack_work_ctx *work;
+	tp_wma_handle wma_handle;
+	pWDAAckFnTxComp ack_cb;
+
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_WDA, NULL)) {
+		WMA_LOGE("%s: Driver load/unload in progress", __func__);
+		return;
+	}
+
+	work = container_of(ack_work, struct wma_tx_ack_work_ctx, ack_cmp_work);
+        wma_handle = work->wma_handle;
+	ack_cb = wma_handle->umac_ota_ack_cb[work->sub_type];
 
 	WMA_LOGD("Tx Ack Cb SubType %d Status %d",
 			work->sub_type, work->status);
 
 	/* Call the Ack Cb registered by UMAC */
-	ack_cb((tpAniSirGlobal)(work->wma_handle->mac_context),
+	ack_cb((tpAniSirGlobal)(wma_handle->mac_context),
                                 work->status ? 0 : 1);
 
 	adf_os_mem_free(work);
+	wma_handle->ack_work_ctx = NULL;
 }
 
 /**
@@ -14876,13 +14930,13 @@ static int wma_mcc_vdev_tx_pause_evt_handler(void *handle, u_int8_t *event,
 		}
 		else
 		{
-			WMA_LOGI("Found vdev %d", vdev_id);
+			WMA_LOGD("Found vdev %d\n", vdev_id);
 			break;
 		}
 	}
 
-	WMA_LOGI("vdev_id %d, vdev_map 0x%x, tid_map 0x%x,"
-			" pause_type 0x%x, action 0x%x, peer_id 0x%x",
+	WMA_LOGD("vdev_id %d, vdev_map 0x%x, tid_map 0x%x,"
+			" pause_type 0x%x, action 0x%x, peer_id 0x%x\n",
 			vdev_id, wmi_event->vdev_map, wmi_event->tid_map,
 			wmi_event->pause_type, wmi_event->action, wmi_event->peer_id);
 
@@ -15077,13 +15131,13 @@ wma_batch_scan_result_event_handler
     tSirBatchScanResultIndParam *pHddResult;
     tSirBatchScanNetworkInfo *pHddApMetaInfo;
     tp_wma_handle wma = (tp_wma_handle) handle;
-    u_int32_t nextScanListOffset, nextApMetaInfoOffset;
-    u_int8_t bssid[IEEE80211_ADDR_LEN], ssid[33], *ssid_temp;
-    u_int32_t temp, count1, count2, scan_num, netinfo_num, total_size;
-    WMI_BATCH_SCAN_RESULT_EVENTID_param_tlvs *param_tlvs;
-    wmi_batch_scan_result_event_fixed_param *fix_param;
     wmi_batch_scan_result_scan_list *scan_list;
     wmi_batch_scan_result_network_info *network_info;
+    wmi_batch_scan_result_event_fixed_param *fix_param;
+    WMI_BATCH_SCAN_RESULT_EVENTID_param_tlvs *param_tlvs;
+    u_int8_t bssid[IEEE80211_ADDR_LEN], ssid[33], *ssid_temp;
+    u_int32_t temp, count1, count2, scan_num, netinfo_num, total_size;
+    u_int32_t nextScanListOffset, nextApMetaInfoOffset, numNetworkInScanList;
     tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(VOS_MODULE_ID_PE,
                                               wma->vos_context);
 
@@ -15155,12 +15209,18 @@ wma_batch_scan_result_event_handler
     network_info = param_tlvs->network_list;
     nextScanListOffset = 0;
     nextApMetaInfoOffset = 0;
+    numNetworkInScanList = 0;
+
     for(count1 = 0; count1 < scan_num; count1++)
     {
-        pHddScanList = (tSirBatchScanList *)(pHddResult->scanResults +
+        pHddScanList = (tSirBatchScanList *)((tANI_U8 *)pHddResult->scanResults +
                                               nextScanListOffset);
         pHddScanList->scanId = scan_list->scanId;
         pHddScanList->numNetworksInScanList = scan_list->numNetworksInScanList;
+        numNetworkInScanList = pHddScanList->numNetworksInScanList;
+
+        /*Initialize next AP meta info offset for next scan list*/
+        nextApMetaInfoOffset = 0;
 
         for (count2 = 0; count2 < scan_list->numNetworksInScanList; count2++)
         {
@@ -15205,7 +15265,9 @@ wma_batch_scan_result_event_handler
             network_info++;
         }
 
-        nextScanListOffset += (sizeof(tSirBatchScanList) - (sizeof(tANI_U8)));
+        nextScanListOffset +=  ((sizeof(tSirBatchScanList) - sizeof(tANI_U8))
+                                + (sizeof(tSirBatchScanNetworkInfo)
+                                * numNetworkInScanList));
         scan_list++;
     }
 
@@ -15316,8 +15378,9 @@ static int wma_channel_avoid_evt_handler(void *handle, u_int8_t *event,
 
 	WMA_LOGD("Channel avoid event received with %d ranges", num_freq_ranges);
 	for (freq_range_idx = 0; freq_range_idx < num_freq_ranges; freq_range_idx++) {
-			afr_desc = (wmi_avoid_freq_range_desc *) (param_buf->avd_freq_range + freq_range_idx * sizeof(wmi_avoid_freq_range_desc));
-			WMA_LOGD("range %d: tlv id = %lu, start freq = %lu,  end freq = %lu",
+			afr_desc = (wmi_avoid_freq_range_desc *) (param_buf->avd_freq_range
+				+ freq_range_idx * sizeof(wmi_avoid_freq_range_desc));
+			WMA_LOGD("range %d: tlv id = %u, start freq = %u,  end freq = %u",
 					freq_range_idx,
 					afr_desc->tlv_header,
 					afr_desc->start_freq,
@@ -15333,9 +15396,12 @@ static int wma_channel_avoid_evt_handler(void *handle, u_int8_t *event,
 
 	sca_indication->avoid_range_count = num_freq_ranges;
 	for (freq_range_idx = 0; freq_range_idx < num_freq_ranges; freq_range_idx++) {
-		afr_desc = (wmi_avoid_freq_range_desc *) (param_buf->avd_freq_range + freq_range_idx * sizeof(wmi_avoid_freq_range_desc));
-		sca_indication->avoid_freq_range[freq_range_idx].start_freq = afr_desc->start_freq;
-		sca_indication->avoid_freq_range[freq_range_idx].end_freq = afr_desc->end_freq;
+		afr_desc = (wmi_avoid_freq_range_desc *) (param_buf->avd_freq_range
+			+ freq_range_idx * sizeof(wmi_avoid_freq_range_desc));
+		sca_indication->avoid_freq_range[freq_range_idx].start_freq =
+			afr_desc->start_freq + 10;
+		sca_indication->avoid_freq_range[freq_range_idx].end_freq = afr_desc->end_freq
+			- 10;
 	}
 
 	sme_msg.type = eWNI_SME_CH_AVOID_IND;
@@ -15668,6 +15734,41 @@ static void wma_cleanup_vdev_resp(tp_wma_handle wma)
 	adf_os_spin_unlock_bh(&wma->vdev_respq_lock);
 }
 
+VOS_STATUS wma_wmi_service_close(v_VOID_t *vos_ctx)
+{
+	tp_wma_handle wma_handle;
+
+	WMA_LOGD("%s: Enter", __func__);
+
+	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+
+	/* validate the wma_handle */
+	if (NULL == wma_handle) {
+		WMA_LOGE("%s: Invalid wma handle", __func__);
+		return VOS_STATUS_E_INVAL;
+	}
+
+	/* validate the wmi handle */
+	if (NULL == wma_handle->wmi_handle) {
+		WMA_LOGE("%s: Invalid wmi handle", __func__);
+		return VOS_STATUS_E_INVAL;
+	}
+
+	/* dettach the wmi serice */
+	WMA_LOGD("calling wmi_unified_detach");
+	wmi_unified_detach(wma_handle->wmi_handle);
+	wma_handle->wmi_handle = NULL;
+
+	vos_mem_free(wma_handle->interfaces);
+	/* free the wma_handle */
+	vos_free_context(wma_handle->vos_context, VOS_MODULE_ID_WDA, wma_handle);
+
+	adf_os_mem_free(((pVosContextType) vos_ctx)->cfg_ctx);
+	WMA_LOGD("%s: Exit", __func__);
+	return VOS_STATUS_SUCCESS;
+}
+
+
 /* function   : wma_close
  * Descriptin :
  * Args       :
@@ -15742,18 +15843,6 @@ VOS_STATUS wma_close(v_VOID_t *vos_ctx)
 	if (vos_get_conparam() == VOS_FTM_MODE)
 		wma_utf_detach(wma_handle);
 #endif
-
-	/* dettach the wmi serice */
-	if (wma_handle->wmi_handle) {
-		WMA_LOGD("calling wmi_unified_detach");
-		wmi_unified_detach(wma_handle->wmi_handle);
-		wma_handle->wmi_handle = NULL;
-	}
-	vos_mem_free(wma_handle->interfaces);
-	/* free the wma_handle */
-	vos_free_context(wma_handle->vos_context, VOS_MODULE_ID_WDA, wma_handle);
-
-	adf_os_mem_free(((pVosContextType) vos_ctx)->cfg_ctx);
 
 	WMA_LOGD("%s: Exit", __func__);
 	return VOS_STATUS_SUCCESS;
@@ -17903,7 +17992,7 @@ wma_dfs_configure_channel(struct ieee80211com *dfs_ic,
                                         GFP_ATOMIC);
     if (dfs_ic->ic_curchan == NULL)
     {
-        WMA_LOGE("allocation of dfs_ic->ic_curchan failed %zu \n",
+        WMA_LOGE("%s: allocation of dfs_ic->ic_curchan failed %zu",
                                      __func__,
                                      sizeof(struct ieee80211_channel));
         return NULL;

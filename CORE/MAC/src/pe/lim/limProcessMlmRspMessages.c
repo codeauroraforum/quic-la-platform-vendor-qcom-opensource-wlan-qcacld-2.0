@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 /*
  * This file limProcessMlmRspMessages.cc contains the code
  * for processing response messages from MLM state machine.
@@ -3610,7 +3611,8 @@ static void limProcessSwitchChannelJoinReq(tpAniSirGlobal pMac, tpPESession pses
         goto error;
     }
 
-    if ( (NULL == psessionEntry ) || (NULL == psessionEntry->pLimMlmJoinReq) )
+    if ( (NULL == psessionEntry ) || (NULL == psessionEntry->pLimMlmJoinReq) ||
+         (NULL == psessionEntry->pLimJoinReq) )
     {
         PELOGE(limLog(pMac, LOGE, FL("invalid pointer!!"));)
         goto error;
@@ -3673,8 +3675,16 @@ static void limProcessSwitchChannelJoinReq(tpAniSirGlobal pMac, tpPESession pses
 error:  
     if(NULL != psessionEntry)
     {
-        vos_mem_free(psessionEntry->pLimMlmJoinReq);
-        psessionEntry->pLimMlmJoinReq = NULL;
+        if (psessionEntry->pLimMlmJoinReq)
+        {
+            vos_mem_free(psessionEntry->pLimMlmJoinReq);
+            psessionEntry->pLimMlmJoinReq = NULL;
+        }
+        if (psessionEntry->pLimJoinReq)
+        {
+            vos_mem_free(psessionEntry->pLimJoinReq);
+            psessionEntry->pLimJoinReq = NULL;
+        }
         mlmJoinCnf.sessionId = psessionEntry->peSessionId;
     }
     else

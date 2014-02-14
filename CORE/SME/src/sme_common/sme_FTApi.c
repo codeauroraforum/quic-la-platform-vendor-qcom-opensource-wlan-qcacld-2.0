@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -24,6 +24,7 @@
  * under proprietary terms before Copyright ownership was assigned
  * to the Linux Foundation.
  */
+
 #ifdef WLAN_FEATURE_VOWIFI_11R
 /**=========================================================================
 
@@ -326,9 +327,8 @@ eHalStatus sme_FTSendUpdateKeyInd(tHalHandle hHal, tCsrRoamSetKey * pFTKeyInfo)
                   &pFTKeyInfo->peerMac[ 0 ],
                   sizeof(tCsrBssid) );
 
-    smsLog(pMac, LOG1, "BSSID = %02X-%02X-%02X-%02X-%02X-%02X",
-           pMsg->bssId[0], pMsg->bssId[1], pMsg->bssId[2],
-           pMsg->bssId[3], pMsg->bssId[4], pMsg->bssId[5]);
+    smsLog(pMac, LOG1, "BSSID = "MAC_ADDRESS_STR,
+           MAC_ADDR_ARRAY(pMsg->bssId));
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 
