@@ -492,7 +492,8 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx)
         return -EAGAIN;
     }
 
-    if (pHddCtx->isLoadUnloadInProgress)
+    if ((pHddCtx->isLoadInProgress) ||
+        (pHddCtx->isUnloadInProgress))
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
@@ -6248,7 +6249,7 @@ tANI_U8* wlan_hdd_get_intf_addr(hdd_context_t* pHddCtx)
    int i;
    for ( i = 0; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
    {
-      if( 0 == (pHddCtx->cfg_ini->intfAddrMask >> i))
+      if( 0 == ((pHddCtx->cfg_ini->intfAddrMask) & (1 << i)))
          break;
    }
 
@@ -7006,6 +7007,15 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
                  "%s: Unable to add virtual intf: currentVdevCnt=%d,hostConfiguredVdevCnt=%d",
                  __func__,pHddCtx->current_intf_count, pHddCtx->max_intf_count);
         return NULL;
+   }
+
+   if(macAddr == NULL)
+   {
+         /* Not received valid macAddr */
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s:Unable to add virtual intf: Not able to get"
+                             "valid mac address",__func__);
+         return NULL;
    }
 
    /*
@@ -8622,7 +8632,8 @@ void __hdd_wlan_exit(void)
                 msleep(1000);
         }
 
-        pHddCtx->isLoadUnloadInProgress = TRUE;
+        pHddCtx->isUnloadInProgress = TRUE;
+
         vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 
         //Do all the cleanup before deregistering the driver
@@ -8987,7 +8998,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 {
    VOS_STATUS status;
    hdd_adapter_t *pAdapter = NULL;
+#ifdef WLAN_OPEN_P2P_INTERFACE
    hdd_adapter_t *pP2pAdapter = NULL;
+#endif
    hdd_context_t *pHddCtx = NULL;
    v_CONTEXT_t pVosContext= NULL;
 #ifdef WLAN_BTAMP_FEATURE
@@ -9002,6 +9015,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 #endif
 #ifndef QCA_WIFI_ISOC
    tSmeThermalParams thermalParam;
+   tSirTxPowerLimit *hddtxlimit;
 #endif
 
    ENTER();
@@ -9023,7 +9037,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 
    pHddCtx->wiphy = wiphy;
    hdd_prevent_suspend();
-   pHddCtx->isLoadUnloadInProgress = TRUE;
+   pHddCtx->isLoadInProgress = TRUE;
 
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 
@@ -9106,13 +9120,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: error parsing %s",
              __func__, WLAN_INI_FILE);
       goto err_config;
-   }
-
-   if ( VOS_STATUS_SUCCESS != hdd_update_mac_config( pHddCtx ) )
-   {
-      hddLog(VOS_TRACE_LEVEL_WARN,
-             "%s: can't update mac config, using MAC from ini file",
-             __func__);
    }
 
    pHddCtx->current_intf_count=0;
@@ -9392,6 +9399,14 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       }
 #endif //WLAN_AUTOGEN_MACADDR_FEATURE && QCA_WIFI_ISOC
    }
+
+   if ( VOS_STATUS_SUCCESS != hdd_update_mac_config( pHddCtx ) )
+   {
+      hddLog(VOS_TRACE_LEVEL_WARN,
+             "%s: can't update mac config, using MAC from ini file",
+             __func__);
+   }
+
    {
       eHalStatus halStatus;
       // Set the MAC Address
@@ -9489,6 +9504,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    {
      pAdapter = hdd_open_adapter( pHddCtx, WLAN_HDD_INFRA_STATION, "wlan%d",
          wlan_hdd_get_intf_addr(pHddCtx), FALSE );
+
+#ifdef WLAN_OPEN_P2P_INTERFACE
+     /* Open P2P device interface */
      if (pAdapter != NULL)
      {
          if ( pHddCtx->cfg_ini->isP2pDeviceAddrAdministrated )
@@ -9529,6 +9547,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
              goto err_close_adapter;
          }
      }
+#endif
    }
 
    if( pAdapter == NULL )
@@ -9720,7 +9739,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 
    mutex_init(&pHddCtx->sap_lock);
 
-   pHddCtx->isLoadUnloadInProgress = FALSE;
+   pHddCtx->isLoadInProgress = FALSE;
 
 #ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
    /* Initialize the wake lcok */
@@ -9788,6 +9807,24 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    {
        hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s: Error while initializing thermal information", __func__);
+   }
+
+   /* SAR power limit */
+   hddtxlimit = vos_mem_malloc(sizeof(tSirTxPowerLimit));
+   if (!hddtxlimit)
+   {
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s: Memory allocation for TxPowerLimit "
+                 "failed!", __func__);
+       goto err_nl_srv;
+   }
+   hddtxlimit->txPower2g = pHddCtx->cfg_ini->TxPower2g;
+   hddtxlimit->txPower5g = pHddCtx->cfg_ini->TxPower5g;
+
+   if (eHAL_STATUS_SUCCESS != sme_TxpowerLimit(pHddCtx->hHal,hddtxlimit))
+   {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               "%s: Error setting txlimit in sme", __func__);
    }
 #endif /*#ifndef QCA_WIFI_ISOC*/
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
@@ -10155,7 +10192,7 @@ static void hdd_driver_exit(void)
          }
       }
 
-      pHddCtx->isLoadUnloadInProgress = TRUE;
+      pHddCtx->isUnloadInProgress = TRUE;
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
    }
 

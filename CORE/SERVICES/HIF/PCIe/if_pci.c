@@ -1,5 +1,5 @@
 /*
- * Copyright (c) . The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,6 +36,7 @@
 #include "hif_msg_based.h"
 #include "hif_pci.h"
 #include "copy_engine_api.h"
+#include "copy_engine_internal.h"
 #include "bmi_msg.h" /* TARGET_TYPE_ */
 #include "regtable.h"
 #include "ol_fw.h"
@@ -69,6 +70,7 @@
 
 #define MAX_NUM_OF_RECEIVES 1000 /* Maximum number of Rx buf to process before break out */
 #define PCIE_WAKE_TIMEOUT 1000 /* Maximum ms timeout for host to wake up target */
+#define RAMDUMP_EVENT_TIMEOUT 2500
 
 unsigned int msienable = 0;
 module_param(msienable, int, 0644);
@@ -374,10 +376,115 @@ int hif_pci_check_soc_status(struct hif_pci_softc *sc)
         timeout_count += 100;
     }
 
-    /* Check BAR + 0x10c register for SoC internal bus issues */
-    val = A_PCI_READ32(sc->mem + 0x10c);
-    printk("BAR + 0x10c is %08x\n", val);
+    /* Check Power register for SoC internal bus issues */
+    val = A_PCI_READ32(sc->mem + RTC_SOC_BASE_ADDRESS + SOC_POWER_REG_OFFSET);
+    printk("Power register is %08x\n", val);
+
     return EOK;
+}
+
+void dump_CE_debug_register(struct hif_pci_softc *sc)
+{
+    struct HIF_CE_state *hif_state = (struct HIF_CE_state *)sc->hif_device;
+    A_target_id_t targid = hif_state->targid;
+    void __iomem *mem = sc->mem;
+    u_int32_t val, i, j;
+    u_int32_t wrapper_idx[] = {1, 2, 3, 4, 5, 6, 8, 9};
+    u_int32_t ce_base;
+
+    A_TARGET_ACCESS_BEGIN(targid);
+
+    /* DEBUG_INPUT_SEL_SRC = 0x6 */
+    val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_INPUT_SEL_OFFSET);
+    val &= ~WLAN_DEBUG_INPUT_SEL_SRC_MASK;
+    val |= WLAN_DEBUG_INPUT_SEL_SRC_SET(0x6);
+    A_PCI_WRITE32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_INPUT_SEL_OFFSET, val);
+
+    /* DEBUG_CONTROL_ENABLE = 0x1 */
+    val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_CONTROL_OFFSET);
+    val &= ~WLAN_DEBUG_CONTROL_ENABLE_MASK;
+    val |= WLAN_DEBUG_CONTROL_ENABLE_SET(0x1);
+    A_PCI_WRITE32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_CONTROL_OFFSET, val);
+
+    printk("Debug: inputsel: %x dbgctrl: %x\n",
+        A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_INPUT_SEL_OFFSET),
+        A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_CONTROL_OFFSET));
+
+    printk("Debug CE: \n");
+    /* Loop CE debug output */
+    /* AMBA_DEBUG_BUS_SEL = 0xc */
+    val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET);
+    val &= ~AMBA_DEBUG_BUS_SEL_MASK;
+    val |= AMBA_DEBUG_BUS_SEL_SET(0xc);
+    A_PCI_WRITE32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET, val);
+
+    for (i = 0; i < sizeof(wrapper_idx)/sizeof(A_UINT32); i++) {
+        /* For (i=1,2,3,4,8,9) write CE_WRAPPER_DEBUG_SEL = i */
+        val = A_PCI_READ32(mem + CE_WRAPPER_BASE_ADDRESS +
+                           CE_WRAPPER_DEBUG_OFFSET);
+        val &= ~CE_WRAPPER_DEBUG_SEL_MASK;
+        val |= CE_WRAPPER_DEBUG_SEL_SET(wrapper_idx[i]);
+        A_PCI_WRITE32(mem + CE_WRAPPER_BASE_ADDRESS +
+                      CE_WRAPPER_DEBUG_OFFSET, val);
+
+        printk("ce wrapper: %d amdbg: %x cewdbg: %x\n", wrapper_idx[i],
+            A_PCI_READ32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET),
+            A_PCI_READ32(mem + CE_WRAPPER_BASE_ADDRESS +
+                         CE_WRAPPER_DEBUG_OFFSET));
+
+        if (wrapper_idx[i] <= 7) {
+            for (j = 0; j <= 5; j++) {
+                ce_base = CE_BASE_ADDRESS(wrapper_idx[i]);
+                /* For (j=0~5) write CE_DEBUG_SEL = j */
+                val = A_PCI_READ32(mem + ce_base + CE_DEBUG_OFFSET);
+                val &= ~CE_DEBUG_SEL_MASK;
+                val |= CE_DEBUG_SEL_SET(j);
+                A_PCI_WRITE32(mem + ce_base + CE_DEBUG_OFFSET, val);
+
+                /* read (@gpio_athr_wlan_reg) WLAN_DEBUG_OUT_DATA */
+                val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS +
+                                   WLAN_DEBUG_OUT_OFFSET);
+                val = WLAN_DEBUG_OUT_DATA_GET(val);
+
+                printk("    module%d: cedbg: %x out: %x\n", j,
+                    A_PCI_READ32(mem + ce_base + CE_DEBUG_OFFSET), val);
+            }
+        } else {
+            /* read (@gpio_athr_wlan_reg) WLAN_DEBUG_OUT_DATA */
+            val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_OUT_OFFSET);
+            val = WLAN_DEBUG_OUT_DATA_GET(val);
+
+            printk("    out: %x\n", val);
+        }
+
+        msleep(1);
+    }
+
+    printk("Debug PCIe: \n");
+    /* Loop PCIe debug output */
+    /* Write AMBA_DEBUG_BUS_SEL = 0x1c */
+    val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET);
+    val &= ~AMBA_DEBUG_BUS_SEL_MASK;
+    val |= AMBA_DEBUG_BUS_SEL_SET(0x1c);
+    A_PCI_WRITE32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET, val);
+
+    for (i = 0; i <= 8; i++) {
+        /* For (i=1~8) write AMBA_DEBUG_BUS_PCIE_DEBUG_SEL = i */
+        val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET);
+        val &= ~AMBA_DEBUG_BUS_PCIE_DEBUG_SEL_MASK;
+        val |= AMBA_DEBUG_BUS_PCIE_DEBUG_SEL_SET(i);
+        A_PCI_WRITE32(mem + GPIO_BASE_ADDRESS + AMBA_DEBUG_BUS_OFFSET, val);
+
+        /* read (@gpio_athr_wlan_reg) WLAN_DEBUG_OUT_DATA */
+        val = A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_OUT_OFFSET);
+        val = WLAN_DEBUG_OUT_DATA_GET(val);
+
+        printk("amdbg: %x out: %x %x\n",
+            A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_OUT_OFFSET), val,
+            A_PCI_READ32(mem + GPIO_BASE_ADDRESS + WLAN_DEBUG_OUT_OFFSET));
+    }
+
+    A_TARGET_ACCESS_END(targid);
 }
 
 /*
@@ -506,27 +613,32 @@ again:
         ret = -EIO;
         goto err_region;
     }
-
+#ifdef CONFIG_ARM_LPAE
+    /* if CONFIG_ARM_LPAE is enabled, we have to set 64 bits mask
+     * for 32 bits device also. */
     ret =  pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
-    if (!ret) {
-        ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
-
-        if (ret) {
-            printk(KERN_ERR "ath: Cannot enable 64-bit consistent DMA\n");
-            goto err_dma;
-        }
-    } else {
-        ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-
-        if (!ret) {
-            ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
-            if (ret) {
-                printk(KERN_ERR "ath: Cannot enable 32-bit consistent DMA\n");
-                goto err_dma;
-            }
-        }
+    if (ret) {
+        printk(KERN_ERR "ath: Cannot enable 64-bit pci DMA\n");
+        goto err_dma;
     }
-
+    ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
+    if (ret) {
+        printk(KERN_ERR "ath: Cannot enable 64-bit consistent DMA\n");
+        goto err_dma;
+    }
+#else
+    ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+    if (ret) {
+        printk(KERN_ERR "ath: Cannot enable 32-bit pci DMA\n");
+        goto err_dma;
+    }
+    ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
+    if (ret) {
+        printk(KERN_ERR "%s: Cannot enable 32-bit consistent DMA!\n",
+               __func__);
+        goto err_dma;
+    }
+#endif
 
     /* Set bus master bit in PCI_COMMAND to enable DMA */
     pci_set_master(pdev);
@@ -674,6 +786,7 @@ again:
 
     adf_os_atomic_init(&sc->tasklet_from_intr);
     init_waitqueue_head(&ol_sc->sc_osdev->event_queue);
+    init_completion(&ol_sc->ramdump_event);
 
     ret = hdd_wlan_startup(&pdev->dev, ol_sc);
 
@@ -805,26 +918,32 @@ again:
         goto err_region;
     }
 
+#ifdef CONFIG_ARM_LPAE
+    /* if CONFIG_ARM_LPAE is enabled, we have to set 64 bits mask
+     * for 32 bits device also. */
     ret =  pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
-    if (!ret) {
-        ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
-
-        if (ret) {
-            printk(KERN_ERR "%s: Cannot enable 64-bit consistent DMA!\n",
-                   __func__);
-            goto err_dma;
-        }
-    } else {
-        ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-        if (!ret) {
-            ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
-            if (ret) {
-                printk(KERN_ERR "%s: Cannot enable 32-bit consistent DMA!\n",
-                       __func__);
-                goto err_dma;
-            }
-        }
+    if (ret) {
+        printk(KERN_ERR "ath: Cannot enable 64-bit pci DMA\n");
+        goto err_dma;
     }
+    ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
+    if (ret) {
+        printk(KERN_ERR "ath: Cannot enable 64-bit consistent DMA\n");
+        goto err_dma;
+    }
+#else
+    ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+    if (ret) {
+        printk(KERN_ERR "ath: Cannot enable 32-bit pci DMA\n");
+        goto err_dma;
+    }
+    ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
+    if (ret) {
+        printk(KERN_ERR "%s: Cannot enable 32-bit consistent DMA!\n",
+               __func__);
+        goto err_dma;
+    }
+#endif
 
     /* Set bus master bit in PCI_COMMAND to enable DMA */
     pci_set_master(pdev);
@@ -972,7 +1091,9 @@ again:
     ol_sc->enablesinglebinary = FALSE;
     ol_sc->max_no_of_peers = 1;
 
+    adf_os_atomic_init(&sc->tasklet_from_intr);
     init_waitqueue_head(&ol_sc->sc_osdev->event_queue);
+    init_completion(&ol_sc->ramdump_event);
 
     if (VOS_STATUS_SUCCESS == hdd_wlan_re_init(ol_sc)) {
         ret = 0;
@@ -1381,14 +1502,41 @@ void hif_pci_shutdown(struct pci_dev *pdev)
 
     printk("%s: WLAN host driver shutting down completed!\n", __func__);
 }
+
+void hif_pci_crash_shutdown(struct pci_dev *pdev)
+{
+    struct hif_pci_softc *sc;
+    struct ol_softc *scn;
+    int status;
+
+    sc = pci_get_drvdata(pdev);
+    if (!sc)
+        return;
+
+    scn = sc->ol_sc;
+    if (!scn)
+        return;
+
+    if (OL_TRGET_STATUS_RESET == scn->target_status) {
+        printk("%s: Target is already asserted, ignore!\n", __func__);
+        return;
+    }
+
+    scn->crash_shutdown = true;
+    process_wma_set_command(0,(int)GEN_PARAM_CRASH_INJECT,
+                            0, GEN_CMD);
+
+    status = wait_for_completion_interruptible_timeout(
+             &scn->ramdump_event,
+             msecs_to_jiffies(RAMDUMP_EVENT_TIMEOUT));
+    if (!status) {
+        printk("%s: RAM dump collecting timeout!\n", __func__);
+        return;
+    }
+}
 #endif
 
 #define OL_ATH_PCI_PM_CONTROL 0x44
-
-#ifdef WLAN_LINK_UMAC_SUSPEND_WITH_BUS_SUSPEND
-void hdd_suspend_wlan(void (*callback)(void *callbackContext),
-                      void *callbackContext);
-#endif
 
 static int
 hif_pci_suspend(struct pci_dev *pdev, pm_message_t state)
@@ -1401,12 +1549,6 @@ hif_pci_suspend(struct pci_dev *pdev, pm_message_t state)
     u32 tx_drain_wait_cnt = 0;
     u32 val;
     v_VOID_t * temp_module;
-
-#ifdef WLAN_LINK_UMAC_SUSPEND_WITH_BUS_SUSPEND
-    hdd_suspend_wlan(NULL, NULL);
-    /* TODO: Wait until tx queue drains. Remove this hard coded delay */
-    msleep(3*1000); /* 3 sec */
-#endif
 
     A_TARGET_ACCESS_BEGIN(targid);
     A_PCI_WRITE32(sc->mem + FW_INDICATOR_ADDRESS, (state.event << 16));
@@ -1447,10 +1589,6 @@ hif_pci_suspend(struct pci_dev *pdev, pm_message_t state)
     }
     return 0;
 }
-
-#ifdef WLAN_LINK_UMAC_SUSPEND_WITH_BUS_SUSPEND
-void hdd_resume_wlan(void);
-#endif
 
 static int
 hif_pci_resume(struct pci_dev *pdev)
@@ -1499,10 +1637,6 @@ hif_pci_resume(struct pci_dev *pdev)
         return wma_resume_target(temp_module);
     }
 
-#ifdef WLAN_LINK_UMAC_SUSPEND_WITH_BUS_SUSPEND
-    hdd_resume_wlan();
-#endif
-
     return 0;
 }
 
@@ -1522,6 +1656,7 @@ struct cnss_wlan_driver cnss_wlan_drv_id = {
     .remove     = hif_pci_remove,
     .reinit     = hif_pci_reinit,
     .shutdown   = hif_pci_shutdown,
+    .crash_shutdown = hif_pci_crash_shutdown,
 #ifdef ATH_BUS_PM
     .suspend    = hif_pci_suspend,
     .resume     = hif_pci_resume,

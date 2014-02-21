@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -304,6 +304,7 @@ limSendSmeJoinReassocRsp(tpAniSirGlobal pMac, tANI_U16 msgType,
                 pSirSmeJoinRsp->staId = pStaDs->staIndex;
                 pSirSmeJoinRsp->ucastSig   = pStaDs->ucUcastSig;
                 pSirSmeJoinRsp->bcastSig   = pStaDs->ucBcastSig;
+                pSirSmeJoinRsp->timingMeasCap = pStaDs->timingMeasCap;
             }
         }
 
@@ -2780,7 +2781,9 @@ void limHandleDeleteBssRsp(tpAniSirGlobal pMac,tpSirMsgQ MsgQ)
     tpDeleteBssParams pDelBss = (tpDeleteBssParams)(MsgQ->bodyptr);
     if((psessionEntry = peFindSessionBySessionId(pMac,pDelBss->sessionId))==NULL)
     {
-        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        vos_mem_free(pDelBss);
+        limLog(pMac, LOGE,FL("Session Does not exist for given sessionID %d"),
+          pDelBss->sessionId);
         return;
     }
     if (psessionEntry->limSystemRole == eLIM_STA_IN_IBSS_ROLE)

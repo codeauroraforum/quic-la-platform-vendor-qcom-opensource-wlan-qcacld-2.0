@@ -4397,8 +4397,7 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
         ((ie_length != 0) ? (const char *)&bss_desc->ieFields: NULL);
     unsigned int freq;
     struct ieee80211_channel *chan;
-    struct ieee80211_mgmt *mgmt =
-        kzalloc((sizeof (struct ieee80211_mgmt) + ie_length), GFP_KERNEL);
+    struct ieee80211_mgmt *mgmt;
     struct cfg80211_bss *bss_status = NULL;
     size_t frame_len = sizeof (struct ieee80211_mgmt) + ie_length;
     int rssi = 0;
@@ -4412,16 +4411,6 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
 
     pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     status = wlan_hdd_validate_context(pHddCtx);
-
-    /*bss_update is not allowed during wlan driver loading or unloading*/
-    if (pHddCtx->isLoadUnloadInProgress)
-    {
-         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                    "%s:Loading_unloading in Progress. Ignore!!!",__func__);
-         return NULL;
-    }
-
-
     if (0 != status)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -4429,7 +4418,16 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
         return NULL;
     }
 
+    /*bss_update is not allowed during wlan driver loading or unloading*/
+    if ((pHddCtx->isLoadInProgress) ||
+        (pHddCtx->isUnloadInProgress))
+    {
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                    "%s:Loading_unloading in Progress. Ignore!!!",__func__);
+         return NULL;
+    }
 
+    mgmt = kzalloc((sizeof (struct ieee80211_mgmt) + ie_length), GFP_KERNEL);
     if (!mgmt)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -4609,7 +4607,8 @@ static int wlan_hdd_cfg80211_update_bss( struct wiphy *wiphy,
 
 
     /*bss_update is not allowed during wlan driver loading or unloading*/
-    if (pHddCtx->isLoadUnloadInProgress)
+    if ((pHddCtx->isLoadInProgress) ||
+        (pHddCtx->isUnloadInProgress))
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s:Loading_unloading in Progress. Ignore!!!",__func__);
@@ -8193,7 +8192,7 @@ static int wlan_hdd_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device 
     /*in case index is 0,no entry to delete*/
     if (0 == PMKIDCacheIndex)
     {
-       hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Invalid entry to delete" ,
+       hddLog(VOS_TRACE_LEVEL_INFO, "%s: No entries to flush" ,
               __func__);
        return -EINVAL;
     }
@@ -8332,8 +8331,7 @@ void hdd_cfg80211_sched_scan_done_callback(void *callbackContext,
 
 /*
  * FUNCTION: wlan_hdd_is_pno_allowed
- * To check is there any P2P GO/SAP or P2P Client/STA
- * session is active
+ * Check if PNO is allowed or not.
  */
 static eHalStatus wlan_hdd_is_pno_allowed(hdd_adapter_t *pAdapter)
 {
@@ -8341,7 +8339,13 @@ static eHalStatus wlan_hdd_is_pno_allowed(hdd_adapter_t *pAdapter)
    hdd_adapter_t *pTempAdapter = NULL;
    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    int status = 0;
+
    status = hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+
+   /* Current firmware design for PNO does not consider concurrent
+    * active sessions. Hence , determine the concurrent active sessions
+    * and return a failure.
+    */
 
    while ((NULL != pAdapterNode) && (VOS_STATUS_SUCCESS == status))
    {
@@ -8355,13 +8359,13 @@ static eHalStatus wlan_hdd_is_pno_allowed(hdd_adapter_t *pAdapter)
                  (WLAN_HDD_P2P_GO == pTempAdapter->device_mode) ||
                  (WLAN_HDD_SOFTAP == pTempAdapter->device_mode))
             {
-                return eHAL_STATUS_SUCCESS;
+                return eHAL_STATUS_FAILURE;
             }
         }
         status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
         pAdapterNode = pNext;
    }
-   return eHAL_STATUS_FAILURE;
+   return eHAL_STATUS_SUCCESS;
 }
 
 /*
@@ -8435,16 +8439,11 @@ static int wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
         }
     }
 
-    /* The current firmware design for PNO does not consider concurrent
-     * active sessions.Hence , determine the concurrent active sessions
-     * and return a failure to the framework on a request for schedule
-     * scan.
-     */
-    if (eHAL_STATUS_SUCCESS == wlan_hdd_is_pno_allowed(pAdapter))
+    if (eHAL_STATUS_FAILURE == wlan_hdd_is_pno_allowed(pAdapter))
     {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: Cannot handle sched_scan as p2p session is active", __func__);
-        return -EBUSY;
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                  "%s: pno is not allowed", __func__);
+        return -ENOTSUPP;
     }
 
     pPnoRequest = (tpSirPNOScanReq) vos_mem_malloc(sizeof (tSirPNOScanReq));
@@ -8647,7 +8646,8 @@ static int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
         return ret;
     }
 
-    if (pHddCtx->isLoadUnloadInProgress)
+    if ((pHddCtx->isLoadInProgress) ||
+        (pHddCtx->isUnloadInProgress))
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
@@ -9806,7 +9806,8 @@ int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
         return 0;
     }
 
-    if (pHddCtx->isLoadUnloadInProgress)
+    if ((pHddCtx->isLoadInProgress) ||
+        (pHddCtx->isUnloadInProgress))
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
