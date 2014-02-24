@@ -8257,16 +8257,19 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter)
     tHddBatchScanRsp *pNode;
     tHddBatchScanRsp *pPrev;
 
-    if (pAdapter)
+    if (NULL == pAdapter)
     {
-        pNode = pAdapter->pBatchScanRsp;
-        while (pNode)
-        {
-            pPrev = pNode;
-            pNode = pNode->pNext;
-            vos_mem_free((v_VOID_t * )pPrev);
-        }
-        pAdapter->pBatchScanRsp = NULL;
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+                "%s: Adapter context is Null", __func__);
+        return;
+    }
+
+    pNode = pAdapter->pBatchScanRsp;
+    while (pNode)
+    {
+        pPrev = pNode;
+        pNode = pNode->pNext;
+        vos_mem_free((v_VOID_t * )pPrev);
     }
 
     pAdapter->pBatchScanRsp = NULL;
@@ -8277,7 +8280,6 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter)
     return;
 }
 #endif
-
 
 VOS_STATUS hdd_reset_all_adapters( hdd_context_t *pHddCtx )
 {
