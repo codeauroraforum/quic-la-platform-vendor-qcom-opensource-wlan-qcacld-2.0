@@ -1592,6 +1592,7 @@ VOS_STATUS hdd_wlan_shutdown(void)
 #endif //WLAN_BTAMP_FEATURE
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
+   hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Doing WDA STOP", __func__);
    vosStatus = WDA_stop(pVosContext, HAL_STOP_TYPE_RF_KILL);
 
    if (!VOS_IS_STATUS_SUCCESS(vosStatus))
@@ -1926,6 +1927,9 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
       goto err_unregister_pmops;
    }
    vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
+
+   wlan_hdd_send_svc_nlink_msg(WLAN_SVC_FW_CRASHED_IND);
+
    goto success;
 
 err_unregister_pmops:
