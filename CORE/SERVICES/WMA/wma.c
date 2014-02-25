@@ -998,7 +998,7 @@ static int wma_vdev_stop_resp_handler(void *handle, u_int8_t *cmd_param_info,
 		}
 	}
 	vos_timer_destroy(&req_msg->event_timeout);
-	vos_mem_free(req_msg);
+	adf_os_mem_free(req_msg);
 	return 0;
 }
 
@@ -2044,7 +2044,7 @@ static int wma_unified_phyerr_rx_event_handler(void * handle,
     }
 
 	 /*
-     * Reconstruct the 64 bit event TSF.  This isn't from the MAC, it's
+     * Reconstruct the 64 bit event TSF. This isn't from the MAC, it's
      * at the time the event was sent to us, the TSF value will be
      * in the future.
      */
@@ -2079,7 +2079,7 @@ static int wma_unified_phyerr_rx_event_handler(void * handle,
          * Sanity check the buffer length of the event against
          * what we currently have.
          * Since buf_len is 32 bits, we check if it overflows
-         * a large 32 bit value.  It's not 0x7fffffff because
+         * a large 32 bit value. It's not 0x7fffffff because
          * we increase n by (buf_len + sizeof(hdr)), which would
          * in itself cause n to overflow.
          * If "int" is 64 bits then this becomes a moot point.
@@ -2160,14 +2160,29 @@ static int wma_unified_bcntx_status_event_handler(void *handle, u_int8_t *cmd_pa
       return -EINVAL;
    }
 
+   resp_event = param_buf->fixed_param;
+
+   /* Check for valid handle to ensure session is not deleted in any race */
+   if (!wma->interfaces[resp_event->vdev_id].handle) {
+      WMA_LOGE("%s: The session does not exist", __func__);
+      return -EINVAL;
+   }
+
+   /* Beacon Tx Indication supports only AP mode. Ignore in other modes */
+   if ((wma->interfaces[resp_event->vdev_id].type != WMI_VDEV_TYPE_AP) ||
+       (wma->interfaces[resp_event->vdev_id].sub_type != 0)) {
+      WMA_LOGI("%s: Beacon Tx Indication does not support type %d and sub_type %d",
+                    __func__, wma->interfaces[resp_event->vdev_id].type,
+                     wma->interfaces[resp_event->vdev_id].sub_type);
+      return 0;
+   }
+
    beacon_tx_complete_ind = (tSirFirstBeaconTxCompleteInd *)
                adf_os_mem_alloc(NULL, sizeof(tSirFirstBeaconTxCompleteInd));
    if (!beacon_tx_complete_ind) {
 	   WMA_LOGE("%s: Failed to alloc beacon_tx_complete_ind", __func__);
 	   return -ENOMEM;
    }
-
-   resp_event = param_buf->fixed_param;
 
    beacon_tx_complete_ind->messageType = WDA_DFS_BEACON_TX_SUCCESS_IND;
    beacon_tx_complete_ind->length = sizeof(tSirFirstBeaconTxCompleteInd);
@@ -2249,6 +2264,10 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 		vos_status = VOS_STATUS_E_NOMEM;
 		goto err_wmi_attach;
 	}
+
+	/* adjust the cfg_ctx default value based on setting */
+	wdi_in_set_cfg_rx_fwd_disabled((ol_pdev_handle)((pVosContextType)vos_context)->cfg_ctx,
+		(u_int8_t)mac_params->apDisableIntraBssFwd);
 
 	/* Allocate dfs_ic and initialize DFS */
 	wma_handle->dfs_ic = wma_dfs_attach(wma_handle->dfs_ic);
@@ -4016,6 +4035,7 @@ VOS_STATUS wma_update_channel_list(WMA_HANDLE handle,
 			WMI_SET_CHANNEL_MODE(chan_info, MODE_11A);
 		}
 
+
 		WMI_SET_CHANNEL_MAX_POWER(chan_info,
 					  chan_list->chanParam[i].pwr);
 
@@ -4489,9 +4509,9 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
          * T(HomeAway) = N * T(dwell) + (N+1) * T(cs)
          * where N is number of channels scanned in single burst
          */
+        scan_params->dwell_time_active  = roam_req->NeighborScanChannelMaxTime;
         if (roam_req->HomeAwayTime < 2*WMA_ROAM_SCAN_CHANNEL_SWITCH_TIME) {
             // clearly we can't follow home away time
-            scan_params->dwell_time_active  = roam_req->NeighborScanChannelMaxTime;
             scan_params->burst_duration     = scan_params->dwell_time_active;
         } else {
             channels_per_burst =
@@ -4505,8 +4525,6 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
                   roam_req->HomeAwayTime - 2*WMA_ROAM_SCAN_CHANNEL_SWITCH_TIME;
                 scan_params->burst_duration = scan_params->dwell_time_active;
             } else {
-                scan_params->dwell_time_active =
-                  roam_req->NeighborScanChannelMaxTime;
                 scan_params->burst_duration =
                   channels_per_burst * scan_params->dwell_time_active;
             }
@@ -5660,7 +5678,7 @@ error0:
 		wma_send_msg(wma, WDA_ADD_BSS_RSP, (void *)params, 0);
 	}
 	vos_timer_destroy(&tgt_req->event_timeout);
-	vos_mem_free(tgt_req);
+	adf_os_mem_free(tgt_req);
 }
 
 static struct wma_target_req *wma_fill_vdev_req(tp_wma_handle wma, u_int8_t vdev_id,
@@ -5701,7 +5719,7 @@ static void wma_remove_vdev_req(tp_wma_handle wma, u_int8_t vdev_id,
 
 	vos_timer_stop(&req_msg->event_timeout);
 	vos_timer_destroy(&req_msg->event_timeout);
-	vos_mem_free(req_msg);
+	adf_os_mem_free(req_msg);
 }
 
 /* function   : wma_roam_preauth_chan_set
@@ -5839,31 +5857,46 @@ static void wma_set_channel(tp_wma_handle wma, tpSwitchChannelParams params)
 		goto send_resp;
 	}
 
-        peer = ol_txrx_find_peer_by_addr(pdev, intr[vdev_id].bssid, &peer_id);
+	peer = ol_txrx_find_peer_by_addr(pdev, intr[vdev_id].bssid, &peer_id);
 
-        if (peer && (peer->state == ol_txrx_peer_state_conn ||
-                     peer->state == ol_txrx_peer_state_auth)) {
-                /* Trying to change channel while connected should not invoke VDEV_START.
-                 * Instead, use start scan command in passive mode to park station
-                 * on that channel
-                 */
-                WMA_LOGI("%s: calling set_scan, state 0x%x", __func__, wma->roam_preauth_scan_state);
-                if (wma->roam_preauth_scan_state == WMA_ROAM_PREAUTH_CHAN_NONE) {
-                    status = wma_roam_preauth_chan_set(wma, params, vdev_id);
-                    /* response will be asynchronous */
-                    return;
-                } else if (wma->roam_preauth_scan_state == WMA_ROAM_PREAUTH_CHAN_REQUESTED ||
-                               wma->roam_preauth_scan_state == WMA_ROAM_PREAUTH_ON_CHAN) {
-                    status = wma_roam_preauth_chan_cancel(wma, params, vdev_id);
-                    /* response will be asynchronous */
-                    return;
-                } else if (wma->roam_preauth_scan_state == WMA_ROAM_PREAUTH_CHAN_COMPLETED) {
-                        /* Already back on home channel. Complete the request */
-                        wma->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_NONE;
-                        status = VOS_STATUS_SUCCESS;
-                }
-                goto send_resp;
-        }
+	/*
+	 * Roam offload feature is currently supported
+	 * only in STA mode. Other modes still require
+	 * to issue a Vdev Start/Vdev Restart for
+	 * channel change.
+	 */
+	if ((wma->interfaces[vdev_id].type == WMI_VDEV_TYPE_STA) &&
+		(wma->interfaces[vdev_id].sub_type == 0)) {
+
+		if (peer && (peer->state == ol_txrx_peer_state_conn ||
+			peer->state == ol_txrx_peer_state_auth)) {
+			/* Trying to change channel while connected
+			 * should not invoke VDEV_START.
+			 * Instead, use start scan command in passive
+			 * mode to park station on that channel
+			 */
+			WMA_LOGI("%s: calling set_scan, state 0x%x",
+						__func__, wma->roam_preauth_scan_state);
+			if (wma->roam_preauth_scan_state ==
+				WMA_ROAM_PREAUTH_CHAN_NONE) {
+				status = wma_roam_preauth_chan_set(wma, params, vdev_id);
+				/* response will be asynchronous */
+				return;
+			} else if (wma->roam_preauth_scan_state ==
+				WMA_ROAM_PREAUTH_CHAN_REQUESTED ||
+				wma->roam_preauth_scan_state == WMA_ROAM_PREAUTH_ON_CHAN) {
+				status = wma_roam_preauth_chan_cancel(wma, params, vdev_id);
+				/* response will be asynchronous */
+				return;
+			} else if (wma->roam_preauth_scan_state ==
+				WMA_ROAM_PREAUTH_CHAN_COMPLETED) {
+				/* Already back on home channel. Complete the request */
+				wma->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_NONE;
+				status = VOS_STATUS_SUCCESS;
+			}
+			goto send_resp;
+		}
+	}
         vos_mem_zero(&req, sizeof(req));
         req.vdev_id = vdev_id;
 	msg = wma_fill_vdev_req(wma, req.vdev_id, WDA_CHNL_SWITCH_REQ,
@@ -11523,7 +11556,9 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 	vos_event_reset(&wma->target_suspend);
 
 	if (wmi_get_host_credits(wma->wmi_handle) < WMI_WOW_REQUIRED_CREDITS) {
-		WMA_LOGE("Cannot Post WMI_WOW_ENABLE_CMDID !. No Credits\n");
+		WMA_LOGE("Cannot Post WMI_WOW_ENABLE_CMDID !.Credits:%d"
+			"pending_cmds:%d\n", wmi_get_host_credits(wma->wmi_handle),
+					wmi_get_pending_cmds(wma->wmi_handle));
 		goto error;
 	}
 
@@ -11544,8 +11579,10 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 	if ((wmi_get_host_credits(wma->wmi_handle) != WMI_MAX_HOST_CREDITS) ||
 					wmi_get_pending_cmds(wma->wmi_handle))
 	{
-		WMA_LOGE("Host Doesn't have enough credits!. FW didn't give enough credits");
-		VOS_BUG(0);
+		WMA_LOGE("Host Doesn't have enough credits after HTC ACK:%d !"
+			"pending_cmds:%d\n", wmi_get_host_credits(wma->wmi_handle),
+			wmi_get_pending_cmds(wma->wmi_handle));
+		VOS_ASSERT(0);
 		return VOS_STATUS_E_FAILURE;
 	}
 
@@ -12192,9 +12229,12 @@ enable_wow:
 
 	ret = wmi_is_suspend_ready(wma->wmi_handle);
 	if (ret) {
+		if (wmi_get_host_credits(wma->wmi_handle))
+			goto send_ready_to_suspend;
+
 		WMA_LOGE("WMI Commands are pending in the queue for long time"
-					"FW is not responding with credits");
-		VOS_BUG(0);
+			"FW is not responding with credits; Fail to suspend");
+		VOS_ASSERT(0);
 		return VOS_STATUS_E_FAILURE;
 	}
 
@@ -13839,6 +13879,14 @@ VOS_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 		vos_mem_free(pRateUpdateParams);
 		return ret;
 	}
+	ret = wmi_unified_vdev_set_param_send(wma->wmi_handle, vdev_id,
+			WMI_VDEV_PARAM_SGI, short_gi);
+	if (ret) {
+		WMA_LOGE("%s: Failed to Set WMI_VDEV_PARAM_SGI (%d), ret = %d",
+			__func__, short_gi, ret);
+	        vos_mem_free(pRateUpdateParams);
+		return VOS_STATUS_E_FAILURE;
+	}
 	ret = wmi_unified_vdev_set_param_send(wma->wmi_handle,
 			vdev_id, paramId, rate);
 	vos_mem_free(pRateUpdateParams);
@@ -14461,6 +14509,35 @@ static void wma_process_set_p2pgo_noa_Req(tp_wma_handle wma,
 	WMA_LOGD("%s: Exit", __func__);
 }
 
+/* function   : wma_process_set_mimops_req
+ * Descriptin : Set the received MiMo PS state to firmware.
+ * Args       :
+                wma_handle  : Pointer to WMA handle
+ *              tSetMIMOPS  : Pointer to MiMo PS struct
+ * Returns    :
+ */
+static void wma_process_set_mimops_req(tp_wma_handle wma_handle,
+					tSetMIMOPS *mimops)
+{
+	/* Translate to what firmware understands */
+	if ( mimops->htMIMOPSState == eSIR_HT_MIMO_PS_DYNAMIC)
+		mimops->htMIMOPSState = WMI_PEER_MIMO_PS_DYNAMIC;
+	else if ( mimops->htMIMOPSState == eSIR_HT_MIMO_PS_STATIC)
+		mimops->htMIMOPSState = WMI_PEER_MIMO_PS_STATIC;
+	else if ( mimops->htMIMOPSState == eSIR_HT_MIMO_PS_NO_LIMIT)
+		mimops->htMIMOPSState = WMI_PEER_MIMO_PS_NONE;
+
+	WMA_LOGD("%s: htMIMOPSState = %d, sessionId = %d \
+		peerMac <%02x:%02x:%02x:%02x:%02x:%02x>", __func__,
+		mimops->htMIMOPSState, mimops->sessionId, mimops->peerMac[0],
+		mimops->peerMac[1], mimops->peerMac[2], mimops->peerMac[3],
+		mimops->peerMac[4], mimops->peerMac[5]);
+
+	wma_set_peer_param(wma_handle, mimops->peerMac,
+			WMI_PEER_MIMO_PS_STATE, mimops->htMIMOPSState,
+			mimops->sessionId);
+}
+
 /*
  * function   : wma_mc_process_msg
  * Descriptin :
@@ -14841,6 +14918,10 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 						(tP2pPsParams *)msg->bodyptr);
                         vos_mem_free(msg->bodyptr);
 			break;
+		case WDA_SET_MIMOPS_REQ:
+			wma_process_set_mimops_req(wma_handle, (tSetMIMOPS *) msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
 
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
@@ -15184,6 +15265,9 @@ static int wma_nlo_match_evt_handler(void *handle, u_int8_t *event,
 	if (node)
 		node->nlo_match_evt_received = TRUE;
 
+	vos_wake_lock_timeout_acquire(&wma->pno_wake_lock,
+				      WMA_PNO_WAKE_LOCK_TIMEOUT);
+
 	return 0;
 }
 
@@ -15197,7 +15281,6 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 			(WMI_NLO_SCAN_COMPLETE_EVENTID_param_tlvs *) event;
 	tSirScanOffloadEvent *scan_event;
 	struct wma_txrx_node *node;
-	VOS_STATUS status;
 
 	if (!param_buf) {
 		WMA_LOGE("Invalid NLO scan comp event buffer");
@@ -15217,10 +15300,6 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 		nlo_event->vdev_id);
 		goto skip_pno_cmp_ind;
 	}
-	/* FW need explict stop to really stop PNO operation */
-	status = wma_pno_stop(wma, nlo_event->vdev_id);
-	if (status)
-		WMA_LOGE("Failed to stop PNO scan");
 
 	scan_event = (tSirScanOffloadEvent *) vos_mem_malloc(
 					      sizeof(tSirScanOffloadEvent));
@@ -16073,7 +16152,7 @@ static void wma_cleanup_vdev_resp(tp_wma_handle wma)
 				 &wma->vdev_resp_queue, node) {
 		list_del(&msg->node);
 		vos_timer_destroy(&msg->event_timeout);
-		vos_mem_free(msg);
+		adf_os_mem_free(msg);
 	}
 	adf_os_spin_unlock_bh(&wma->vdev_respq_lock);
 }
@@ -16438,7 +16517,8 @@ static void wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	void *hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD,
 					wma_handle->vos_context);
 
-   hdd_tgt_cfg.reg_domain = wma_handle->reg_cap.eeprom_rd;
+	hdd_tgt_cfg.reg_domain = wma_handle->reg_cap.eeprom_rd;
+	hdd_tgt_cfg.eeprom_rd_ext = wma_handle->reg_cap.eeprom_rd_ext;
 
 	switch (wma_handle->phy_capability) {
 	case WMI_11G_CAPABILITY:

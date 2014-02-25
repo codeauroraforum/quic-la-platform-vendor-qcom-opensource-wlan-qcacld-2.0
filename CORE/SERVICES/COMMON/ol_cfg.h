@@ -67,6 +67,7 @@ struct txrx_pdev_cfg_t {
 	u32 max_nbuf_frags;
 	u32 throttle_period_ms;
 	enum wlan_frm_fmt frame_type;
+	u8 rx_fwd_disabled;
 };
 
 /**
@@ -139,6 +140,18 @@ int ol_cfg_rx_pn_check(ol_pdev_handle pdev);
 int ol_cfg_rx_fwd_check(ol_pdev_handle pdev);
 
 /**
+ * @brief set rx fwd disable/enable.
+ * @details
+ *  Choose whether to forward rx frames to tx (where applicable) within the
+ *  WLAN driver, or to leave all forwarding up to the operating system.
+ *  currently only intra-bss fwd is supported.
+ *
+ * @param pdev - handle to the physical device
+ * @param disable_rx_fwd 1 -> no rx->tx forward -> rx->tx forward
+ */
+void ol_set_cfg_rx_fwd_disabled(ol_pdev_handle pdev, u_int8_t disalbe_rx_fwd);
+
+/**
  * @brief Check whether rx forwarding is enabled or disabled.
  * @details
  *  Choose whether to forward rx frames to tx (where applicable) within the
@@ -147,15 +160,7 @@ int ol_cfg_rx_fwd_check(ol_pdev_handle pdev);
  * @param pdev - handle to the physical device
  * @return 1 -> no rx->tx forward -OR- 0 -> rx->tx forward (in host or target)
  */
-static inline int ol_cfg_rx_fwd_disabled(ol_pdev_handle pdev)
-{
-#if defined(ATHR_WIN_NWF)
-    /* for Windows, let the OS handle the forwarding */
-    return 1;
-#else
-    return 0;
-#endif
-}
+int ol_cfg_rx_fwd_disabled(ol_pdev_handle pdev);
 
 /**
  * @brief Check whether to perform inter-BSS or intra-BSS rx->tx forwarding.
@@ -236,7 +241,7 @@ int ol_cfg_netbuf_frags_max(ol_pdev_handle pdev);
  *  transmit frames until the target explicitly indicates it is finished
  *  transmitting them, or if it should free its copy as soon as the
  *  tx frame is downloaded to the target.
- *  
+ *
  * @param pdev - handle to the physical device
  * @return
  *      0 -> retain the tx frame until the target indicates it is done
@@ -248,14 +253,14 @@ int ol_cfg_tx_free_at_download(ol_pdev_handle pdev);
 
 
 /**
- * @brief Low water mark for target tx credit. 
- * Tx completion handler is invoked to reap the buffers when the target tx 
+ * @brief Low water mark for target tx credit.
+ * Tx completion handler is invoked to reap the buffers when the target tx
  * credit goes below Low Water Mark.
  */
 #define OL_CFG_NUM_MSDU_REAP 512
 #define ol_cfg_tx_credit_lwm(pdev)                                             \
         ((CFG_TGT_NUM_MSDU_DESC >  OL_CFG_NUM_MSDU_REAP) ?                     \
-                        (CFG_TGT_NUM_MSDU_DESC -  OL_CFG_NUM_MSDU_REAP) : 0)   
+                        (CFG_TGT_NUM_MSDU_DESC -  OL_CFG_NUM_MSDU_REAP) : 0)
 
 /**
  * @brief In a HL system, specify the target initial credit count.
@@ -306,12 +311,12 @@ int ol_cfg_tx_download_size(ol_pdev_handle pdev);
  *   logic to time out stale fragments is moved to the host.
  *
  * @param pdev - handle to the physical device
- * @return 
+ * @return
  *  0 -> target is responsible non-aggregate duplicate detection and
- *          timing out stale fragments. 
+ *          timing out stale fragments.
  *
  *  1 -> host is responsible non-aggregate duplicate detection and
- *          timing out stale fragments. 
+ *          timing out stale fragments.
  */
 int ol_cfg_rx_host_defrag_timeout_duplicate_check(ol_pdev_handle pdev);
 
