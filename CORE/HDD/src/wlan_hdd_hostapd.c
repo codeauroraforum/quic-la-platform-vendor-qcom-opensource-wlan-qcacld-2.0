@@ -476,6 +476,13 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     struct iw_michaelmicfailure msg;
 
     dev = (struct net_device *)usrDataForCallback;
+    if (!dev)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "%s: usrDataForCallback is null", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
+
     pHostapdAdapter = netdev_priv(dev);
 
     if ((NULL == pHostapdAdapter) ||
@@ -488,6 +495,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
     pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(pHostapdAdapter);
     pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter);
+
+    if (!pSapEvent)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "%s: pSapEvent is null", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
+
     sapEvent = pSapEvent->sapHddEventCode;
     memset(&wrqu, '\0', sizeof(wrqu));
     pHddCtx = (hdd_context_t*)(pHostapdAdapter->pHddCtx);
@@ -733,7 +748,8 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 /* send peer status indication to oem app */
                 hdd_SendPeerStatusIndToOemApp(
                   &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac,
-                  ePeerConnected, 0,
+                  ePeerConnected,
+                  pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.timingMeasCap,
                   pHostapdAdapter->sessionId, pHddApCtx->operatingChannel);
             }
 #endif
@@ -1505,53 +1521,82 @@ static iw_softap_setparam(struct net_device *dev,
                 break;
             }
         case QCASAP_SET_11N_RATE:
-        {
-           u_int8_t preamble, nss, rix;
-           hddLog(LOG1, "SAP WE_SET_11N_RATE val %d", set_value);
+            {
+                u_int8_t preamble = 0, nss = 0, rix = 0;
+                tsap_Config_t *pConfig =
+                        &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
-           rix = RC_2_RATE_IDX(set_value);
-           if (set_value & 0x80) {
-               preamble = WMI_RATE_PREAMBLE_HT;
-               nss = HT_RC_2_STREAMS(set_value) -1;
-           } else {
-               nss = 0;
-               rix = RC_2_RATE_IDX(set_value);
-               if (set_value & 0x10) {
-                   preamble = WMI_RATE_PREAMBLE_CCK;
-                   if (rix != 0x3)
-                       /* Enable Short preamble always for CCK except 1mbps*/
-                       rix |= 0x4;
-               } else
-                   preamble = WMI_RATE_PREAMBLE_OFDM;
-           }
+                hddLog(LOG1, "WMI_VDEV_PARAM_FIXED_RATE val %d", set_value);
 
-           hddLog(LOG1, "SAP WMI_VDEV_PARAM_FIXED_RATE val %d rix %d "
-                  "preamble %x nss %d", set_value, rix, preamble, nss);
+                rix = RC_2_RATE_IDX(set_value);
+                if (set_value & 0x80) {
+                    if (pConfig->SapHw_mode == eSAP_DOT11_MODE_11b ||
+                        pConfig->SapHw_mode == eSAP_DOT11_MODE_11b_ONLY ||
+                        pConfig->SapHw_mode == eSAP_DOT11_MODE_11g ||
+                        pConfig->SapHw_mode == eSAP_DOT11_MODE_11g_ONLY ||
+                        pConfig->SapHw_mode == eSAP_DOT11_MODE_abg ||
+                        pConfig->SapHw_mode == eSAP_DOT11_MODE_11a) {
+                        hddLog(VOS_TRACE_LEVEL_ERROR, "Not valid mode for HT");
+                        ret = -EIO;
+                        break;
+                    }
+                    preamble = WMI_RATE_PREAMBLE_HT;
+                    nss = HT_RC_2_STREAMS(set_value) - 1;
+                } else if (set_value & 0x10) {
+                    if (pConfig->SapHw_mode == eSAP_DOT11_MODE_11a) {
+                        hddLog(VOS_TRACE_LEVEL_ERROR, "Not valid for cck");
+                        ret = -EIO;
+                        break;
+                    }
+                    preamble = WMI_RATE_PREAMBLE_CCK;
+                    /* Enable Short preamble always for CCK except 1mbps */
+                    if (rix != 0x3)
+                        rix |= 0x4;
+                } else {
+                    if (pConfig->SapHw_mode == eSAP_DOT11_MODE_11b ||
+                        pConfig->SapHw_mode == eSAP_DOT11_MODE_11b_ONLY) {
+                        hddLog(VOS_TRACE_LEVEL_ERROR, "Not valid for OFDM");
+                        ret = -EIO;
+                        break;
+                    }
+                    preamble = WMI_RATE_PREAMBLE_OFDM;
+                }
+                hddLog(LOG1, "WMI_VDEV_PARAM_FIXED_RATE val %d rix %d "
+                    "preamble %x nss %d", set_value, rix, preamble, nss);
 
-           set_value = (preamble << 6) | (nss << 4) | rix;
-           ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                         (int)WMI_VDEV_PARAM_FIXED_RATE,
-                                         set_value, VDEV_CMD);
-           break;
-         }
+                set_value = (preamble << 6) | (nss << 4) | rix;
+                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                              (int)WMI_VDEV_PARAM_FIXED_RATE,
+                                              set_value, VDEV_CMD);
+                break;
+            }
+
         case QCASAP_SET_VHT_RATE:
-        {
-           u_int8_t preamble, nss, rix;
-           hddLog(LOG1, "SAP WE_SET_11AC_RATE val %d", set_value);
+            {
+                u_int8_t preamble, nss, rix;
+                tsap_Config_t *pConfig =
+                    &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
-           rix = RC_2_RATE_IDX_11AC(set_value);
-           preamble = WMI_RATE_PREAMBLE_VHT;
-           nss = HT_RC_2_STREAMS_11AC(set_value) -1;
+                if (pConfig->SapHw_mode != eSAP_DOT11_MODE_11ac ||
+                    pConfig->SapHw_mode != eSAP_DOT11_MODE_11ac_ONLY) {
+                    hddLog(VOS_TRACE_LEVEL_ERROR, "Not valid mode for VHT");
+                    ret = -EIO;
+                    break;
+                }
 
-           hddLog(LOG1, "SAP WMI_VDEV_PARAM_FIXED_RATE val %d rix %d "
-                  "preamble %x nss %d", set_value, rix, preamble, nss);
+                rix = RC_2_RATE_IDX_11AC(set_value);
+                preamble = WMI_RATE_PREAMBLE_VHT;
+                nss = HT_RC_2_STREAMS_11AC(set_value) - 1;
 
-           set_value = (preamble << 6) | (nss << 4) | rix;
-           ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                         (int)WMI_VDEV_PARAM_FIXED_RATE,
-                                         set_value, VDEV_CMD);
-           break;
-        }
+                hddLog(LOG1, "WMI_VDEV_PARAM_FIXED_RATE val %d rix %d "
+                    "preamble %x nss %d", set_value, rix, preamble, nss);
+
+                set_value = (preamble << 6) | (nss << 4) | rix;
+                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                              (int)WMI_VDEV_PARAM_FIXED_RATE,
+                                              set_value, VDEV_CMD);
+                break;
+            }
 
          case QCASAP_SET_SHORT_GI:
              {
