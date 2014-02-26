@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,6 +35,7 @@
 #include "wma_api.h"
 #include "wma.h"
 #include "if_pci.h"
+#include "regtable.h"
 
 #define ATH_MODULE_NAME bmi
 #include "a_debug.h"
@@ -172,18 +173,10 @@ static int ol_transfer_single_bin_file(struct ol_softc *scn,
 		binary_len = one_bin_header->binary_len;
 		next_tag_offset = one_bin_header->next_tag_off;
 
-		switch (one_bin_header->chip_id)
-		{
-		default:
-			fw_sign = FALSE;
-			break;
-		case AR6320_1_0_CHIP_ID:
-			fw_sign = FALSE;
-			break;
-		case AR6320_1_1_CHIP_ID:
+		if (one_bin_header->action & ACTION_PARSE_SIG)
 			fw_sign = TRUE;
-			break;
-		}
+		else
+			fw_sign = FALSE;
 
 		if (fw_sign)
 		{
@@ -197,8 +190,8 @@ static int ol_transfer_single_bin_file(struct ol_softc *scn,
 				status = A_ERROR;
 				goto exit;
 			}
-			sign_header = (SIGN_HEADER_T *)(u_int8_t *)fw_entry_data
-					+ binary_offset;
+			sign_header = (SIGN_HEADER_T *)((u_int8_t *)fw_entry_data
+					+ binary_offset);
 
 			status = BMISignStreamStart(scn->hif_hdl, address,
 						    (u_int8_t *)fw_entry_data
@@ -250,7 +243,8 @@ static int ol_transfer_single_bin_file(struct ol_softc *scn,
 			}
 		}
 
-		if (one_bin_header->action == ACTION_DOWNLOAD_EXEC)
+		if ((one_bin_header->action & ACTION_DOWNLOAD_EXEC)	\
+						== ACTION_DOWNLOAD_EXEC)
 		{
 			param = 0;
 			BMIExecute(scn->hif_hdl, address, &param, scn);
@@ -494,23 +488,33 @@ u_int32_t host_interest_item_address(u_int32_t target_type, u_int32_t item_offse
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
 int dump_CE_register(struct ol_softc *scn)
 {
-	A_UINT32 CE_reg_address = CE7_LOCATION;
-	A_UINT32 CE_reg_values[CE_USEFUL_SIZE>>2];
+	struct hif_pci_softc *sc = scn->hif_sc;
+	A_UINT32 CE_reg_address = CE0_BASE_ADDRESS;
+	A_UINT32 CE_reg_values[8][CE_USEFUL_SIZE>>2];
 	A_UINT32 CE_reg_word_size = CE_USEFUL_SIZE>>2;
-	A_UINT16 i;
+	A_UINT16 i, j;
 
-	if (HIFDiagReadMem(scn->hif_hdl, CE_reg_address,
-		(A_UCHAR*)&CE_reg_values[0],
-		CE_reg_word_size * sizeof(A_UINT32)) != A_OK)
-	{
-		printk(KERN_ERR "Dumping CE register failed!\n");
-		return -EACCES;
+	for(i = 0; i < 8; i++, CE_reg_address += CE_OFFSET) {
+		if (HIFDiagReadMem(scn->hif_hdl, CE_reg_address,
+			(A_UCHAR*)&CE_reg_values[i][0],
+			CE_reg_word_size * sizeof(A_UINT32)) != A_OK)
+		{
+			printk(KERN_ERR "Dumping CE register failed!\n");
+			return -EACCES;
+		}
 	}
 
-	printk("CE7 Register Dump:\n");
-	for (i = 0; i < CE_reg_word_size; i++) {
-		printk("[%02d] : 0x%08X\n", i, CE_reg_values[i]);
+	for (i = 0; i < 8; i++) {
+		printk("CE%d Registers:\n", i);
+		for (j = 0; j < CE_reg_word_size; j++) {
+			printk("0x%08x ", CE_reg_values[i][j]);
+			if (!((j+1)%5) || (CE_reg_word_size - 1) == j)
+				printk("\n");
+		}
+
+		msleep(1);
 	}
+
 	return EOK;
 }
 #endif
@@ -518,11 +522,37 @@ int dump_CE_register(struct ol_softc *scn)
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
 static struct ol_softc *ramdump_scn;
 
-static void ramdump_work_handler(struct work_struct *ramdump)
+int ol_copy_ramdump(struct ol_softc *scn)
 {
 	void __iomem *ramdump_base;
 	unsigned long address;
 	unsigned long size;
+	int ret;
+
+	/* Get RAM dump memory address and size */
+	if (cnss_get_ramdump_mem(&address, &size)) {
+		printk("No RAM dump will be collected since failed to get "
+			"memory address or size!\n");
+		ret = -EACCES;
+		goto out;
+	}
+
+	ramdump_base = ioremap(address, size);
+	if (!ramdump_base) {
+		printk("No RAM dump will be collected since ramdump_base is NULL!\n");
+		ret = -EACCES;
+		goto out;
+	}
+
+	ret = ol_target_coredump(scn, ramdump_base, TOTAL_DUMP_SIZE);
+	iounmap(ramdump_base);
+
+out:
+	return ret;
+}
+
+static void ramdump_work_handler(struct work_struct *ramdump)
+{
 	int ret;
 	u_int32_t host_interest_address;
 
@@ -531,6 +561,22 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 		goto out_fail;
 	}
 
+	if (ramdump_scn->crash_shutdown) {
+		if (hif_pci_check_soc_status(ramdump_scn->hif_sc))
+			goto out;
+
+		if (ol_copy_ramdump(ramdump_scn))
+			goto out;
+
+		printk("%s: RAM dump collecting completed!\n", __func__);
+
+out:
+		ramdump_scn->crash_shutdown = false;
+		complete(&ramdump_scn->ramdump_event);
+		return;
+	}
+
+#ifdef DEBUG
 	ret = hif_pci_check_soc_status(ramdump_scn->hif_sc);
 	if (ret)
 		goto out_fail;
@@ -539,43 +585,33 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 	if (ret)
 		goto out_fail;
 
+	dump_CE_debug_register(ramdump_scn->hif_sc);
+#endif
+
 	if (HIFDiagReadMem(ramdump_scn->hif_hdl,
 		host_interest_item_address(ramdump_scn->target_type,
 		offsetof(struct host_interest_s, hi_failure_state)),
 		(A_UCHAR*) &host_interest_address, sizeof(u_int32_t)) != A_OK) {
 		printk(KERN_ERR "HifDiagReadiMem FW Dump Area Pointer failed!\n");
 		dump_CE_register(ramdump_scn);
+		dump_CE_debug_register(ramdump_scn->hif_sc);
 
 		goto out_fail;
 	}
-	printk("Host interest item address: 0x%08X\n", host_interest_address);
+	printk("Host interest item address: 0x%08x\n", host_interest_address);
 
-	/* Get RAM dump memory address and size */
-	if (cnss_get_ramdump_mem(&address, &size)) {
-		printk("No RAM dump will be collected since failed to get "
-			"memory address or size!\n");
-		goto out_fail;
-	}
-
-	ramdump_base = ioremap(address, size);
-	if (!ramdump_base) {
-		printk("No RAM dump will be collected since ramdump_base is NULL!\n");
-		goto out_fail;
-	}
-
-	ret = ol_target_coredump(ramdump_scn, ramdump_base, TOTAL_DUMP_SIZE);
-	iounmap(ramdump_base);
-	if (ret)
+	if (ol_copy_ramdump(ramdump_scn))
 		goto out_fail;
 
 	printk("%s: RAM dump collecting completed!\n", __func__);
 	msleep(250);
+
 	/* Notify SSR framework the target has crashed. */
 	cnss_device_crashed();
 	return;
 
 out_fail:
-	/* silent SSR on dump failure */
+	/* Silent SSR on dump failure */
 #ifdef CNSS_SELF_RECOVERY
 	cnss_device_self_recovery();
 #else
@@ -585,6 +621,12 @@ out_fail:
 }
 
 static DECLARE_WORK(ramdump_work, ramdump_work_handler);
+
+void ol_schedule_ramdump_work(struct ol_softc *scn)
+{
+	ramdump_scn = scn;
+	schedule_work(&ramdump_work);
+}
 #endif
 
 #define REGISTER_DUMP_LEN_MAX   60
@@ -611,7 +653,10 @@ void ol_target_failure(void *instance, A_STATUS status)
 		return;
 	}
 
-	printk("XXX TARGET ASSERTED XXX\n");
+	if (scn->crash_shutdown)
+		printk("XXX TARGET ASSERTED because of Kernel Panic XXX\n");
+	else
+		printk("XXX TARGET ASSERTED XXX\n");
 	scn->target_status = OL_TRGET_STATUS_RESET;
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
@@ -697,8 +742,7 @@ void ol_target_failure(void *instance, A_STATUS status)
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
 	/* Collect the RAM dump through a workqueue */
-	ramdump_scn = scn;
-	schedule_work(&ramdump_work);
+	ol_schedule_ramdump_work(scn);
 #endif
 
 	return;
@@ -1060,6 +1104,7 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 			} else {
 				printk(KERN_ERR "Could not read dump section!\n");
 				dump_CE_register(scn);
+				dump_CE_debug_register(scn->hif_sc);
 				ret = -EACCES;
 				break; /* Could not read the section */
 			}
