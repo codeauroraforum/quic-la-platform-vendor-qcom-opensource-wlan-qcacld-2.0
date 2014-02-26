@@ -104,7 +104,7 @@
          *    A_UINT8       data[length]
          * Response format: none
          */
-/* 
+/*
  * Capbility to write "segmented files" is provided for two reasons
  * 1) backwards compatibility for certain situations where Hosts
  *    have limited flexibility
@@ -138,7 +138,7 @@
  * can use an arbitrary address.  In each BMI_WRITE_MEMORY command, the
  * length specifies the number of data bytes transmitted (except for the
  * special cases listed above).
- * 
+ *
  * Alternatively, a segmented file may be sent to the Target using a
  * BMI_LZ_STREAM_START command with address=BMI_SEGMENTED_WRITE_ADDR
  * followed by a series of BMI_LZ_DATA commands that each send the next portion
@@ -208,7 +208,7 @@ struct bmi_segmented_metadata {
          * Request format:
          *    A_UINT32      command (BMI_READ_REGISTER)
          *    A_UINT32      address
-         * Response format: 
+         * Response format:
          *    A_UINT32      value
          */
 
@@ -257,9 +257,14 @@ PREPACK struct bmi_target_info {
 #define TARGET_TYPE_AR9888    7
 #define TARGET_TYPE_AR6320    8
 #define TARGET_TYPE_AR900B    9
-#define TARGET_TYPE_AR6320V2  10
 /* For attach Peregrine 2.0 board target_reg_tbl only */
 #define TARGET_TYPE_AR9888V2  10
+/* For attach Rome1.0 target_reg_tbl only*/
+#define TARGET_TYPE_AR6320V1    11
+/* For Rome2.0/2.1 target_reg_tbl ID*/
+#define TARGET_TYPE_AR6320V2    12
+/* For Rome3.0 target_reg_tbl ID*/
+#define TARGET_TYPE_AR6320V3    13
 
 #define BMI_ROMPATCH_INSTALL               9
         /*

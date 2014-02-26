@@ -171,6 +171,7 @@ typedef enum {
     WMI_GRP_LOCATION_SCAN,
     WMI_GRP_OEM,
     WMI_GRP_NAN,
+    WMI_GRP_COEX,
 } WMI_GRP_ID;
 
 #define WMI_CMD_GRP_START_ID(grp_id) (((grp_id) << 12) | 0x1)
@@ -589,6 +590,9 @@ typedef enum {
 
     /** Nan Request */
     WMI_NAN_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_NAN),
+
+    /** Modem power state command */
+    WMI_MODEM_POWER_STATE_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_COEX),
 } WMI_CMD_ID;
 
 typedef enum {
@@ -1928,10 +1932,10 @@ typedef struct {
 typedef struct {
     A_UINT32 tlv_header;     /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_pdev_set_quiet_cmd_fixed_param */
     A_UINT32 reserved0;      /** placeholder for pdev_id of future multiple MAC products. Init. to 0. */
-	A_UINT32 period;		/*period in TUs*/	
+	A_UINT32 period;		/*period in TUs*/
 	A_UINT32 duration;		/*duration in TUs*/
 	A_UINT32 next_start;	/*offset in TUs*/
-        A_UINT32 enabled; 		/*enable/disable*/
+        A_UINT32 enabled;		/*enable/disable*/
 } wmi_pdev_set_quiet_cmd_fixed_param;
 
 /*
@@ -5249,7 +5253,7 @@ typedef struct {
 
 typedef struct {
     A_UINT32    tlv_header;                     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_GTK_OFFLOAD_CMD_fixed_param */
-    A_UINT32 	vdev_id;    					/** unique id identifying the VDEV */
+    A_UINT32	vdev_id;					/** unique id identifying the VDEV */
     A_UINT32    flags;                          /* control flags, GTK offload command use high byte  */
     /* The size of following 3 arrays cannot be changed without breaking WMI compatibility. */
     A_UINT8     KEK[GTK_OFFLOAD_KEK_BYTES];     /* key encryption key */
@@ -6376,6 +6380,34 @@ enum {
 
 #define GET_PDEV_PARAM_TXPOWER_REASON(txpower_param)     \
     (((txpower_param) & PDEV_PARAM_TXPOWER_REASON_MASK) >> PDEV_PARAM_TXPOWER_REASON_SHIFT)
+
+/**
+ * This command is sent from WLAN host driver to firmware to
+ * notify the current modem power state. Host would receive a
+ * message from modem when modem is powered on. Host driver
+ * would then send this command to firmware. Firmware would then
+ * power on WCI-2 (UART) interface for LTE/MWS Coex.
+ *
+ * This command is only applicable for APQ platform which has
+ * modem on the platform. If firmware doesn't support MWS Coex,
+ * this command can be dropped by firmware.
+ *
+ * This is a requirement from modem team that WCN can't toggle
+ * UART before modem is powered on.
+ */
+typedef struct {
+    /** TLV tag and len; tag equals
+     *  WMITLV_TAG_STRUC_wmi_modem_power_state_cmd_param */
+    A_UINT32 tlv_header;
+
+    /** Modem power state parameter */
+    A_UINT32 modem_power_state;
+} wmi_modem_power_state_cmd_param;
+
+enum {
+    WMI_MODEM_STATE_OFF = 0,
+    WMI_MODEM_STATE_ON
+};
 
 #ifdef __cplusplus
 }
