@@ -100,6 +100,11 @@ extern int process_wma_set_command(int sessid, int paramid,
  */
 #define WE_SAP_MAX_STA_INFO 0x7FF
 
+#define RC_2_RATE_IDX(_rc)        ((_rc) & 0x7)
+#define HT_RC_2_STREAMS(_rc)    ((((_rc) & 0x78) >> 3) + 1)
+#define RC_2_RATE_IDX_11AC(_rc)        ((_rc) & 0xf)
+#define HT_RC_2_STREAMS_11AC(_rc)    ((((_rc) & 0x30) >> 4) + 1)
+
 #define SAP_24GHZ_CH_COUNT (14)
 
 /*---------------------------------------------------------------------------
@@ -1292,98 +1297,6 @@ static iw_softap_setparam(struct net_device *dev,
                   break;
              }
 #endif
-         case QCASAP_SET_TXRX_FWSTATS:
-             {
-                  hddLog(LOG1, "WE_SET_TXRX_FWSTATS val %d", set_value);
-                  ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                                (int)WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID,
-                                                set_value, VDEV_CMD);
-                   break;
-             }
-         case QCASAP_TXRX_FWSTATS_RESET:
-             {
-                  hddLog(LOG1, "WE_TXRX_FWSTATS_RESET val %d", set_value);
-                  ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                                (int)WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
-                                                set_value, VDEV_CMD);
-                  break;
-             }
-         case QCSAP_PARAM_SETRTSCTS:
-            {
-                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
-                                set_value, VDEV_CMD);
-                if (!ret) {
-                    if (ccmCfgSetInt(hHal, WNI_CFG_RTS_THRESHOLD, (tANI_U32)value,
-                        ccmCfgSetCallback, eANI_BOOLEAN_TRUE) !=
-                        eHAL_STATUS_SUCCESS) {
-
-                        hddLog(LOGE, "FAILED TO SET RTSCTS at SAP");
-                        ret = -EIO;
-                        break;
-                    }
-                }
-                break;
-            }
-        case QCASAP_SET_11N_RATE:
-            {
-                u_int8_t preamble, nss, rix;
-                hddLog(LOG1, "WMI_VDEV_PARAM_FIXED_RATE val %d", set_value);
-
-                rix = RC_2_RATE_IDX(set_value);
-                if (set_value & 0x80) {
-                    preamble = WMI_RATE_PREAMBLE_HT;
-                    nss = HT_RC_2_STREAMS(set_value) -1;
-                } else {
-                    nss = 0;
-                    rix = RC_2_RATE_IDX(set_value);
-                    if (set_value & 0x10) {
-                        preamble = WMI_RATE_PREAMBLE_CCK;
-                        rix |= 0x4; /* Enable Short preamble always for CCK */
-                    } else
-                        preamble = WMI_RATE_PREAMBLE_OFDM;
-                }
-
-                hddLog(LOG1, "WMI_VDEV_PARAM_FIXED_RATE val %d rix %d preamble %x\
-                       nss %d", set_value, rix, preamble, nss);
-
-                set_value = (preamble << 6) | (nss << 4) | rix;
-                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                              (int)WMI_VDEV_PARAM_FIXED_RATE,
-                                              set_value, VDEV_CMD);
-                break;
-            }
-
-        case QCASAP_SET_VHT_RATE:
-            {
-                u_int8_t preamble, nss, rix;
-
-                rix = RC_2_RATE_IDX_11AC(set_value);
-                preamble = WMI_RATE_PREAMBLE_VHT;
-                nss = HT_RC_2_STREAMS_11AC(set_value) -1;
-
-                hddLog(LOG1, "WMI_VDEV_PARAM_FIXED_RATE val %d rix %d preamble %x\
-                       nss %d", set_value, rix, preamble, nss);
-
-                set_value = (preamble << 6) | (nss << 4) | rix;
-                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
-                                              (int)WMI_VDEV_PARAM_FIXED_RATE,
-                                              set_value, VDEV_CMD);
-                break;
-            }
-
-         case QCASAP_SET_SHORT_GI:
-             {
-                  hddLog(LOG1, "QCASAP_SET_SHORT_GI val %d", set_value);
-
-                  ret = sme_UpdateHTConfig(hHal, pHostapdAdapter->sessionId,
-                                           WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ, /* same as 40MHZ */
-                                           set_value);
-                  if (ret)
-                      hddLog(LOGE, "Failed to set ShortGI value ret(%d)", ret);
-                  break;
-             }
-
          case QCSAP_PARAM_SET_MCC_CHANNEL_LATENCY:
              {
                   tVOS_CONCURRENCY_MODE concurrent_state = 0;
@@ -1555,6 +1468,119 @@ static iw_softap_setparam(struct net_device *dev,
                              "Exit w/o setting latency", __func__);
                  }
                  break;
+             }
+
+         case QCASAP_SET_TXRX_FWSTATS:
+             {
+                  hddLog(LOG1, "WE_SET_TXRX_FWSTATS val %d", set_value);
+                  ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                                (int)WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID,
+                                                set_value, VDEV_CMD);
+                   break;
+             }
+         case QCASAP_TXRX_FWSTATS_RESET:
+             {
+                  hddLog(LOG1, "WE_TXRX_FWSTATS_RESET val %d", set_value);
+                  ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                                (int)WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
+                                                set_value, VDEV_CMD);
+                  break;
+             }
+
+         case QCSAP_PARAM_SETRTSCTS:
+            {
+                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
+                                set_value, VDEV_CMD);
+                if (!ret) {
+                    if (ccmCfgSetInt(hHal, WNI_CFG_RTS_THRESHOLD, (tANI_U32)value,
+                        ccmCfgSetCallback, eANI_BOOLEAN_TRUE) !=
+                        eHAL_STATUS_SUCCESS) {
+
+                        hddLog(LOGE, "FAILED TO SET RTSCTS at SAP");
+                        ret = -EIO;
+                        break;
+                    }
+                }
+                break;
+            }
+        case QCASAP_SET_11N_RATE:
+        {
+           u_int8_t preamble, nss, rix;
+           hddLog(LOG1, "SAP WE_SET_11N_RATE val %d", set_value);
+
+           rix = RC_2_RATE_IDX(set_value);
+           if (set_value & 0x80) {
+               preamble = WMI_RATE_PREAMBLE_HT;
+               nss = HT_RC_2_STREAMS(set_value) -1;
+           } else {
+               nss = 0;
+               rix = RC_2_RATE_IDX(set_value);
+               if (set_value & 0x10) {
+                   preamble = WMI_RATE_PREAMBLE_CCK;
+                   if (rix != 0x3)
+                       /* Enable Short preamble always for CCK except 1mbps*/
+                       rix |= 0x4;
+               } else
+                   preamble = WMI_RATE_PREAMBLE_OFDM;
+           }
+
+           hddLog(LOG1, "SAP WMI_VDEV_PARAM_FIXED_RATE val %d rix %d "
+                  "preamble %x nss %d", set_value, rix, preamble, nss);
+
+           set_value = (preamble << 6) | (nss << 4) | rix;
+           ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_FIXED_RATE,
+                                         set_value, VDEV_CMD);
+           break;
+         }
+        case QCASAP_SET_VHT_RATE:
+        {
+           u_int8_t preamble, nss, rix;
+           hddLog(LOG1, "SAP WE_SET_11AC_RATE val %d", set_value);
+
+           rix = RC_2_RATE_IDX_11AC(set_value);
+           preamble = WMI_RATE_PREAMBLE_VHT;
+           nss = HT_RC_2_STREAMS_11AC(set_value) -1;
+
+           hddLog(LOG1, "SAP WMI_VDEV_PARAM_FIXED_RATE val %d rix %d "
+                  "preamble %x nss %d", set_value, rix, preamble, nss);
+
+           set_value = (preamble << 6) | (nss << 4) | rix;
+           ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                         (int)WMI_VDEV_PARAM_FIXED_RATE,
+                                         set_value, VDEV_CMD);
+           break;
+        }
+
+         case QCASAP_SET_SHORT_GI:
+             {
+                  hddLog(LOG1, "QCASAP_SET_SHORT_GI val %d", set_value);
+
+                  ret = sme_UpdateHTConfig(hHal, pHostapdAdapter->sessionId,
+                                           WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ, /* same as 40MHZ */
+                                           set_value);
+                  if (ret)
+                      hddLog(LOGE, "Failed to set ShortGI value ret(%d)", ret);
+                  break;
+             }
+
+         case QCSAP_SET_AMPDU:
+             {
+                  hddLog(LOG1, "QCSAP_SET_AMPDU val %d", set_value);
+                  ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                               (int)GEN_VDEV_PARAM_AMPDU,
+                                               set_value, GEN_CMD);
+                  break;
+             }
+
+         case QCSAP_SET_AMSDU:
+             {
+                  hddLog(LOG1, "QCSAP_SET_AMSDU val %d", set_value);
+                  ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                               (int)GEN_VDEV_PARAM_AMSDU,
+                                               set_value, GEN_CMD);
+                  break;
              }
 
 #endif /* QCA_WIFI_2_0 */
@@ -1782,6 +1808,7 @@ static iw_softap_set_tx_power(struct net_device *dev,
     int *value = (int *)extra;
     int set_value;
     ptSapContext  pSapCtx = NULL;
+    tSirMacAddr bssid;
 
     if (NULL == value)
         return -ENOMEM;
@@ -1793,9 +1820,13 @@ static iw_softap_set_tx_power(struct net_device *dev,
                    "%s: Invalid SAP pointer from pvosGCtx", __func__);
         return VOS_STATUS_E_FAULT;
     }
+    vos_mem_copy(bssid, pHostapdAdapter->macAddressCurrent.bytes,
+           VOS_MAC_ADDR_SIZE);
 
     set_value = value[0];
-    if (eHAL_STATUS_SUCCESS != sme_SetTxPower(hHal, pSapCtx->sessionId, set_value))
+    if (eHAL_STATUS_SUCCESS != sme_SetTxPower(hHal, pSapCtx->sessionId, bssid,
+                                              pHostapdAdapter->device_mode,
+                                              set_value))
     {
         hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Setting tx power failed",
                 __func__);
@@ -3581,6 +3612,16 @@ static const struct iw_priv_args hostapd_private_args[] = {
     {   QCASAP_GET_SHORT_GI, 0,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "get_short_gi" },
+
+    {   QCSAP_SET_AMPDU,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "ampdu" },
+
+    {   QCSAP_SET_AMSDU,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "amsdu" },
 
 #endif /* QCA_WIFI_2_0 */
 
