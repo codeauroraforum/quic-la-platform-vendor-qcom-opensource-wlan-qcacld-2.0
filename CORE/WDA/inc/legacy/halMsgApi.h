@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1195,6 +1195,8 @@ typedef struct sSet_MIMOPS
     eHalStatus status;
     tANI_U8     fsendRsp;
 
+    tSirMacAddr peerMac;
+    tANI_U8     sessionId;
 } tSetMIMOPS, * tpSetMIMOPS;
 
 
@@ -1362,6 +1364,7 @@ typedef struct sMaxTxPowerParams
     //In response,
     //power == tx power used for management frames.
     tPowerdBm  power;
+    tVOS_CON_MODE dev_mode;
 }tMaxTxPowerParams, *tpMaxTxPowerParams;
 
 typedef struct sMaxTxPowerPerBandParams
@@ -1412,6 +1415,7 @@ typedef struct sP2pPsParams
    tANI_U32  interval;
    tANI_U32  single_noa_duration;
    tANI_U8   psSelection;
+   tANI_U8   sessionId;
 }tP2pPsParams, *tpP2pPsParams;
 
 typedef struct sTdlsLinkEstablishParams

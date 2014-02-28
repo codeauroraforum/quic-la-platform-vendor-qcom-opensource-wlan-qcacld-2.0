@@ -689,6 +689,10 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                  psessionEntry->shortSlotTimeSupported =
                      limGetShortSlotFromPhyMode(pMac, psessionEntry,
                                                 psessionEntry->gLimPhyMode);
+
+                 // initialize to "OPEN". will be updated upon key installation
+                 psessionEntry->encryptType = eSIR_ED_NONE;
+
                  break;
 
             case eSIR_BTAMP_AP_MODE:
@@ -5493,7 +5497,8 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 #endif
         case eWNI_SME_JOIN_REQ:
             /* If we have an existing P2P GO session we need to insert NOA before actually process this SME Req */
-            if ((limIsNOAInsertReqd(pMac) == TRUE) && IS_FEATURE_SUPPORTED_BY_FW(P2P_GO_NOA_DECOUPLE_INIT_SCAN))
+            if (!pMac->fScanOffload && (limIsNOAInsertReqd(pMac) == TRUE) &&
+                IS_FEATURE_SUPPORTED_BY_FW(P2P_GO_NOA_DECOUPLE_INIT_SCAN))
             {
                 tANI_U32 noaDuration;
                 __limRegisterDeferredSmeReqForNOAStart(pMac, pMsg->type, pMsgBuf);

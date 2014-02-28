@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -6383,7 +6383,8 @@ returnFailure:
  */
 tSirRetStatus 
 limPostSMStateUpdate(tpAniSirGlobal pMac, 
-        tANI_U16 staIdx, tSirMacHTMIMOPowerSaveState state)
+        tANI_U16 staIdx, tSirMacHTMIMOPowerSaveState state,
+        tANI_U8 *pPeerStaMac, tANI_U8 sessionId)
 {
     tSirRetStatus             retCode = eSIR_SUCCESS;
     tSirMsgQ                    msgQ;
@@ -6403,6 +6404,10 @@ limPostSMStateUpdate(tpAniSirGlobal pMac,
     pMIMO_PSParams->htMIMOPSState = state;
     pMIMO_PSParams->staIdx = staIdx;
     pMIMO_PSParams->fsendRsp = true;
+    pMIMO_PSParams->sessionId = sessionId;
+    vos_mem_copy(pMIMO_PSParams->peerMac, pPeerStaMac,
+                    sizeof( tSirMacAddr ));
+
     msgQ.bodyptr = pMIMO_PSParams;
     msgQ.bodyval = 0;
 
@@ -7321,12 +7326,16 @@ tpPESession limIsApSessionActive(tpAniSirGlobal pMac)
 
 void limHandleDeferMsgError(tpAniSirGlobal pMac, tpSirMsgQ pLimMsg)
 {
-      if(SIR_BB_XPORT_MGMT_MSG == pLimMsg->type) 
-        {
-            vos_pkt_return_packet((vos_pkt_t*)pLimMsg->bodyptr);
-        }
-      else if(pLimMsg->bodyptr != NULL)
-            vos_mem_free( pLimMsg->bodyptr);
+    if(SIR_BB_XPORT_MGMT_MSG == pLimMsg->type)
+    {
+        vos_pkt_return_packet((vos_pkt_t*)pLimMsg->bodyptr);
+        pLimMsg->bodyptr = NULL;
+    }
+    else if(pLimMsg->bodyptr != NULL)
+    {
+        vos_mem_free(pLimMsg->bodyptr);
+        pLimMsg->bodyptr = NULL;
+    }
 
 }
 

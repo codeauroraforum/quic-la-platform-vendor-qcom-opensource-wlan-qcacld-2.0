@@ -77,7 +77,7 @@
 /** Private **/
 #define WMA_CFG_NV_DNLD_TIMEOUT            500
 #define WMA_READY_EVENTID_TIMEOUT          2000
-#define WMA_TGT_SUSPEND_COMPLETE_TIMEOUT   2000
+#define WMA_TGT_SUSPEND_COMPLETE_TIMEOUT   1000
 #define MAX_MEM_CHUNKS 32
 /*
    In prima 12 HW stations are supported including BCAST STA(staId 0)
@@ -413,6 +413,7 @@ struct wma_txrx_node {
 	WLAN_PHY_MODE           chanmode;
 	tANI_U8                 vht_capable;
 	tANI_U8                 ht_capable;
+	A_UINT32                mhz; /* channel frequency  in KHZ */
 	v_BOOL_t vdev_up;
 	u_int64_t tsfadjust;
 	void     *addBssStaContext;
@@ -431,6 +432,8 @@ struct wma_txrx_node {
 	tANI_U8 nss;
 	v_BOOL_t is_channel_switch;
 	u_int16_t pause_bitmap;
+	tPowerdBm  tx_power; /* TX power in dBm */
+	tPowerdBm  max_tx_power; /* max Tx power in dBm */
 };
 
 #if defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)

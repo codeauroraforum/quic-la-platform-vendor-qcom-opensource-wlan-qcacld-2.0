@@ -117,8 +117,13 @@ static int vos_cpu_hotplug_notify(struct notifier_block *block,
    pVosSchedContext pSchedContext = get_vos_sched_ctxt();
    int i;
 
-   if (!pSchedContext)
+   if ((NULL == pSchedContext) || (NULL == pSchedContext->TlshimRxThread))
        return NOTIFY_OK;
+
+   if (vos_is_load_unload_in_progress(VOS_MODULE_ID_VOSS, NULL))
+   {
+       return NOTIFY_OK;
+   }
 
    switch (state) {
    case CPU_ONLINE:
@@ -251,11 +256,16 @@ vos_sched_open
   spin_lock_init(&pSchedContext->TlshimRxQLock);
   spin_lock_init(&pSchedContext->VosTlshimPktFreeQLock);
   INIT_LIST_HEAD(&pSchedContext->tlshimRxQueue);
+  spin_lock_bh(&pSchedContext->VosTlshimPktFreeQLock);
   INIT_LIST_HEAD(&pSchedContext->VosTlshimPktFreeQ);
   if (vos_alloc_tlshim_pkt_freeq(pSchedContext) !=  VOS_STATUS_SUCCESS)
+  {
+       spin_unlock_bh(&pSchedContext->VosTlshimPktFreeQLock);
        return VOS_STATUS_E_FAILURE;
+  }
+  spin_unlock_bh(&pSchedContext->VosTlshimPktFreeQLock);
   register_hotcpu_notifier(&vos_cpu_hotplug_notifier);
-  pSchedContext->cpuHotPlugNotifier = vos_cpu_hotplug_notifier;
+  pSchedContext->cpuHotPlugNotifier = &vos_cpu_hotplug_notifier;
 #endif
 
 
@@ -2238,7 +2248,8 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
     /* Release the lock here */
     spin_unlock(&gpVosWatchdogContext->wdLock);
 
-    if (pHddCtx->isLoadUnloadInProgress)
+    if ((pHddCtx->isLoadInProgress) ||
+        (pHddCtx->isUnloadInProgress))
     {
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
                 "%s: Load/unload in Progress. Ignoring signaling Watchdog",

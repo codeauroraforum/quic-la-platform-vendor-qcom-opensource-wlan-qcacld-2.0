@@ -1,5 +1,5 @@
 /*
- * Copyright (c) . The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -28,4 +28,4 @@
 
 /**
  * @brief Linux does not require a postpack # directive.
- */ 
+ */

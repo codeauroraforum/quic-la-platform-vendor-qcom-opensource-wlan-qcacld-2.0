@@ -1143,7 +1143,9 @@ struct hdd_context_s
 
    volatile v_BOOL_t isLogpInProgress;
 
-   v_BOOL_t isLoadUnloadInProgress;
+   v_BOOL_t isLoadInProgress;
+
+   v_BOOL_t isUnloadInProgress;
 
    /**Track whether driver has been suspended.*/
    hdd_ps_state_t hdd_ps_state;
@@ -1422,5 +1424,7 @@ int hdd_handle_batch_scan_ioctl
 void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter);
 
 #endif /*End of FEATURE_WLAN_BATCH_SCAN*/
+
+void wlan_hdd_send_svc_nlink_msg(int type);
 
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
