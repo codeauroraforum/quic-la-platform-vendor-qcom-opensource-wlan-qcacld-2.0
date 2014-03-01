@@ -261,6 +261,7 @@ typedef struct sLimTimers
 typedef struct {
     void *pMlmDisassocReq;
     void *pMlmDeauthReq;
+    vos_spin_lock_t deauthDisassocInprogress;
 }tLimDisassocDeauthCnfReq;
 
 typedef struct sAniSirLim
@@ -991,6 +992,12 @@ typedef struct sMacOpenParameters
  * offload currently, rest bits are unused
  */
     tANI_U8 olIniInfo;
+    /*
+     * DFS Phyerror Filtering offload status from ini
+     * 0 indicates offload disabled
+     * 1 indicates offload enabled
+     */
+    tANI_U8 dfsPhyerrFilterOffload;
 /* pass intra-bss-fwd info to txrx module */
     tANI_U8 apDisableIntraBssFwd;
 } tMacOpenParameters;

@@ -1037,6 +1037,13 @@ tSirRetStatus peOpen(tpAniSirGlobal pMac, tMacOpenParameters *pMacOpenParam)
         PELOGE(limLog(pMac, LOGE, FL("pe lock init failed!"));)
         return eSIR_FAILURE;
     }
+
+    if (!VOS_IS_STATUS_SUCCESS(
+        vos_spin_lock_init(&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
+    {
+        PELOGE(limLog(pMac, LOGE, FL("deauth/disassoc process lock init failed!"));)
+        return eSIR_FAILURE;
+    }
     pMac->lim.deauthMsgCnt = 0;
     return eSIR_SUCCESS;
 }
@@ -1081,6 +1088,12 @@ tSirRetStatus peClose(tpAniSirGlobal pMac)
     pMac->pmm.gPmmTim.pTim = NULL;
     if( !VOS_IS_STATUS_SUCCESS( vos_lock_destroy( &pMac->lim.lkPeGlobalLock ) ) )
     {
+        return eSIR_FAILURE;
+    }
+    if (!VOS_IS_STATUS_SUCCESS(
+        vos_spin_lock_destroy(&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
+    {
+        PELOGE(limLog(pMac, LOGE, FL("deauth/disassoc process lock destroy failed!"));)
         return eSIR_FAILURE;
     }
     return eSIR_SUCCESS;
@@ -1347,6 +1360,7 @@ VOS_STATUS peHandleMgmtFrame( v_PVOID_t pvosGCtx, v_PVOID_t vosBuff)
     {
         // cannot log a failure without a valid pMac
         vos_pkt_return_packet(pVosPkt);
+        pVosPkt = NULL;
         return VOS_STATUS_E_FAILURE;
     }
 
@@ -1355,6 +1369,7 @@ VOS_STATUS peHandleMgmtFrame( v_PVOID_t pvosGCtx, v_PVOID_t vosBuff)
     if(!VOS_IS_STATUS_SUCCESS(vosStatus))
     {
         vos_pkt_return_packet(pVosPkt);
+        pVosPkt = NULL;
         return VOS_STATUS_E_FAILURE;
     }
 
@@ -1387,6 +1402,7 @@ VOS_STATUS peHandleMgmtFrame( v_PVOID_t pvosGCtx, v_PVOID_t vosBuff)
                                                   mHdr->fc.subType ))
     {
         vos_pkt_return_packet(pVosPkt);
+        pVosPkt = NULL;
         limLog( pMac, LOGW,
                 FL ( "sysBbtProcessMessageCore failed to process SIR_BB_XPORT_MGMT_MSG" ));
         return VOS_STATUS_E_FAILURE;
