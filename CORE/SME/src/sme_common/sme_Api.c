@@ -1465,9 +1465,7 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
                   if (NV_CHANNEL_DFS ==
                        vos_nv_getChannelEnabledState(pPlmReq->plmChList[count]))
                   /* DFS channel is provided, no PLM bursts can be
-                  * transmitted. TODO shall we ignore these channels
-                  * and continue PLM bursts on other channels ??
-                  * OR return error ?? For now, ignoring these channels
+                  * transmitted. Ignoring these channels.
                   */
                   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                             "%s DFS channel %d ignored for PLM", __func__,
@@ -1476,10 +1474,7 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
               }
               else if (!ret)
               {
-                   /* Not supported channel
-                    * TODO : shall we return error ? OR ignore this channel ?
-                    * for now ignoring the channel
-                   */
+                   /* Not supported, ignore the channel */
                    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                              "%s Unsupported channel %d ignored for PLM",
                              __func__, pPlmReq->plmChList[count]);
@@ -1490,7 +1485,13 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
            } /* End of for () */
 
            /* Copying back the valid channel list to plm struct */
-           vos_mem_copy(pPlmReq->plmChList, ch_list, valid_count);
+           vos_mem_set((void *)pPlmReq->plmChList, pPlmReq->plmNumCh, 0);
+           if (valid_count)
+              vos_mem_copy(pPlmReq->plmChList, ch_list, valid_count);
+           /* All are invalid channels, FW need to send the PLM
+           *  report with "incapable" bit set.
+           */
+           pPlmReq->plmNumCh = valid_count;
         } /* PLM START */
 
         msg.type     = WDA_SET_PLM_REQ;
@@ -11504,3 +11505,58 @@ eHalStatus sme_UpdateConnectDebug(tHalHandle hHal, tANI_U32 set_value)
     pMac->fEnableDebugLog = set_value;
     return (status);
 }
+
+/* ---------------------------------------------------------------------------
+  \fn    sme_ApDisableIntraBssFwd
+
+  \brief
+    SME will send message to WMA to set Intra BSS in txrx
+
+  \param
+
+    hHal - The handle returned by macOpen
+
+    sessionId - session id ( vdev id)
+
+    disablefwd - boolean value that indicate disable intrabss fwd disable
+
+  \return eHalStatus
+--------------------------------------------------------------------------- */
+eHalStatus sme_ApDisableIntraBssFwd(tHalHandle hHal, tANI_U8 sessionId,
+                                    tANI_BOOLEAN disablefwd)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    int status = eHAL_STATUS_SUCCESS;
+    VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
+    vos_msg_t vosMessage;
+    tpDisableIntraBssFwd pSapDisableIntraFwd = NULL;
+
+    //Prepare the request to send to SME.
+    pSapDisableIntraFwd = vos_mem_malloc(sizeof(tDisableIntraBssFwd));
+    if (NULL == pSapDisableIntraFwd)
+    {
+       smsLog(pMac, LOGP, "Memory Allocation Failure!!! %s", __func__);
+       return eSIR_MEM_ALLOC_FAILED;
+    }
+
+    vos_mem_zero(pSapDisableIntraFwd, sizeof(tDisableIntraBssFwd));
+
+    pSapDisableIntraFwd->sessionId = sessionId;
+    pSapDisableIntraFwd->disableintrabssfwd = disablefwd;
+
+    if (eHAL_STATUS_SUCCESS == (status = sme_AcquireGlobalLock(&pMac->sme)))
+    {
+        /* serialize the req through MC thread */
+        vosMessage.bodyptr = pSapDisableIntraFwd;
+        vosMessage.type    = WDA_SET_SAP_INTRABSS_DIS;
+        vosStatus = vos_mq_post_message(VOS_MQ_ID_WDA, &vosMessage);
+        if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+        {
+           status = eHAL_STATUS_FAILURE;
+           vos_mem_free(pSapDisableIntraFwd);
+        }
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return (status);
+}
+

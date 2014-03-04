@@ -1455,6 +1455,15 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                              pHddCtx->wiphy,
 #endif
                              bss);
+
+            // perform any WMM-related association processing
+            hdd_wmm_assoc(pAdapter, pRoamInfo, eCSR_BSS_TYPE_INFRASTRUCTURE);
+
+            /* Start the Queue - Start tx queues before hdd_roamRegisterSTA,
+               since hdd_roamRegisterSTA will flush any cached data frames
+               immediately */
+            netif_tx_wake_all_queues(dev);
+
             // Register the Station with TL after associated...
             vosStatus = hdd_roamRegisterSTA( pAdapter,
                     pRoamInfo,
@@ -1490,16 +1499,20 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                                                    WLANTL_STA_AUTHENTICATED );
                 pHddStaCtx->conn_info.uIsAuthenticated = VOS_TRUE;
             }
+
+            if ( VOS_IS_STATUS_SUCCESS( vosStatus ) )
+            {
+                // perform any WMM-related association processing
+                hdd_wmm_assoc(pAdapter, pRoamInfo, eCSR_BSS_TYPE_INFRASTRUCTURE);
+            }
+
+            /* Start the tx queues */
+            netif_tx_wake_all_queues(dev);
         }
 
-        if ( VOS_IS_STATUS_SUCCESS( vosStatus ) )
+        if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
         {
-            // perform any WMM-related association processing
-            hdd_wmm_assoc(pAdapter, pRoamInfo, eCSR_BSS_TYPE_INFRASTRUCTURE);
-        }
-        else
-        {
-            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                     "Cannot register STA with TL.  Failed with vosStatus = %d [%08X]",
                     vosStatus, vosStatus );
         }
@@ -1507,8 +1520,6 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
         vos_mem_zero( &pAdapter->hdd_stats.hddPmfStats,
                       sizeof(pAdapter->hdd_stats.hddPmfStats) );
 #endif
-        // Start the Queue
-        netif_tx_wake_all_queues(dev);
     }
     else
     {
@@ -1570,11 +1581,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
         }
 
         /* CR465478: Only send up a connection failure result when CSR has
-         * completed operation - with a ASSOCIATION_FAILURE status.
-         * or an ASSOCIATION_COMPLETION with RESULT_NOT_ASSOCIATED */
-        if (( eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus ) ||
-                (( eCSR_ROAM_ASSOCIATION_COMPLETION == roamStatus )
-                 && ( eCSR_ROAM_RESULT_NOT_ASSOCIATED == roamResult )))
+         * completed operation - with a ASSOCIATION_FAILURE status.*/
+        if ( eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus )
         {
             /* inform association failure event to nl80211 */
             if ( eCSR_ROAM_RESULT_ASSOC_FAIL_CON_CHANNEL == roamResult )
@@ -4189,7 +4197,7 @@ void hdd_indicateCckmPreAuth(hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo)
 
     /* Timestamp0 is lower 32 bits and Timestamp1 is upper 32 bits */
     hddLog(VOS_TRACE_LEVEL_INFO,
-           "CCXPREAUTHNOTIFY=" MAC_ADDRESS_STR" %lu:%lu",
+           "CCXPREAUTHNOTIFY=" MAC_ADDRESS_STR" %d:%d",
            MAC_ADDR_ARRAY(pRoamInfo->bssid),
            pRoamInfo->timestamp[0],
            pRoamInfo->timestamp[1]);
