@@ -65,6 +65,7 @@
 #define WLAN_DICT_FILE             ""
 #define WLAN_COUNTRY_INFO_FILE     "wlan/wlan_country_info.dat"
 #define WLAN_HO_CFG_FILE           "wlan/wlan_ho_config"
+#define WLAN_MAC_FILE              "wlan/wlan_mac.bin"
 #endif // MSM_PLATFORM
 
 
@@ -88,4 +89,3 @@ VOS_STATUS hdd_read_cfg_file(v_VOID_t *pCtx, char *pFileName, v_VOID_t *pBuffer,
 tVOS_CONCURRENCY_MODE hdd_get_concurrency_mode ( void );
 
 #endif /* WLAN_HDD_MISC_H */
-

@@ -2866,6 +2866,8 @@ static int create_crda_regulatory_entry_from_regd(struct wiphy *wiphy,
 }
 
 #ifdef CONFIG_ENABLE_LINUX_REG
+static int create_linux_regulatory_entry(struct wiphy *wiphy,
+                                         v_U8_t nBandCapability);
 
 /**------------------------------------------------------------------------
   \brief vos_nv_setRegDomain -
@@ -3032,14 +3034,14 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
         {
             INIT_COMPLETION(pHddCtx->linux_reg_req);
             regulatory_hint(wiphy, country_code);
-            wait_result = wait_for_completion_interruptible_timeout(
-                                                            &pHddCtx->linux_reg_req,
-                                                            LINUX_REG_WAIT_TIME);
+            wait_result = wait_for_completion_timeout(
+                &pHddCtx->linux_reg_req,
+                LINUX_REG_WAIT_TIME);
 
             /* if the country information does not exist with the kernel,
                then the driver callback would not be called */
 
-            if (wait_result >= 0) {
+            if (wait_result > 0) {
 
                 /* the driver callback was called. this means the country
                    regulatory information was found in the kernel database.
@@ -3062,10 +3064,26 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
                 /* the country information has not been found in the kernel
                    database, return failure */
 
-                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
+                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                            ("runtime country code is not found in kernel db"));
 
-                return VOS_STATUS_E_EXISTS;
+                /* Set to world only if kernel never respnded before*/
+                if ((linux_reg_cc[0] == 0) && (linux_reg_cc[1] == 0))
+                {
+                   temp_reg_domain = REGDOMAIN_WORLD;
+                   cur_reg_domain = temp_reg_domain;
+
+                   if (create_linux_regulatory_entry(wiphy,
+                            pHddCtx->cfg_ini->nBandCapability) != 0)
+                   {
+                      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                            ("Error while creating regulatory entry"));
+                      return VOS_STATUS_E_FAULT;
+                   }
+                }
+                *pRegDomain = temp_reg_domain;
+
+                return VOS_STATUS_SUCCESS;
             }
         }
         else if (COUNTRY_IE == source || COUNTRY_USER == source)

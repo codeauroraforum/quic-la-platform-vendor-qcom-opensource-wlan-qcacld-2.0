@@ -135,6 +135,12 @@ ifeq ($(CONFIG_IPA), y)
 CONFIG_IPA_OFFLOAD := 1
 endif
 
+#Enable Signed firmware support for split binary format
+CONFIG_QCA_SIGNED_SPLIT_BINARY_SUPPORT := 0
+
+#Enable single firmware binary format
+CONFIG_QCA_SINGLE_BINARY_SUPPORT := 0
+
 ifeq ($(CONFIG_CFG80211),y)
 HAVE_CFG80211 := 1
 else
@@ -873,7 +879,8 @@ ifeq ($(CONFIG_QCA_WIFI_2_0), 0)
 CDEFINES +=	-DWLANTL_DEBUG
 else
 CDEFINES +=	-DOSIF_NEED_RX_PEER_ID \
-		-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID
+		-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID \
+		-DQCA_PKT_PROTO_TRACE
 endif
 
 ifneq ($(CONFIG_QCA_CLD_WLAN),)
@@ -1106,6 +1113,16 @@ endif
 #Open P2P device interface only for non-MDM9630 platform
 ifneq ($(CONFIG_ARCH_MDM9630), y)
 CDEFINES += -DWLAN_OPEN_P2P_INTERFACE
+endif
+
+#Enable Signed firmware support for split binary format
+ifeq ($(CONFIG_QCA_SIGNED_SPLIT_BINARY_SUPPORT), 1)
+CDEFINES += -DQCA_SIGNED_SPLIT_BINARY_SUPPORT
+endif
+
+#Enable single firmware binary format
+ifeq ($(CONFIG_QCA_SINGLE_BINARY_SUPPORT), 1)
+CDEFINES += -DQCA_SINGLE_BINARY_SUPPORT
 endif
 
 # Fix build for GCC 4.7
