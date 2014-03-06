@@ -269,6 +269,11 @@
 #define CFG_ENABLE_ADAPT_RX_DRAIN_DEFAULT   WNI_CFG_ENABLE_ADAPT_RX_DRAIN_STADEF
 
 
+#define CFG_REG_CHANGE_DEF_COUNTRY_NAME          "gRegulatoryChangeCountry"
+#define CFG_REG_CHANGE_DEF_COUNTRY_DEFAULT       ( 0 )
+#define CFG_REG_CHANGE_DEF_COUNTRY_MIN           ( 0 )
+#define CFG_REG_CHANGE_DEF_COUNTRY_MAX           ( 1 )
+
 typedef enum
 {
     eHDD_DOT11_MODE_AUTO = 0, //covers all things we support
@@ -2708,6 +2713,7 @@ typedef struct
    v_U32_t                     gEnableDebugLog;
    v_U8_t                      enableRxThread;
    v_BOOL_t                    fDfsPhyerrFilterOffload;
+   v_BOOL_t                    fRegChangeDefCountry;
 } hdd_config_t;
 /*---------------------------------------------------------------------------
   Function declarations and documenation
