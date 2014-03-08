@@ -41,6 +41,7 @@
 #include "a_debug.h"
 #include "fw_one_bin.h"
 #include "bin_sig.h"
+#include "ar6320v2_dbg_regtable.h"
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
 #include <net/cnss.h>
@@ -298,6 +299,11 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 #ifdef CONFIG_CNSS
 	struct cnss_fw_files fw_files;
 #endif
+#ifdef QCA_SIGNED_SPLIT_BINARY_SUPPORT
+	bool bin_sign = FALSE;
+	int bin_off, bin_len;
+	SIGN_HEADER_T *sign_header;
+#endif
 	int ret;
 
 	if (scn->enablesinglebinary && file != ATH_BOARD_DATA_FILE) {
@@ -331,6 +337,9 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 #else
 		filename = QCA_OTP_FILE;
 #endif
+#ifdef QCA_SIGNED_SPLIT_BINARY_SUPPORT
+		bin_sign = TRUE;
+#endif
 		break;
 	case ATH_FIRMWARE_FILE:
 #ifdef QCA_WIFI_FTM
@@ -339,6 +348,9 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 			filename = fw_files.utf_file;
 #else
 			filename = QCA_UTF_FIRMWARE_FILE;
+#endif
+#ifdef QCA_SIGNED_SPLIT_BINARY_SUPPORT
+			bin_sign = TRUE;
 #endif
 			printk(KERN_INFO "%s: Loading firmware file %s\n",
 			       __func__, filename);
@@ -350,6 +362,9 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 #else
 		filename = QCA_FIRMWARE_FILE;
 #endif
+#ifdef QCA_SIGNED_SPLIT_BINARY_SUPPORT
+		bin_sign = TRUE;
+#endif
 		break;
 	case ATH_PATCH_FILE:
 		printk("%s: no Patch file defined\n", __func__);
@@ -359,6 +374,9 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 		filename = fw_files.board_data;
 #else
 		filename = QCA_BOARD_DATA_FILE;
+#endif
+#ifdef QCA_SIGNED_SPLIT_BINARY_SUPPORT
+		bin_sign = FALSE;
 #endif
 		break;
 	}
@@ -438,15 +456,99 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 		}
 	}
 
-	if (compressed) {
-		status = BMIFastDownload(scn->hif_hdl, address, (u_int8_t *)fw_entry->data, fw_entry_size, scn);
-	} else {
-		if (file==ATH_BOARD_DATA_FILE && fw_entry->data) {
-			status = BMIWriteMemory(scn->hif_hdl, address, (u_int8_t *)tempEeprom, fw_entry_size, scn);
+#ifdef QCA_SIGNED_SPLIT_BINARY_SUPPORT
+	if (bin_sign) {
+		u_int32_t chip_id;
+
+		if (fw_entry_size < sizeof(SIGN_HEADER_T)) {
+			AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
+				("%s: Invalid binary size %d\n", __func__,
+				 fw_entry_size));
+			status = A_ERROR;
+			goto end;
+		}
+
+		sign_header = (SIGN_HEADER_T *)fw_entry->data;
+		chip_id = cpu_to_le32(sign_header->product_id);
+		if (sign_header->magic_num == SIGN_HEADER_MAGIC
+		    && (chip_id == AR6320_REV1_1_VERSION
+			|| chip_id == AR6320_REV1_3_VERSION
+			|| chip_id == AR6320_REV2_1_VERSION)) {
+
+			status = BMISignStreamStart(scn->hif_hdl, address,
+						    (u_int8_t *)fw_entry->data,
+						    sizeof(SIGN_HEADER_T), scn);
+			if (status != EOK) {
+				AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
+					("%s: unable to start sign stream\n",
+					__func__));
+				status = A_ERROR;
+				goto end;
+			}
+
+			bin_off = sizeof(SIGN_HEADER_T);
+			bin_len = sign_header->rampatch_len
+				  - sizeof(SIGN_HEADER_T);
 		} else {
-			status = BMIWriteMemory(scn->hif_hdl, address, (u_int8_t *)fw_entry->data, fw_entry_size, scn);
+			bin_sign = FALSE;
+			bin_off = 0;
+			bin_len = fw_entry_size;
+		}
+	} else {
+		bin_len = fw_entry_size;
+		bin_off = 0;
+	}
+
+	if (compressed) {
+		status = BMIFastDownload(scn->hif_hdl, address,
+					 (u_int8_t *)fw_entry->data + bin_off,
+					 bin_len, scn);
+	} else {
+		if (file == ATH_BOARD_DATA_FILE && fw_entry->data) {
+			status = BMIWriteMemory(scn->hif_hdl, address,
+						(u_int8_t *)tempEeprom,
+						fw_entry_size, scn);
+		} else {
+			status = BMIWriteMemory(scn->hif_hdl, address,
+						(u_int8_t *)fw_entry->data
+						+ bin_off,
+						bin_len, scn);
 		}
 	}
+
+	if (bin_sign) {
+		bin_off += bin_len;
+		bin_len = sign_header->total_len
+			  - sign_header->rampatch_len;
+
+		if (bin_len > 0) {
+			status = BMISignStreamStart(scn->hif_hdl, 0,
+					(u_int8_t *)fw_entry->data + bin_off,
+					bin_len, scn);
+			if (status != EOK) {
+				AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
+					("%s:sign stream error\n",
+					__func__));
+			}
+		}
+	}
+#else
+	if (compressed) {
+		status = BMIFastDownload(scn->hif_hdl, address,
+					 (u_int8_t *)fw_entry->data,
+					 fw_entry_size, scn);
+	} else {
+		if (file == ATH_BOARD_DATA_FILE && fw_entry->data) {
+			status = BMIWriteMemory(scn->hif_hdl, address,
+						(u_int8_t *)tempEeprom,
+						fw_entry_size, scn);
+		} else {
+			status = BMIWriteMemory(scn->hif_hdl, address,
+						(u_int8_t *)fw_entry->data,
+						fw_entry_size, scn);
+		}
+	}
+#endif	/* QCA_SIGNED_SPLIT_BINARY_SUPPORT */
 
 end:
 	if (tempEeprom) {
@@ -1040,6 +1142,82 @@ int ol_diag_read(struct ol_softc *scn, u_int8_t *buffer,
 	}
 }
 
+static int ol_ath_get_reg_table(A_UINT32 target_version,
+				tgt_reg_table *reg_table)
+{
+	int section_len = 0;
+
+	if (!reg_table) {
+		ASSERT(0);
+		return section_len;
+	}
+
+	switch (target_version) {
+	case AR6320_REV2_1_VERSION:
+		reg_table->section = (tgt_reg_section *)&ar6320v2_reg_table[0];
+		reg_table->section_size = sizeof(ar6320v2_reg_table)
+					 /sizeof(ar6320v2_reg_table[0]);
+		section_len = AR6320_REV2_1_REG_SIZE;
+		break;
+	default:
+		reg_table->section = (void *)NULL;
+		reg_table->section_size = 0;
+		section_len = 0;
+	}
+
+	return section_len;
+}
+
+static int ol_diag_read_reg_loc(struct ol_softc *scn, u_int8_t *buffer)
+{
+	int i, len, section_len, fill_len;
+	int dump_len, result = 0;
+	tgt_reg_table reg_table;
+	tgt_reg_section *curr_sec, *next_sec;
+
+	section_len = ol_ath_get_reg_table(scn->target_version, &reg_table);
+
+	if (!reg_table.section || !reg_table.section_size || !section_len) {
+		printk(KERN_ERR "%s: failed to get reg table\n", __func__);
+		result = -EIO;
+		goto out;
+	}
+
+	curr_sec = reg_table.section;
+	for (i=0; i<reg_table.section_size; i++) {
+
+		dump_len = curr_sec->end_addr - curr_sec->start_addr;
+		len = ol_diag_read(scn, buffer, curr_sec->start_addr, dump_len);
+
+		if (len != -EIO) {
+			buffer += len;
+			result += len;
+		} else {
+			printk(KERN_ERR "%s: can't read reg 0x%08x len = %d\n",
+			       __func__, curr_sec->start_addr, dump_len);
+			result = -EIO;
+			goto out;
+		}
+
+		if (result < section_len) {
+			next_sec = (tgt_reg_section *)((u_int8_t *)curr_sec
+							+ sizeof(*curr_sec));
+			fill_len = next_sec->start_addr - curr_sec->end_addr;
+			if (fill_len) {
+				adf_os_mem_set(buffer,
+					       INVALID_REG_LOC_DUMMY_DATA,
+					       fill_len);
+				buffer += fill_len;
+				result += fill_len;
+			}
+		}
+		curr_sec++;
+	}
+
+out:
+	return result;
+}
+
 /**---------------------------------------------------------------------------
  *   \brief  ol_target_coredump
  *
@@ -1071,12 +1249,16 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 	* START   = 0x00980000
 	* LENGTH  = 0x00038000
 	*
+	* SECTION = REG
+	* START   = 0x00000800
+	* LENGTH  = 0x0007F820
+	*
 	* SECTION = AXI
 	* START   = 0x000a0000
 	* LENGTH  = 0x00018000
 	*/
 
-	while ((sectionCount < 2) && (amountRead < blockLength)) {
+	while ((sectionCount < 3) && (amountRead < blockLength)) {
 		switch (sectionCount) {
 		case 0:
 			/* DRAM SECTION */
@@ -1089,6 +1271,10 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 			readLen = IRAM_SIZE;
 			break;
 		case 2:
+			/* REG SECTION */
+			pos = REGISTER_LOCATION;
+			break;
+		case 3:
 			/* AXI SECTION */
 			pos = AXI_LOCATION;
 			readLen = AXI_SIZE;
@@ -1096,8 +1282,12 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 		}
 
 		if ((blockLength - amountRead) >= readLen) {
-			result = ol_diag_read(scn, bufferLoc, pos, readLen);
-			if (result != EIO) {
+			if (pos == REGISTER_LOCATION)
+				result = ol_diag_read_reg_loc(scn, bufferLoc);
+			else
+				result = ol_diag_read(scn, bufferLoc,
+						      pos, readLen);
+			if (result != -EIO) {
 				amountRead += result;
 				bufferLoc += result;
 				sectionCount++;

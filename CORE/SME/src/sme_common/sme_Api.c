@@ -103,7 +103,7 @@ eHalStatus sme_HandleChangeCountryCode(tpAniSirGlobal pMac,  void *pMsgBuf);
 
 eHalStatus sme_HandleGenericChangeCountryCode(tpAniSirGlobal pMac,  void *pMsgBuf);
 
-eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal);
+eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal, void *pMsgBuf);
 
 eHalStatus sme_HandlePostChannelSwitchInd(tHalHandle hHal);
 
@@ -1400,7 +1400,7 @@ eHalStatus sme_getSoftApDomain(tHalHandle hHal,  v_REGDOMAIN_t *domainIdSoftAp)
 
    *domainIdSoftAp = pMac->scan.domainIdCurrent;
    status = eHAL_STATUS_SUCCESS;
-    
+
    return status;
 }
 
@@ -1465,9 +1465,7 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
                   if (NV_CHANNEL_DFS ==
                        vos_nv_getChannelEnabledState(pPlmReq->plmChList[count]))
                   /* DFS channel is provided, no PLM bursts can be
-                  * transmitted. TODO shall we ignore these channels
-                  * and continue PLM bursts on other channels ??
-                  * OR return error ?? For now, ignoring these channels
+                  * transmitted. Ignoring these channels.
                   */
                   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                             "%s DFS channel %d ignored for PLM", __func__,
@@ -1476,10 +1474,7 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
               }
               else if (!ret)
               {
-                   /* Not supported channel
-                    * TODO : shall we return error ? OR ignore this channel ?
-                    * for now ignoring the channel
-                   */
+                   /* Not supported, ignore the channel */
                    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                              "%s Unsupported channel %d ignored for PLM",
                              __func__, pPlmReq->plmChList[count]);
@@ -1490,7 +1485,13 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
            } /* End of for () */
 
            /* Copying back the valid channel list to plm struct */
-           vos_mem_copy(pPlmReq->plmChList, ch_list, valid_count);
+           vos_mem_set((void *)pPlmReq->plmChList, pPlmReq->plmNumCh, 0);
+           if (valid_count)
+              vos_mem_copy(pPlmReq->plmChList, ch_list, valid_count);
+           /* All are invalid channels, FW need to send the PLM
+           *  report with "incapable" bit set.
+           */
+           pPlmReq->plmNumCh = valid_count;
         } /* PLM START */
 
         msg.type     = WDA_SET_PLM_REQ;
@@ -2429,11 +2430,17 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                 break;
 #endif // WLAN_FEATURE_PACKET_FILTERING
           case eWNI_SME_PRE_SWITCH_CHL_IND:
-             {
-                status = sme_HandlePreChannelSwitchInd(pMac);
+                if(pMsg->bodyptr)
+                {
+                   status = sme_HandlePreChannelSwitchInd(pMac,pMsg->bodyptr);
+                   vos_mem_free(pMsg->bodyptr);
+                }
+                else
+                {
+                   smsLog(pMac, LOGE, "Empty rsp message for meas "
+                          "(eWNI_SME_PRE_SWITCH_CHL_IND), nothing to process");
+                }
                 break;
-             }
-
           case eWNI_SME_POST_SWITCH_CHL_IND:
              {
                 status = sme_HandlePostChannelSwitchInd(pMac);
@@ -3308,7 +3315,7 @@ eHalStatus sme_RoamReassoc(tHalHandle hHal, tANI_U8 sessionId, tCsrRoamProfile *
         if( CSR_IS_SESSION_VALID( pMac, sessionId ) )
         {
             if((NULL == pProfile) && (fForce == 1))
-            { 
+            {
                 tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
                 /* to force the AP initiate fresh 802.1x authentication need to clear
                  * the PMKID cache for that set the following boolean. this is needed
@@ -4375,7 +4382,7 @@ eHalStatus sme_RequestBmps (
 
 /* ---------------------------------------------------------------------------
     \fn  sme_SetDHCPTillPowerActiveFlag
-    \brief  Sets/Clears DHCP related flag in PMC to disable/enable auto BMPS 
+    \brief  Sets/Clears DHCP related flag in PMC to disable/enable auto BMPS
             entry by PMC
     \param  hHal - The handle returned by macOpen.
   ---------------------------------------------------------------------------*/
@@ -6260,7 +6267,7 @@ eHalStatus sme_ScanGetBKIDCandidateList(tHalHandle hHal, tANI_U32 sessionId,
     \param pContext - a pointer passed in for the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
-eHalStatus sme_getOemDataRsp(tHalHandle hHal, 
+eHalStatus sme_getOemDataRsp(tHalHandle hHal,
         tOemDataRsp **pOemDataRsp)
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
@@ -6302,11 +6309,11 @@ eHalStatus sme_getOemDataRsp(tHalHandle hHal,
     \param pContext - a pointer passed in for the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
-eHalStatus sme_OemDataReq(tHalHandle hHal, 
+eHalStatus sme_OemDataReq(tHalHandle hHal,
         tANI_U8 sessionId,
-        tOemDataReqConfig *pOemDataReqConfig, 
-        tANI_U32 *pOemDataReqID, 
-        oemData_OemDataReqCompleteCallback callback, 
+        tOemDataReqConfig *pOemDataReqConfig,
+        tANI_U32 *pOemDataReqID,
+        oemData_OemDataReqCompleteCallback callback,
         void *pContext)
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
@@ -6858,7 +6865,7 @@ eHalStatus sme_GetOperationChannel(tHalHandle hHal, tANI_U32 *pChannel, tANI_U8 
 
     \brief To register managment frame of specified type and subtype.
     \param frameType - type of the frame that needs to be passed to HDD.
-    \param matchData - data which needs to be matched before passing frame 
+    \param matchData - data which needs to be matched before passing frame
                        to HDD.
     \param matchDataLen - Length of matched data.
     \return eHalStatus
@@ -7207,24 +7214,24 @@ eHalStatus sme_ConfigureRxpFilter( tHalHandle hHal,
   \fn    sme_ConfigureSuspendInd
 
   \brief
-    SME will pass this request to lower mac to Indicate that the wlan needs to 
+    SME will pass this request to lower mac to Indicate that the wlan needs to
     be suspended
 
   \param
 
     hHal - The handle returned by macOpen.
- 
+
     wlanSuspendParam- Depicts the wlan suspend params
 
     csrReadyToSuspendCallback - Callback to be called when ready to suspend
                                 event is received.
     callbackContext  - Context associated with csrReadyToSuspendCallback.
-   
-  \return eHalStatus    
-  
-  
+
+  \return eHalStatus
+
+
 --------------------------------------------------------------------------- */
-eHalStatus sme_ConfigureSuspendInd( tHalHandle hHal, 
+eHalStatus sme_ConfigureSuspendInd( tHalHandle hHal,
                           tpSirWlanSuspendParam  wlanSuspendParam,
                           csrReadyToSuspendCallback callback,
                           void *callbackContext)
@@ -7263,13 +7270,13 @@ eHalStatus sme_ConfigureSuspendInd( tHalHandle hHal,
   \fn    sme_ConfigureResumeReq
 
   \brief
-    SME will pass this request to lower mac to Indicate that the wlan needs to 
+    SME will pass this request to lower mac to Indicate that the wlan needs to
     be Resumed
 
   \param
 
     hHal - The handle returned by macOpen.
- 
+
     wlanResumeParam- Depicts the wlan resume params
 
 
@@ -8039,7 +8046,7 @@ eHalStatus sme_ReceiveFilterSetFilter(tHalHandle hHal, tpSirRcvPktFilterCfgType 
            pRequestBuf->paramsData[idx].compareData[4],
            pRequestBuf->paramsData[idx].compareData[5]);
 
-      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO, 
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
            "MData: %d:%d:%d:%d:%d:%d",
            pRequestBuf->paramsData[idx].dataMask[0],
            pRequestBuf->paramsData[idx].dataMask[1],
@@ -8159,20 +8166,70 @@ void sme_PreChannelSwitchIndFullPowerCB(void *callbackContext,
 }
 
 /* ---------------------------------------------------------------------------
+    \fn sme_PreChannelSwitchIndOffloadFullPowerCB
+    \brief  call back function for the PMC full power request because of pre
+             channel switch for offload case.
+    \param callbackContext
+    \param sessionId
+    \param status
+  ---------------------------------------------------------------------------*/
+void sme_PreChannelSwitchIndOffloadFullPowerCB(void *callbackContext,tANI_U32 sessionId,
+                eHalStatus status)
+{
+    tpAniSirGlobal pMac = (tpAniSirGlobal)callbackContext;
+    tSirMbMsg *pMsg;
+    tANI_U16 msgLen;
+
+    msgLen = (tANI_U16)(sizeof( tSirMbMsg ));
+    pMsg = vos_mem_malloc(msgLen);
+    if ( NULL != pMsg )
+    {
+        vos_mem_set(pMsg, msgLen, 0);
+        pMsg->type = pal_cpu_to_be16((tANI_U16)eWNI_SME_PRE_CHANNEL_SWITCH_FULL_POWER);
+        pMsg->msgLen = pal_cpu_to_be16(msgLen);
+        status = palSendMBMessage(pMac->hHdd, pMsg);
+    }
+
+    return;
+}
+
+/* ---------------------------------------------------------------------------
     \fn sme_HandlePreChannelSwitchInd
     \brief  Processes the indcation from PE for pre-channel switch.
     \param hHal
+    \param void *pMsgBuf to carry session id
     \- The handle returned by macOpen. return eHalStatus
   ---------------------------------------------------------------------------*/
-eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal)
+eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal, void *pMsgBuf)
 {
    eHalStatus status = eHAL_STATUS_FAILURE;
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+   tpSirSmePreSwitchChannelInd pPreSwitchChInd = (tpSirSmePreSwitchChannelInd)pMsgBuf;
+
    status = sme_AcquireGlobalLock( &pMac->sme );
    if ( HAL_STATUS_SUCCESS( status ) )
    {
-       status = pmcRequestFullPower(hHal, sme_PreChannelSwitchIndFullPowerCB,
+
+        if(!pMac->psOffloadEnabled)
+        {
+            status = pmcRequestFullPower(hHal, sme_PreChannelSwitchIndFullPowerCB,
                             pMac, eSME_FULL_PWR_NEEDED_BY_CHANNEL_SWITCH);
+        }
+        else
+        {
+            if (NULL != pPreSwitchChInd)
+            {
+                status = pmcOffloadRequestFullPower(hHal, pPreSwitchChInd->sessionId,
+                                                    sme_PreChannelSwitchIndOffloadFullPowerCB,
+                                                    pMac, eSME_FULL_PWR_NEEDED_BY_CHANNEL_SWITCH);
+            }
+            else
+	    {
+                   smsLog(pMac, LOGE, "Empty pMsgBuf  message for channel switch "
+                          "(eWNI_SME_PRE_SWITCH_CHL_IND), nothing to process");
+            }
+        }
+
        sme_ReleaseGlobalLock( &pMac->sme );
    }
 
@@ -8524,12 +8581,12 @@ eHalStatus sme_HideSSID(tHalHandle hHal, v_U8_t sessionId, v_U8_t ssidHidden)
             sme_ReleaseGlobalLock( &pMac->sme );
             return eHAL_STATUS_FAILURE;
         }
-        
+
         if( !pSession->sessionActive )
             VOS_ASSERT(0);
 
         /* Create the message and send to lim */
-        len = sizeof(tSirUpdateParams); 
+        len = sizeof(tSirUpdateParams);
         pMsg = vos_mem_malloc(len);
         if ( NULL == pMsg )
            status = eHAL_STATUS_FAILURE;
@@ -10103,7 +10160,7 @@ VOS_STATUS sme_AddTdlsPeerSta(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr pe
 /* ---------------------------------------------------------------------------
     \fn sme_DeleteTdlsPeerSta
     \brief  API to Delete TDLS peer sta entry.
-            
+
     \param  peerMac - peer's Mac Adress.
     \- return VOS_STATUS_SUCCES
     -------------------------------------------------------------------------*/
@@ -10861,6 +10918,26 @@ void activeListCmdTimeoutHandle(void *userData)
     smeGetCommandQStatus((tHalHandle) userData);
 }
 
+VOS_STATUS sme_notify_modem_power_state(v_PVOID_t vosContext, tANI_U32 value)
+{
+   v_PVOID_t wdaContext = vos_get_context(VOS_MODULE_ID_WDA, vosContext);
+
+   if (NULL == wdaContext)
+   {
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                "%s: wdaContext is NULL", __func__);
+      return VOS_STATUS_E_FAILURE;
+   }
+
+   if (VOS_STATUS_SUCCESS != WDA_notify_modem_power_state(wdaContext, value))
+   {
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                "Failed to notify modem power state %d", value);
+      return VOS_STATUS_E_FAILURE;
+   }
+   return VOS_STATUS_SUCCESS;
+}
+
 /*
  * SME API to enable/disable idle mode powersave
  * This should be called only if powersave offload
@@ -11484,3 +11561,58 @@ eHalStatus sme_UpdateConnectDebug(tHalHandle hHal, tANI_U32 set_value)
     pMac->fEnableDebugLog = set_value;
     return (status);
 }
+
+/* ---------------------------------------------------------------------------
+  \fn    sme_ApDisableIntraBssFwd
+
+  \brief
+    SME will send message to WMA to set Intra BSS in txrx
+
+  \param
+
+    hHal - The handle returned by macOpen
+
+    sessionId - session id ( vdev id)
+
+    disablefwd - boolean value that indicate disable intrabss fwd disable
+
+  \return eHalStatus
+--------------------------------------------------------------------------- */
+eHalStatus sme_ApDisableIntraBssFwd(tHalHandle hHal, tANI_U8 sessionId,
+                                    tANI_BOOLEAN disablefwd)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    int status = eHAL_STATUS_SUCCESS;
+    VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
+    vos_msg_t vosMessage;
+    tpDisableIntraBssFwd pSapDisableIntraFwd = NULL;
+
+    //Prepare the request to send to SME.
+    pSapDisableIntraFwd = vos_mem_malloc(sizeof(tDisableIntraBssFwd));
+    if (NULL == pSapDisableIntraFwd)
+    {
+       smsLog(pMac, LOGP, "Memory Allocation Failure!!! %s", __func__);
+       return eSIR_MEM_ALLOC_FAILED;
+    }
+
+    vos_mem_zero(pSapDisableIntraFwd, sizeof(tDisableIntraBssFwd));
+
+    pSapDisableIntraFwd->sessionId = sessionId;
+    pSapDisableIntraFwd->disableintrabssfwd = disablefwd;
+
+    if (eHAL_STATUS_SUCCESS == (status = sme_AcquireGlobalLock(&pMac->sme)))
+    {
+        /* serialize the req through MC thread */
+        vosMessage.bodyptr = pSapDisableIntraFwd;
+        vosMessage.type    = WDA_SET_SAP_INTRABSS_DIS;
+        vosStatus = vos_mq_post_message(VOS_MQ_ID_WDA, &vosMessage);
+        if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+        {
+           status = eHAL_STATUS_FAILURE;
+           vos_mem_free(pSapDisableIntraFwd);
+        }
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return (status);
+}
+

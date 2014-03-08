@@ -49,7 +49,7 @@ typedef struct sSSID
 
 typedef struct sSSIDInfo
 {
-   tSSID     ssid;   
+   tSSID     ssid;
    u_int8_t  ssidHidden;
 }tSSIDInfo;
 
@@ -83,7 +83,7 @@ typedef enum {
     eQC_AUTH_TYPE_OPEN_SYSTEM,
     eQC_AUTH_TYPE_SHARED_KEY,
     eQC_AUTH_TYPE_AUTO_SWITCH
-} eQcAuthType; 
+} eQcAuthType;
 
 typedef enum {
     eQC_WPS_BEACON_IE,
@@ -110,7 +110,7 @@ typedef struct s_CommitConfig {
         QC_ACCEPT_UNLESS_DENIED = 0,
         QC_DENY_UNLESS_ACCEPTED = 1,
     } qc_macaddr_acl;
-    
+
     struct qc_mac_acl_entry *accept_mac; /* MAC filtering */
     u_int32_t num_accept_mac;
     struct qc_mac_acl_entry *deny_mac;   /* MAC filtering */
@@ -124,10 +124,10 @@ typedef struct s_CommitConfig {
     u_int32_t countryCode[3];  //it ignored if [0] is 0.
 
     u_int32_t ht_op_mode_fixed;
-    
+
     /*HT capability information to enable/diabale protection
      *           bit15   bit14   bit13   bit12 bit11 bit10    bit9 bit8
-     * (overlap) from11a from11b from11g Ht20  NonGf LsigTxop Rifs OBSS   
+     * (overlap) from11a from11b from11g Ht20  NonGf LsigTxop Rifs OBSS
      * bit7    bit6    bit5    bit4 bit3  bit2     bit1 bit0
      * from11a from11b from11g ht20 nonGf lsigTxop rifs obss*/
     u_int16_t ht_capab;
@@ -187,7 +187,7 @@ struct sQcSapreq_wscie {
 typedef struct sQcSapreq_WPSPBCProbeReqIES {
     u_int8_t    macaddr[QCSAP_ADDR_LEN];
     u_int16_t   probeReqIELen;
-    u_int8_t    probeReqIE[512]; 
+    u_int8_t    probeReqIE[512];
 } sQcSapreq_WPSPBCProbeReqIES_t ;
 
 /*
@@ -196,7 +196,7 @@ typedef struct sQcSapreq_WPSPBCProbeReqIES {
 
 typedef struct
 {
-    v_U8_t            num_channels;    
+    v_U8_t            num_channels;
     v_U8_t            channels[WNI_CFG_VALID_CHANNEL_LIST_LEN];
 }tChannelListInfo, *tpChannelListInfo;
 
@@ -239,7 +239,7 @@ typedef struct
 
 #define QCSAP_IOCTL_MODIFY_ACL          (SIOCIWFIRSTPRIV+18)
 #define QCSAP_IOCTL_GET_CHANNEL_LIST    (SIOCIWFIRSTPRIV+19)
-#define QCSAP_IOCTL_SET_TX_POWER        (SIOCIWFIRSTPRIV+20) 
+#define QCSAP_IOCTL_SET_TX_POWER        (SIOCIWFIRSTPRIV+20)
 #define QCSAP_IOCTL_GET_STA_INFO        (SIOCIWFIRSTPRIV+21)
 #define QCSAP_IOCTL_SET_MAX_TX_POWER    (SIOCIWFIRSTPRIV+22)
 #define QCSAP_IOCTL_DATAPATH_SNAP_SHOT  (SIOCIWFIRSTPRIV+23)
@@ -280,9 +280,28 @@ typedef struct
 #define QCSAP_SET_VHT_RATE                 49
 #define QCSAP_SET_AMPDU                    50
 #define QCSAP_SET_AMSDU                    51
+#define QCSAP_SET_GTX_HT_MCS               52
+#define QCSAP_SET_GTX_VHT_MCS              53
+#define QCSAP_SET_GTX_USRCFG               54
+#define QCSAP_SET_GTX_THRE                 55
+#define QCSAP_SET_GTX_MARGIN               56
+#define QCSAP_SET_GTX_STEP                 57
+#define QCSAP_SET_GTX_MINTPC               58
+#define QCSAP_SET_GTX_BWMASK               59
+#define QCSAP_GET_GTX_HT_MCS               60
+#define QCSAP_GET_GTX_VHT_MCS              61
+#define QCSAP_GET_GTX_USRCFG               62
+#define QCSAP_GET_GTX_THRE                 63
+#define QCSAP_GET_GTX_MARGIN               64
+#define QCSAP_GET_GTX_STEP                 65
+#define QCSAP_GET_GTX_MINTPC               66
+#define QCSAP_GET_GTX_BWMASK               67
+#ifdef QCA_PKT_PROTO_TRACE
+#define QCASAP_SET_DEBUG_LOG               68
+#endif /* QCA_PKT_PROTO_TRACE */
 #endif /* QCA_WIFI_2_0 */
 
-enum { 
+enum {
     QCSAP_PARAM_MAX_ASSOC = 1,
     QCSAP_PARAM_GET_WLAN_DBG = 4,
     QCSAP_PARAM_MODULE_DOWN_IND = 5,
@@ -296,7 +315,7 @@ enum {
     QCSAP_PARAM_SET_MCC_CHANNEL_QUOTA = 13,
 };
 
-int iw_softap_get_channel_list(struct net_device *dev, 
+int iw_softap_get_channel_list(struct net_device *dev,
                                struct iw_request_info *info,
                                union iwreq_data *wrqu, char *extra);
 
