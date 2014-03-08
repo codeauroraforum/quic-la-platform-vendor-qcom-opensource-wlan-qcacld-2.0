@@ -103,7 +103,7 @@ eHalStatus sme_HandleChangeCountryCode(tpAniSirGlobal pMac,  void *pMsgBuf);
 
 eHalStatus sme_HandleGenericChangeCountryCode(tpAniSirGlobal pMac,  void *pMsgBuf);
 
-eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal);
+eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal, void *pMsgBuf);
 
 eHalStatus sme_HandlePostChannelSwitchInd(tHalHandle hHal);
 
@@ -2430,11 +2430,17 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                 break;
 #endif // WLAN_FEATURE_PACKET_FILTERING
           case eWNI_SME_PRE_SWITCH_CHL_IND:
-             {
-                status = sme_HandlePreChannelSwitchInd(pMac);
+                if(pMsg->bodyptr)
+                {
+                   status = sme_HandlePreChannelSwitchInd(pMac,pMsg->bodyptr);
+                   vos_mem_free(pMsg->bodyptr);
+                }
+                else
+                {
+                   smsLog(pMac, LOGE, "Empty rsp message for meas "
+                          "(eWNI_SME_PRE_SWITCH_CHL_IND), nothing to process");
+                }
                 break;
-             }
-
           case eWNI_SME_POST_SWITCH_CHL_IND:
              {
                 status = sme_HandlePostChannelSwitchInd(pMac);
@@ -7446,7 +7452,7 @@ eHalStatus sme_PreferredNetworkFoundInd (tHalHandle hHal, void* pMsg)
        }
        else
        {
-          smsLog(pMac, LOGE, FL(" not enough data length %d needed %d"),
+          smsLog(pMac, LOGE, FL(" not enough data length %d needed %zu"),
              pPrefNetworkFoundInd->mesgLen, sizeof(tSirPrefNetworkFoundInd));
        }
 
@@ -8160,20 +8166,70 @@ void sme_PreChannelSwitchIndFullPowerCB(void *callbackContext,
 }
 
 /* ---------------------------------------------------------------------------
+    \fn sme_PreChannelSwitchIndOffloadFullPowerCB
+    \brief  call back function for the PMC full power request because of pre
+             channel switch for offload case.
+    \param callbackContext
+    \param sessionId
+    \param status
+  ---------------------------------------------------------------------------*/
+void sme_PreChannelSwitchIndOffloadFullPowerCB(void *callbackContext,tANI_U32 sessionId,
+                eHalStatus status)
+{
+    tpAniSirGlobal pMac = (tpAniSirGlobal)callbackContext;
+    tSirMbMsg *pMsg;
+    tANI_U16 msgLen;
+
+    msgLen = (tANI_U16)(sizeof( tSirMbMsg ));
+    pMsg = vos_mem_malloc(msgLen);
+    if ( NULL != pMsg )
+    {
+        vos_mem_set(pMsg, msgLen, 0);
+        pMsg->type = pal_cpu_to_be16((tANI_U16)eWNI_SME_PRE_CHANNEL_SWITCH_FULL_POWER);
+        pMsg->msgLen = pal_cpu_to_be16(msgLen);
+        status = palSendMBMessage(pMac->hHdd, pMsg);
+    }
+
+    return;
+}
+
+/* ---------------------------------------------------------------------------
     \fn sme_HandlePreChannelSwitchInd
     \brief  Processes the indcation from PE for pre-channel switch.
     \param hHal
+    \param void *pMsgBuf to carry session id
     \- The handle returned by macOpen. return eHalStatus
   ---------------------------------------------------------------------------*/
-eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal)
+eHalStatus sme_HandlePreChannelSwitchInd(tHalHandle hHal, void *pMsgBuf)
 {
    eHalStatus status = eHAL_STATUS_FAILURE;
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+   tpSirSmePreSwitchChannelInd pPreSwitchChInd = (tpSirSmePreSwitchChannelInd)pMsgBuf;
+
    status = sme_AcquireGlobalLock( &pMac->sme );
    if ( HAL_STATUS_SUCCESS( status ) )
    {
-       status = pmcRequestFullPower(hHal, sme_PreChannelSwitchIndFullPowerCB,
+
+        if(!pMac->psOffloadEnabled)
+        {
+            status = pmcRequestFullPower(hHal, sme_PreChannelSwitchIndFullPowerCB,
                             pMac, eSME_FULL_PWR_NEEDED_BY_CHANNEL_SWITCH);
+        }
+        else
+        {
+            if (NULL != pPreSwitchChInd)
+            {
+                status = pmcOffloadRequestFullPower(hHal, pPreSwitchChInd->sessionId,
+                                                    sme_PreChannelSwitchIndOffloadFullPowerCB,
+                                                    pMac, eSME_FULL_PWR_NEEDED_BY_CHANNEL_SWITCH);
+            }
+            else
+	    {
+                   smsLog(pMac, LOGE, "Empty pMsgBuf  message for channel switch "
+                          "(eWNI_SME_PRE_SWITCH_CHL_IND), nothing to process");
+            }
+        }
+
        sme_ReleaseGlobalLock( &pMac->sme );
    }
 
@@ -9347,6 +9403,159 @@ v_U8_t sme_GetRoamRescanRssiDiff(tHalHandle hHal)
     return pMac->roam.configParam.neighborRoamConfig.nRoamRescanRssiDiff;
 }
 
+/* ---------------------------------------------------------------------------
+    \fn     sme_SetRoamBmissFirstBcnt
+    \brief  Update Roam count for first beacon miss
+            This function is called through dynamic setConfig callback function
+            to configure nRoamBmissFirstBcnt
+    \param  hHal - HAL handle for device
+    \param  nRoamBmissFirstBcnt - Roam first bmiss count
+    \return eHAL_STATUS_SUCCESS - SME update nRoamBmissFirstBcnt
+            successfully.
+            else SME is failed to update nRoamBmissFirstBcnt
+    -------------------------------------------------------------------------*/
+eHalStatus sme_SetRoamBmissFirstBcnt(tHalHandle hHal,
+                                     const v_U8_t nRoamBmissFirstBcnt)
+{
+    tpAniSirGlobal pMac    = PMAC_STRUCT( hHal );
+    eHalStatus     status  = eHAL_STATUS_SUCCESS;
+
+    status = sme_AcquireGlobalLock( &pMac->sme );
+    if ( HAL_STATUS_SUCCESS( status ) )
+    {
+        status = csrNeighborRoamSetRoamBmissFirstBcnt(pMac, nRoamBmissFirstBcnt);
+        if (HAL_STATUS_SUCCESS(status))
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+                "LFR runtime successfully set "
+                "beacon miss first beacon count to %d"
+                " - old value is %d - roam state is %d",
+                nRoamBmissFirstBcnt,
+                pMac->roam.configParam.neighborRoamConfig.nRoamBmissFirstBcnt,
+                pMac->roam.neighborRoamInfo.neighborRoamState);
+            pMac->roam.configParam.neighborRoamConfig.nRoamBmissFirstBcnt =
+                nRoamBmissFirstBcnt;
+        }
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return status;
+}
+
+/* ---------------------------------------------------------------------------
+    \fn sme_getNeighborScanPeriod
+    \brief  get neighbor scan period
+    \param hHal - The handle returned by macOpen.
+    \return v_U16_t - neighbor scan period
+    -------------------------------------------------------------------------*/
+v_U8_t sme_GetRoamBmissFirstBcnt(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    return pMac->roam.configParam.neighborRoamConfig.nRoamBmissFirstBcnt;
+}
+
+/* ---------------------------------------------------------------------------
+    \fn     sme_SetRoamBmissFinalBcnt
+    \brief  Update Roam count for final beacon miss
+            This function is called through dynamic setConfig callback function
+            to configure nRoamBmissFinalBcnt
+    \param  hHal - HAL handle for device
+    \param  nRoamBmissFinalBcnt - Roam final bmiss count
+    \return eHAL_STATUS_SUCCESS - SME update nRoamBmissFinalBcnt
+            successfully.
+            else SME is failed to update nRoamBmissFinalBcnt
+    -------------------------------------------------------------------------*/
+eHalStatus sme_SetRoamBmissFinalBcnt(tHalHandle hHal,
+                                     const v_U8_t nRoamBmissFinalBcnt)
+{
+    tpAniSirGlobal pMac    = PMAC_STRUCT( hHal );
+    eHalStatus     status  = eHAL_STATUS_SUCCESS;
+
+    status = sme_AcquireGlobalLock( &pMac->sme );
+    if ( HAL_STATUS_SUCCESS( status ) )
+    {
+        status = csrNeighborRoamSetRoamBmissFinalBcnt(pMac, nRoamBmissFinalBcnt);
+        if (HAL_STATUS_SUCCESS(status))
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+                "LFR runtime successfully set "
+                "beacon miss final beacon count to %d"
+                " - old value is %d - roam state is %d",
+                nRoamBmissFinalBcnt,
+                pMac->roam.configParam.neighborRoamConfig.nRoamBmissFinalBcnt,
+                pMac->roam.neighborRoamInfo.neighborRoamState);
+            pMac->roam.configParam.neighborRoamConfig.nRoamBmissFinalBcnt =
+                nRoamBmissFinalBcnt;
+        }
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return status;
+}
+
+/*--------------------------------------------------------------------------
+  \fn    sme_GetRoamBmissFinalBcnt
+  \brief gets Roam count for final beacon miss
+         This is a synchronous call
+  \param hHal - The handle returned by macOpen
+  \return v_U8_t - nRoamBmissFinalBcnt
+  \sa
+  --------------------------------------------------------------------------*/
+v_U8_t sme_GetRoamBmissFinalBcnt(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    return pMac->roam.configParam.neighborRoamConfig.nRoamBmissFinalBcnt;
+}
+
+/* ---------------------------------------------------------------------------
+    \fn     sme_SetRoamBeaconRssiWeight
+    \brief  Update Roam beacon rssi weight
+            This function is called through dynamic setConfig callback function
+            to configure nRoamBeaconRssiWeight
+    \param  hHal - HAL handle for device
+    \param  nRoamBeaconRssiWeight - Roam beacon rssi weight
+    \return eHAL_STATUS_SUCCESS - SME update nRoamBeaconRssiWeight config
+            successfully.
+            else SME is failed to update nRoamBeaconRssiWeight
+    -------------------------------------------------------------------------*/
+eHalStatus sme_SetRoamBeaconRssiWeight(tHalHandle hHal,
+                                     const v_U8_t nRoamBeaconRssiWeight)
+{
+    tpAniSirGlobal pMac    = PMAC_STRUCT( hHal );
+    eHalStatus     status  = eHAL_STATUS_SUCCESS;
+
+    status = sme_AcquireGlobalLock( &pMac->sme );
+    if ( HAL_STATUS_SUCCESS( status ) )
+    {
+        status = csrNeighborRoamSetRoamBeaconRssiWeight(pMac, nRoamBeaconRssiWeight);
+        if (HAL_STATUS_SUCCESS(status))
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+                "LFR runtime successfully set "
+                "beacon miss final beacon count to %d"
+                " - old value is %d - roam state is %d",
+                nRoamBeaconRssiWeight,
+                pMac->roam.configParam.neighborRoamConfig.nRoamBeaconRssiWeight,
+                pMac->roam.neighborRoamInfo.neighborRoamState);
+            pMac->roam.configParam.neighborRoamConfig.nRoamBeaconRssiWeight =
+                nRoamBeaconRssiWeight;
+        }
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return status;
+}
+
+/*--------------------------------------------------------------------------
+  \fn    sme_GetRoamBeaconRssiWeight
+  \brief gets Roam beacon rssi weight
+         This is a synchronous call
+  \param hHal - The handle returned by macOpen
+  \return v_U8_t - nRoamBeaconRssiWeight
+  \sa
+  --------------------------------------------------------------------------*/
+v_U8_t sme_GetRoamBeaconRssiWeight(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    return pMac->roam.configParam.neighborRoamConfig.nRoamBeaconRssiWeight;
+}
 /*--------------------------------------------------------------------------
   \brief sme_setNeighborLookupRssiThreshold() - update neighbor lookup rssi threshold
   This is a synchronous call
@@ -11089,6 +11298,7 @@ eHalStatus sme_MoveCsrToScanStateForPno (tHalHandle hHal, tANI_U8 sessionId)
 }
 #endif
 
+#define HT20_SHORT_GI_MCS7_RATE 722
 /* ---------------------------------------------------------------------------
     \fn sme_SendRateUpdateInd
     \brief  API to Update rate
@@ -11111,6 +11321,15 @@ eHalStatus sme_SendRateUpdateInd(tHalHandle hHal,
     rateUpdateParams->reliableMcastDataRate &= ~0x70000000;
     rateUpdateParams->mcastDataRate5GHz &= ~0x70000000;
 #endif
+
+    if (rateUpdateParams->mcastDataRate24GHz ==
+            HT20_SHORT_GI_MCS7_RATE)
+        rateUpdateParams->mcastDataRate24GHzTxFlag =
+           eHAL_TX_RATE_HT20 | eHAL_TX_RATE_SGI;
+    else if (rateUpdateParams->reliableMcastDataRate ==
+             HT20_SHORT_GI_MCS7_RATE)
+        rateUpdateParams->reliableMcastDataRateTxFlag =
+           eHAL_TX_RATE_HT20 | eHAL_TX_RATE_SGI;
 
     if (eHAL_STATUS_SUCCESS == (status = sme_AcquireGlobalLock(&pMac->sme)))
     {

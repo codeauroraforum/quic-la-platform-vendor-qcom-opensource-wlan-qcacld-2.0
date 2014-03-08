@@ -63,6 +63,8 @@ typedef void (*__adf_nbuf_callback_fn) (struct sk_buff *skb);
  */
 #define CVG_NBUF_MAX_EXTRA_FRAGS 2
 
+typedef void (*adf_nbuf_trace_update_t)(char *);
+
 struct cvg_nbuf_cb {
     /*
      * Store a pointer to a parent network buffer.
@@ -107,6 +109,10 @@ struct cvg_nbuf_cb {
 #ifdef IPA_OFFLOAD
     unsigned long priv_data;
 #endif
+#ifdef QCA_PKT_PROTO_TRACE
+    unsigned char proto_type;
+    unsigned char vdev_id;
+#endif /* QCA_PKT_PROTO_TRACE */
 };
 #define NBUF_OWNER_ID(skb) \
     (((struct cvg_nbuf_cb *)((skb)->cb))->owner_id)
@@ -130,6 +136,16 @@ struct cvg_nbuf_cb {
     (((struct cvg_nbuf_cb *)((skb)->cb))->extra_frags.len[(frag_num)])
 #define NBUF_EXTRA_FRAG_WORDSTREAM_FLAGS(skb) \
     (((struct cvg_nbuf_cb *)((skb)->cb))->extra_frags.wordstream_flags)
+
+#ifdef QCA_PKT_PROTO_TRACE
+#define NBUF_SET_PROTO_TYPE(skb, proto_type) \
+    (((struct cvg_nbuf_cb *)((skb)->cb))->proto_type = proto_type)
+#define NBUF_GET_PROTO_TYPE(skb) \
+    (((struct cvg_nbuf_cb *)((skb)->cb))->proto_type)
+#else
+#define NBUF_SET_PROTO_TYPE(skb, proto_type);
+#define NBUF_GET_PROTO_TYPE(skb) 0;
+#endif /* QCA_PKT_PROTO_TRACE */
 
 #define __adf_nbuf_get_num_frags(skb)              \
     /* assume the OS provides a single fragment */ \
@@ -178,6 +194,10 @@ struct cvg_nbuf_cb {
             ((is_wordstream) << frag_num);                              \
     } while (0)
 
+#define __adf_nbuf_trace_set_proto_type(skb, proto_type) \
+    NBUF_SET_PROTO_TYPE(skb, proto_type)
+#define __adf_nbuf_trace_get_proto_type(skb) \
+    NBUF_GET_PROTO_TYPE(skb);
 
 typedef struct __adf_nbuf_qhead {
     struct sk_buff   *head;
@@ -229,7 +249,14 @@ void            __adf_nbuf_unmap_single(__adf_os_device_t osdev,
 void            __adf_nbuf_dmamap_info(__adf_os_dma_map_t bmap, adf_os_dmamap_info_t *sg);
 void            __adf_nbuf_frag_info(struct sk_buff *skb, adf_os_sglist_t  *sg);
 void            __adf_nbuf_dmamap_set_cb(__adf_os_dma_map_t dmap, void *cb, void *arg);
+void            __adf_nbuf_reg_trace_cb(adf_nbuf_trace_update_t cb_func_ptr);
 
+#ifdef QCA_PKT_PROTO_TRACE
+void
+__adf_nbuf_trace_update(struct sk_buff *buf, char *event_string);
+#else
+#define __adf_nbuf_trace_update(skb, event_string)
+#endif /* QCA_PKT_PROTO_TRACE */
 
 static inline a_status_t
 __adf_os_to_status(signed int error)

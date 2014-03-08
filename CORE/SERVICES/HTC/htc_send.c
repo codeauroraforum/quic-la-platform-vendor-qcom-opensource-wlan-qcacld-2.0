@@ -68,17 +68,27 @@ void HTC_dump_counter_info(HTC_HANDLE HTCHandle)
 		     __func__, target->CE_send_cnt, target->TX_comp_cnt));
 }
 
-void HTCGetHostCredits(HTC_HANDLE HTCHandle,int *credits)
+void HTCGetControlEndpointTxHostCredits(HTC_HANDLE HTCHandle, int *credits)
 {
     HTC_TARGET *target = GET_HTC_TARGET_FROM_HANDLE(HTCHandle);
+    HTC_ENDPOINT *pEndpoint;
+    int i;
 
-    if (!target) {
-        AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("Target Pointer is NULL!"));
-        AR_DEBUG_ASSERT(FALSE);
-        *credits = 0;
+    if (!credits || !target) {
+        AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("%s: invalid args", __func__));
+        return;
     }
 
-    *credits = target->TotalHostCredits;
+    *credits = 0;
+    LOCK_HTC_TX(target);
+    for (i = 0; i < ENDPOINT_MAX; i++) {
+        pEndpoint = &target->EndPoint[i];
+        if (pEndpoint->ServiceID == WMI_CONTROL_SVC) {
+            *credits = pEndpoint->TxCredits;
+            break;
+        }
+    }
+    UNLOCK_HTC_TX(target);
 }
 
 static INLINE void RestoreTxPacket(HTC_TARGET *target, HTC_PACKET *pPacket)
@@ -1543,8 +1553,6 @@ void HTCProcessCreditRpt(HTC_TARGET *target, HTC_CREDIT_REPORT *pRpt, int NumEnt
 #endif
         totalCredits += rpt_credits;
     }
-
-    target->TotalHostCredits = totalCredits;
 
     AR_DEBUG_PRINTF(ATH_DEBUG_SEND, ("  Report indicated %d credits to distribute \n", totalCredits));
 

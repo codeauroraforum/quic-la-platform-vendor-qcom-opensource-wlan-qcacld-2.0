@@ -816,6 +816,17 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
         hdd_ipa_wlan_evt(pAdapter, pHddStaCtx->conn_info.staId[0],
                 WLAN_STA_DISCONNECT, pHddStaCtx->conn_info.bssId);
 #endif
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+        wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_TRUE);
+#endif
+
+#ifdef QCA_PKT_PROTO_TRACE
+     /* STA disconnected, update into trace buffer */
+     if (pHddCtx->cfg_ini->gEnableDebugLog)
+     {
+        vos_pkt_trace_buf_update("ST:DISASC");
+     }
+#endif /* QCA_PKT_PROTO_TRACE */
 
     if(pHddStaCtx->conn_info.connState != eConnectionState_Disconnecting)
     {
@@ -1308,10 +1319,21 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
             hdd_ipa_wlan_evt(pAdapter, pRoamInfo->staId, WLAN_STA_CONNECT,
                     pRoamInfo->bssid);
 #endif
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+        wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_FALSE);
+#endif
 
 #ifdef FEATURE_WLAN_TDLS
         wlan_hdd_tdls_connection_callback(pAdapter);
 #endif
+
+#ifdef QCA_PKT_PROTO_TRACE
+        /* STA Associated, update into trace buffer */
+        if (pHddCtx->cfg_ini->gEnableDebugLog)
+        {
+           vos_pkt_trace_buf_update("ST:ASSOC");
+        }
+#endif /* QCA_PKT_PROTO_TRACE */
         //For reassoc, the station is already registered, all we need is to change the state
         //of the STA in TL.
         //If authentication is required (WPA/WPA2/DWEP), change TL to CONNECTED instead of AUTHENTICATED
@@ -2814,8 +2836,12 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
             }
             else
             {
-                // Clear saved connection information in HDD
-                hdd_connRemoveConnectInfo( WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) );
+                // To Do - address probable memory leak with WEP encryption upon successful association
+                if (eCSR_ROAM_RESULT_ASSOCIATED != roamResult)
+                {
+                  //Clear saved connection information in HDD
+                  hdd_connRemoveConnectInfo( WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) );
+                }
                 halStatus = hdd_AssociationCompletionHandler( pAdapter, pRoamInfo, roamId, roamStatus, roamResult );
             }
 
