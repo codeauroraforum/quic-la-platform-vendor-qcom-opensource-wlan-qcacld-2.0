@@ -665,7 +665,7 @@ typedef struct sSirSmeStartBssReq
 } tSirSmeStartBssReq, *tpSirSmeStartBssReq;
 
 #define GET_IE_LEN_IN_BSS(lenInBss) ( lenInBss + sizeof(lenInBss) - \
-              ((int) OFFSET_OF( tSirBssDescription, ieFields)))
+              ((uintptr_t)OFFSET_OF( tSirBssDescription, ieFields)))
 
 #define WSCIE_PROBE_RSP_LEN (317 + 2)
 
@@ -3848,6 +3848,9 @@ typedef struct sSirRoamOffloadScanReq
   tSirRoamNetworkType ConnectedNetwork;
   tSirMobilityDomainInfo MDID;
   tANI_U8 sessionId;
+  tANI_U8   RoamBmissFirstBcnt;
+  tANI_U8   RoamBmissFinalBcnt;
+  tANI_U8   RoamBeaconRssiWeight;
 } tSirRoamOffloadScanReq, *tpSirRoamOffloadScanReq;
 #endif //WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 

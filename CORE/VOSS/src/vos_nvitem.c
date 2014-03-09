@@ -1166,6 +1166,18 @@ VOS_STATUS vos_nv_open(void)
            VOS_TRACE(VOS_MODULE_ID_VOSS,  VOS_TRACE_LEVEL_ERROR,
                        "nvParser failed %d",status);
 
+           if (nvReadBufSize != sizeof(sHalNv)) {
+               vos_mem_free(pEncodedBuf);
+               pEncodedBuf = (v_U8_t *)vos_mem_malloc(sizeof(sHalNv));
+
+               if (!pEncodedBuf) {
+                   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s : failed to allocate memory for NV", __func__);
+                   vos_mem_free(pnvData);
+                   return VOS_STATUS_E_NOMEM;
+               }
+           }
+
            nvReadBufSize = 0;
 
            vos_mem_copy(pEncodedBuf, &nvDefaults, sizeof(sHalNv));
@@ -1177,6 +1189,17 @@ VOS_STATUS vos_nv_open(void)
     {
        dataOffset = sizeof(v_U32_t);
        nvReadEncodeBufSize = sizeof(sHalNv);
+       if (nvReadBufSize != nvReadEncodeBufSize) {
+           vos_mem_free(pEncodedBuf);
+           pEncodedBuf = (v_U8_t *)vos_mem_malloc(nvReadEncodeBufSize);
+           if (!pEncodedBuf)
+           {
+               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                         "%s : failed to allocate memory for NV", __func__);
+               return VOS_STATUS_E_NOMEM;
+           }
+       }
+
        memcpy(pEncodedBuf, &pnvEncodedBuf[dataOffset], nvReadEncodeBufSize);
     }
 
@@ -1185,9 +1208,11 @@ VOS_STATUS vos_nv_open(void)
        vos_mem_free(pnvData);
     }
 
+#ifdef CONFIG_QCA_WIFI_ISOC
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
            "INFO: NV binary file version=%d Driver default NV version=%d, continue...",
            gnvEFSTable->halnv.fields.nvVersion, WLAN_NV_VERSION);
+#endif
 
      /* Copying the read nv data to the globa NV EFS table */
     {
@@ -1207,9 +1232,11 @@ VOS_STATUS vos_nv_open(void)
         if ( nvReadBufSize != bufSize)
         {
             pnvEFSTable->nvValidityBitmap = DEFAULT_NV_VALIDITY_BITMAP;
+#ifdef CONFIG_QCA_WIFI_ISOC
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
                       "!!!WARNING: INVALID NV FILE, DRIVER IS USING DEFAULT CAL VALUES %d %d!!!",
                       nvReadBufSize, bufSize);
+#endif
             return VOS_STATUS_SUCCESS;
         }
 

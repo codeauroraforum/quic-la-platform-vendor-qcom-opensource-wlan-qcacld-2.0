@@ -102,7 +102,7 @@
 #define MAX_HT_MCS_IDX 8
 #define MAX_VHT_MCS_IDX 10
 #define GET_IE_LEN_IN_BSS_DESC(lenInBss) ( lenInBss + sizeof(lenInBss) - \
-        ((int) OFFSET_OF( tSirBssDescription, ieFields)))
+        ((uintptr_t)OFFSET_OF( tSirBssDescription, ieFields)))
 
 #define HDD2GHZCHAN(freq, chan, flag)   {     \
     .band =  IEEE80211_BAND_2GHZ, \
@@ -267,7 +267,9 @@ static struct ieee80211_supported_band wlan_hdd_band_2_4_GHZ =
     .ht_cap.cap            =  IEEE80211_HT_CAP_SGI_20
                             | IEEE80211_HT_CAP_GRN_FLD
                             | IEEE80211_HT_CAP_DSSSCCK40
-                            | IEEE80211_HT_CAP_LSIG_TXOP_PROT,
+                            | IEEE80211_HT_CAP_LSIG_TXOP_PROT
+                            | IEEE80211_HT_CAP_SGI_40
+                            | IEEE80211_HT_CAP_SUP_WIDTH_20_40,
     .ht_cap.ampdu_factor   = IEEE80211_HT_MAX_AMPDU_64K,
     .ht_cap.ampdu_density  = IEEE80211_HT_MPDU_DENSITY_16,
     .ht_cap.mcs.rx_mask    = { 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, },
@@ -1909,6 +1911,38 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
     return status;
 }
 
+/*
+ * FUNCTION: wlan_hdd_set_acs_allowed_channels
+ * set only allowed channel for ACS
+ * input channel list is a string with comma separated
+ * channel number, the first number is the total number
+ * of channels specified. e.g. 4,1,6,9,36
+ */
+static void wlan_hdd_set_acs_allowed_channels(
+                                             char *acsAllowedChnls,
+                                             char *acsSapChnlList,
+                                             int length)
+{
+    char *p;
+
+    /* a white space is required at the beginning of the
+       string to be properly parsed by function
+       sapSetPreferredChannel later */
+    strlcpy(acsSapChnlList, " ", length);
+    strlcat(acsSapChnlList, acsAllowedChnls, length);
+    p = acsSapChnlList;
+    while (*p)
+    {
+        /* looking for comma, replace it with white space */
+        if (*p == ',')
+            *p = ' ';
+
+        p++;
+    }
+
+    return;
+}
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
                             struct beacon_parameters *params)
@@ -1965,6 +1999,15 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
     hddLog(VOS_TRACE_LEVEL_INFO_HIGH,"****pConfig->dtim_period=%d***\n",
                                       pConfig->dtim_period);
+
+    pConfig->enOverLapCh = !!pHddCtx->cfg_ini->gEnableOverLapCh;
+    if (strlen(iniConfig->acsAllowedChnls) > 0)
+    {
+        wlan_hdd_set_acs_allowed_channels(
+                                     iniConfig->acsAllowedChnls,
+                                     pConfig->acsAllowedChnls,
+                                     sizeof(pConfig->acsAllowedChnls));
+    }
 
     if (pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP)
     {
@@ -2778,7 +2821,6 @@ static int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 #endif //(LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0))
 
-
 static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
                                       struct net_device *dev,
                                       struct bss_parameters *params)
@@ -2787,12 +2829,21 @@ static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     int ret = 0;
     eHalStatus halStatus;
+    v_CONTEXT_t pVosContext = pHddCtx->pvosContext;
+    ptSapContext pSapCtx = NULL;
 
     ENTER();
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: device_mode = %d, ap_isolate = %d",
                                __func__,pAdapter->device_mode,
                                params->ap_isolate);
+    if (!pVosContext)
+        return -EINVAL;
+
+    pSapCtx = VOS_GET_SAP_CB(pVosContext);
+
+    if (!pSapCtx)
+        return -EINVAL;
 
     if((pAdapter->device_mode == WLAN_HDD_SOFTAP)
      ||  (pAdapter->device_mode == WLAN_HDD_P2P_GO)
@@ -2805,7 +2856,7 @@ static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
             pAdapter->sessionCtx.ap.apDisableIntraBssFwd = !!params->ap_isolate;
 
             halStatus = sme_ApDisableIntraBssFwd(pHddCtx->hHal,
-                        pAdapter->sessionId,
+                        pSapCtx->sessionId,
                         pAdapter->sessionCtx.ap.apDisableIntraBssFwd);
             if (!HAL_STATUS_SUCCESS(halStatus))
             {
@@ -6863,6 +6914,10 @@ static int wlan_hdd_cfg80211_join_ibss( struct wiphy *wiphy,
         alloc_bssid = VOS_TRUE;
     }
 
+    pRoamProfile->beaconInterval = 100;
+    if ((params->beacon_interval >= 1) && (params->beacon_interval <= 1000))
+        pRoamProfile->beaconInterval = params->beacon_interval;
+
     /* Set Channel */
     if (NULL !=
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0))
@@ -7379,14 +7434,19 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
     //convert to the UI units of 100kbps
     myRate = pAdapter->hdd_stats.ClassA_stat.tx_rate * 5;
 #ifdef QCA_WIFI_2_0
-    if (!(rate_flags & eHAL_TX_RATE_LEGACY) && myRate)
+    if (!(rate_flags & eHAL_TX_RATE_LEGACY))
     {
         nss = pAdapter->hdd_stats.ClassA_stat.rx_frag_cnt;
-        pAdapter->hdd_stats.ClassA_stat.mcs_index =
-                                  wlan_hdd_get_mcs_idx(myRate, rate_flags, nss);
-        hddLog(VOS_TRACE_LEVEL_DEBUG, "computed mcs idx %d from rate:%d",
+
+        if(myRate)
+        {
+            pAdapter->hdd_stats.ClassA_stat.mcs_index =
+                wlan_hdd_get_mcs_idx(myRate, rate_flags, nss);
+            hddLog(VOS_TRACE_LEVEL_DEBUG, "computed mcs idx %d from rate:%d",
                                      pAdapter->hdd_stats.ClassA_stat.mcs_index,
                                      myRate);
+        }
+
         myRate = 0;
     }
 #endif
@@ -8827,7 +8887,7 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
 
 #ifdef WLAN_FEATURE_TDLS_DEBUG
     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-               "%s: " MAC_ADDRESS_STR " action %d, dialog_token %d status %d, len = %d",
+               "%s: " MAC_ADDRESS_STR " action %d, dialog_token %d status %d, len = %zu",
                "tdls_mgmt", MAC_ADDR_ARRAY(peer),
                action_code, dialog_token, status_code, len);
 #endif
@@ -8845,7 +8905,7 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
        else
        {
            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                    "%s: " MAC_ADDRESS_STR " peer doesn't exist or not connected %d dialog_token %d status %d, len = %d",
+                    "%s: " MAC_ADDRESS_STR " peer doesn't exist or not connected %d dialog_token %d status %d, len = %zu",
                     __func__, MAC_ADDR_ARRAY(peer), (NULL == pTdlsPeer) ? -1 : pTdlsPeer->link_status,
                      dialog_token, status_code, len);
            return -EPERM;
@@ -9637,7 +9697,7 @@ void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len)
 
     if (!buf || !buf_len) {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: buf or buf_len invalid, buf = %p buf_len = %d",
+                  "%s: buf or buf_len invalid, buf = %p buf_len = %zu",
                   __func__, buf, buf_len);
         return;
     }
@@ -9933,7 +9993,7 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
            INIT_COMPLETION(pScanInfo->abortscan_event_var);
            hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId);
 
-           status = wait_for_completion_interruptible_timeout(
+           status = wait_for_completion_timeout(
                            &pScanInfo->abortscan_event_var,
                            msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
            if (!status)
@@ -9953,13 +10013,13 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
     hdd_suspend_wlan(&wlan_hdd_cfg80211_ready_to_suspend, pHddCtx);
 
-    rc = wait_for_completion_interruptible_timeout(&pHddCtx->ready_to_suspend,
+    rc = wait_for_completion_timeout(&pHddCtx->ready_to_suspend,
                              msecs_to_jiffies(WLAN_WAIT_TIME_READY_TO_SUSPEND));
     if (!rc)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: Failed to get ready to suspend", __func__);
-        return -ETIME;
+        goto resume_tx;
     }
 
     /* Suspend MC thread */
@@ -9967,37 +10027,55 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
     wake_up_interruptible(&vosSchedContext->mcWaitQueue);
 
     /* Wait for suspend confirmation from MC thread */
-    rc = wait_for_completion_interruptible_timeout(&pHddCtx->mc_sus_event_var,
+    rc = wait_for_completion_timeout(&pHddCtx->mc_sus_event_var,
                                  msecs_to_jiffies(WLAN_WAIT_TIME_MCTHREAD_SUSPEND));
     if (!rc)
     {
         clear_bit(MC_SUSPEND_EVENT_MASK, &vosSchedContext->mcEventFlag);
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: Failed to stop mc thread", __func__);
-        return -ETIME;
+        goto resume_tx;
     }
 
     pHddCtx->isMcThreadSuspended = TRUE;
 #endif
-    pHddCtx->isWiphySuspended = TRUE;
 
 #ifdef QCA_CONFIG_SMP
     /* Suspend tlshim rx thread */
     set_bit(RX_SUSPEND_EVENT_MASK, &vosSchedContext->tlshimRxEvtFlg);
     wake_up_interruptible(&vosSchedContext->tlshimRxWaitQueue);
-    rc = wait_for_completion_interruptible_timeout(
+    rc = wait_for_completion_timeout(
                      &vosSchedContext->SuspndTlshimRxEvent,
                      msecs_to_jiffies(RX_TLSHIM_SUSPEND_TIMEOUT));
     if (!rc) {
         clear_bit(RX_SUSPEND_EVENT_MASK, &vosSchedContext->tlshimRxEvtFlg);
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: Failed to stop tl_shim rx thread", __func__);
-        return -ETIME;
+        goto resume_all;
     }
 #endif
 
+    pHddCtx->isWiphySuspended = TRUE;
+
     EXIT();
     return 0;
+
+#ifdef QCA_CONFIG_SMP
+resume_all:
+
+#ifdef QCA_WIFI_2_0
+    complete(&vosSchedContext->ResumeMcEvent);
+    pHddCtx->isMcThreadSuspended = FALSE;
+#endif
+#endif
+
+#ifdef QCA_WIFI_2_0
+resume_tx:
+
+    hdd_resume_wlan();
+    return -ETIME;
+#endif
+
 }
 
 /* cfg80211_ops */
@@ -10071,4 +10149,3 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops =
 #endif
      .dump_survey = wlan_hdd_cfg80211_dump_survey,
 };
-

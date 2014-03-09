@@ -858,7 +858,8 @@ int wmi_get_host_credits(wmi_unified_t wmi_handle)
 {
 	int host_credits;
 
-	HTCGetHostCredits(wmi_handle->htc_handle, &host_credits);
+	HTCGetControlEndpointTxHostCredits(wmi_handle->htc_handle,
+					   &host_credits);
 	return host_credits;
 }
 
@@ -892,6 +893,6 @@ int wmi_is_suspend_ready(wmi_unified_t wmi_handle)
 		i=i+1;
 	}
 
-	pr_info(" Pending wmi_pending_cmds:%d \n", wmi_pending_cmds);
+	pr_info("%s:Pending wmi_pending_cmds:%d \n", __func__, wmi_pending_cmds);
 	return 0;
 }

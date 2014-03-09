@@ -464,7 +464,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     v_U8_t staId;
     VOS_STATUS vos_status;
     v_BOOL_t bWPSState;
-    v_BOOL_t bApActive = FALSE;
     v_BOOL_t bAuthRequired = TRUE;
     tpSap_AssocMacAddr pAssocStasArray = NULL;
     char unknownSTAEvent[IW_CUSTOM_MAX+1];
@@ -548,6 +547,9 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                    hddLog(LOGE, FL("Failed to init AP inactivity timer\n"));
 
             }
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+            wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_TRUE);
+#endif
             pHddApCtx->operatingChannel = pSapEvent->sapevt.sapStartBssCompleteEvent.operatingChannel;
             pHostapdState->bssState = BSS_START;
 
@@ -702,7 +704,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                    WLAN_CLIENT_CONNECT_EX,
                    pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac.bytes);
 #endif
-
+#ifdef QCA_PKT_PROTO_TRACE
+            /* Peer associated, update into trace buffer */
+            if (pHddCtx->cfg_ini->gEnableDebugLog)
+            {
+               vos_pkt_trace_buf_update("HA:ASSOC");
+            }
+#endif /* QCA_PKT_PROTO_TRACE */
+            pHddApCtx->bApActive = VOS_TRUE;
             // Stop AP inactivity timer
             if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_RUNNING)
             {
@@ -710,6 +719,9 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
                    hddLog(LOGE, FL("Failed to start AP inactivity timer\n"));
             }
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+            wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_FALSE);
+#endif
             vos_wake_lock_timeout_acquire(&pHddCtx->sap_wake_lock,
                                           HDD_SAP_WAKE_LOCK_DURATION);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
@@ -774,23 +786,31 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                hdd_ipa_wlan_evt(pHostapdAdapter, staId, WLAN_CLIENT_DISCONNECT,
                   pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac.bytes);
 #endif
+#ifdef QCA_PKT_PROTO_TRACE
+            /* Peer dis-associated, update into trace buffer */
+            if (pHddCtx->cfg_ini->gEnableDebugLog)
+            {
+               vos_pkt_trace_buf_update("HA:DISASC");
+            }
+#endif /* QCA_PKT_PROTO_TRACE */
             hdd_softap_DeregisterSTA(pHostapdAdapter, staId);
 
-            if (0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)
+            pHddApCtx->bApActive = VOS_FALSE;
+            spin_lock_bh( &pHostapdAdapter->staInfo_lock );
+            for (i = 0; i < WLAN_MAX_STA_COUNT; i++)
             {
-                spin_lock_bh( &pHostapdAdapter->staInfo_lock );
-                // Start AP inactivity timer if no stations associated with it
-                for (i = 0; i < WLAN_MAX_STA_COUNT; i++)
+                if (pHostapdAdapter->aStaInfo[i].isUsed && i != (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->uBCStaId)
                 {
-                    if (pHostapdAdapter->aStaInfo[i].isUsed && i != (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->uBCStaId)
-                    {
-                        bApActive = TRUE;
-                        break;
-                    }
+                    pHddApCtx->bApActive = VOS_TRUE;
+                    break;
                 }
-                spin_unlock_bh( &pHostapdAdapter->staInfo_lock );
+            }
+            spin_unlock_bh( &pHostapdAdapter->staInfo_lock );
 
-                if (bApActive == FALSE)
+            // Start AP inactivity timer if no stations associated with it
+            if ((0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff))
+            {
+                if (pHddApCtx->bApActive == FALSE)
                 {
                     if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_STOPPED)
                     {
@@ -802,6 +822,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                         VOS_ASSERT(vos_timer_getCurrentState(&pHddApCtx->hdd_ap_inactivity_timer) == VOS_TIMER_STATE_STOPPED);
                 }
             }
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+            wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_TRUE);
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
             cfg80211_del_sta(dev,
                             (const u8 *)&pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac.bytes[0],
@@ -954,6 +978,9 @@ stopbss :
             if (!VOS_IS_STATUS_SUCCESS(vos_status))
                 hddLog(LOGE, FL("Failed to Destroy AP inactivity timer"));
         }
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+        wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_TRUE);
+#endif
 
         /* Stop the pkts from n/w stack as we are going to free all of
          * the TX WMM queues for all STAID's */
@@ -1210,6 +1237,7 @@ static iw_softap_setparam(struct net_device *dev,
                 rateUpdate->nss = (pConfig->enable2x2 == 0) ? 0 : 1;
                 rateUpdate->dev_mode = pHostapdAdapter->device_mode;
                 rateUpdate->mcastDataRate24GHz = set_value;
+                rateUpdate->mcastDataRate24GHzTxFlag = 1;
                 rateUpdate->mcastDataRate5GHz = set_value;
                 rateUpdate->bcastDataRate = -1;
                 status = sme_SendRateUpdateInd(hHal, rateUpdate);
@@ -1509,14 +1537,8 @@ static iw_softap_setparam(struct net_device *dev,
                                 (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
                                 set_value, VDEV_CMD);
                 if (!ret) {
-                    if (ccmCfgSetInt(hHal, WNI_CFG_RTS_THRESHOLD, (tANI_U32)value,
-                        ccmCfgSetCallback, eANI_BOOLEAN_TRUE) !=
-                        eHAL_STATUS_SUCCESS) {
-
-                        hddLog(LOGE, "FAILED TO SET RTSCTS at SAP");
-                        ret = -EIO;
-                        break;
-                    }
+                    hddLog(LOGE, "FAILED TO SET RTSCTS at SAP");
+                    ret = -EIO;
                 }
                 break;
             }
@@ -1577,9 +1599,11 @@ static iw_softap_setparam(struct net_device *dev,
                 tsap_Config_t *pConfig =
                     &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
-                if (pConfig->SapHw_mode != eSAP_DOT11_MODE_11ac ||
+                if (pConfig->SapHw_mode != eSAP_DOT11_MODE_11ac &&
                     pConfig->SapHw_mode != eSAP_DOT11_MODE_11ac_ONLY) {
-                    hddLog(VOS_TRACE_LEVEL_ERROR, "Not valid mode for VHT");
+                    hddLog(VOS_TRACE_LEVEL_ERROR,
+                        "%s: SET_VHT_RATE error: SapHw_mode= 0x%x, ch = %d",
+                        __func__, pConfig->SapHw_mode, pConfig->channel);
                     ret = -EIO;
                     break;
                 }
@@ -1700,6 +1724,23 @@ static iw_softap_setparam(struct net_device *dev,
              }
 
 
+
+#ifdef QCA_PKT_PROTO_TRACE
+         case QCASAP_SET_DEBUG_LOG:
+             {
+                  hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
+
+                  hddLog(LOG1, "QCASAP_SET_DEBUG_LOG val %d", set_value);
+                  /* Trace buffer dump only */
+                  if (VOS_PKT_TRAC_DUMP_CMD == set_value)
+                  {
+                      vos_pkt_trace_buf_dump();
+                      break;
+                  }
+                  pHddCtx->cfg_ini->gEnableDebugLog = set_value;
+                  break;
+             }
+#endif /* QCA_PKT_PROTO_TRACE */
 
 #endif /* QCA_WIFI_2_0 */
         default:
@@ -3908,6 +3949,13 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "get_gtxBWMask" },
+
+#ifdef QCA_PKT_PROTO_TRACE
+    {   QCASAP_SET_DEBUG_LOG,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "setDbgLvl" },
+#endif /* QCA_PKT_PROTO_TRACE */
 
 #endif /* QCA_WIFI_2_0 */
 
