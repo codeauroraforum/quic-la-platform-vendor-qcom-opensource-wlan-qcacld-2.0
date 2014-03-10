@@ -646,7 +646,7 @@ int ol_copy_ramdump(struct ol_softc *scn)
 		goto out;
 	}
 
-	ret = ol_target_coredump(scn, ramdump_base, TOTAL_DUMP_SIZE);
+	ret = ol_target_coredump(scn, ramdump_base, size);
 	iounmap(ramdump_base);
 
 out:
@@ -663,20 +663,17 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 		goto out_fail;
 	}
 
+#ifdef CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC
 	if (ramdump_scn->crash_shutdown) {
-		if (hif_pci_check_soc_status(ramdump_scn->hif_sc))
-			goto out;
+		if (!hif_pci_check_soc_status(ramdump_scn->hif_sc)
+			&& !ol_copy_ramdump(ramdump_scn))
+			printk("%s: RAM dump collecting completed!\n", __func__);
 
-		if (ol_copy_ramdump(ramdump_scn))
-			goto out;
-
-		printk("%s: RAM dump collecting completed!\n", __func__);
-
-out:
 		ramdump_scn->crash_shutdown = false;
 		complete(&ramdump_scn->ramdump_event);
 		return;
-	}
+    }
+#endif
 
 #ifdef DEBUG
 	ret = hif_pci_check_soc_status(ramdump_scn->hif_sc);
@@ -755,9 +752,11 @@ void ol_target_failure(void *instance, A_STATUS status)
 		return;
 	}
 
+#ifdef CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC
 	if (scn->crash_shutdown)
 		printk("XXX TARGET ASSERTED because of Kernel Panic XXX\n");
 	else
+#endif
 		printk("XXX TARGET ASSERTED XXX\n");
 	scn->target_status = OL_TRGET_STATUS_RESET;
 
@@ -1168,7 +1167,8 @@ static int ol_ath_get_reg_table(A_UINT32 target_version,
 	return section_len;
 }
 
-static int ol_diag_read_reg_loc(struct ol_softc *scn, u_int8_t *buffer)
+static int ol_diag_read_reg_loc(struct ol_softc *scn, u_int8_t *buffer,
+		u_int32_t buffer_len)
 {
 	int i, len, section_len, fill_len;
 	int dump_len, result = 0;
@@ -1184,9 +1184,18 @@ static int ol_diag_read_reg_loc(struct ol_softc *scn, u_int8_t *buffer)
 	}
 
 	curr_sec = reg_table.section;
-	for (i=0; i<reg_table.section_size; i++) {
+	for (i = 0; i < reg_table.section_size; i++) {
 
 		dump_len = curr_sec->end_addr - curr_sec->start_addr;
+
+		if ((buffer_len - result) < dump_len) {
+			printk("Not enough memory to dump the registers:"
+					" %d: 0x%08x-0x%08x\n", i,
+					curr_sec->start_addr,
+					curr_sec->end_addr);
+			goto out;
+		}
+
 		len = ol_diag_read(scn, buffer, curr_sec->start_addr, dump_len);
 
 		if (len != -EIO) {
@@ -1203,6 +1212,14 @@ static int ol_diag_read_reg_loc(struct ol_softc *scn, u_int8_t *buffer)
 			next_sec = (tgt_reg_section *)((u_int8_t *)curr_sec
 							+ sizeof(*curr_sec));
 			fill_len = next_sec->start_addr - curr_sec->end_addr;
+			if ((buffer_len - result) < fill_len) {
+				printk("Not enough memory to fill registers:"
+						" %d: 0x%08x-0x%08x\n", i,
+						curr_sec->end_addr,
+						next_sec->start_addr);
+				goto out;
+			}
+
 			if (fill_len) {
 				adf_os_mem_set(buffer,
 					       INVALID_REG_LOC_DUMMY_DATA,
@@ -1273,6 +1290,8 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 		case 2:
 			/* REG SECTION */
 			pos = REGISTER_LOCATION;
+			/*  ol_diag_read_reg_loc checks for buffer overrun */
+			readLen = 0;
 			break;
 		case 3:
 			/* AXI SECTION */
@@ -1283,7 +1302,8 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 
 		if ((blockLength - amountRead) >= readLen) {
 			if (pos == REGISTER_LOCATION)
-				result = ol_diag_read_reg_loc(scn, bufferLoc);
+				result = ol_diag_read_reg_loc(scn, bufferLoc,
+						blockLength - amountRead);
 			else
 				result = ol_diag_read(scn, bufferLoc,
 						      pos, readLen);
