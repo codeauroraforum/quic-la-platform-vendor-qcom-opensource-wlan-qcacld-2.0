@@ -1644,7 +1644,7 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
 
     \param device_mode the mode of the device
 
-    \param macAddr the macAddress of the devices
+    \param sessionId session ID
 
     \return eHalStatus  SUCCESS.
 
@@ -1654,7 +1654,7 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
 
 eHalStatus sme_DHCPStartInd( tHalHandle hHal,
                              tANI_U8 device_mode,
-                             tANI_U8 *macAddr );
+                             tANI_U8 sessionId );
 
 /* ---------------------------------------------------------------------------
 
@@ -1666,7 +1666,7 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
 
     \param device_mode the mode of the device
 
-    \param macAddr the macAddress of the devices
+    \param sessionId session ID
 
     \return eHalStatus  SUCCESS.
 
@@ -1675,8 +1675,7 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
  -------------------------------------------------------------------------------*/
 eHalStatus sme_DHCPStopInd( tHalHandle hHal,
                             tANI_U8 device_mode,
-                            tANI_U8 *macAddr );
-
+                            tANI_U8 sessionId );
 
 /* ---------------------------------------------------------------------------
     \fn sme_BtcSignalBtEvent
@@ -3400,7 +3399,7 @@ sme_StopBatchScanInd
  * is enabled
  */
 VOS_STATUS sme_SetIdlePowersaveConfig(v_PVOID_t vosContext, tANI_U32 value);
-VOS_STATUS sme_notify_modem_power_state(v_PVOID_t vosContext, tANI_U32 value);
+VOS_STATUS sme_notify_modem_power_state(tHalHandle hHal, tANI_U32 value);
 
 eHalStatus sme_ConfigEnablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode);
 eHalStatus sme_ConfigDisablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode);

@@ -3961,12 +3961,12 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
            if ('1' == *dhcpPhase)
            {
                sme_DHCPStartInd(pHddCtx->hHal, pAdapter->device_mode,
-                                pAdapter->macAddressCurrent.bytes);
+                                pAdapter->sessionId);
            }
            else if ('2' == *dhcpPhase)
            {
                sme_DHCPStopInd(pHddCtx->hHal, pAdapter->device_mode,
-                               pAdapter->macAddressCurrent.bytes);
+                               pAdapter->sessionId);
            }
        }
        else if (strncmp(command, "SCAN-ACTIVE", 11) == 0)
@@ -8671,6 +8671,7 @@ void __hdd_wlan_exit(void)
   -------------------------------------------------------------------------*/
 int hdd_wlan_notify_modem_power_state(int state)
 {
+   int status;
    VOS_STATUS vosStatus;
    v_CONTEXT_t pVosContext = NULL;
    hdd_context_t *pHddCtx = NULL;
@@ -8678,11 +8679,20 @@ int hdd_wlan_notify_modem_power_state(int state)
    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
    if (!pVosContext)
       return -1;
+
    pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
-   if (!pHddCtx)
+
+   status = wlan_hdd_validate_context(pHddCtx);
+   if (0 != status)
+   {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: HDD context is not valid", __func__);
+       return -1;
+   }
+   if (!pHddCtx->hHal)
       return -1;
 
-   vosStatus = sme_notify_modem_power_state(pHddCtx->pvosContext, state);
+   vosStatus = sme_notify_modem_power_state(pHddCtx->hHal, state);
    if (VOS_STATUS_SUCCESS != vosStatus) {
       hddLog(LOGE, "Fail to send notification with modem power state %d\n",
              state);
