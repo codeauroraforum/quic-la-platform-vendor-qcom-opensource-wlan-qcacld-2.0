@@ -5457,7 +5457,7 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
 
     \param device_mode - mode(AP,SAP etc) of the device.
 
-    \param macAddr  - MAC address of the device.
+    \param sessionId - session ID.
 
     \return eHalStatus  SUCCESS.
 
@@ -5465,17 +5465,27 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
   --------------------------------------------------------------------------*/
 eHalStatus sme_DHCPStartInd( tHalHandle hHal,
                                    tANI_U8 device_mode,
-                                   tANI_U8 *macAddr )
+                                   tANI_U8 sessionId )
 {
     eHalStatus          status;
     VOS_STATUS          vosStatus;
     tpAniSirGlobal      pMac = PMAC_STRUCT( hHal );
     vos_msg_t           vosMessage;
     tAniDHCPInd         *pMsg;
+    tCsrRoamSession     *pSession;
 
     status = sme_AcquireGlobalLock(&pMac->sme);
     if ( eHAL_STATUS_SUCCESS == status)
     {
+        pSession = CSR_GET_SESSION( pMac, sessionId );
+
+        if (!pSession)
+        {
+            smsLog(pMac, LOGE, FL("session %d not found "), sessionId);
+            sme_ReleaseGlobalLock( &pMac->sme );
+            return eHAL_STATUS_FAILURE;
+        }
+
         pMsg = (tAniDHCPInd*)vos_mem_malloc(sizeof(tAniDHCPInd));
         if (NULL == pMsg)
         {
@@ -5487,7 +5497,8 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
         pMsg->msgType = WDA_DHCP_START_IND;
         pMsg->msgLen = (tANI_U16)sizeof(tAniDHCPInd);
         pMsg->device_mode = device_mode;
-        vos_mem_copy( pMsg->macAddr, macAddr, sizeof(tSirMacAddr));
+        vos_mem_copy( pMsg->macAddr, pSession->connectedProfile.bssid,
+                      sizeof(tSirMacAddr) );
 
         vosMessage.type = WDA_DHCP_START_IND;
         vosMessage.bodyptr = pMsg;
@@ -5514,24 +5525,34 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
 
     \param device_mode - mode(AP, SAP etc) of the device.
 
-    \param macAddr  - MAC address of the device.
+    \param sessionId - session ID.
 
     \return eHalStatus  SUCCESS.
                          FAILURE or RESOURCES  The API finished and failed.
   --------------------------------------------------------------------------*/
 eHalStatus sme_DHCPStopInd( tHalHandle hHal,
                               tANI_U8 device_mode,
-                              tANI_U8 *macAddr )
+                              tANI_U8 sessionId )
 {
     eHalStatus          status;
     VOS_STATUS          vosStatus;
     tpAniSirGlobal      pMac = PMAC_STRUCT( hHal );
     vos_msg_t           vosMessage;
     tAniDHCPInd         *pMsg;
+    tCsrRoamSession     *pSession;
 
     status = sme_AcquireGlobalLock(&pMac->sme);
     if ( eHAL_STATUS_SUCCESS == status)
     {
+        pSession = CSR_GET_SESSION( pMac, sessionId );
+
+        if (!pSession)
+        {
+            smsLog(pMac, LOGE, FL("session %d not found "), sessionId);
+            sme_ReleaseGlobalLock( &pMac->sme );
+            return eHAL_STATUS_FAILURE;
+        }
+
         pMsg = (tAniDHCPInd*)vos_mem_malloc(sizeof(tAniDHCPInd));
         if (NULL == pMsg)
         {
@@ -5544,7 +5565,8 @@ eHalStatus sme_DHCPStopInd( tHalHandle hHal,
        pMsg->msgType = WDA_DHCP_STOP_IND;
        pMsg->msgLen = (tANI_U16)sizeof(tAniDHCPInd);
        pMsg->device_mode = device_mode;
-       vos_mem_copy( pMsg->macAddr, macAddr, sizeof(tSirMacAddr));
+       vos_mem_copy( pMsg->macAddr, pSession->connectedProfile.bssid,
+                     sizeof(tSirMacAddr) );
 
        vosMessage.type = WDA_DHCP_STOP_IND;
        vosMessage.bodyptr = pMsg;
@@ -9960,8 +9982,15 @@ eHalStatus sme_ChangeRoamScanChannelList(tHalHandle hHal, tANI_U8 *pChannelList,
         {
             for (i = 0; i < pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels; i++)
             {
-                j += snprintf(oldChannelList + j, sizeof(oldChannelList) - j," %d",
-                pNeighborRoamInfo->cfgParams.channelInfo.ChannelList[i]);
+                if (j < sizeof(oldChannelList))
+                {
+                    j += snprintf(oldChannelList + j, sizeof(oldChannelList) - j," %d",
+                    pNeighborRoamInfo->cfgParams.channelInfo.ChannelList[i]);
+                }
+                else
+                {
+                    break;
+                }
             }
         }
         csrFlushCfgBgScanRoamChannelList(pMac);
@@ -9972,8 +10001,15 @@ eHalStatus sme_ChangeRoamScanChannelList(tHalHandle hHal, tANI_U8 *pChannelList,
             j = 0;
             for (i = 0; i < pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels; i++)
             {
-                j += snprintf(newChannelList + j, sizeof(newChannelList) - j," %d",
-                pNeighborRoamInfo->cfgParams.channelInfo.ChannelList[i]);
+                if (j < sizeof(newChannelList))
+                {
+                    j += snprintf(newChannelList + j, sizeof(newChannelList) - j," %d",
+                           pNeighborRoamInfo->cfgParams.channelInfo.ChannelList[i]);
+                }
+                else
+                {
+                    break;
+                }
             }
         }
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
@@ -11071,23 +11107,40 @@ void activeListCmdTimeoutHandle(void *userData)
     smeGetCommandQStatus((tHalHandle) userData);
 }
 
-VOS_STATUS sme_notify_modem_power_state(v_PVOID_t vosContext, tANI_U32 value)
+VOS_STATUS sme_notify_modem_power_state(tHalHandle hHal, tANI_U32 value)
 {
-   v_PVOID_t wdaContext = vos_get_context(VOS_MODULE_ID_WDA, vosContext);
+   vos_msg_t msg;
+   tpSirModemPowerStateInd pRequestBuf;
+   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
 
-   if (NULL == wdaContext)
+   if (NULL == pMac)
    {
-      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                "%s: wdaContext is NULL", __func__);
       return VOS_STATUS_E_FAILURE;
    }
 
-   if (VOS_STATUS_SUCCESS != WDA_notify_modem_power_state(wdaContext, value))
+   pRequestBuf = vos_mem_malloc(sizeof(tSirModemPowerStateInd));
+   if (NULL == pRequestBuf)
    {
       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                "Failed to notify modem power state %d", value);
+       "%s: Not able to allocate memory for MODEM POWER STATE IND",
+       __func__);
       return VOS_STATUS_E_FAILURE;
    }
+
+   pRequestBuf->param = value;
+
+   msg.type     = WDA_MODEM_POWER_STATE_IND;
+   msg.reserved = 0;
+   msg.bodyptr  = pRequestBuf;
+   if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(VOS_MODULE_ID_WDA, &msg)))
+   {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+         "%s: Not able to post WDA_MODEM_POWER_STATE_IND message"
+         " to WDA", __func__);
+       vos_mem_free(pRequestBuf);
+       return VOS_STATUS_E_FAILURE;
+   }
+
    return VOS_STATUS_SUCCESS;
 }
 
