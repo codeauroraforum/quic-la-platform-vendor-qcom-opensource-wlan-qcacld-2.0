@@ -3243,6 +3243,13 @@ REG_VARIABLE( CFG_SAP_SCAN_BAND_PREFERENCE, WLAN_PARAM_Integer,
                CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT,
                CFG_SAP_SCAN_BAND_PREFERENCE_MIN,
                CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
+
+REG_VARIABLE( CFG_ACS_BAND_SWITCH_THRESHOLD, WLAN_PARAM_Integer,
+              hdd_config_t, acsBandSwitchThreshold,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
+              CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT,
+              CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
+              CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
 };
 
 /*
@@ -3480,6 +3487,8 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gApProtection] value = [%u]\n",pHddCtx->cfg_ini->apProtection);
   VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gEnableApOBSSProt] value = [%u]\n",pHddCtx->cfg_ini->apOBSSProtEnabled);
   VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gApAutoChannelSelection] value = [%u]\n",pHddCtx->cfg_ini->apAutoChannelSelection);
+  VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gACSAllowedChannels] value = [%s]\n", pHddCtx->cfg_ini->acsAllowedChnls);
+  VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gACSBandSwitchThreshold] value = [%u]\n", pHddCtx->cfg_ini->acsBandSwitchThreshold);
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ChannelBondingMode] Value = [%u]",pHddCtx->cfg_ini->nChannelBondingMode24GHz);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ChannelBondingMode] Value = [%u]",pHddCtx->cfg_ini->nChannelBondingMode5GHz);
