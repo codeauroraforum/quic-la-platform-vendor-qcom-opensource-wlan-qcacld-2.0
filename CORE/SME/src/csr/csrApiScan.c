@@ -4651,7 +4651,7 @@ tANI_BOOLEAN csrIsDuplicateBssDescription( tpAniSirGlobal pMac, tSirBssDescripti
                 if(pIes1->SSID.present && pIesTemp->SSID.present)
                 {
                     fMatch = csrIsSsidMatch(pMac, pIes1->SSID.ssid, pIes1->SSID.num_ssid,
-                                            pIesTemp->SSID.ssid, pIesTemp->SSID.num_ssid, eANI_BOOLEAN_TRUE);
+                                            pIesTemp->SSID.ssid, pIesTemp->SSID.num_ssid, eANI_BOOLEAN_FALSE);
                 }
             }while(0);
 
@@ -4676,7 +4676,7 @@ tANI_BOOLEAN csrIsDuplicateBssDescription( tpAniSirGlobal pMac, tSirBssDescripti
                 if(pIes1->SSID.present && pIesTemp->SSID.present)
                 {
                     fMatch = csrIsSsidMatch(pMac, pIes1->SSID.ssid, pIes1->SSID.num_ssid,
-                                            pIesTemp->SSID.ssid, pIesTemp->SSID.num_ssid, eANI_BOOLEAN_TRUE);
+                                            pIesTemp->SSID.ssid, pIesTemp->SSID.num_ssid, eANI_BOOLEAN_FALSE);
                 }
             }while(0);
         }
@@ -5075,14 +5075,6 @@ eHalStatus csrSavePnoScanResults(tpAniSirGlobal pMac, tSirSmeScanRsp *pScanRsp)
         cbParsed += cbBssDesc;
         pSirBssDescription = (tSirBssDescription *)((tANI_U8 *)pSirBssDescription +
                               cbBssDesc );
-    }
-
-    if ( eSIR_SME_SUCCESS == pScanRsp->statusCode )
-    {
-           // PNO is completed, rollback csr to old state
-           csrRoamStateChange(pMac,
-                       pMac->roam.roamSession[pScanRsp->sessionId].lastRoamStateBeforePno,
-                       pScanRsp->sessionId);
     }
 
     return eHAL_STATUS_SUCCESS;
@@ -7993,21 +7985,6 @@ tANI_BOOLEAN csrRoamIsValidChannel( tpAniSirGlobal pMac, tANI_U8 channel )
 
     return fValid;
 }
-
-#ifdef FEATURE_WLAN_SCAN_PNO
-void csrMoveToScanStateForPno( tpAniSirGlobal pMac, tANI_U8 sessionId )
-{
-    tCsrRoamSession *pSession = &pMac->roam.roamSession[sessionId];
-
-    smsLog( pMac, LOG3, "Moving CSR to Scanning state for PNO");
-
-    // Take a back up of previous CSR state before moving to scanning state.
-    // CSR will be moved to previous state from scanning state after PNO
-    // completion.
-    pSession->lastRoamStateBeforePno =
-               csrRoamStateChange(pMac, eCSR_ROAMING_STATE_SCANNING, sessionId);
-}
-#endif
 
 #ifdef FEATURE_WLAN_SCAN_PNO
 eHalStatus csrScanSavePreferredNetworkFound(tpAniSirGlobal pMac,
