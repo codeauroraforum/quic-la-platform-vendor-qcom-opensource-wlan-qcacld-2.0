@@ -2291,6 +2291,7 @@ int wlan_hdd_set_mc_rate(hdd_adapter_t *pAdapter, int targetRate)
    rateUpdate->nss = (pConfig->enable2x2 == 0) ? 0 : 1;
    rateUpdate->dev_mode = pAdapter->device_mode;
    rateUpdate->mcastDataRate24GHz = targetRate;
+   rateUpdate->mcastDataRate24GHzTxFlag = 1;
    rateUpdate->mcastDataRate5GHz = targetRate;
    rateUpdate->bcastDataRate = -1;
    memcpy(rateUpdate->bssid, pAdapter->macAddressCurrent.bytes,
@@ -6343,10 +6344,6 @@ void hdd_set_station_ops( struct net_device *pWlanDev )
       pWlanDev->do_ioctl = hdd_ioctl;
       pWlanDev->set_mac_address = hdd_set_mac_address;
 #endif
-
-#ifdef QCA_WIFI_2_0
-      pWlanDev->tx_queue_len = 0;
-#endif
 }
 
 static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMacAddr macAddr, const char* name )
@@ -7646,9 +7643,6 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
             pAdapter->isLinkUpSvcNeeded = FALSE;
             pAdapter->scan_info.mScanPending = FALSE;
             pAdapter->scan_info.waitScanResult = FALSE;
-
-            //Trigger the initial scan
-            hdd_wlan_initial_scan(pAdapter);
 
             //Indicate disconnect event to supplicant if associated previously
             if (eConnectionState_Associated == connState ||
