@@ -418,6 +418,7 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
         struct wma_txrx_node *iface = NULL;
 	tp_wma_handle wma;
 	u_int8_t *efrm, *orig_hdr;
+        u_int16_t key_id;
 #endif /* WLAN_FEATURE_11W */
 
 	vos_pkt_t *rx_pkt;
@@ -580,8 +581,18 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 				 IEEE80211_IS_MULTICAST(wh->i_addr1))
 			{
 				efrm = adf_nbuf_data(wbuf) + adf_nbuf_len(wbuf);
+
+				key_id = (u_int16_t)*(efrm - vos_get_mmie_size() + 2);
+				if (!((key_id == WMA_IGTK_KEY_INDEX_4) ||
+					(key_id == WMA_IGTK_KEY_INDEX_5))) {
+					TLSHIM_LOGE("Invalid KeyID(%d)"
+					" dropping the frame", key_id);
+					vos_pkt_return_packet(rx_pkt);
+					return 0;
+				}
+
 				if (vos_is_mmie_valid(iface->key.key,
-					 iface->key.ipn,
+				    iface->key.key_id[key_id - WMA_IGTK_KEY_INDEX_4].ipn,
 					 (u_int8_t *)wh, efrm))
 				{
 					TLSHIM_LOGD("Protected BC/MC frame MMIE"
@@ -911,6 +922,9 @@ void WLANTL_RegisterVdev(void *vos_ctx, void *vdev)
 		return;
 	}
 
+#ifdef QCA_LL_TX_FLOW_CT
+	txrx_ops.tx.flow_control_cb = WLANTL_TXFlowControlCb;
+#endif /* QCA_LL_TX_FLOW_CT */
 	txrx_ops.rx.std = tlshim_data_rx_handler;
 	wdi_in_osif_vdev_register(vdev_handle, tl_shim, &txrx_ops);
 	/* TODO: Keep vdev specific tx callback, if needed */
@@ -1623,6 +1637,11 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 		adf_os_spinlock_init(&tl_shim->sta_info[i].stainfo_lock);
 		tl_shim->sta_info[i].flags = 0;
 		INIT_LIST_HEAD(&tl_shim->sta_info[i].cached_bufq);
+#ifdef QCA_LL_TX_FLOW_CT
+		tl_shim->sta_info[i].flowControl = NULL;
+		tl_shim->sta_info[i].sessionId = 0xFF;
+		tl_shim->sta_info[i].adpaterCtxt = NULL;
+#endif /* QCA_LL_TX_FLOW_CT */
 	}
 
 	INIT_WORK(&tl_shim->cache_flush_work, tl_shim_cache_flush_work);
@@ -1713,3 +1732,153 @@ void *tl_shim_get_vdev_by_sta_id(void *vos_context, uint8_t sta_id)
 
 	return peer->vdev;
 }
+
+#ifdef QCA_LL_TX_FLOW_CT
+/*=============================================================================
+  FUNCTION    WLANTL_GetTxResource
+
+  DESCRIPTION
+    This function will query WLAN kernel driver TX resource availability.
+    Per STA/VDEV instance, if TX resource is not available, should back
+    pressure to OS NET layer.
+
+  DEPENDENCIES
+    NONE
+
+  PARAMETERS
+   IN
+   vos_context   : Pointer to VOS global context
+   sta_id : STA/VDEV instance to query TX resource
+
+  RETURN VALUE
+    VOS_TRUE : Enough resource available, Not need to PAUSE TX OS Q
+    VOS_FALSE : TX resource is not enough, stop OS TX Q
+
+  SIDE EFFECTS
+
+==============================================================================*/
+v_BOOL_t WLANTL_GetTxResource
+(
+	void *vos_context,
+	uint8_t sta_id
+)
+{
+	struct ol_txrx_peer_t *peer = NULL;
+
+	if (!vos_context) {
+		return VOS_TRUE;
+	}
+
+	peer = ol_txrx_peer_find_by_local_id(
+		((pVosContextType) vos_context)->pdev_txrx_ctx,
+		sta_id);
+	if (!peer) {
+		return VOS_TRUE;
+	}
+
+	return (v_BOOL_t)wdi_in_get_tx_resource(peer->vdev);
+}
+
+/*=============================================================================
+  FUNCTION    WLANTL_TXFlowControlCb
+
+  DESCRIPTION
+    This function will be called bu TX resource management unit.
+    If TC resource management unit reserved enough resource for TX session,
+    Call this function to resume OS TX Q.
+
+  PARAMETERS
+   IN
+   tlContext : Pointer to TL SHIM context
+   sessionId : STA/VDEV instance to query TX resource
+   resume_tx : Resume OS TX Q or not
+
+  RETURN VALUE
+    NONE
+
+  SIDE EFFECTS
+
+==============================================================================*/
+void WLANTL_TXFlowControlCb
+(
+	void  *tlContext,
+	v_U8_t sessionId,
+	v_BOOL_t resume_tx
+)
+{
+	struct txrx_tl_shim_ctx *tl_shim;
+	v_U8_t sta_loop;
+	WLANTL_TxFlowControlCBType flow_control_cb = NULL;
+	void *adpter_ctxt = NULL;
+
+	tl_shim = (struct txrx_tl_shim_ctx *)tlContext;
+	if (!tl_shim) {
+		/* Invalid instace */
+		return;
+	}
+
+	for (sta_loop = 0; sta_loop < WLAN_MAX_STA_COUNT; sta_loop++) {
+		if ((tl_shim->sta_info[sta_loop].sessionId == sessionId) &&
+			(tl_shim->sta_info[sta_loop].flowControl))
+		{
+			flow_control_cb = tl_shim->sta_info[sta_loop].flowControl;
+			adpter_ctxt = tl_shim->sta_info[sta_loop].adpaterCtxt;
+			break;
+		}
+	}
+
+	if ((flow_control_cb) && (adpter_ctxt)) {
+		flow_control_cb(adpter_ctxt, resume_tx);
+	}
+	return;
+}
+
+/*=============================================================================
+  FUNCTION    WLANTL_RegisterTXFlowControl
+
+  DESCRIPTION
+    This function will be called by TL client.
+    Any device want to enable TX flow control, should register Cb function
+    And needed information into TL SHIM
+
+  PARAMETERS
+   IN
+   vos_ctx : Global OS context context
+   sta_id  : STA/VDEV instance index
+   flowControl : Flow control callback function pointer
+   sessionId : VDEV ID
+   adpaterCtxt : VDEV os interface adapter context
+
+  RETURN VALUE
+    NONE
+
+  SIDE EFFECTS
+
+==============================================================================*/
+void WLANTL_RegisterTXFlowControl
+(
+	void *vos_ctx,
+	v_U8_t sta_id,
+	WLANTL_TxFlowControlCBType flowControl,
+	v_U8_t sessionId,
+	void *adpaterCtxt
+)
+{
+	struct txrx_tl_shim_ctx *tl_shim;
+	struct tlshim_sta_info *sta_info;
+
+	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return;
+	}
+
+	sta_info = &tl_shim->sta_info[sta_id];
+	sta_info->flowControl = flowControl;
+	sta_info->sessionId = sessionId;
+	sta_info->adpaterCtxt = adpaterCtxt;
+
+	return;
+}
+#endif /* QCA_LL_TX_FLOW_CT */
+

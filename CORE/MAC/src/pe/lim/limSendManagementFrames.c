@@ -209,6 +209,38 @@ void limMergeExtCapIEStruct(tDot11fIEExtCap *pDst,
     }
 }
 
+#ifdef QCA_WIFI_2_0
+/**
+ *
+ * \brief This function is called to add the sequence number to the
+ * management frames
+ *
+ * \param  pMac Pointer to Global MAC structure
+ *
+ * \param  pMacHdr Pointer to MAC management header
+ *
+ * The pMacHdr argument points to the MAC management header. The
+ * sequence number stored in the pMac structure will be incremented
+ * and updated to the MAC management header. The start sequence
+ * number is WLAN_HOST_SEQ_NUM_MIN and the end value is
+ * WLAN_HOST_SEQ_NUM_MAX. After reaching the MAX value, the sequence
+ * number will roll over.
+ *
+ */
+void
+limAddMgmtSeqNum (tpAniSirGlobal pMac, tpSirMacMgmtHdr pMacHdr)
+{
+    if (pMac->mgmtSeqNum >= WLAN_HOST_SEQ_NUM_MAX) {
+        pMac->mgmtSeqNum = WLAN_HOST_SEQ_NUM_MIN-1;
+    }
+
+    pMac->mgmtSeqNum++;
+
+    pMacHdr->seqControl.seqNumLo = (pMac->mgmtSeqNum & LOW_SEQ_NUM_MASK);
+    pMacHdr->seqControl.seqNumHi =
+            ((pMac->mgmtSeqNum & HIGH_SEQ_NUM_MASK) >> HIGH_SEQ_NUM_OFFSET);
+}
+#endif /* QCA_WIFI_2_0 */
 
 /**
  *
@@ -264,6 +296,16 @@ tSirRetStatus limPopulateMacHeader( tpAniSirGlobal pMac,
     vos_mem_copy(  (tANI_U8 *) pMacHdr->bssId,
                    (tANI_U8 *) peerAddr,
                    sizeof( tSirMacAddr ));
+
+#ifdef QCA_WIFI_2_0
+    /* Prepare sequence number */
+    limAddMgmtSeqNum(pMac, pMacHdr);
+    limLog(pMac, LOG1,"seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d",
+            pMacHdr->seqControl.seqNumLo,
+            pMacHdr->seqControl.seqNumHi,
+            pMac->mgmtSeqNum);
+#endif /* QCA_WIFI_2_0 */
+
     return statusCode;
 } /*** end limPopulateMacHeader() ***/
 
@@ -1386,7 +1428,7 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
     tANI_BOOLEAN         isVHTEnabled = eANI_BOOLEAN_FALSE;
     tANI_U16             addStripoffIELen = 0;
     tDot11fIEExtCap      extractedExtCap;
-    tANI_BOOLEAN         extractedExtCapFlag = eANI_BOOLEAN_TRUE;
+    tANI_BOOLEAN         extractedExtCapFlag = eANI_BOOLEAN_FALSE;
     if(NULL == psessionEntry)
     {
         return;
@@ -1575,12 +1617,15 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
                                       &addIE[0],
                                       &addStripoffIELen,
                                       &extractedExtCap );
-                    addnIELen = addStripoffIELen;
                     if(eSIR_SUCCESS != nSirStatus)
                     {
-                        extractedExtCapFlag = eANI_BOOLEAN_FALSE;
                         limLog(pMac, LOG1,
                             FL("Unable to Stripoff ExtCap IE from Assoc Rsp"));
+                    }
+                    else
+                    {
+                        addnIELen = addStripoffIELen;
+                        extractedExtCapFlag = eANI_BOOLEAN_TRUE;
                     }
                     nBytes = nBytes + addnIELen;
                 }
@@ -2597,6 +2642,7 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
 #endif
     tANI_U8               txFlag = 0;
     tANI_U8               smeSessionId = 0;
+    tANI_BOOLEAN          isVHTEnabled = eANI_BOOLEAN_FALSE;
 
     if (NULL == psessionEntry)
     {
@@ -2819,6 +2865,18 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
         PopulateMDIE( pMac, &frm.MobilityDomain, psessionEntry->pLimReAssocReq->bssDescription.mdie);
     }
 #endif
+
+#ifdef WLAN_FEATURE_11AC
+    if ( psessionEntry->vhtCapability &&
+             psessionEntry->vhtCapabilityPresentInBeacon)
+    {
+        limLog( pMac, LOG1, FL("Populate VHT IEs in Re-Assoc Request"));
+        PopulateDot11fVHTCaps( pMac, psessionEntry, &frm.VHTCaps );
+        isVHTEnabled = eANI_BOOLEAN_TRUE;
+    }
+#endif
+
+    PopulateDot11fExtCap(pMac, isVHTEnabled, &frm.ExtCap);
 
     nStatus = dot11fGetPackedReAssocRequestSize( pMac, &frm, &nPayload );
     if ( DOT11F_FAILED( nStatus ) )
@@ -3853,46 +3911,12 @@ end:
 
 eHalStatus limDisassocTxCompleteCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess)
 {
-    eHalStatus status = eHAL_STATUS_FAILURE;
-
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-        return status;
-    }
-    status = limSendDisassocCnf(pMac);
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-        return eHAL_STATUS_FAILURE;
-    }
-    return status;
+    return limSendDisassocCnf(pMac);
 }
 
 eHalStatus limDeauthTxCompleteCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess)
 {
-    eHalStatus status = eHAL_STATUS_FAILURE;
-
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-        return status;
-    }
-    status = limSendDeauthCnf(pMac);
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-        return eHAL_STATUS_FAILURE;
-    }
-    return status;
+    return limSendDeauthCnf(pMac);
 }
 
 /**
