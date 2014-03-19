@@ -6863,6 +6863,17 @@ static int wlan_hdd_cfg80211_join_ibss( struct wiphy *wiphy,
         alloc_bssid = VOS_TRUE;
     }
 
+    if ((params->beacon_interval > CFG_BEACON_INTERVAL_MIN)
+        && (params->beacon_interval <= CFG_BEACON_INTERVAL_MAX))
+        pRoamProfile->beaconInterval = params->beacon_interval;
+    else {
+        pRoamProfile->beaconInterval = CFG_BEACON_INTERVAL_DEFAULT;
+        hddLog(VOS_TRACE_LEVEL_INFO_HIGH,
+                "%s: input beacon interval %d TU is invalid, use default %d TU",
+                __func__, params->beacon_interval,
+                pRoamProfile->beaconInterval);
+    }
+
     /* Set Channel */
     if (NULL !=
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0))
@@ -7379,14 +7390,19 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
     //convert to the UI units of 100kbps
     myRate = pAdapter->hdd_stats.ClassA_stat.tx_rate * 5;
 #ifdef QCA_WIFI_2_0
-    if (!(rate_flags & eHAL_TX_RATE_LEGACY) && myRate)
+    if (!(rate_flags & eHAL_TX_RATE_LEGACY))
     {
         nss = pAdapter->hdd_stats.ClassA_stat.rx_frag_cnt;
-        pAdapter->hdd_stats.ClassA_stat.mcs_index =
-                                  wlan_hdd_get_mcs_idx(myRate, rate_flags, nss);
-        hddLog(VOS_TRACE_LEVEL_DEBUG, "computed mcs idx %d from rate:%d",
+
+        if(myRate)
+        {
+            pAdapter->hdd_stats.ClassA_stat.mcs_index =
+                wlan_hdd_get_mcs_idx(myRate, rate_flags, nss);
+            hddLog(VOS_TRACE_LEVEL_DEBUG, "computed mcs idx %d from rate:%d",
                                      pAdapter->hdd_stats.ClassA_stat.mcs_index,
                                      myRate);
+        }
+
         myRate = 0;
     }
 #endif
@@ -7492,10 +7508,9 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
             maxRate = (currentRate > maxRate)?currentRate:maxRate;
         }
         /* Get MCS Rate Set --
-           only if we are connected at MCS rates (or)
-           if we are always reporting max speed  (or)
+           Only if we are always reporting max speed  (or)
            if we have good rssi */
-         if (((0 == rssidx) && !(rate_flags & eHAL_TX_RATE_LEGACY)) ||
+         if ((0 == rssidx) ||
               (eHDD_LINK_SPEED_REPORT_MAX == pCfg->reportMaxLinkSpeed))
         {
             if (0 != ccmCfgGetStr(WLAN_HDD_GET_HAL_CTX(pAdapter), WNI_CFG_CURRENT_MCS_SET,
