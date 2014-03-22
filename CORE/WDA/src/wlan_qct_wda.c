@@ -10156,7 +10156,13 @@ void WDA_GTKOffloadRespCallback( WDI_GtkOffloadRspParams  *pwdiGtkOffloadRsparam
    VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
                                           "<------ %s " ,__func__);
 
-   VOS_ASSERT(NULL != pWdaParams);
+   if(NULL == pWdaParams)
+   {
+      VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+                 "%s: pWdaParams received NULL", __func__);
+      VOS_ASSERT(0);
+      return;
+   }
 
    vos_mem_free(pWdaParams->wdaMsgParam) ;
    vos_mem_free(pWdaParams->wdaWdiApiMsgParam);
@@ -10288,8 +10294,13 @@ void WDA_GtkOffloadGetInfoRespCallback( WDI_GtkOffloadGetInfoRspParams *pwdiGtkO
    VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
                                           "<------ %s " ,__func__);
 
-   VOS_ASSERT(NULL != pWdaParams);
-
+   if(NULL == pWdaParams)
+   {
+      VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+                 "%s: pWdaParams received NULL", __func__);
+      VOS_ASSERT(0);
+      return;
+   }
    pWDA = (tWDA_CbContext *)pWdaParams->pWdaContext ;
    pGtkOffloadGetInfoReq = (tpSirGtkOffloadGetInfoRspParams)pWdaParams->wdaMsgParam;
 
@@ -11278,7 +11289,9 @@ static VOS_STATUS WDA_ProcessDHCPStartInd (tWDA_CbContext *pWDA,
    }
 
    wdiDHCPInd->device_mode = dhcpStartInd->device_mode;
-   vos_mem_copy(wdiDHCPInd->macAddr, dhcpStartInd->macAddr,
+   vos_mem_copy(wdiDHCPInd->adapterMacAddr, dhcpStartInd->adapterMacAddr,
+                                               sizeof(tSirMacAddr));
+   vos_mem_copy(wdiDHCPInd->peerMacAddr, dhcpStartInd->peerMacAddr,
                                                sizeof(tSirMacAddr));
 
    status = WDI_dhcpStartInd(wdiDHCPInd);
@@ -11311,7 +11324,8 @@ static VOS_STATUS WDA_ProcessDHCPStartInd (tWDA_CbContext *pWDA,
       return VOS_STATUS_E_NOMEM;
    }
    wdiDHCPInd->device_mode = dhcpStopInd->device_mode;
-   vos_mem_copy(wdiDHCPInd->macAddr, dhcpStopInd->macAddr, sizeof(tSirMacAddr));
+   vos_mem_copy(wdiDHCPInd->adapterMacAddr, dhcpStopInd->adapterMacAddr, sizeof(tSirMacAddr));
+   vos_mem_copy(wdiDHCPInd->peerMacAddr, dhcpStopInd->peerMacAddr, sizeof(tSirMacAddr));
    status = WDI_dhcpStopInd(wdiDHCPInd);
    if (IS_WDI_STATUS_FAILURE(status))
    {

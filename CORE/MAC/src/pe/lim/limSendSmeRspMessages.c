@@ -2783,7 +2783,6 @@ void limHandleDeleteBssRsp(tpAniSirGlobal pMac,tpSirMsgQ MsgQ)
     {
         limLog(pMac, LOGE,FL("Session Does not exist for given sessionID %d"),
           pDelBss->sessionId);
-        vos_mem_free(pDelBss);
         return;
     }
     if (psessionEntry->limSystemRole == eLIM_STA_IN_IBSS_ROLE)
@@ -2952,7 +2951,7 @@ limSendSmeCandidateFoundInd(tpAniSirGlobal pMac, tANI_U8  sessionId)
     pSirSmeCandidateFoundInd->sessionId     =  sessionId;
 
 
-    limLog( pMac, LOGE, FL("posting candidate ind to SME"));
+    limLog( pMac, LOG1, FL("posting candidate ind to SME"));
     mmhMsg.type = eWNI_SME_CANDIDATE_FOUND_IND;
     mmhMsg.bodyptr = pSirSmeCandidateFoundInd;
     mmhMsg.bodyval = 0;

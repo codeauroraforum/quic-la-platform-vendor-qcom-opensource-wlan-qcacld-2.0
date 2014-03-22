@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1134,6 +1134,14 @@ void macTraceDumpAll(tpAniSirGlobal pMac, tANI_U8 code, tANI_U8 session, tANI_U3
             }
         }
 
+        if (i < 0)
+        {
+            i = 0;
+        }
+        else if (i >= MAX_TRACE_RECORDS)
+        {
+            i = MAX_TRACE_RECORDS - 1;
+        }
         pRecord = &gTraceTbl[i];
 
         for (;;)
