@@ -525,6 +525,8 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             else
             {
                 pHddApCtx->uBCStaId = pSapEvent->sapevt.sapStartBssCompleteEvent.staId;
+                pHostapdAdapter->sessionId =
+                        pSapEvent->sapevt.sapStartBssCompleteEvent.sessionId;
                 //@@@ need wep logic here to set privacy bit
                 hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
             }
@@ -1166,7 +1168,7 @@ static iw_softap_setparam(struct net_device *dev,
             }
             break;
 
-        case QCSAP_PARAM_SET_AUTO_CHANNEL:
+        case QCSAP_PARAM_AUTO_CHANNEL:
             if ((0 != set_value) && (1 != set_value))
             {
                 hddLog(LOGE, FL("Invalid setAutoChannel value %d"), set_value);
@@ -1754,6 +1756,18 @@ static iw_softap_setparam(struct net_device *dev,
                   break;
              }
 #endif /* QCA_PKT_PROTO_TRACE */
+
+        case QCASAP_SET_TM_LEVEL:
+             {
+                  hddLog(VOS_TRACE_LEVEL_INFO, "Set Thermal Mitigation Level %d",
+                            set_value);
+#ifdef QCA_WIFI_ISOC
+                  hddLog(VOS_TRACE_LEVEL_ERROR, " 'setTmLevel' Command Not supported for this mode");
+#else
+                  (void)sme_SetThermalLevel(hHal, set_value);
+#endif
+                  break;
+             }
 
 #endif /* QCA_WIFI_2_0 */
         default:
@@ -3791,7 +3805,8 @@ static const struct iw_priv_args hostapd_private_args[] = {
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,  "setMccLatency" },
    { QCSAP_PARAM_SET_MCC_CHANNEL_QUOTA,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,  "setMccQuota" },
-
+   { QCSAP_PARAM_AUTO_CHANNEL,
+      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,  "setAutoChannel" },
 
 #ifdef QCA_WIFI_2_0
  /* Sub-cmds DBGLOG specific commands */
@@ -3970,6 +3985,11 @@ static const struct iw_priv_args hostapd_private_args[] = {
         "setDbgLvl" },
 #endif /* QCA_PKT_PROTO_TRACE */
 
+    {   QCASAP_SET_TM_LEVEL,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "setTmLevel" },
+
 #endif /* QCA_WIFI_2_0 */
 
   { QCSAP_IOCTL_GETPARAM,
@@ -3983,8 +4003,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "getwlandbg" },
   { QCSAP_PARAM_AUTO_CHANNEL, 0,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "getAutoChannel" },
-  { QCSAP_PARAM_SET_AUTO_CHANNEL,
-      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "setAutoChannel" },
   { QCSAP_PARAM_MODULE_DOWN_IND, 0,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "moduleDownInd" },
   { QCSAP_PARAM_CLR_ACL, 0,

@@ -60,7 +60,7 @@
 #include <pmcApi.h>
 #include <wlan_hdd_misc.h>
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
 static void cbNotifySetRoamPrefer5GHz(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
     sme_UpdateRoamPrefer5GHz((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nRoamPrefer5GHz);
@@ -145,11 +145,11 @@ static void NotifyIsMAWCIniFeatureEnabled(hdd_context_t *pHddCtx, unsigned long 
 }
 #endif
 
-#ifdef FEATURE_WLAN_CCX
-static void cbNotifySetCcxFeatureEnabled(hdd_context_t *pHddCtx, unsigned long NotifyId)
+#ifdef FEATURE_WLAN_ESE
+static void cbNotifySetEseFeatureEnabled(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
     // at the point this routine is called, the value in the cfg_ini table has already been updated
-    sme_UpdateIsCcxFeatureEnabled((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->isCcxIniFeatureEnabled );
+    sme_UpdateIsEseFeatureEnabled((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->isEseIniFeatureEnabled );
 }
 #endif
 
@@ -1096,21 +1096,21 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_QOS_WMM_INFRA_UAPSD_BK_SUS_INTV_MIN,
                  CFG_QOS_WMM_INFRA_UAPSD_BK_SUS_INTV_MAX ),
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
    REG_VARIABLE( CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, InfraInactivityInterval,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_DEFAULT,
                  CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MIN,
                  CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MAX),
-   REG_DYNAMIC_VARIABLE( CFG_CCX_FEATURE_ENABLED_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, isCcxIniFeatureEnabled,
+   REG_DYNAMIC_VARIABLE( CFG_ESE_FEATURE_ENABLED_NAME, WLAN_PARAM_Integer,
+                 hdd_config_t, isEseIniFeatureEnabled,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-                 CFG_CCX_FEATURE_ENABLED_DEFAULT,
-                 CFG_CCX_FEATURE_ENABLED_MIN,
-                 CFG_CCX_FEATURE_ENABLED_MAX,
-                 cbNotifySetCcxFeatureEnabled, 0 ),
-#endif // FEATURE_WLAN_CCX
+                 CFG_ESE_FEATURE_ENABLED_DEFAULT,
+                 CFG_ESE_FEATURE_ENABLED_MIN,
+                 CFG_ESE_FEATURE_ENABLED_MAX,
+                 cbNotifySetEseFeatureEnabled, 0 ),
+#endif // FEATURE_WLAN_ESE
 
 #ifdef FEATURE_WLAN_LFR
    // flag to turn ON/OFF Legacy Fast Roaming
@@ -1133,8 +1133,8 @@ REG_TABLE_ENTRY g_registry_table[] =
 
 #endif // FEATURE_WLAN_LFR
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
-   // flag to turn ON/OFF 11r and CCX FastTransition
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
+   // flag to turn ON/OFF 11r and ESE FastTransition
    REG_DYNAMIC_VARIABLE( CFG_FAST_TRANSITION_ENABLED_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, isFastTransitionEnabled,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2350,7 +2350,7 @@ REG_TABLE_ENTRY g_registry_table[] =
                        CFG_LINK_SPEED_RSSI_LOW_MAX,
                        NULL, 0 ),
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    REG_DYNAMIC_VARIABLE( CFG_ROAM_PREFER_5GHZ, WLAN_PARAM_Integer,
                        hdd_config_t, nRoamPrefer5GHz,
                        VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2500,6 +2500,20 @@ REG_VARIABLE( CFG_VHT_ENABLE_GID_FEATURE, WLAN_PARAM_Integer,
              CFG_VHT_ENABLE_GID_FEATURE_MIN,
              CFG_VHT_ENABLE_GID_FEATURE_MAX ),
 #endif
+
+REG_VARIABLE( CFG_VHT_ENABLE_1x1_TX_CHAINMASK, WLAN_PARAM_Integer,
+             hdd_config_t, txchainmask1x1,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+             CFG_VHT_ENABLE_1x1_TX_CHAINMASK_DEFAULT,
+             CFG_VHT_ENABLE_1x1_TX_CHAINMASK_MIN,
+             CFG_VHT_ENABLE_1x1_TX_CHAINMASK_MAX ),
+
+REG_VARIABLE( CFG_VHT_ENABLE_1x1_RX_CHAINMASK, WLAN_PARAM_Integer,
+             hdd_config_t, rxchainmask1x1,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+             CFG_VHT_ENABLE_1x1_RX_CHAINMASK_DEFAULT,
+             CFG_VHT_ENABLE_1x1_RX_CHAINMASK_MIN,
+             CFG_VHT_ENABLE_1x1_RX_CHAINMASK_MAX ),
 
 REG_VARIABLE( CFG_ENABLE_AMPDUPS_FEATURE, WLAN_PARAM_Integer,
              hdd_config_t, enableAmpduPs,
@@ -3193,6 +3207,36 @@ REG_VARIABLE( CFG_SAP_SCAN_BAND_PREFERENCE, WLAN_PARAM_Integer,
                CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT,
                CFG_SAP_SCAN_BAND_PREFERENCE_MIN,
                CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
+
+#ifdef QCA_LL_TX_FLOW_CT
+REG_VARIABLE( CFG_LL_TX_STA_FLOW_LWM, WLAN_PARAM_Integer,
+              hdd_config_t, TxStaFlowLowWaterMark,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_STA_FLOW_LWM_DEFAULT,
+              CFG_LL_TX_STA_FLOW_LWM_MIN,
+              CFG_LL_TX_STA_FLOW_LWM_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_STA_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
+              hdd_config_t, TxStaFlowHighWaterMarkOffset,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_STA_FLOW_HWM_OFFSET_DEFAULT,
+              CFG_LL_TX_STA_FLOW_HWM_OFFSET_MIN,
+              CFG_LL_TX_STA_FLOW_HWM_OFFSET_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_IBSS_FLOW_LWM, WLAN_PARAM_Integer,
+              hdd_config_t, TxIbssFlowLowWaterMark,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_LWM_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_LWM_MIN,
+              CFG_LL_TX_IBSS_FLOW_LWM_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_IBSS_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
+              hdd_config_t, TxIbssFlowHighWaterMarkOffset,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MIN,
+              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MAX ),
+#endif /* QCA_LL_TX_FLOW_CT */
 };
 
 /*
@@ -3452,9 +3496,9 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraUapsdBkSrvIntv] Value = [%u] ",pHddCtx->cfg_ini->InfraUapsdBkSrvIntv);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraUapsdBkSuspIntv] Value = [%u] ",pHddCtx->cfg_ini->InfraUapsdBkSuspIntv);
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraInactivityInterval] Value = [%u] ",pHddCtx->cfg_ini->InfraInactivityInterval);
-  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [CcxEnabled] Value = [%u] ",pHddCtx->cfg_ini->isCcxIniFeatureEnabled);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [EseEnabled] Value = [%u] ",pHddCtx->cfg_ini->isEseIniFeatureEnabled);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [FastTransitionEnabled] Value = [%u] ",pHddCtx->cfg_ini->isFastTransitionEnabled);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gTxPowerCap] Value = [%u] dBm ",pHddCtx->cfg_ini->nTxPowerCap);
 #endif
@@ -3462,7 +3506,7 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [FastRoamEnabled] Value = [%u] ",pHddCtx->cfg_ini->isFastRoamIniFeatureEnabled);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [MAWCEnabled] Value = [%u] ",pHddCtx->cfg_ini->MAWCEnabled);
 #endif
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [RoamRssiDiff] Value = [%u] ",pHddCtx->cfg_ini->RoamRssiDiff);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ImmediateRoamRssiDiff] Value = [%u] ",pHddCtx->cfg_ini->nImmediateRoamRssiDiff);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [isWESModeEnabled] Value = [%u] ",pHddCtx->cfg_ini->isWESModeEnabled);
@@ -4800,7 +4844,14 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
                fStatus = FALSE;
                hddLog(LOGE, "Could not pass on WNI_CFG_VHT_TX_MCS_MAP to CCM\n");
            }
-
+           /* Currently shortGI40Mhz is used for shortGI80Mhz */
+           if (ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_VHT_SHORT_GI_80MHZ,
+               pConfig->ShortGI40MhzEnable, NULL, eANI_BOOLEAN_FALSE)
+               == eHAL_STATUS_FAILURE)
+           {
+               fStatus = FALSE;
+               hddLog(LOGE, "Could not pass WNI_VHT_SHORT_GI_80MHZ to CCM\n");
+           }
            // Hardware is capable of doing 128K AMPDU in 11AC mode
            if(ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_VHT_AMPDU_LEN_EXPONENT,
                            pConfig->fVhtAmpduLenExponent, NULL,
@@ -5142,7 +5193,7 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig.csrConfig.nTxPowerCap = pConfig->nTxPowerCap;
    smeConfig.csrConfig.fEnableBypass11d          = pConfig->enableBypass11d;
    smeConfig.csrConfig.fEnableDFSChnlScan        = pConfig->enableDFSChnlScan;
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    smeConfig.csrConfig.nRoamPrefer5GHz           = pConfig->nRoamPrefer5GHz;
    smeConfig.csrConfig.nRoamIntraBand            = pConfig->nRoamIntraBand;
    smeConfig.csrConfig.nProbes                   = pConfig->nProbes;
@@ -5189,14 +5240,14 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig.csrConfig.isFastRoamIniFeatureEnabled = pConfig->isFastRoamIniFeatureEnabled;
    smeConfig.csrConfig.MAWCEnabled = pConfig->MAWCEnabled;
 #endif
-#ifdef FEATURE_WLAN_CCX
-   smeConfig.csrConfig.isCcxIniFeatureEnabled = pConfig->isCcxIniFeatureEnabled;
-   if( pConfig->isCcxIniFeatureEnabled )
+#ifdef FEATURE_WLAN_ESE
+   smeConfig.csrConfig.isEseIniFeatureEnabled = pConfig->isEseIniFeatureEnabled;
+   if( pConfig->isEseIniFeatureEnabled )
    {
        pConfig->isFastTransitionEnabled = TRUE;
    }
 #endif
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    smeConfig.csrConfig.isFastTransitionEnabled = pConfig->isFastTransitionEnabled;
    if (pConfig->nSelect5GHzMargin)
    {

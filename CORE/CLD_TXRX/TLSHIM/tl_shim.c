@@ -57,7 +57,7 @@
 #define TLSHIM_LOGP(args...) \
 	VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_FATAL, ## args)
 
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 
 /************************/
 /*   Internal defines   */
@@ -186,7 +186,7 @@ tlshim_mgmt_over_data_rx_handler(struct work_struct *ptr_work)
         * if not native wifi populate: copy just part after 802.11 hdr
         * i.e. part starting from snap header
         */
-        tpCcxIappHdr iapp_hdr_ptr = (tpCcxIappHdr)&data[ETHERNET_HDR_LEN];
+        tpEseIappHdr iapp_hdr_ptr = (tpEseIappHdr)&data[ETHERNET_HDR_LEN];
         u_int8_t *snap_hdr_ptr = &(((u_int8_t*)wh)[SIZEOF_80211_HDR]);
         tpSirMacFrameCtl ptr_80211_FC = (tpSirMacFrameCtl)&wh->i_fc;
         ptr_80211_FC->protVer = SIR_MAC_PROTOCOL_VERSION;
@@ -318,7 +318,7 @@ tlshim_check_n_process_iapp_frame (pVosContextType pVosGCtx,
     /* if returned false the packet will be handled by the upper layer */
     return false;
 }
-#endif /* defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD) */
+#endif /* defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD) */
 
 
 #ifdef QCA_WIFI_ISOC
@@ -751,7 +751,7 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 {
 	struct txrx_tl_shim_ctx *tl_shim;
 #if defined(IPA_OFFLOAD) || \
-    (defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD))
+    (defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD))
 	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, context);
 #endif
 	struct tlshim_sta_info *sta_info;
@@ -813,7 +813,7 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 		if (ret == VOS_STATUS_E_INVAL) {
 #endif
 
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 			/*
 			 * in case following returns true, a defered task was created
 			 * inside function, which does following:
@@ -1365,6 +1365,9 @@ VOS_STATUS WLANTL_RegisterMgmtFrmClient(void *vos_ctx,
 VOS_STATUS WLANTL_GetRssi(void *vos_ctx, u_int8_t sta_id, v_S7_t *rssi, void *pGetRssiReq)
 {
 	tp_wma_handle wma_handle;
+	struct txrx_tl_shim_ctx *tl_shim;
+	struct tlshim_sta_info *sta_info;
+	v_S7_t first_rssi;
 
 	ENTER();
 
@@ -1374,12 +1377,26 @@ VOS_STATUS WLANTL_GetRssi(void *vos_ctx, u_int8_t sta_id, v_S7_t *rssi, void *pG
 		return VOS_STATUS_E_FAILURE;
 	}
 
+	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return VOS_STATUS_E_FAULT;
+	}
+
+	if (sta_id >= WLAN_MAX_STA_COUNT) {
+		TLSHIM_LOGE("Invalid sta id :%d", sta_id);
+		return VOS_STATUS_E_INVAL;
+	}
+
+	sta_info = &tl_shim->sta_info[sta_id];
+	first_rssi = sta_info->first_rssi;
+
 	if(VOS_STATUS_SUCCESS !=
-		wma_send_snr_request(wma_handle, pGetRssiReq))
-	{
+		wma_send_snr_request(wma_handle, pGetRssiReq, first_rssi)) {
 		TLSHIM_LOGE("Failed to Trigger wma stats request");
 		return VOS_STATUS_E_FAILURE;
 	}
+
 	/* dont send success, otherwise call back
 	 * will released with out values */
 	return VOS_STATUS_E_BUSY;
@@ -1493,6 +1510,7 @@ VOS_STATUS WLANTL_ClearSTAClient(void *vos_ctx, u_int8_t sta_id)
 	adf_os_spin_lock_bh(&tl_shim->sta_info[sta_id].stainfo_lock);
 	tl_shim->sta_info[sta_id].registered = 0;
 	tl_shim->sta_info[sta_id].data_rx = NULL;
+	tl_shim->sta_info[sta_id].first_rssi = 0;
 	adf_os_spin_unlock_bh(&tl_shim->sta_info[sta_id].stainfo_lock);
 
 	return VOS_STATUS_SUCCESS;
@@ -1536,6 +1554,7 @@ VOS_STATUS WLANTL_RegisterSTAClient(void *vos_ctx,
 	adf_os_spin_lock_bh(&sta_info->stainfo_lock);
 	sta_info->data_rx = rxcb;
 	sta_info->registered = true;
+	sta_info->first_rssi = rssi;
 	adf_os_spin_unlock_bh(&sta_info->stainfo_lock);
 
 	param.qos_capable =  sta_desc->ucQosEnabled;
@@ -1590,7 +1609,7 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 		return VOS_STATUS_E_FAILURE;
 	}
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 	vos_flush_work(&tl_shim->iapp_work.deferred_work);
 #endif
 	vos_flush_work(&tl_shim->cache_flush_work);
@@ -1645,7 +1664,7 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	}
 
 	INIT_WORK(&tl_shim->cache_flush_work, tl_shim_cache_flush_work);
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
     INIT_WORK(&(tl_shim->iapp_work.deferred_work),
         tlshim_mgmt_over_data_rx_handler);
 #endif
@@ -1760,7 +1779,9 @@ void *tl_shim_get_vdev_by_sta_id(void *vos_context, uint8_t sta_id)
 v_BOOL_t WLANTL_GetTxResource
 (
 	void *vos_context,
-	uint8_t sta_id
+	uint8_t sta_id,
+	unsigned int low_watermark,
+	unsigned int high_watermark_offset
 )
 {
 	struct ol_txrx_peer_t *peer = NULL;
@@ -1776,7 +1797,9 @@ v_BOOL_t WLANTL_GetTxResource
 		return VOS_TRUE;
 	}
 
-	return (v_BOOL_t)wdi_in_get_tx_resource(peer->vdev);
+	return (v_BOOL_t)wdi_in_get_tx_resource(peer->vdev,
+				low_watermark,
+				high_watermark_offset);
 }
 
 /*=============================================================================
@@ -1802,29 +1825,27 @@ v_BOOL_t WLANTL_GetTxResource
 void WLANTL_TXFlowControlCb
 (
 	void  *tlContext,
+	v_U8_t peer_idx,
 	v_U8_t sessionId,
 	v_BOOL_t resume_tx
 )
 {
 	struct txrx_tl_shim_ctx *tl_shim;
-	v_U8_t sta_loop;
 	WLANTL_TxFlowControlCBType flow_control_cb = NULL;
 	void *adpter_ctxt = NULL;
 
 	tl_shim = (struct txrx_tl_shim_ctx *)tlContext;
 	if (!tl_shim) {
+		TLSHIM_LOGE("%s, tl_shim is NULL", __func__);
 		/* Invalid instace */
 		return;
 	}
 
-	for (sta_loop = 0; sta_loop < WLAN_MAX_STA_COUNT; sta_loop++) {
-		if ((tl_shim->sta_info[sta_loop].sessionId == sessionId) &&
-			(tl_shim->sta_info[sta_loop].flowControl))
-		{
-			flow_control_cb = tl_shim->sta_info[sta_loop].flowControl;
-			adpter_ctxt = tl_shim->sta_info[sta_loop].adpaterCtxt;
-			break;
-		}
+	if ((peer_idx < WLAN_MAX_STA_COUNT) &&
+		(tl_shim->sta_info[peer_idx].sessionId == sessionId) &&
+		(tl_shim->sta_info[peer_idx].flowControl)) {
+		flow_control_cb = tl_shim->sta_info[peer_idx].flowControl;
+		adpter_ctxt = tl_shim->sta_info[peer_idx].adpaterCtxt;
 	}
 
 	if ((flow_control_cb) && (adpter_ctxt)) {

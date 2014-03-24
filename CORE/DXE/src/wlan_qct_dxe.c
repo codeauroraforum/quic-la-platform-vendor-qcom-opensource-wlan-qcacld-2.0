@@ -86,6 +86,13 @@ when           who        what, where, why
 
 #define WLANPAL_RX_INTERRUPT_PRO_MASK      0x20
 #define WLANDXE_RX_INTERRUPT_PRO_UNMASK    0x5F
+
+/* 1msec busy wait in case CSR is not valid */
+#define WLANDXE_CSR_NEXT_READ_WAIT         1000
+/* CSR max retry count */
+#define WLANDXE_CSR_MAX_READ_COUNT         30
+
+
 /* This is temporary fot the compile
  * WDI will release official version
  * This must be removed */
@@ -1318,25 +1325,51 @@ static wpt_status dxeEngineCoreStart
 {
    wpt_status                 status = eWLAN_PAL_STATUS_SUCCESS;
    wpt_uint32                 registerData = 0;
-
+   wpt_uint8                  readRetry;
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Enter", __func__);
+#ifdef WCN_PRONTO
+   /* Read default */
+   wpalReadRegister(WLANDXE_CCU_SOFT_RESET, &registerData);
+   registerData |= WLANDXE_DMA_CCU_DXE_RESET_MASK;
 
+   /* Make reset */
+   wpalWriteRegister(WLANDXE_CCU_SOFT_RESET, registerData);
+
+   /* Clear reset */
+   registerData &= ~WLANDXE_DMA_CCU_DXE_RESET_MASK;
+   wpalWriteRegister(WLANDXE_CCU_SOFT_RESET, registerData);
+#else
    /* START This core init is not needed for the integrated system */
    /* Reset First */
    registerData = WLANDXE_DMA_CSR_RESET_MASK;
    wpalWriteRegister(WALNDEX_DMA_CSR_ADDRESS,
                           registerData);
-
-   registerData  = WLANDXE_DMA_CSR_EN_MASK;
-   registerData |= WLANDXE_DMA_CSR_ECTR_EN_MASK;
-   registerData |= WLANDXE_DMA_CSR_TSTMP_EN_MASK;
-   registerData |= WLANDXE_DMA_CSR_H2H_SYNC_EN_MASK;
-
-   registerData = 0x00005c89;
-   wpalWriteRegister(WALNDEX_DMA_CSR_ADDRESS,
-                          registerData);
-
+#endif /* WCN_PRONTO */
+   for(readRetry = 0; readRetry < WLANDXE_CSR_MAX_READ_COUNT; readRetry++)
+   {
+      wpalWriteRegister(WALNDEX_DMA_CSR_ADDRESS,
+                        WLANDXE_CSR_DEFAULT_ENABLE);
+      wpalReadRegister(WALNDEX_DMA_CSR_ADDRESS, &registerData);
+      if(!(registerData & WLANDXE_DMA_CSR_EN_MASK))
+      {
+         HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                  "%s CSR 0x%x, count %d",
+                  __func__, registerData, readRetry);
+         /* CSR is not valid value, re-try to write */
+         wpalBusyWait(WLANDXE_CSR_NEXT_READ_WAIT);
+      }
+      else
+      {
+         break;
+      }
+   }
+   if(WLANDXE_CSR_MAX_READ_COUNT == readRetry)
+   {
+      /* MAX wait, still cannot write correct value
+       * Panic device */
+      wpalDevicePanic();
+   }
    /* Is This needed?
     * Not sure, revisit with integrated system */
    /* END This core init is not needed for the integrated system */
@@ -1922,13 +1955,17 @@ void dxeRXPacketAvailableCB
    dxeCtxt->freeRXPacket = freePacket;
 
    /* Serialize RX Packet Available message upon RX thread */
-   HDXE_ASSERT(NULL != dxeCtxt->rxPktAvailMsg);
-
+   if (NULL == dxeCtxt->rxPktAvailMsg)
+   {
+       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+               "DXE NULL pkt");
+       HDXE_ASSERT(0);
+       return;
+   }
    status = wpalPostRxMsg(WDI_GET_PAL_CTX(),
                           dxeCtxt->rxPktAvailMsg);
    if(eWLAN_PAL_STATUS_SUCCESS != status)
    {
-      HDXE_ASSERT(eWLAN_PAL_STATUS_SUCCESS == status);
       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
                "dxeRXPacketAvailableCB serialize fail");
    }
@@ -2035,8 +2072,13 @@ static wpt_status dxeRXFrameSingleBufferAlloc
    status = wpalAllocateShadowRxFrame(currentPalPacketBuffer,
                                            &physicalAddressPCIe,
                                            &virtualAddressPCIe);
-   HDXE_ASSERT(0 != physicalAddressPCIe);
-   HDXE_ASSERT(0 != virtualAddressPCIe);
+   if((0 == physicalAddressPCIe) || (0 = virtualAddressPCIe))
+   {
+       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_MED,
+               "RX NULL Shadow Memory");
+       HDXE_ASSERT(0);
+       return eWLAN_PAL_STATUS_E_FAULT;
+   }
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_MED,
             "RX Shadow Memory Va 0x%x, Pa 0x%x",
             virtualAddressPCIe, physicalAddressPCIe);
@@ -2994,12 +3036,18 @@ static void dxeRXISR
    }
 
    /* Serialize RX Ready interrupt upon RX thread */
-   HDXE_ASSERT(NULL != dxeCtxt->rxIsrMsg);
+   if(NULL == dxeCtxt->rxIsrMsg)
+   {
+      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "dxeRXFrameReadyISR NULL message");
+      HDXE_ASSERT(0);
+      return;
+   }
+
    status = wpalPostRxMsg(WDI_GET_PAL_CTX(),
                           dxeCtxt->rxIsrMsg);
    if(eWLAN_PAL_STATUS_SUCCESS != status)
    {
-      HDXE_ASSERT(eWLAN_PAL_STATUS_SUCCESS == status);
       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
                "dxeRXFrameReadyISR interrupt serialize fail");
    }
@@ -3108,8 +3156,21 @@ static wpt_status dxeTXPushFrame
       sourcePhysicalAddress          = (void *)frameVector.frg[fragCount].pa;
       xferSize                       = frameVector.frg[fragCount].size;
       fragCount++;
-      HDXE_ASSERT(0 != xferSize);
-      HDXE_ASSERT(NULL != sourcePhysicalAddress);
+      if(0 == xferSize)
+      {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                  "dxeTXPushFrame invalid transfer size");
+
+          HDXE_ASSERT(0);
+          return eWLAN_PAL_STATUS_E_FAILURE;
+      }
+      if(NULL == sourcePhysicalAddress)
+      {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+              "dxeTXPushFrame invalid sourcePhysicalAddress");
+          HDXE_ASSERT(0);
+          return eWLAN_PAL_STATUS_E_FAILURE;
+      }
 #else
       status = wpalIteratorNext(&iterator,
                                 palPacket,
@@ -3474,7 +3535,13 @@ static wpt_status dxeTXCompFrame
          break;
       }
 
-      HDXE_ASSERT(currentCtrlBlk->xfrFrame != NULL);
+      if(currentCtrlBlk->xfrFrame == NULL)
+      {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                  "Invalid transfer frame");
+          HDXE_ASSERT(0);
+          break;
+      }
       channelEntry->numFreeDesc++;
       channelEntry->numRsvdDesc--;
 
@@ -4162,7 +4229,13 @@ static void dxeTXISR
    dxeCtxt->ucTxMsgCnt = 1;
 
    /* Serialize TX complete interrupt upon TX thread */
-   HDXE_ASSERT(NULL != dxeCtxt->txIsrMsg);
+   if(NULL == dxeCtxt->txIsrMsg)
+   {
+       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+               "Invalid message");
+       HDXE_ASSERT(0);
+       return;
+   }
    status = wpalPostTxMsg(WDI_GET_PAL_CTX(),
                           dxeCtxt->txIsrMsg);
    if(eWLAN_PAL_STATUS_SUCCESS != status)

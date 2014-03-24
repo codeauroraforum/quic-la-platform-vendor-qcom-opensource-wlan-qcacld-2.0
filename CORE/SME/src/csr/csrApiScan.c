@@ -1932,7 +1932,7 @@ static tANI_U32 csrGetBssPreferValue(tpAniSirGlobal pMac, int rssi)
 static tANI_U32 csrGetBssCapValue(tpAniSirGlobal pMac, tSirBssDescription *pBssDesc, tDot11fBeaconIEs *pIes)
 {
     tANI_U32 ret = CSR_BSS_CAP_VALUE_NONE;
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
     if(CSR_IS_ROAM_PREFER_5GHZ(pMac))
     {
         if((pBssDesc) && CSR_IS_CHANNEL_5GHZ(pBssDesc->channelId))
@@ -5168,22 +5168,29 @@ eHalStatus csrScanSmeScanResponse( tpAniSirGlobal pMac, void *pMsgBuf )
                 }
             smeProcessPendingQueue( pMac );
         }
+#ifdef FEATURE_WLAN_SCAN_PNO
+        else if (pMac->pnoOffload && !HAL_STATUS_SUCCESS(csrSavePnoScanResults(pMac, pScanRsp)))
+        {
+            smsLog( pMac, LOGE, "CSR: Unable to store scan results for PNO" );
+            status = eHAL_STATUS_FAILURE;
+        }
+#endif
         else
         {
-            smsLog( pMac, LOGW, "CSR: Scan Completion called but SCAN command is not ACTIVE ..." );
+            smsLog( pMac, LOGE, "CSR: Scan Completion called but SCAN command is not ACTIVE ..." );
             status = eHAL_STATUS_FAILURE;
         }
     }
 #ifdef FEATURE_WLAN_SCAN_PNO
     else if (pMac->pnoOffload && !HAL_STATUS_SUCCESS(csrSavePnoScanResults(pMac, pScanRsp)))
     {
-        smsLog( pMac, LOGW, "CSR: Unable to store scan results for PNO" );
+        smsLog( pMac, LOGE, "CSR: Unable to store scan results for PNO" );
         status = eHAL_STATUS_FAILURE;
     }
 #endif
     else if (pMac->pnoOffload == FALSE)
     {
-        smsLog( pMac, LOGW, "CSR: Scan Completion called but NO commands are ACTIVE ..." );
+        smsLog( pMac, LOGE, "CSR: Scan Completion called but NO commands are ACTIVE ..." );
         status = eHAL_STATUS_FAILURE;
     }
 
@@ -8097,6 +8104,13 @@ eHalStatus csrScanSavePreferredNetworkFound(tpAniSirGlobal pMac,
    pBssDescr->sinr = 0;
    pBssDescr->rssi = -1 * pPrefNetworkFoundInd->rssi;
    pBssDescr->beaconInterval = pParsedFrame->beaconInterval;
+   if (!pBssDescr->beaconInterval)
+   {
+      smsLog(pMac, LOGW,
+         FL("Bcn Interval is Zero , default to 100" MAC_ADDRESS_STR),
+         MAC_ADDR_ARRAY(pBssDescr->bssId) );
+      pBssDescr->beaconInterval = 100;
+   }
    pBssDescr->timeStamp[0]   = pParsedFrame->timeStamp[0];
    pBssDescr->timeStamp[1]   = pParsedFrame->timeStamp[1];
    pBssDescr->capabilityInfo = *((tANI_U16 *)&pParsedFrame->capabilityInfo);
@@ -8301,7 +8315,7 @@ eHalStatus csrScanCreateEntryInScanCache(tpAniSirGlobal pMac, tANI_U32 sessionId
     return status;
 }
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 //  Update the TSF with the difference in system time
 void UpdateCCKMTSF(tANI_U32 *timeStamp0, tANI_U32 *timeStamp1, tANI_U32 *incr)
 {
