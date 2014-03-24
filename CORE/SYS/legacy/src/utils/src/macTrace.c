@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -495,8 +495,8 @@ tANI_U8* macTraceGetSmeMsgString( tANI_U16 smeMsg )
         CASE_RETURN_STRING(eWNI_SME_FT_AGGR_QOS_REQ);
         CASE_RETURN_STRING(eWNI_SME_FT_AGGR_QOS_RSP);
 #endif
-#if defined FEATURE_WLAN_CCX
-        CASE_RETURN_STRING(eWNI_SME_CCX_ADJACENT_AP_REPORT);
+#if defined FEATURE_WLAN_ESE
+        CASE_RETURN_STRING(eWNI_SME_ESE_ADJACENT_AP_REPORT);
 #endif
         CASE_RETURN_STRING(eWNI_SME_REGISTER_MGMT_FRAME_REQ);
         CASE_RETURN_STRING(eWNI_SME_COEX_IND);
@@ -670,7 +670,7 @@ tANI_U8* macTraceGetWdaMsgString( tANI_U16 wdaMsg )
         CASE_RETURN_STRING(WDA_TIMER_CHIP_MONITOR_TIMEOUT);
         CASE_RETURN_STRING(WDA_TIMER_TRAFFIC_ACTIVITY_REQ);
         CASE_RETURN_STRING(WDA_TIMER_ADC_RSSI_STATS);
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         CASE_RETURN_STRING(WDA_TSM_STATS_REQ);
         CASE_RETURN_STRING(WDA_TSM_STATS_RSP);
 #endif
@@ -786,7 +786,7 @@ tANI_U8* macTraceGetWdaMsgString( tANI_U16 wdaMsg )
 #ifndef REMOVE_PKT_LOG
         CASE_RETURN_STRING(WDA_PKTLOG_ENABLE_REQ);
 #endif
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
         CASE_RETURN_STRING(WDA_SET_PLM_REQ);
 #endif
         CASE_RETURN_STRING(WDA_CONFIG_PARAM_UPDATE_REQ);
@@ -864,8 +864,8 @@ tANI_U8* macTraceGetLimMsgString( tANI_U16 limMsg )
 #endif
         CASE_RETURN_STRING(SIR_LIM_BEACON_GEN_IND );
         CASE_RETURN_STRING(SIR_LIM_PERIODIC_PROBE_REQ_TIMEOUT);
-#ifdef FEATURE_WLAN_CCX
-        CASE_RETURN_STRING(SIR_LIM_CCX_TSM_TIMEOUT);
+#ifdef FEATURE_WLAN_ESE
+        CASE_RETURN_STRING(SIR_LIM_ESE_TSM_TIMEOUT);
 #endif
         CASE_RETURN_STRING(SIR_LIM_DISASSOC_ACK_TIMEOUT);
         CASE_RETURN_STRING(SIR_LIM_DEAUTH_ACK_TIMEOUT);
@@ -1134,6 +1134,14 @@ void macTraceDumpAll(tpAniSirGlobal pMac, tANI_U8 code, tANI_U8 session, tANI_U3
             }
         }
 
+        if (i < 0)
+        {
+            i = 0;
+        }
+        else if (i >= MAX_TRACE_RECORDS)
+        {
+            i = MAX_TRACE_RECORDS - 1;
+        }
         pRecord = &gTraceTbl[i];
 
         for (;;)

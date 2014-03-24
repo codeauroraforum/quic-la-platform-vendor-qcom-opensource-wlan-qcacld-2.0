@@ -171,7 +171,7 @@ static const u32 hdd_cipher_suites[] =
     WLAN_CIPHER_SUITE_WEP40,
     WLAN_CIPHER_SUITE_WEP104,
     WLAN_CIPHER_SUITE_TKIP,
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 #define WLAN_CIPHER_SUITE_KRK 0x004096ff /* use for KRK */
     WLAN_CIPHER_SUITE_KRK,
     WLAN_CIPHER_SUITE_CCMP,
@@ -818,13 +818,13 @@ int wlan_hdd_cfg80211_init(struct device *dev,
     wiphy->wowlan.pattern_min_len = 1;
     wiphy->wowlan.pattern_max_len = WOWL_PTRN_MAX_SIZE;
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
     if (pCfg->isFastTransitionEnabled
 #ifdef FEATURE_WLAN_LFR
        || pCfg->isFastRoamIniFeatureEnabled
 #endif
-#ifdef FEATURE_WLAN_CCX
-       || pCfg->isCcxIniFeatureEnabled
+#ifdef FEATURE_WLAN_ESE
+       || pCfg->isEseIniFeatureEnabled
 #endif
     )
     {
@@ -3811,7 +3811,7 @@ static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
             }
 #endif
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         case WLAN_CIPHER_SUITE_KRK:
             setKey.encType = eCSR_ENCRYPT_TYPE_KRK;
             break;
@@ -5813,7 +5813,7 @@ static int wlan_hdd_cfg80211_set_auth_type(hdd_adapter_t *pAdapter,
                     "%s: set authentication type to SHARED", __func__);
             pHddStaCtx->conn_info.authType = eCSR_AUTH_TYPE_SHARED_KEY;
             break;
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         case NL80211_AUTHTYPE_NETWORK_EAP:
             hddLog(VOS_TRACE_LEVEL_INFO,
                             "%s: set authentication type to CCKM WPA", __func__);
@@ -5867,7 +5867,7 @@ static int wlan_hdd_set_akm_suite( hdd_adapter_t *pAdapter,
                     __func__);
             pWextState->authKeyMgmt |= IW_AUTH_KEY_MGMT_802_1X;
             break;
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 #define WLAN_AKM_SUITE_CCKM         0x00409600 /* Should be in ieee802_11_defs.h */
 #define IW_AUTH_KEY_MGMT_CCKM       8  /* Should be in linux/wireless.h */
         case WLAN_AKM_SUITE_CCKM:
@@ -5939,7 +5939,7 @@ static int wlan_hdd_cfg80211_set_cipher( hdd_adapter_t *pAdapter,
             break;
 #endif
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         case WLAN_CIPHER_SUITE_KRK:
             encryptionType = eCSR_ENCRYPT_TYPE_KRK;
             break;
@@ -8079,7 +8079,7 @@ static int wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *d
     tANI_U32 j=0;
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle halHandle;
-    eHalStatus result;
+    eHalStatus result = eHAL_STATUS_SUCCESS;
     int status;
     tANI_U8  BSSIDMatched = 0;
     hdd_context_t *pHddCtx;
@@ -8157,7 +8157,7 @@ static int wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *d
     result = sme_RoamSetPMKIDCache(halHandle,pAdapter->sessionId,
                                     PMKIDCache,
                                     PMKIDCacheIndex);
-    return 0;
+    return HAL_STATUS_SUCCESS(result) ? 0 : -EINVAL;
 }
 
 
@@ -8171,7 +8171,7 @@ static int wlan_hdd_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *d
     int status;
     tANI_U8  BSSIDMatched = 0;
     hdd_context_t *pHddCtx;
-    int result = 0;
+    eHalStatus result = eHAL_STATUS_SUCCESS;
 
     hddLog(VOS_TRACE_LEVEL_DEBUG, "%s: deleting PMKSA for " MAC_ADDRESS_STR,
            __func__, MAC_ADDR_ARRAY(pmksa->bssid));
@@ -8236,7 +8236,7 @@ static int wlan_hdd_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *d
 
              /*delete the last PMKID cache in CSR*/
              result = sme_RoamDelPMKIDfromCache(halHandle, pAdapter->sessionId, pmksa->bssid);
-             if (0 != result)
+             if (!HAL_STATUS_SUCCESS(result))
              {
                 hddLog(VOS_TRACE_LEVEL_ERROR,"%s: cannot delete PMKSA %d CONTENT.",
                           __func__,PMKIDCacheIndex);
@@ -8259,7 +8259,8 @@ static int wlan_hdd_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *d
        dump_pmkid(halHandle, pmksa->pmkid);
        return -EINVAL;
     }
-   return result;
+
+    return HAL_STATUS_SUCCESS(result) ? 0 : -EINVAL;
 }
 
 
@@ -8272,6 +8273,7 @@ static int wlan_hdd_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device 
     hdd_context_t *pHddCtx;
     tANI_U8 *pBSSId;
     int status = -1;
+    eHalStatus result = eHAL_STATUS_SUCCESS;
 
     hddLog(VOS_TRACE_LEVEL_DEBUG, "%s: flushing PMKSA ",__func__);
 
@@ -8310,9 +8312,9 @@ static int wlan_hdd_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device 
           pBSSId =(tANI_U8 *)(PMKIDCache[j].BSSID);
 
           /*delete the PMKID in CSR*/
-          status = sme_RoamDelPMKIDfromCache(halHandle, pAdapter->sessionId, pBSSId);
+          result = sme_RoamDelPMKIDfromCache(halHandle, pAdapter->sessionId, pBSSId);
 
-          if (0 != status)
+          if (!HAL_STATUS_SUCCESS(result))
           {
              hddLog(VOS_TRACE_LEVEL_ERROR ,"%s cannot flush PMKIDCache %d.",
                     __func__,j);
@@ -8323,7 +8325,8 @@ static int wlan_hdd_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device 
       }
 
     PMKIDCacheIndex = 0;
-    return status;
+
+    return HAL_STATUS_SUCCESS(result) ? 0 : -EINVAL;
 }
 #endif
 
@@ -8351,7 +8354,7 @@ static int wlan_hdd_cfg80211_update_ft_ies(struct wiphy *wiphy,
     }
 
 #ifdef WLAN_FEATURE_VOWIFI_11R_DEBUG
-    hddLog(LOGE, FL("%s called with Ie of length = %zu\n"), __func__,
+    hddLog(LOG1, FL("%s called with Ie of length = %zu\n"), __func__,
            ftie->ie_len);
 #endif
 

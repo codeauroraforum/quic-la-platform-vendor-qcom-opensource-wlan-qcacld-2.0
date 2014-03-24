@@ -275,9 +275,9 @@ typedef struct
  /*Flag to indicate if STA is a WAPI STA*/
   v_U8_t         ucIsWapiSta;
 
-#ifdef FEATURE_WLAN_CCX
- /*Flag to indicate if STA is a CCX STA*/
-  v_U8_t         ucIsCcxSta;
+#ifdef FEATURE_WLAN_ESE
+ /*Flag to indicate if STA is a ESE STA*/
+  v_U8_t         ucIsEseSta;
 #endif
 
   /*DPU Signature used for broadcast data - used for data caching*/
@@ -3045,7 +3045,9 @@ WLANTL_TLDebugMessage
 v_BOOL_t WLANTL_GetTxResource
 (
    void *vos_context,
-   uint8_t sta_id
+   uint8_t sta_id,
+   unsigned int low_watermark,
+   unsigned int high_watermark_offset
 );
 
 /*=============================================================================
@@ -3059,6 +3061,7 @@ v_BOOL_t WLANTL_GetTxResource
   PARAMETERS
    IN
    tlContext : Pointer to TL SHIM context
+   peer_idx  : peer index belongs to virtual device
    sessionId : STA/VDEV instance to query TX resource
    resume_tx : Resume OS TX Q or not
 
@@ -3071,6 +3074,7 @@ v_BOOL_t WLANTL_GetTxResource
 void WLANTL_TXFlowControlCb
 (
    void  *tlContext,
+   v_U8_t peer_idx,
    v_U8_t sessionId,
    v_BOOL_t resume_tx
 );
