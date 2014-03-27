@@ -1229,9 +1229,12 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
       pAc->wmmAcAccessAllowed = VOS_FALSE;
    }
 
-   // if ACM bit is not set, allow access
-   if (!(pAc->wmmAcAccessRequired))
-      pAc->wmmAcAccessAllowed = VOS_TRUE;
+   // if we have valid Tpsec or if ACM bit is not set, allow access
+   if ((pAc->wmmAcTspecValid &&
+       (pAc->wmmAcTspecInfo.ts_info.direction != SME_QOS_WMM_TS_DIR_DOWNLINK)) ||
+       !pAc->wmmAcAccessRequired) {
+         pAc->wmmAcAccessAllowed = VOS_TRUE;
+   }
 #endif
 
    VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
@@ -2032,7 +2035,9 @@ VOS_STATUS hdd_wmm_acquire_access( hdd_adapter_t* pAdapter,
    VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO_LOW,
              "%s: Entered for AC %d", __func__, acType);
 
-   if (!hdd_wmm_is_active(pAdapter) || !(WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->bImplicitQosEnabled)
+   if (!hdd_wmm_is_active(pAdapter) ||
+       !(WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->bImplicitQosEnabled ||
+       !pAdapter->hddWmmStatus.wmmAcStatus[acType].wmmAcAccessRequired)
    {
       // either we don't want QoS or the AP doesn't support QoS
       // or we don't want to do implicit QoS
