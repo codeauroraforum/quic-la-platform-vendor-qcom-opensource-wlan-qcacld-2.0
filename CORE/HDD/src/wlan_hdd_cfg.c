@@ -3448,6 +3448,14 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
                 CFG_PMF_SA_QUERY_RETRY_INTERVAL_MIN,
                 CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX ),
 #endif
+#ifdef QCA_HT_2040_COEX
+   REG_VARIABLE(CFG_ENABLE_HT_2040_COEX, WLAN_PARAM_Integer,
+                hdd_config_t, ht2040CoexEnabled,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_ENABLE_HT_2040_COEX_DEFAULT,
+                CFG_ENABLE_HT_2040_COEX_MIN,
+                CFG_ENABLE_HT_2040_COEX_MAX ),
+#endif
 };
 
 /*
@@ -3868,6 +3876,12 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
           "Name = [gbusBandwidthComputeInterval] Value = [%u] ",
           pHddCtx->cfg_ini->busBandwidthComputeInterval);
+#endif
+
+#ifdef QCA_HT_2040_COEX
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+          "Name = [gHT2040CoexEnabled] Value = [%u]",
+          pHddCtx->cfg_ini->ht2040CoexEnabled);
 #endif
 }
 

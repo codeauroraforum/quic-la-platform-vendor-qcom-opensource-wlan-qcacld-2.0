@@ -2475,6 +2475,13 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX                  ( 2000  )
 #endif
 
+#ifdef QCA_HT_2040_COEX
+#define CFG_ENABLE_HT_2040_COEX                    "gHT2040CoexEnabled"
+#define CFG_ENABLE_HT_2040_COEX_MIN                ( 0 )
+#define CFG_ENABLE_HT_2040_COEX_MAX                ( 1 )
+#define CFG_ENABLE_HT_2040_COEX_DEFAULT            ( 0 )
+#endif
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3002,6 +3009,9 @@ typedef struct
 #ifdef WLAN_FEATURE_11W
    v_U32_t                     pmfSaQueryMaxRetries;
    v_U32_t                     pmfSaQueryRetryInterval;
+#endif
+#ifdef QCA_HT_2040_COEX
+   v_BOOL_t                    ht2040CoexEnabled;
 #endif
 } hdd_config_t;
 /*---------------------------------------------------------------------------
