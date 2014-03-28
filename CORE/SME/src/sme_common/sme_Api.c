@@ -5457,6 +5457,8 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
 
     \param device_mode - mode(AP,SAP etc) of the device.
 
+    \param macAddr - MAC address of the adapter.
+
     \param sessionId - session ID.
 
     \return eHalStatus  SUCCESS.
@@ -5465,6 +5467,7 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
   --------------------------------------------------------------------------*/
 eHalStatus sme_DHCPStartInd( tHalHandle hHal,
                                    tANI_U8 device_mode,
+                                   tANI_U8 *macAddr,
                                    tANI_U8 sessionId )
 {
     eHalStatus          status;
@@ -5497,7 +5500,8 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
         pMsg->msgType = WDA_DHCP_START_IND;
         pMsg->msgLen = (tANI_U16)sizeof(tAniDHCPInd);
         pMsg->device_mode = device_mode;
-        vos_mem_copy( pMsg->macAddr, pSession->connectedProfile.bssid,
+        vos_mem_copy( pMsg->adapterMacAddr, macAddr, sizeof(tSirMacAddr));
+        vos_mem_copy( pMsg->peerMacAddr, pSession->connectedProfile.bssid,
                       sizeof(tSirMacAddr) );
 
         vosMessage.type = WDA_DHCP_START_IND;
@@ -5525,6 +5529,8 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
 
     \param device_mode - mode(AP, SAP etc) of the device.
 
+    \param macAddr - MAC address of the adapter.
+
     \param sessionId - session ID.
 
     \return eHalStatus  SUCCESS.
@@ -5532,6 +5538,7 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
   --------------------------------------------------------------------------*/
 eHalStatus sme_DHCPStopInd( tHalHandle hHal,
                               tANI_U8 device_mode,
+                              tANI_U8 *macAddr,
                               tANI_U8 sessionId )
 {
     eHalStatus          status;
@@ -5565,7 +5572,8 @@ eHalStatus sme_DHCPStopInd( tHalHandle hHal,
        pMsg->msgType = WDA_DHCP_STOP_IND;
        pMsg->msgLen = (tANI_U16)sizeof(tAniDHCPInd);
        pMsg->device_mode = device_mode;
-       vos_mem_copy( pMsg->macAddr, pSession->connectedProfile.bssid,
+       vos_mem_copy( pMsg->adapterMacAddr, macAddr, sizeof(tSirMacAddr));
+       vos_mem_copy( pMsg->peerMacAddr, pSession->connectedProfile.bssid,
                      sizeof(tSirMacAddr) );
 
        vosMessage.type = WDA_DHCP_STOP_IND;
@@ -7460,6 +7468,11 @@ eHalStatus sme_PreferredNetworkFoundInd (tHalHandle hHal, void* pMsg)
        dumpSsId[ssIdLength] = 0;
        smsLog(pMac, LOG2, "%s:SSID=%s frame length %d",
            __func__, dumpSsId, pPrefNetworkFoundInd->frameLength);
+
+         /* Flush scan results, So as to avoid indication/updation of
+          * stale entries, which may not have aged out during APPS collapse
+          */
+         sme_ScanFlushResult(hHal,0);
 
        //Save the frame to scan result
        if (pPrefNetworkFoundInd->mesgLen > sizeof(tSirPrefNetworkFoundInd))
@@ -11471,12 +11484,11 @@ eHalStatus sme_AddChAvoidCallback
    \fn sme_RoamChannelChangeReq
    \brief API to Indicate Channel change to new target channel
    \param hHal - The handle returned by macOpen
-   \param sessionId - session ID
    \param targetChannel - New Channel to move the SAP to.
    \return eHalStatus
 ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamChannelChangeReq( tHalHandle hHal,
-                tANI_U8 sessionId, tANI_U8 targetChannel, eCsrPhyMode phyMode)
+eHalStatus sme_RoamChannelChangeReq( tHalHandle hHal, tCsrBssid bssid,
+                                tANI_U8 targetChannel, eCsrPhyMode phyMode )
 {
     eHalStatus status = eHAL_STATUS_FAILURE;
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
@@ -11485,8 +11497,8 @@ eHalStatus sme_RoamChannelChangeReq( tHalHandle hHal,
     {
         sme_SelectCBMode(hHal, phyMode, targetChannel);
 
-        status = csrRoamChannelChangeReq( pMac, sessionId, targetChannel,
-                       pMac->roam.configParam.channelBondingMode5GHz);
+        status = csrRoamChannelChangeReq( pMac, bssid, targetChannel,
+                       pMac->roam.configParam.channelBondingMode5GHz );
 
         sme_ReleaseGlobalLock( &pMac->sme );
     }
@@ -11558,8 +11570,8 @@ eHalStatus sme_ProcessChannelChangeResp(tpAniSirGlobal pMac,
    \param dfsCacWaitStatus - CAC WAIT status flag
    \return eHalStatus
 ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamStartBeaconReq( tHalHandle hHal, tANI_U8 sessionId,
-                                              tANI_U8 dfsCacWaitStatus)
+eHalStatus sme_RoamStartBeaconReq( tHalHandle hHal, tCsrBssid bssid,
+                              tANI_U8 dfsCacWaitStatus)
 {
     eHalStatus status = eHAL_STATUS_FAILURE;
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
@@ -11567,7 +11579,7 @@ eHalStatus sme_RoamStartBeaconReq( tHalHandle hHal, tANI_U8 sessionId,
 
     if ( HAL_STATUS_SUCCESS( status ) )
     {
-        status = csrRoamStartBeaconReq( pMac, sessionId, dfsCacWaitStatus);
+        status = csrRoamStartBeaconReq( pMac, bssid, dfsCacWaitStatus);
         sme_ReleaseGlobalLock( &pMac->sme );
     }
     return (status);
@@ -11577,11 +11589,11 @@ eHalStatus sme_RoamStartBeaconReq( tHalHandle hHal, tANI_U8 sessionId,
    \fn sme_RoamCsaIeRequest
    \brief API to request CSA IE transmission from PE
    \param hHal - The handle returned by macOpen
-   \param sessionId - session ID
    \param pDfsCsaReq - CSA IE request
+   \param bssid - SAP bssid
    \return eHalStatus
 ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamCsaIeRequest(tHalHandle hHal, tANI_U8 sessionId,
+eHalStatus sme_RoamCsaIeRequest(tHalHandle hHal, tCsrBssid bssid,
                                     tANI_U8 targetChannel, tANI_U8 csaIeReqd)
 {
     eHalStatus status = eHAL_STATUS_FAILURE;
@@ -11589,8 +11601,8 @@ eHalStatus sme_RoamCsaIeRequest(tHalHandle hHal, tANI_U8 sessionId,
     status = sme_AcquireGlobalLock( &pMac->sme );
     if ( HAL_STATUS_SUCCESS( status ) )
     {
-        status = csrRoamSendChanSwIERequest(pMac, sessionId,
-                                            targetChannel, csaIeReqd);
+        status = csrRoamSendChanSwIERequest(pMac, bssid, targetChannel,
+                                                             csaIeReqd);
         sme_ReleaseGlobalLock( &pMac->sme );
     }
     return (status);

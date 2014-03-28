@@ -2501,6 +2501,20 @@ REG_VARIABLE( CFG_VHT_ENABLE_GID_FEATURE, WLAN_PARAM_Integer,
              CFG_VHT_ENABLE_GID_FEATURE_MAX ),
 #endif
 
+REG_VARIABLE( CFG_VHT_ENABLE_1x1_TX_CHAINMASK, WLAN_PARAM_Integer,
+             hdd_config_t, txchainmask1x1,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+             CFG_VHT_ENABLE_1x1_TX_CHAINMASK_DEFAULT,
+             CFG_VHT_ENABLE_1x1_TX_CHAINMASK_MIN,
+             CFG_VHT_ENABLE_1x1_TX_CHAINMASK_MAX ),
+
+REG_VARIABLE( CFG_VHT_ENABLE_1x1_RX_CHAINMASK, WLAN_PARAM_Integer,
+             hdd_config_t, rxchainmask1x1,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+             CFG_VHT_ENABLE_1x1_RX_CHAINMASK_DEFAULT,
+             CFG_VHT_ENABLE_1x1_RX_CHAINMASK_MIN,
+             CFG_VHT_ENABLE_1x1_RX_CHAINMASK_MAX ),
+
 REG_VARIABLE( CFG_ENABLE_AMPDUPS_FEATURE, WLAN_PARAM_Integer,
              hdd_config_t, enableAmpduPs,
              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3193,6 +3207,36 @@ REG_VARIABLE( CFG_SAP_SCAN_BAND_PREFERENCE, WLAN_PARAM_Integer,
                CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT,
                CFG_SAP_SCAN_BAND_PREFERENCE_MIN,
                CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
+
+#ifdef QCA_LL_TX_FLOW_CT
+REG_VARIABLE( CFG_LL_TX_STA_FLOW_LWM, WLAN_PARAM_Integer,
+              hdd_config_t, TxStaFlowLowWaterMark,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_STA_FLOW_LWM_DEFAULT,
+              CFG_LL_TX_STA_FLOW_LWM_MIN,
+              CFG_LL_TX_STA_FLOW_LWM_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_STA_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
+              hdd_config_t, TxStaFlowHighWaterMarkOffset,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_STA_FLOW_HWM_OFFSET_DEFAULT,
+              CFG_LL_TX_STA_FLOW_HWM_OFFSET_MIN,
+              CFG_LL_TX_STA_FLOW_HWM_OFFSET_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_IBSS_FLOW_LWM, WLAN_PARAM_Integer,
+              hdd_config_t, TxIbssFlowLowWaterMark,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_LWM_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_LWM_MIN,
+              CFG_LL_TX_IBSS_FLOW_LWM_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_IBSS_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
+              hdd_config_t, TxIbssFlowHighWaterMarkOffset,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_DEFAULT,
+              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MIN,
+              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MAX ),
+#endif /* QCA_LL_TX_FLOW_CT */
 };
 
 /*
@@ -4800,7 +4844,14 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
                fStatus = FALSE;
                hddLog(LOGE, "Could not pass on WNI_CFG_VHT_TX_MCS_MAP to CCM\n");
            }
-
+           /* Currently shortGI40Mhz is used for shortGI80Mhz */
+           if (ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_VHT_SHORT_GI_80MHZ,
+               pConfig->ShortGI40MhzEnable, NULL, eANI_BOOLEAN_FALSE)
+               == eHAL_STATUS_FAILURE)
+           {
+               fStatus = FALSE;
+               hddLog(LOGE, "Could not pass WNI_VHT_SHORT_GI_80MHZ to CCM\n");
+           }
            // Hardware is capable of doing 128K AMPDU in 11AC mode
            if(ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_VHT_AMPDU_LEN_EXPONENT,
                            pConfig->fVhtAmpduLenExponent, NULL,

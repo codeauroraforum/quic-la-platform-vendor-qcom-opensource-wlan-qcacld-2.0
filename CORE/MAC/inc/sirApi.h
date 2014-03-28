@@ -2278,7 +2278,8 @@ typedef struct sAniDHCPStopInd
     tANI_U16                msgType;      // message type is same as the request type
     tANI_U16                msgLen;       // length of the entire request
     tANI_U8                 device_mode;  // Mode of the device(ex:STA, AP)
-    tSirMacAddr             macAddr;
+    tSirMacAddr             adapterMacAddr; // MAC address of the adapter
+    tSirMacAddr             peerMacAddr; // MAC address of the connected peer
 
 } tAniDHCPInd, *tpAniDHCPInd;
 
@@ -4788,9 +4789,9 @@ typedef struct sSirChanChangeRequest
 {
     tANI_U16     messageType;
     tANI_U16     messageLen;
-    tANI_U8      sessionId;
     tANI_U8      targetChannel;
     tANI_U8      cbMode;
+    tANI_U8      bssid[WNI_CFG_BSSID_LEN];
 }tSirChanChangeRequest, *tpSirChanChangeRequest;
 
 typedef struct sSirChanChangeResponse
@@ -4805,8 +4806,8 @@ typedef struct sSirStartBeaconIndication
 {
     tANI_U16     messageType;
     tANI_U16     messageLen;
-    tANI_U8      sessionId;
     tANI_U8      beaconStartStatus;
+    tANI_U8      bssid[WNI_CFG_BSSID_LEN];
 }tSirStartBeaconIndication, *tpSirStartBeaconIndication;
 
 /* Message format for requesting channel switch announcement to lower layers */
@@ -4814,9 +4815,9 @@ typedef struct sSirDfsCsaIeRequest
 {
     tANI_U16 msgType;
     tANI_U16 msgLen;
-    tANI_U8  sessionId;
     tANI_U8  targetChannel;
     tANI_U8  csaIeRequired;
+    tANI_U8  bssid[WNI_CFG_BSSID_LEN];
 }tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
