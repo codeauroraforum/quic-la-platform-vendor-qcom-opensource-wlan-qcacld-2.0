@@ -658,17 +658,6 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                 MAC_ADDR_ARRAY(wrqu.ap_addr.sa_data));
         hdd_SendUpdateBeaconIEsEvent(pAdapter, pCsrRoamInfo);
 
-#ifdef MSM_PLATFORM
-        if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION) {
-            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-            pHddCtx->sta_cnt++;
-            pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
-            pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
-            if (1 == pHddCtx->sta_cnt)
-                hdd_start_bus_bw_compute_timer(pAdapter);
-            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
-        }
-#endif
 
         /* Send IWEVASSOCRESPIE Event if WLAN_FEATURE_CIQ_METRICS is Enabled Or
          * Send IWEVASSOCRESPIE Event if WLAN_FEATURE_VOWIFI_11R is Enabled
@@ -699,6 +688,20 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                                    pHddStaCtx->conn_info.operationChannel);
         }
 #endif
+
+#ifdef MSM_PLATFORM
+        /* start timer in sta/p2p_cli */
+        spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+        pHddCtx->sta_cnt++;
+        pAdapter->connection++;
+        if (1 == pAdapter->connection) {
+            pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
+            pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
+        }
+        if (1 == pHddCtx->sta_cnt)
+            hdd_start_bus_bw_compute_timer(pAdapter);
+        spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+#endif
     }
     else if (eConnectionState_IbssConnected == pHddStaCtx->conn_info.connState) // IBss Associated
     {
@@ -713,17 +716,6 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         type = WLAN_STA_DISASSOC_DONE_IND;
         memset(wrqu.ap_addr.sa_data,'\0',ETH_ALEN);
 
-#ifdef MSM_PLATFORM
-        if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION) {
-            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-            pHddCtx->sta_cnt--;
-            pAdapter->prev_tx_packets = 0;
-            pAdapter->prev_rx_packets = 0;
-            if (0 == pHddCtx->sta_cnt)
-                hdd_stop_bus_bw_compute_timer(pAdapter);
-            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
-        }
-#endif
 
 #ifdef QCA_WIFI_2_0
         if (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
@@ -736,6 +728,20 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                                      0, pAdapter->sessionId,
                                      pHddStaCtx->conn_info.operationChannel);
         }
+#endif
+
+#ifdef MSM_PLATFORM
+        /* stop timer in sta/p2p_cli */
+        spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+        pHddCtx->sta_cnt--;
+        pAdapter->connection--;
+        if (0 == pAdapter->connection) {
+            pAdapter->prev_tx_packets = 0;
+            pAdapter->prev_rx_packets = 0;
+        }
+        if (0 == pHddCtx->sta_cnt)
+            hdd_stop_bus_bw_compute_timer(pAdapter);
+        spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 #endif
     }
     hdd_dump_concurrency_info(pHddCtx);
@@ -1152,14 +1158,6 @@ static VOS_STATUS hdd_roamRegisterSTA( hdd_adapter_t *pAdapter,
                  vosStatus, vosStatus );
       return vosStatus;
    }
-
-#ifdef QCA_LL_TX_FLOW_CT
-   WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
-                                staDesc.ucSTAId,
-                                hdd_tx_resume_cb,
-                                pAdapter->sessionId,
-                                (void *)pAdapter);
-#endif /* QCA_LL_TX_FLOW_CT */
 
    if ( cfg_param->dynSplitscan &&
       ( VOS_TIMER_STATE_RUNNING !=
@@ -3258,7 +3256,11 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
     // Validity checks
     if ((gen_ie_len < VOS_MIN(DOT11F_IE_RSN_MIN_LEN, DOT11F_IE_WPA_MIN_LEN)) ||
             (gen_ie_len > VOS_MAX(DOT11F_IE_RSN_MAX_LEN, DOT11F_IE_WPA_MAX_LEN)) )
+    {
+        hddLog(LOGE, "%s: Invalid DOT11F IE Length passed :%d",
+               __func__,  gen_ie_len);
         return -EINVAL;
+    }
     // Type check
     if ( gen_ie[0] ==  DOT11F_EID_RSN)
     {
@@ -3266,6 +3268,8 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         if ((gen_ie_len < DOT11F_IE_RSN_MIN_LEN ) ||
                 (gen_ie_len > DOT11F_IE_RSN_MAX_LEN) )
         {
+            hddLog(LOGE, "%s: Invalid DOT11F RSN IE length :%d",
+                   __func__, gen_ie_len);
             return -EINVAL;
         }
         // Skip past the EID byte and length byte
@@ -3299,10 +3303,12 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         {
             if ( pBssid == NULL)
             {
+                hddLog(LOGE, "%s: pBssid passed is NULL", __func__);
                 break;
             }
             if ( hdd_IsMACAddrNULL( (u_char *) pBssid->ether_addr_octet , 6))
             {
+                hddLog(LOGE, "%s: Invalid MAC adrr", __func__);
                 break;
             }
             updatePMKCache = TRUE;
@@ -3331,6 +3337,8 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         if ((gen_ie_len < DOT11F_IE_WPA_MIN_LEN ) ||
                     (gen_ie_len > DOT11F_IE_WPA_MAX_LEN))
         {
+            hddLog(LOGE, "%s: Invalid DOT11F WPA IE length :%d",
+                   __func__, gen_ie_len);
             return -EINVAL;
         }
         // Skip past the EID byte and length byte - and four byte WiFi OUI

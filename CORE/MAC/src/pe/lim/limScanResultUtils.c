@@ -43,8 +43,7 @@
 #if defined WLAN_FEATURE_VOWIFI
 #include "rrmApi.h"
 #endif
-
-
+#include "vos_utils.h"
 
 /**
  * limDeactiveMinChannelTimerDuringScan()
@@ -732,8 +731,9 @@ limLookupNaddHashEntry(tpAniSirGlobal pMac,
             (vos_mem_compare( (tANI_U8 *) pBssDescr->bssDescription.bssId,
                       (tANI_U8 *) ptemp->bssDescription.bssId,
                       sizeof(tSirMacAddr))) &&   //matching BSSID
-            (pBssDescr->bssDescription.channelId ==
-                                      ptemp->bssDescription.channelId) &&
+             // matching band to update new channel info
+            (vos_freq_to_band(pBssDescr->bssDescription.channelId) ==
+                      vos_freq_to_band(ptemp->bssDescription.channelId)) &&
             vos_mem_compare( ((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1),
                            ((tANI_U8 *) &ptemp->bssDescription.ieFields + 1),
                            (tANI_U8) (ssidLen + 1)) &&
@@ -1193,7 +1193,77 @@ limDeleteCachedScanResults(tpAniSirGlobal pMac)
     pMac->lim.gLimSmeScanResultLength = 0;
 } /****** end limDeleteCachedScanResults() ******/
 
+/**
+ * limFlushp2pScanResults()
+ *
+ *FUNCTION:
+ * This function is called before scan to flush the
+ * the p2p scan entries from LIM
+ *
+ *LOGIC:
+ *
+ *ASSUMPTIONS:
+ * NA
+ *
+ *NOTE:
+ * NA
+ *
+ * @param  pMac - Pointer to Global MAC structure
+ * @return None
+ */
 
+void
+limFlushp2pScanResults(tpAniSirGlobal pMac)
+{
+    tLimScanResultNode    *pNode, *pNextNode, *pPrev, *pHead, *pTemp;
+    tANI_U16 i;
+    tANI_U8 *pSsidStr;
+    tSirMacSSid *pSsid;
+
+    for (i = 0; i < LIM_MAX_NUM_OF_SCAN_RESULTS; i++)
+    {
+        if ((pNode = pMac->lim.gLimCachedScanHashTable[i]) != NULL)
+        {
+            pPrev = pNode;
+            pHead = pNode;
+            while (pNode)
+            {
+                pSsid = (tSirMacSSid *)((tANI_U8 *)&pNode->bssDescription.ieFields + 1);
+                pSsidStr = pSsid->ssId;
+                if (vos_mem_compare(pSsidStr, "DIRECT-", 7))
+                {
+                    if (pNode == pHead)
+                    {
+                        pTemp = pNode;
+                        pNode = pNode->next;
+                        pMac->lim.gLimSmeScanResultLength -=
+                           (pTemp->bssDescription.length +
+                            sizeof(pTemp->bssDescription.length));
+                        pPrev = pNode;
+                        pHead = pNode;
+                        vos_mem_free(pTemp);
+                        pMac->lim.gLimCachedScanHashTable[i]= pHead;
+                    }
+                    else
+                    {
+                        pNextNode = pNode->next;
+                        pMac->lim.gLimSmeScanResultLength -=
+                           (pNode->bssDescription.length +
+                            sizeof(pNode->bssDescription.length));
+                        vos_mem_free(pNode);
+                        pPrev->next = pNextNode;
+                        pNode = pNextNode;
+                    }
+                }
+                else
+                {
+                    pPrev = pNode;
+                    pNode = pNode->next;
+                }
+            }
+        }
+    }
+} /****** end limFlushp2pScanResults() ******/
 
 /**
  * limReInitScanResults()
