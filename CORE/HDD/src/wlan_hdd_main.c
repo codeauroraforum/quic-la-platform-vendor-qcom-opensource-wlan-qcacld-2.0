@@ -10570,11 +10570,13 @@ static int fwpath_changed_handler(const char *kmessage,
    return param_set_copystring(kmessage, kp);
 }
 
+#if !(defined(QCA_WIFI_2_0) && defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC))
 static int con_mode_handler(const char *kmessage,
                                  struct kernel_param *kp)
 {
    return param_set_int(kmessage, kp);
 }
+#endif
 #else /* #ifdef MODULE */
 /**---------------------------------------------------------------------------
 
@@ -10628,6 +10630,7 @@ static int fwpath_changed_handler(const char *kmessage,
    return ret;
 }
 
+#if !(defined(QCA_WIFI_2_0) && defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC))
 /**---------------------------------------------------------------------------
 
   \brief con_mode_handler() -
@@ -10650,6 +10653,7 @@ static int con_mode_handler(const char *kmessage, struct kernel_param *kp)
       ret = kickstart_driver();
    return ret;
 }
+#endif
 #endif /* #ifdef MODULE */
 
 /**---------------------------------------------------------------------------
