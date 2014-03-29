@@ -626,6 +626,7 @@ typedef struct hdd_cfg80211_state_s
   size_t len;
   struct sk_buff *skb;
   hdd_remain_on_chan_ctx_t* remain_on_chan_ctx;
+  struct mutex remain_on_chan_ctx_lock;
   eP2PActionFrameState actionFrmState;
 }hdd_cfg80211_state_t;
 
@@ -1051,6 +1052,7 @@ struct hdd_adapter_s
 #ifdef MSM_PLATFORM
     unsigned long prev_rx_packets;
     unsigned long prev_tx_packets;
+    int connection;
 #endif
     v_BOOL_t is_roc_inprogress;
 };
