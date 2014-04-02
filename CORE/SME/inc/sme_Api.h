@@ -3582,4 +3582,6 @@ tANI_BOOLEAN sme_PsOffloadIsStaInPowerSave(tHalHandle hHal, tANI_U8 sessionId);
 
 eHalStatus sme_abortRoamScan(tHalHandle hHal);
 #endif //#if WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+tANI_U32 sme_GetChannelBondingMode5G(tHalHandle hHal);
+tANI_U32 sme_GetChannelBondingMode24G(tHalHandle hHal);
 #endif //#if !defined( __SME_API_H )
