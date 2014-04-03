@@ -45,7 +45,10 @@
 #include "wlan_hdd_cfg80211.h"
 
 
+#ifdef TDLS_USE_SEPARATE_DISCOVERY_TIMER
 static tANI_S32 wlan_hdd_get_tdls_discovery_peer_cnt(tdlsCtx_t *pHddTdlsCtx);
+#endif /* TDLS_USE_SEPARATE_DISCOVERY_TIMER */
+
 static tANI_S32 wlan_hdd_tdls_peer_reset_discovery_processed(tdlsCtx_t *pHddTdlsCtx);
 static void wlan_hdd_tdls_timers_destroy(tdlsCtx_t *pHddTdlsCtx);
 static void wlan_hdd_tdls_peer_timers_destroy(tdlsCtx_t *pHddTdlsCtx);
@@ -74,8 +77,31 @@ static u8 wlan_hdd_tdls_hash_key (u8 *mac)
 void wlan_hdd_tdls_pre_setup_init_work(tdlsCtx_t * pHddTdlsCtx,
                                        hddTdlsPeer_t *curr_candidate)
 {
+    if (!pHddTdlsCtx || !curr_candidate)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: either pHddTdlsCtx or curr_candidate is null",
+                  __func__);
+        return;
+    }
+
     if (TDLS_CTX_MAGIC != pHddTdlsCtx->magic)
     {
+#ifdef QCA_WIFI_2_0
+        /* When TDLS discovery attempt for a peer reaches to max configured
+         * threshold then tdls support for that peer would be disabled and
+         * in that case, ignore discovery trigger from FW for that peer.
+         */
+        if (eTDLS_CAP_NOT_SUPPORTED == curr_candidate->tdls_support)
+        {
+            VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
+                      "%s: tdls_support is marked disabled for peer: "
+                      MAC_ADDRESS_STR ", ignore pre_setup_init_work",
+                      __func__, MAC_ADDR_ARRAY(curr_candidate->peerMac));
+            return;
+        }
+#endif /* QCA_WIFI_2_0 */
+
         pHddTdlsCtx->curr_candidate = curr_candidate;
         pHddTdlsCtx->magic = TDLS_CTX_MAGIC;
 
@@ -84,6 +110,7 @@ void wlan_hdd_tdls_pre_setup_init_work(tdlsCtx_t * pHddTdlsCtx,
 }
 #endif
 
+#ifdef TDLS_USE_SEPARATE_DISCOVERY_TIMER
 static v_VOID_t wlan_hdd_tdls_start_peer_discover_timer(tdlsCtx_t *pHddTdlsCtx,
                                                         tANI_BOOLEAN mutexLock,
                                                         v_U32_t discoveryExpiry)
@@ -122,7 +149,6 @@ static v_VOID_t wlan_hdd_tdls_start_peer_discover_timer(tdlsCtx_t *pHddTdlsCtx,
     return;
 }
 
-#ifdef TDLS_USE_SEPARATE_DISCOVERY_TIMER
 static v_VOID_t wlan_hdd_tdls_discover_peer_cb( v_PVOID_t userData )
 {
     int i;
@@ -241,7 +267,7 @@ done:
         mutex_unlock(&pHddCtx->tdls_lock);
     return;
 }
-#endif
+#endif /* TDLS_USE_SEPARATE_DISCOVERY_TIMER */
 
 #ifndef QCA_WIFI_2_0
 static v_VOID_t wlan_hdd_tdls_update_peer_cb( v_PVOID_t userData )
@@ -395,6 +421,7 @@ next_peer:
 }
 #endif
 
+#ifndef QCA_WIFI_2_0
 static v_VOID_t wlan_hdd_tdls_idle_cb( v_PVOID_t userData )
 {
 #ifdef CONFIG_TDLS_IMPLICIT
@@ -452,6 +479,7 @@ static v_VOID_t wlan_hdd_tdls_idle_cb( v_PVOID_t userData )
     mutex_unlock(&pHddCtx->tdls_lock);
 #endif
 }
+#endif /* QCA_WIFI_2_0 */
 
 static v_VOID_t wlan_hdd_tdls_discovery_timeout_peer_cb(v_PVOID_t userData)
 {
@@ -1021,6 +1049,17 @@ void wlan_hdd_tdls_set_peer_link_status(hddTdlsPeer_t *curr_peer, tTDLSLinkStatu
 
     curr_peer->link_status = status;
 
+#ifdef QCA_WIFI_2_0
+    /* If TDLS link status is already passed the discovery state
+     * then clear discovery attempt count
+     */
+    if (status >= eTDLS_LINK_DISCOVERED)
+    {
+        curr_peer->discovery_attempt = 0;
+    }
+#endif /* QCA_WIFI_2_0 */
+
+    return;
 }
 
 void wlan_hdd_tdls_set_link_status(hdd_adapter_t *pAdapter,
@@ -1034,6 +1073,16 @@ void wlan_hdd_tdls_set_link_status(hdd_adapter_t *pAdapter,
         return;
 
     curr_peer->link_status= linkStatus;
+
+#ifdef QCA_WIFI_2_0
+    /* If TDLS link status is already passed the discovery state
+     * then clear discovery attempt count
+     */
+    if (linkStatus >= eTDLS_LINK_DISCOVERED)
+    {
+        curr_peer->discovery_attempt = 0;
+    }
+#endif /* QCA_WIFI_2_0 */
 
     return;
 }
@@ -1548,6 +1597,7 @@ static tANI_S32 wlan_hdd_tdls_peer_reset_discovery_processed(tdlsCtx_t *pHddTdls
     return 0;
 }
 
+#ifdef TDLS_USE_SEPARATE_DISCOVERY_TIMER
 static tANI_S32 wlan_hdd_get_tdls_discovery_peer_cnt(tdlsCtx_t *pHddTdlsCtx)
 {
     int i;
@@ -1572,6 +1622,7 @@ static tANI_S32 wlan_hdd_get_tdls_discovery_peer_cnt(tdlsCtx_t *pHddTdlsCtx)
     }
     return discovery_peer_cnt;
 }
+#endif /* TDLS_USE_SEPARATE_DISCOVERY_TIMER */
 
 tANI_U16 wlan_hdd_tdlsConnectedPeers(hdd_adapter_t *pAdapter)
 {
@@ -2040,7 +2091,19 @@ static void wlan_hdd_tdls_pre_setup(struct work_struct *work)
         curr_peer->link_status = eTDLS_LINK_DISCOVERING;
 
 #ifdef QCA_WIFI_2_0
-        curr_peer->link_status = eTDLS_LINK_DISCOVERING;
+    if (curr_peer->discovery_attempt >=
+        pHddTdlsCtx->threshold_config.discovery_tries_n)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: discovery attempt (%d) reached max (%d) for peer "
+                  MAC_ADDRESS_STR ", ignore discovery trigger from fw",
+                  __func__, MAC_ADDR_ARRAY(curr_peer->peerMac),
+                  curr_peer->discovery_attempt,
+                  pHddTdlsCtx->threshold_config.discovery_tries_n);
+        curr_peer->tdls_support = eTDLS_CAP_NOT_SUPPORTED;
+        goto done;
+    }
+    curr_peer->link_status = eTDLS_LINK_DISCOVERING;
 #endif
 
     status = wlan_hdd_cfg80211_send_tdls_discover_req(pHddTdlsCtx->pAdapter->wdev.wiphy,
@@ -2057,6 +2120,10 @@ static void wlan_hdd_tdls_pre_setup(struct work_struct *work)
     }
 
     pHddTdlsCtx->discovery_sent_cnt++;
+
+#ifdef QCA_WIFI_2_0
+    curr_peer->discovery_attempt++;
+#endif /* QCA_WIFI_2_0 */
 
     mutex_lock(&pHddCtx->tdls_lock);
 

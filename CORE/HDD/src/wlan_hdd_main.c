@@ -1752,6 +1752,10 @@ int hdd_handle_batch_scan_ioctl
 
          if ( eHAL_STATUS_SUCCESS == halStatus )
          {
+             char extra[32];
+             tANI_U8 len = 0;
+             tANI_U8 mScan = 0;
+
              VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                 "sme_SetBatchScanReq  returned success halStatus %d",
                 halStatus);
@@ -1780,13 +1784,22 @@ int hdd_handle_batch_scan_ioctl
              }
              /*As per the Batch Scan Framework API we should return the MIN of
                either MSCAN or the max # of scans firmware can cache*/
-             ret = MIN(pReq->numberOfScansToBatch , pRsp->nScansToBatch);
+             mScan = MIN(pReq->numberOfScansToBatch , pRsp->nScansToBatch);
 
              pAdapter->batchScanState = eHDD_BATCH_SCAN_STATE_STARTED;
 
              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                 "%s: request MSCAN %d response MSCAN %d ret %d",
-                __func__, pReq->numberOfScansToBatch, pRsp->nScansToBatch, ret);
+                __func__, pReq->numberOfScansToBatch, pRsp->nScansToBatch, mScan);
+
+             len = scnprintf(extra, sizeof(extra), "%d", mScan);
+             if (copy_to_user(pPrivdata->buf, &extra, len + 1))
+             {
+                   VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                     "%s: failed to copy MSCAN value to user buffer", __func__);
+                   ret = -EFAULT;
+                   goto exit;
+             }
          }
          else
          {
@@ -1997,7 +2010,7 @@ static int hdd_parse_setrmcrate_command(tANI_U8 *pValue,
   \brief hdd_parse_plm_cmd() - HDD Parse Plm command
 
   This function parses the plm command passed in the format
-  ESEPLMREQ<space><enable><space><dialog_token><space>
+  CCXPLMREQ<space><enable><space><dialog_token><space>
   <meas_token><space><num_of_bursts><space><burst_int><space>
   <measu duration><space><burst_len><space><desired_tx_pwr>
   <space><multcast_addr><space><number_of_channels>
@@ -3459,6 +3472,9 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            /* Proceed with reassoc */
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
            handoffInfo.channel = channel;
+#ifndef QCA_WIFI_ISOC
+           handoffInfo.src = REASSOC;
+#endif
            vos_mem_copy(handoffInfo.bssid, targetApBssid, sizeof(tSirMacAddr));
            sme_HandoffRequest(pHddCtx->hHal, &handoffInfo);
 #endif
@@ -3684,6 +3700,61 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
 
        else if (strncmp(command, "FASTREASSOC", 11) == 0)
        {
+#ifndef QCA_WIFI_ISOC
+           tANI_U8 *value = command;
+           tANI_U8 channel = 0;
+           tSirMacAddr targetApBssid;
+           eHalStatus status = eHAL_STATUS_SUCCESS;
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+           tCsrHandoffRequest handoffInfo;
+#endif
+           hdd_station_ctx_t *pHddStaCtx = NULL;
+           pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+
+           /* if not associated, no need to proceed with reassoc */
+           if (eConnectionState_Associated != pHddStaCtx->conn_info.connState)
+           {
+               VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s:Not associated!",__func__);
+               ret = -EINVAL;
+               goto exit;
+           }
+
+           status = hdd_parse_reassoc_command_data(value, targetApBssid, &channel);
+           if (eHAL_STATUS_SUCCESS != status)
+           {
+               VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Failed to parse reassoc command data", __func__);
+               ret = -EINVAL;
+               goto exit;
+           }
+
+           /* if the target bssid is same as currently associated AP,
+              then no need to proceed with reassoc */
+           if (VOS_TRUE == vos_mem_compare(targetApBssid,
+                                           pHddStaCtx->conn_info.bssId, sizeof(tSirMacAddr)))
+           {
+               VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s:Reassoc BSSID is same as currently associated AP bssid",__func__);
+               ret = -EINVAL;
+               goto exit;
+           }
+
+           /* Check channel number is a valid channel number */
+           if(VOS_STATUS_SUCCESS !=
+                         wlan_hdd_validate_operation_channel(pAdapter, channel))
+           {
+               hddLog(VOS_TRACE_LEVEL_ERROR,
+                      "%s: Invalid Channel [%d] \n", __func__, channel);
+               return -EINVAL;
+           }
+
+           /* Proceed with reassoc */
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+           handoffInfo.channel = channel;
+           handoffInfo.src = FASTREASSOC;
+           vos_mem_copy(handoffInfo.bssid, targetApBssid, sizeof(tSirMacAddr));
+           sme_HandoffRequest(pHddCtx->hHal, &handoffInfo);
+#endif
+#else
            tANI_U8 *value = command;
            tSirMacAddr targetApBssid;
            tANI_U8 trigger = 0;
@@ -3724,10 +3795,11 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            smeIssueFastRoamNeighborAPEvent(WLAN_HDD_GET_HAL_CTX(pAdapter),
                                            &targetApBssid[0],
                                            (tSmeFastRoamTrigger)(trigger));
+#endif
        }
 #endif
 #if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
-       else if (strncmp(command, "ESEPLMREQ", 9) == 0)
+       else if (strncmp(command, "CCXPLMREQ", 9) == 0)
        {
            tANI_U8 *value = command;
            eHalStatus status = eHAL_STATUS_SUCCESS;
@@ -10625,11 +10697,13 @@ static int fwpath_changed_handler(const char *kmessage,
    return param_set_copystring(kmessage, kp);
 }
 
+#if !(defined(QCA_WIFI_2_0) && defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC))
 static int con_mode_handler(const char *kmessage,
                                  struct kernel_param *kp)
 {
    return param_set_int(kmessage, kp);
 }
+#endif
 #else /* #ifdef MODULE */
 /**---------------------------------------------------------------------------
 
@@ -10683,6 +10757,7 @@ static int fwpath_changed_handler(const char *kmessage,
    return ret;
 }
 
+#if !(defined(QCA_WIFI_2_0) && defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC))
 /**---------------------------------------------------------------------------
 
   \brief con_mode_handler() -
@@ -10705,6 +10780,7 @@ static int con_mode_handler(const char *kmessage, struct kernel_param *kp)
       ret = kickstart_driver();
    return ret;
 }
+#endif
 #endif /* #ifdef MODULE */
 
 /**---------------------------------------------------------------------------

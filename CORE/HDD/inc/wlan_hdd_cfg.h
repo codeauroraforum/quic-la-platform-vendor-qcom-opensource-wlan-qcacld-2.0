@@ -1520,6 +1520,11 @@ typedef enum
 #define CFG_ENABLE_OVERLAP_CH_MAX           ( 1 )
 #define CFG_ENABLE_OVERLAP_CH_DEFAULT       ( 0 )
 
+#define CFG_PPS_ENABLE_5G_EBT                 "gEnable5gEBT"
+#define CFG_PPS_ENABLE_5G_EBT_FEATURE_MIN     ( 0 )
+#define CFG_PPS_ENABLE_5G_EBT_FEATURE_MAX     ( 1 )
+#define CFG_PPS_ENABLE_5G_EBT_FEATURE_DEFAULT ( 0 )
+
 /*
  * VOS Trace Enable Control
  * Notes:
@@ -1871,7 +1876,7 @@ typedef enum
 #define CFG_TDLS_MAX_DISCOVERY_ATTEMPT              "gTDLSMaxDiscoveryAttempt"
 #define CFG_TDLS_MAX_DISCOVERY_ATTEMPT_MIN          ( 1 )
 #define CFG_TDLS_MAX_DISCOVERY_ATTEMPT_MAX          ( 100 )
-#define CFG_TDLS_MAX_DISCOVERY_ATTEMPT_DEFAULT      ( 3 )
+#define CFG_TDLS_MAX_DISCOVERY_ATTEMPT_DEFAULT      ( 5 )
 
 #define CFG_TDLS_IDLE_TIMEOUT                       "gTDLSIdleTimeout"
 #define CFG_TDLS_IDLE_TIMEOUT_MIN                   ( 2000 )
@@ -2671,6 +2676,7 @@ typedef struct
    v_BOOL_t                    enableRxSTBC;
    v_BOOL_t                    enableTxSTBC;
    v_BOOL_t                    enableRxLDPC;
+   v_BOOL_t                    enable5gEBT;
 #ifdef FEATURE_WLAN_TDLS
    v_BOOL_t                    fEnableTDLSSupport;
    v_BOOL_t                    fEnableTDLSImplicitTrigger;
