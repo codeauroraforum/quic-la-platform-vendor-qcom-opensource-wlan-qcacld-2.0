@@ -2316,6 +2316,14 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH_MAX         ( 3500 )
 #define CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH_DEFAULT     ( 1500 )
 #endif /* QCA_LL_TX_FLOW_CT */
+
+#ifdef QCA_WIFI_2_0
+#define CFG_SAP_MAX_OFFLOAD_PEERS                  "gMaxOffloadPeers"
+#define CFG_SAP_MAX_OFFLOAD_PEERS_MIN              (2)
+#define CFG_SAP_MAX_OFFLOAD_PEERS_MAX              (5)
+#define CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT          (2)
+#endif
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2798,7 +2806,7 @@ typedef struct
    v_BOOL_t                    gEnableOverLapCh;
    char                        acsAllowedChnls[CFG_MAX_STR_LEN];
    v_U16_t                     acsBandSwitchThreshold;
-
+   v_U8_t                      apMaxOffloadPeers;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
