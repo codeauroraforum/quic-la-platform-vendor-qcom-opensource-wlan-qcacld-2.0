@@ -241,6 +241,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_EARLY_RX_ADJUST_PAUSE          80
 #define WE_SET_MC_RATE                        81
 #define WE_SET_EARLY_RX_DRIFT_SAMPLE          82
+/* Private ioctl for packet power save */
+#define WE_PPS_5G_EBT                         83
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
@@ -2164,7 +2166,7 @@ static int iw_get_genie(struct net_device *dev,
         hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
         return -EFAULT;
     }
-    vos_mem_copy( extra, (v_VOID_t*)genIeBytes, wrqu->data.length);
+    vos_mem_copy( extra, (v_VOID_t*)genIeBytes, length);
     wrqu->data.length = length;
 
     hddLog(LOG1,"%s: RSN IE of %d bytes returned\n", __func__, wrqu->data.length );
@@ -5540,6 +5542,18 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
            hddLog(LOG1, "WMI_VDEV_PPS_RSSI_CHECK val %d ", set_value);
            ret = process_wma_set_command((int)pAdapter->sessionId,
                            (int)WMI_VDEV_PPS_RSSI_CHECK,
+                           set_value, PPS_CMD);
+           break;
+        }
+
+        case WE_PPS_5G_EBT:
+        {
+           if (pAdapter->device_mode != WLAN_HDD_INFRA_STATION)
+              return -EINVAL;
+
+           hddLog(LOG1, "WMI_VDEV_PPS_5G_EBT val %d", set_value);
+           ret = process_wma_set_command((int)pAdapter->sessionId,
+                           (int)WMI_VDEV_PPS_5G_EBT,
                            set_value, PPS_CMD);
            break;
         }
@@ -10069,6 +10083,10 @@ static const struct iw_priv_args we_private_args[] = {
     {   WE_PPS_RSSI_CHECK,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0, "rssi_chk" },
+
+    {   WE_PPS_5G_EBT,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "5g_ebt" },
 
     {   WE_SET_HTSMPS,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
