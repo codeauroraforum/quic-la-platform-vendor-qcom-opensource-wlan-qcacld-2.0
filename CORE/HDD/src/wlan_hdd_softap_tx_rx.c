@@ -459,6 +459,70 @@ xmit_done:
 
 #else
 
+#ifdef QCA_LL_TX_FLOW_CT
+/**============================================================================
+  @brief hdd_softap_tx_resume_timer_expired_handler() - Resume OS TX Q timer
+      expired handler for SAP and P2P GO interface.
+      If Blocked OS Q is not resumed during timeout period, to prevent
+      permanent stall, resume OS Q forcefully for SAP and P2P GO interface.
+
+  @param adapter_context : [in] pointer to vdev adapter
+
+  @return         : NONE
+  ===========================================================================*/
+void hdd_softap_tx_resume_timer_expired_handler(void *adapter_context)
+{
+   hdd_adapter_t *pAdapter = (hdd_adapter_t *)adapter_context;
+
+   if (!pAdapter)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "%s: INV ARG", __func__);
+      /* INVALID ARG */
+      return;
+   }
+
+   netif_tx_wake_all_queues(pAdapter->dev);
+   return;
+}
+
+/**============================================================================
+  @brief hdd_softap_tx_resume_cb() - Resume OS TX Q.
+      Q was stopped due to WLAN TX path low resource condition
+
+  @param adapter_context : [in] pointer to vdev adapter
+  @param tx_resume       : [in] TX Q resume trigger
+
+  @return         : NONE
+  ===========================================================================*/
+void hdd_softap_tx_resume_cb(void *adapter_context,
+                        v_BOOL_t tx_resume)
+{
+   hdd_adapter_t *pAdapter = (hdd_adapter_t *)adapter_context;
+
+   if (!pAdapter)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "%s: INV ARG", __func__);
+      /* INVALID ARG */
+      return;
+   }
+
+   /* Resume TX  */
+   if (VOS_TRUE == tx_resume)
+   {
+       if(VOS_TIMER_STATE_STOPPED !=
+          vos_timer_getCurrentState(&pAdapter->tx_flow_control_timer))
+       {
+          vos_timer_stop(&pAdapter->tx_flow_control_timer);
+       }
+
+       netif_tx_wake_all_queues(pAdapter->dev);
+   }
+   return;
+}
+#endif /* QCA_LL_TX_FLOW_CT */
+
 /**============================================================================
   @brief hdd_softap_hard_start_xmit() - Function registered with the Linux OS
                                         for transmitting packets.
@@ -537,6 +601,22 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
         }
       }
    }
+
+#ifdef QCA_LL_TX_FLOW_CT
+   if (VOS_FALSE == WLANTL_GetTxResource((WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
+                                         pAdapter->sessionId,
+                                         pAdapter->tx_flow_low_watermark,
+                                         pAdapter->tx_flow_high_watermark_offset))
+   {
+       netif_tx_stop_all_queues(dev);
+       if (VOS_TIMER_STATE_STOPPED ==
+           vos_timer_getCurrentState(&pAdapter->tx_flow_control_timer))
+       {
+          vos_timer_start(&pAdapter->tx_flow_control_timer,
+                          WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
+       }
+   }
+#endif /* QCA_LL_TX_FLOW_CT */
 
    //Get TL AC corresponding to Qdisc queue index/AC.
    ac = hdd_QdiscAcToTlAC[skb->queue_mapping];
@@ -746,7 +826,7 @@ xmit_end:
   ===========================================================================*/
 void hdd_softap_tx_timeout(struct net_device *dev)
 {
-   VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ERROR,
+   VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_DEBUG,
       "%s: Transmission timeout occurred", __func__);
    //Getting here implies we disabled the TX queues for too long. Queues are
    //disabled either because of disassociation or low resource scenarios. In
@@ -1442,6 +1522,7 @@ VOS_STATUS hdd_softap_rx_packet_cbk( v_VOID_t *vosContext,
    vos_pkt_t* pVosPacket;
    vos_pkt_t* pNextVosPacket;
    hdd_context_t *pHddCtx = NULL;
+   hdd_ap_ctx_t *pHddApCtx;
 
    //Sanity check on inputs
    if ( ( NULL == vosContext ) ||
@@ -1527,13 +1608,13 @@ VOS_STATUS hdd_softap_rx_packet_cbk( v_VOID_t *vosContext,
       ++pAdapter->stats.rx_packets;
       pAdapter->stats.rx_bytes += skb->len;
 
+      pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
+
       if (WLAN_RX_BCMC_STA_ID == pRxMetaInfo->ucDesSTAId)
       {
          //MC/BC packets. Duplicate a copy of packet
          struct sk_buff *pSkbCopy;
-         hdd_ap_ctx_t *pHddApCtx;
 
-         pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
          if (!(pHddApCtx->apDisableIntraBssFwd))
          {
              pSkbCopy = skb_copy(skb, GFP_ATOMIC);
@@ -1552,7 +1633,11 @@ VOS_STATUS hdd_softap_rx_packet_cbk( v_VOID_t *vosContext,
       } //(WLAN_RX_BCMC_STA_ID == staId)
 
       if ((WLAN_RX_BCMC_STA_ID == pRxMetaInfo->ucDesSTAId) ||
+#ifdef WLAN_FEATURE_MBSSID
+          (pHddApCtx->uBCStaId == pRxMetaInfo->ucDesSTAId))
+#else
           (WLAN_RX_SAP_SELF_STA_ID == pRxMetaInfo->ucDesSTAId))
+#endif
       {
          VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO_LOW,
                           "%s: send one packet to kernel \n", __func__);
@@ -1973,10 +2058,16 @@ VOS_STATUS hdd_softap_Register_BC_STA( hdd_adapter_t *pAdapter, v_BOOL_t fPrivac
    VOS_STATUS vosStatus = VOS_STATUS_E_FAILURE;
    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    v_MACADDR_t broadcastMacAddr = VOS_MAC_ADDR_BROADCAST_INITIALIZER;
+   hdd_ap_ctx_t *pHddApCtx;
 
+   pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
 
    pHddCtx->sta_to_adapter[WLAN_RX_BCMC_STA_ID] = pAdapter;
+#ifdef WLAN_FEATURE_MBSSID
+   pHddCtx->sta_to_adapter[pHddApCtx->uBCStaId] = pAdapter;
+#else
    pHddCtx->sta_to_adapter[WLAN_RX_SAP_SELF_STA_ID] = pAdapter;
+#endif
    vosStatus = hdd_softap_RegisterSTA( pAdapter, VOS_FALSE, fPrivacyBit, (WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->uBCStaId, 0, 1, &broadcastMacAddr,0);
 
    return vosStatus;

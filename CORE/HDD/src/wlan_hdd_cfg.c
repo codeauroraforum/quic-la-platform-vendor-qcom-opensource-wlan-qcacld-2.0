@@ -3216,33 +3216,47 @@ REG_VARIABLE( CFG_SAP_SCAN_BAND_PREFERENCE, WLAN_PARAM_Integer,
                CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
 
 #ifdef QCA_LL_TX_FLOW_CT
-REG_VARIABLE( CFG_LL_TX_STA_FLOW_LWM, WLAN_PARAM_Integer,
-              hdd_config_t, TxStaFlowLowWaterMark,
+REG_VARIABLE( CFG_LL_TX_LBW_FLOW_LWM, WLAN_PARAM_Integer,
+              hdd_config_t, TxLbwFlowLowWaterMark,
               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-              CFG_LL_TX_STA_FLOW_LWM_DEFAULT,
-              CFG_LL_TX_STA_FLOW_LWM_MIN,
-              CFG_LL_TX_STA_FLOW_LWM_MAX ),
+              CFG_LL_TX_LBW_FLOW_LWM_DEFAULT,
+              CFG_LL_TX_LBW_FLOW_LWM_MIN,
+              CFG_LL_TX_LBW_FLOW_LWM_MAX ),
 
-REG_VARIABLE( CFG_LL_TX_STA_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
-              hdd_config_t, TxStaFlowHighWaterMarkOffset,
+REG_VARIABLE( CFG_LL_TX_LBW_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
+              hdd_config_t, TxLbwFlowHighWaterMarkOffset,
               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-              CFG_LL_TX_STA_FLOW_HWM_OFFSET_DEFAULT,
-              CFG_LL_TX_STA_FLOW_HWM_OFFSET_MIN,
-              CFG_LL_TX_STA_FLOW_HWM_OFFSET_MAX ),
+              CFG_LL_TX_LBW_FLOW_HWM_OFFSET_DEFAULT,
+              CFG_LL_TX_LBW_FLOW_HWM_OFFSET_MIN,
+              CFG_LL_TX_LBW_FLOW_HWM_OFFSET_MAX ),
 
-REG_VARIABLE( CFG_LL_TX_IBSS_FLOW_LWM, WLAN_PARAM_Integer,
-              hdd_config_t, TxIbssFlowLowWaterMark,
+REG_VARIABLE( CFG_LL_TX_LBW_FLOW_MAX_Q_DEPTH, WLAN_PARAM_Integer,
+              hdd_config_t, TxLbwFlowMaxQueueDepth,
               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-              CFG_LL_TX_IBSS_FLOW_LWM_DEFAULT,
-              CFG_LL_TX_IBSS_FLOW_LWM_MIN,
-              CFG_LL_TX_IBSS_FLOW_LWM_MAX ),
+              CFG_LL_TX_LBW_FLOW_MAX_Q_DEPTH_DEFAULT,
+              CFG_LL_TX_LBW_FLOW_MAX_Q_DEPTH_MIN,
+              CFG_LL_TX_LBW_FLOW_MAX_Q_DEPTH_MAX ),
 
-REG_VARIABLE( CFG_LL_TX_IBSS_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
-              hdd_config_t, TxIbssFlowHighWaterMarkOffset,
+REG_VARIABLE( CFG_LL_TX_HBW_FLOW_LWM, WLAN_PARAM_Integer,
+              hdd_config_t, TxHbwFlowLowWaterMark,
               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_DEFAULT,
-              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MIN,
-              CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MAX ),
+              CFG_LL_TX_HBW_FLOW_LWM_DEFAULT,
+              CFG_LL_TX_HBW_FLOW_LWM_MIN,
+              CFG_LL_TX_HBW_FLOW_LWM_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_HBW_FLOW_HWM_OFFSET, WLAN_PARAM_Integer,
+              hdd_config_t, TxHbwFlowHighWaterMarkOffset,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_HBW_FLOW_HWM_OFFSET_DEFAULT,
+              CFG_LL_TX_HBW_FLOW_HWM_OFFSET_MIN,
+              CFG_LL_TX_HBW_FLOW_HWM_OFFSET_MAX ),
+
+REG_VARIABLE( CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH, WLAN_PARAM_Integer,
+              hdd_config_t, TxHbwFlowMaxQueueDepth,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH_DEFAULT,
+              CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH_MIN,
+              CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH_MAX ),
 #endif /* QCA_LL_TX_FLOW_CT */
 REG_VARIABLE( CFG_ACS_BAND_SWITCH_THRESHOLD, WLAN_PARAM_Integer,
               hdd_config_t, acsBandSwitchThreshold,
@@ -3250,6 +3264,13 @@ REG_VARIABLE( CFG_ACS_BAND_SWITCH_THRESHOLD, WLAN_PARAM_Integer,
               CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT,
               CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
               CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
+
+REG_VARIABLE( CFG_SAP_MAX_OFFLOAD_PEERS, WLAN_PARAM_Integer,
+              hdd_config_t, apMaxOffloadPeers,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
+              CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT,
+              CFG_SAP_MAX_OFFLOAD_PEERS_MIN,
+              CFG_SAP_MAX_OFFLOAD_PEERS_MAX ),
 };
 
 /*
@@ -3447,6 +3468,8 @@ config_exit:
 
 static void print_hdd_cfg(hdd_context_t *pHddCtx)
 {
+  int i;
+
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "*********Config values in HDD Adapter*******");
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [RTSThreshold] Value = %u",pHddCtx->cfg_ini->RTSThreshold) ;
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [OperatingChannel] Value = [%u]",pHddCtx->cfg_ini->OperatingChannel);
@@ -3459,21 +3482,12 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
             "Name = [gIbssBssid] Value =["MAC_ADDRESS_STR"]",
             MAC_ADDR_ARRAY(pHddCtx->cfg_ini->IbssBssid.bytes));
 
-  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-            "Name = [Intf0MacAddress] Value =["MAC_ADDRESS_STR"]",
-            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[0].bytes));
-
-  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-            "Name = [Intf1MacAddress] Value =["MAC_ADDRESS_STR"]",
-            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[1].bytes));
-
-  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-            "Name = [Intf2MacAddress] Value =["MAC_ADDRESS_STR"]",
-            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[2].bytes));
-
-  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-            "Name = [Intf3MacAddress] Value =["MAC_ADDRESS_STR"]",
-            MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[3].bytes));
+  for (i=0; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
+  {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+            "Name = [Intf%dMacAddress] Value =["MAC_ADDRESS_STR"]",
+            i, MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
+  }
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gApEnableUapsd] value = [%u]\n",pHddCtx->cfg_ini->apUapsdEnabled);
 
@@ -3650,6 +3664,8 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
 #endif
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gEnableOverLapCh] Value = [%u] ",pHddCtx->cfg_ini->gEnableOverLapCh);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gAcsScanBandPreference] Value = [%u] ",pHddCtx->cfg_ini->acsScanBandPreference);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gMaxOffloadPeers] Value = [%u] ",pHddCtx->cfg_ini->apMaxOffloadPeers);
+
 }
 
 
