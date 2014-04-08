@@ -418,6 +418,8 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
                         pHddCtx->cfg_ini->fDfsPhyerrFilterOffload;
 #endif
 
+   macOpenParms.apMaxOffloadPeers = pHddCtx->cfg_ini->apMaxOffloadPeers;
+
    macOpenParms.apDisableIntraBssFwd = pHddCtx->cfg_ini->apDisableIntraBssFwd;
 
    vStatus = WDA_open( gpVosContext, gpVosContext->pHDDContext,
@@ -1240,11 +1242,13 @@ v_VOID_t* vos_get_context( VOS_MODULE_ID moduleId,
     }
 #endif //WLAN_BTAMP_FEATURE
 
+#ifndef WLAN_FEATURE_MBSSID
     case VOS_MODULE_ID_SAP:
     {
       pModContext = gpVosContext->pSAPContext;
       break;
     }
+#endif
 
     case VOS_MODULE_ID_HDD_SOFTAP:
     {
@@ -1513,11 +1517,13 @@ VOS_STATUS vos_alloc_context( v_VOID_t *pVosContext, VOS_MODULE_ID moduleID,
     }
 #endif //WLAN_BTAMP_FEATURE
 
+#ifndef WLAN_FEATURE_MBSSID
     case VOS_MODULE_ID_SAP:
     {
       pGpModContext = &(gpVosContext->pSAPContext);
       break;
     }
+#endif
 
     case VOS_MODULE_ID_WDA:
     {
@@ -1638,11 +1644,13 @@ VOS_STATUS vos_free_context( v_VOID_t *pVosContext, VOS_MODULE_ID moduleID,
     }
 #endif //WLAN_BTAMP_FEATURE
 
+#ifndef WLAN_FEATURE_MBSSID
     case VOS_MODULE_ID_SAP:
     {
       pGpModContext = &(gpVosContext->pSAPContext);
       break;
     }
+#endif
 
     case VOS_MODULE_ID_WDA:
     {
@@ -2485,33 +2493,7 @@ VOS_STATUS vos_wlanRestart(void)
 v_VOID_t vos_fwDumpReq(tANI_U32 cmd, tANI_U32 arg1, tANI_U32 arg2,
                         tANI_U32 arg3, tANI_U32 arg4)
 {
-   VOS_STATUS vStatus          = VOS_STATUS_SUCCESS;
-
-   /* Reset wda wait event */
-   vos_event_reset(&gpVosContext->wdaCompleteEvent);
-
    WDA_HALDumpCmdReq(NULL, cmd, arg1, arg2, arg3, arg4, NULL);
-
-   /* Need to update time out of complete */
-   vStatus = vos_wait_single_event(&gpVosContext->wdaCompleteEvent,
-                                   VOS_WDA_RESP_TIMEOUT );
-
-   if (vStatus != VOS_STATUS_SUCCESS)
-   {
-      if (vStatus == VOS_STATUS_E_TIMEOUT)
-      {
-         VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-          "%s: Timeout occurred before WDA HAL DUMP complete", __func__);
-      }
-      else
-      {
-         VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-           "%s: reporting other error", __func__);
-      }
-   }
-
-   return;
-
 }
 
 VOS_STATUS vos_get_vdev_types(tVOS_CON_MODE mode, tANI_U32 *type,

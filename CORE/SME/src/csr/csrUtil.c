@@ -2764,6 +2764,7 @@ csrIsconcurrentsessionValid(tpAniSirGlobal pMac,tANI_U32 cursessionId,
 #endif
 
                 case VOS_STA_SAP_MODE:
+#ifndef WLAN_FEATURE_MBSSID
                     if((pMac->roam.roamSession[sessionId].bssParams.bssPersona
                                       == VOS_STA_SAP_MODE)&&
                        (pMac->roam.roamSession[sessionId].connectState
@@ -2772,7 +2773,9 @@ csrIsconcurrentsessionValid(tpAniSirGlobal pMac,tANI_U32 cursessionId,
                         smsLog(pMac, LOGE, FL(" ****SoftAP mode already exists ****"));
                         return eHAL_STATUS_FAILURE;
                     }
-                    else if( (pMac->roam.roamSession[sessionId].bssParams.bssPersona
+                    else
+#endif
+                        if( (pMac->roam.roamSession[sessionId].bssParams.bssPersona
                                       == VOS_P2P_GO_MODE &&
                               pMac->roam.roamSession[sessionId].connectState
                                       != eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED) ||
@@ -3110,7 +3113,7 @@ eHalStatus csrValidateMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U8 channelId,
                 break;
 
                 default :
-                    smsLog(pMac, LOG1, FL(" Persona not supported : %d"),currBssPersona);
+                    smsLog(pMac, LOGE, FL(" Persona not supported : %d"),currBssPersona);
                     return eHAL_STATUS_FAILURE;
             }
         }
@@ -6151,7 +6154,7 @@ v_CountryInfoSource_t source
         }
         else
         {
-            smsLog(pMac, LOGE, FL("  doesn't match country %c%c, status %d"), pCountry[0], pCountry[1], vosStatus);
+            smsLog(pMac, LOGW, FL(" Couldn't find domain for country code  %c%c"), pCountry[0], pCountry[1]);
             status = eHAL_STATUS_INVALID_PARAMETER;
         }
     }
