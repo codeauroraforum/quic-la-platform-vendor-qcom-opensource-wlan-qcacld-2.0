@@ -1509,6 +1509,11 @@ typedef enum
 #define CFG_ENABLE_SSR_MAX                  ( 1 )
 #define CFG_ENABLE_SSR_DEFAULT              ( 1 )
 
+#define CFG_ENABLE_OVERLAP_CH               "gEnableOverLapCh"
+#define CFG_ENABLE_OVERLAP_CH_MIN           ( 0 )
+#define CFG_ENABLE_OVERLAP_CH_MAX           ( 1 )
+#define CFG_ENABLE_OVERLAP_CH_DEFAULT       ( 0 )
+
 /*
  * VOS Trace Enable Control
  * Notes:
@@ -2754,6 +2759,7 @@ typedef struct
    v_U32_t                     TxIbssFlowLowWaterMark;
    v_U32_t                     TxIbssFlowHighWaterMarkOffset;
 #endif /* QCA_LL_TX_FLOW_CT */
+   v_BOOL_t                    gEnableOverLapCh;
 } hdd_config_t;
 /*---------------------------------------------------------------------------
   Function declarations and documenation
