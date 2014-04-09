@@ -1006,6 +1006,11 @@ VOS_STATUS vos_stop( v_CONTEXT_t vosContext )
   }
 #endif
 
+#ifndef QCA_WIFI_ISOC
+  hif_disable_isr(((VosContextType*)vosContext)->pHIFContext);
+  hif_reset_soc(((VosContextType*)vosContext)->pHIFContext);
+#endif
+
   /* SYS STOP will stop SME and MAC */
   vosStatus = sysStop( vosContext);
   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
@@ -1022,10 +1027,6 @@ VOS_STATUS vos_stop( v_CONTEXT_t vosContext )
          "%s: Failed to stop TL", __func__);
      VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
   }
-
-#ifndef QCA_WIFI_ISOC
-  hif_disable_isr(((VosContextType*)vosContext)->pHIFContext);
-#endif
 
   return VOS_STATUS_SUCCESS;
 }
