@@ -580,7 +580,7 @@ ol_txrx_pdev_attach(
     adf_os_mem_zero(&pdev->tx_delay, sizeof(pdev->tx_delay));
     adf_os_spinlock_init(&pdev->tx_delay.mutex);
 
-    /* initialize compute interval with 5 seconds (CCX default) */
+    /* initialize compute interval with 5 seconds (ESE default) */
     pdev->tx_delay.avg_period_ticks = adf_os_msecs_to_ticks(5000);
     {
         u_int32_t bin_width_1000ticks;
@@ -838,6 +838,11 @@ ol_txrx_vdev_attach(
             &vdev->ll_pause.timer,
             ol_tx_vdev_ll_pause_queue_send,
             vdev);
+    adf_os_atomic_init(&vdev->os_q_paused);
+    adf_os_atomic_set(&vdev->os_q_paused, 0);
+    vdev->tx_fl_lwm = 0;
+    vdev->tx_fl_hwm = 0;
+    vdev->osif_flow_control_cb = NULL;
 
     /* add this vdev into the pdev's list */
     TAILQ_INSERT_TAIL(&pdev->vdev_list, vdev, vdev_list_elem);
@@ -870,6 +875,9 @@ void ol_txrx_osif_vdev_register(ol_txrx_vdev_handle vdev,
 	} else {
 		txrx_ops->tx.std = vdev->tx = OL_TX_LL;
 		txrx_ops->tx.non_std = ol_tx_non_std_ll;
+#ifdef QCA_LL_TX_FLOW_CT
+		vdev->osif_flow_control_cb = txrx_ops->tx.flow_control_cb;
+#endif /* QCA_LL_TX_FLOW_CT */
 	}
 }
 
@@ -1489,10 +1497,6 @@ ol_txrx_get_tx_pending(ol_txrx_pdev_handle pdev_handle)
 {
     struct ol_txrx_pdev_t *pdev = (ol_txrx_pdev_handle)pdev_handle;
     int total;
-#ifndef QCA_WIFI_ISOC
-    union ol_tx_desc_list_elem_t *p_tx_desc;
-    int unused = 0;
-#endif
 
     if (ol_cfg_is_high_latency(pdev->ctrl_pdev)) {
         total = adf_os_atomic_read(&pdev->orig_target_tx_credit);
@@ -1501,28 +1505,7 @@ ol_txrx_get_tx_pending(ol_txrx_pdev_handle pdev_handle)
     }
 
 #ifndef QCA_WIFI_ISOC
-    /*
-     * Iterate over the tx descriptor freelist to see how many are available,
-     * and thus by inference, how many are in use.
-     * This iteration is inefficient, but this code is called during
-     * cleanup, when performance is not paramount.  It is preferable
-     * to do have a large inefficiency during this non-critical
-     * cleanup stage than to have lots of little inefficiencies of
-     * updating counters during the performance-critical tx "fast path".
-     *
-     * Use the lock to ensure there are no new allocations made while
-     * we're trying to count the number of allocations.
-     * This function is expected to be used only during cleanup, at which
-     * time there should be no new allocations made, but just to be safe...
-     */
-    adf_os_spin_lock_bh(&pdev->tx_mutex);
-    p_tx_desc = pdev->tx_desc.freelist;
-    while (p_tx_desc) {
-        p_tx_desc = p_tx_desc->next;
-        unused++;
-    }
-    adf_os_spin_unlock_bh(&pdev->tx_mutex);
-    return (total - unused);
+    return (total - pdev->tx_desc.num_free);
 #else
     return total - adf_os_atomic_read(&pdev->target_tx_credit);
 #endif
@@ -1547,7 +1530,7 @@ ol_txrx_discard_tx_pending(ol_txrx_pdev_handle pdev_handle)
 
 /*--- debug features --------------------------------------------------------*/
 
-unsigned g_txrx_print_level = TXRX_PRINT_LEVEL_INFO1; /* default */
+unsigned g_txrx_print_level = TXRX_PRINT_LEVEL_ERR; /* default */
 
 void ol_txrx_print_level_set(unsigned level)
 {
@@ -1965,6 +1948,30 @@ ol_vdev_rx_set_intrabss_fwd(
     ol_txrx_vdev_handle vdev,
     a_bool_t val)
 {
+    if (NULL == vdev)
+        return;
+
     vdev->disable_intrabss_fwd = val;
 }
 
+#ifdef QCA_LL_TX_FLOW_CT
+a_bool_t
+ol_txrx_get_tx_resource(
+    ol_txrx_vdev_handle vdev,
+    unsigned int low_watermark,
+    unsigned int high_watermark_offset
+)
+{
+   adf_os_spin_lock_bh(&vdev->pdev->tx_mutex);
+   if (vdev->pdev->tx_desc.num_free < (u_int16_t)low_watermark) {
+      vdev->tx_fl_lwm = (u_int16_t)low_watermark;
+      vdev->tx_fl_hwm = (u_int16_t)(low_watermark + high_watermark_offset);
+      /* Not enough free resource, stop TX OS Q */
+      adf_os_atomic_set(&vdev->os_q_paused, 1);
+      adf_os_spin_unlock_bh(&vdev->pdev->tx_mutex);
+      return A_FALSE;
+   }
+   adf_os_spin_unlock_bh(&vdev->pdev->tx_mutex);
+   return A_TRUE;
+}
+#endif /* QCA_LL_TX_FLOW_CT */

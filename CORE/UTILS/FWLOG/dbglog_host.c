@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -719,6 +719,8 @@ char * DBG_MSG_ARR[WLAN_MODULE_ID_MAX][MAX_DBG_MSGS] =
         "BEACON_EVENT_EARLY_RX_SLEEP_SLOP",
         "BEACON_EVENT_EARLY_RX_CONT_BMISS_TIMEOUT",
         "BEACON_EVENT_EARLY_RX_PAUSE_SKIP_BCN_NUM",
+        "BEACON_EVENT_EARLY_RX_CLK_DRIFT",
+        "BEACON_EVENT_EARLY_RX_AP_DRIFT",
         "BEACON_EVENT_EARLY_RX_BCN_TYPE",
     },
     { /* Offload Mgr */
@@ -1634,7 +1636,7 @@ dbglog_parse_debug_logs(ol_scn_t scn, u_int8_t *data, u_int32_t datalen)
 
     dropped = *((A_UINT32 *)datap);
     if (dropped > 0) {
-        AR_DEBUG_PRINTF(ATH_DEBUG_INFO, ("%d log buffers are dropped \n", dropped));
+        AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("%d log buffers are dropped \n", dropped));
     }
     datap += sizeof(dropped);
     len -= sizeof(dropped);
@@ -2818,6 +2820,20 @@ dbglog_beacon_print_handler(
         if (numargs == 1) {
             dbglog_printf(timestamp, vap_id,
                     "early_rx skip bcn num:%d",
+                    args[0]);
+        }
+        break;
+    case BEACON_EVENT_EARLY_RX_CLK_DRIFT:
+        if (numargs == 1) {
+            dbglog_printf(timestamp, vap_id,
+                    "early_rx clk drift:%d",
+                    args[0]);
+        }
+        break;
+    case BEACON_EVENT_EARLY_RX_AP_DRIFT:
+        if (numargs == 1) {
+            dbglog_printf(timestamp, vap_id,
+                    "early_rx ap drift:%d",
                     args[0]);
         }
         break;

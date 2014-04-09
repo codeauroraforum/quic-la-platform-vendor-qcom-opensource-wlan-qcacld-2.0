@@ -105,6 +105,7 @@ when           who                what, where, why
 #define       MAX_NAME_SIZE                64
 #define       MAX_TEXT_SIZE                32
 
+#define       MAX_CHANNEL_LIST_LEN         256
 
 /*--------------------------------------------------------------------------
   reasonCode take form 802.11 standard Table 7-22 to be passed to WLANSAP_DisassocSta api.
@@ -247,6 +248,7 @@ typedef struct sap_StartBssCompleteEvent_s {
     v_U8_t  status;
     v_U8_t  operatingChannel;
     v_U16_t staId; //self StaID
+    v_U8_t  sessionId; /* SoftAP SME session ID */
 } tSap_StartBssCompleteEvent;
 
 typedef struct sap_StopBssCompleteEvent_s {
@@ -453,6 +455,9 @@ typedef struct sap_Config {
     tVOS_CON_MODE   persona; /*Tells us which persona it is GO or AP for now*/
     v_U8_t          disableDFSChSwitch;
     eCsrBand        scanBandPreference;
+    v_BOOL_t        enOverLapCh;
+    char            acsAllowedChnls[MAX_CHANNEL_LIST_LEN];
+    v_U16_t         acsBandSwitchThreshold;
 } tsap_Config_t;
 
 typedef enum {

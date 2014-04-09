@@ -269,6 +269,11 @@
 #define CFG_ENABLE_ADAPT_RX_DRAIN_DEFAULT   WNI_CFG_ENABLE_ADAPT_RX_DRAIN_STADEF
 
 
+#define CFG_REG_CHANGE_DEF_COUNTRY_NAME          "gRegulatoryChangeCountry"
+#define CFG_REG_CHANGE_DEF_COUNTRY_DEFAULT       ( 0 )
+#define CFG_REG_CHANGE_DEF_COUNTRY_MIN           ( 0 )
+#define CFG_REG_CHANGE_DEF_COUNTRY_MAX           ( 1 )
+
 typedef enum
 {
     eHDD_DOT11_MODE_AUTO = 0, //covers all things we support
@@ -352,7 +357,7 @@ typedef enum
 #define CFG_RSSI_CATEGORY_GAP_MAX              ( 100 )
 #define CFG_RSSI_CATEGORY_GAP_DEFAULT          ( 5 )
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
 #define CFG_ROAM_PREFER_5GHZ                   "gRoamPrefer5GHz"
 #define CFG_ROAM_PREFER_5GHZ_MIN              ( 0 )
 #define CFG_ROAM_PREFER_5GHZ_MAX              ( 1 )
@@ -487,14 +492,14 @@ typedef enum
 #define CFG_ENABLE_LTE_COEX_DEFAULT           ( 0 )
 
 #define CFG_AP_KEEP_ALIVE_PERIOD_NAME          "gApKeepAlivePeriod"
-#define CFG_AP_KEEP_ALIVE_PERIOD_MIN           ( 3 )
-#define CFG_AP_KEEP_ALIVE_PERIOD_MAX           ( 20 )
-#define CFG_AP_KEEP_ALIVE_PERIOD_DEFAULT       ( 5 )
+#define CFG_AP_KEEP_ALIVE_PERIOD_MIN           WNI_CFG_AP_KEEP_ALIVE_TIMEOUT_STAMIN
+#define CFG_AP_KEEP_ALIVE_PERIOD_MAX           WNI_CFG_AP_KEEP_ALIVE_TIMEOUT_STAMAX
+#define CFG_AP_KEEP_ALIVE_PERIOD_DEFAULT       WNI_CFG_AP_KEEP_ALIVE_TIMEOUT_STADEF
 
 #define CFG_GO_KEEP_ALIVE_PERIOD_NAME          "gGoKeepAlivePeriod"
-#define CFG_GO_KEEP_ALIVE_PERIOD_MIN           ( 3 )
-#define CFG_GO_KEEP_ALIVE_PERIOD_MAX           ( 20 )
-#define CFG_GO_KEEP_ALIVE_PERIOD_DEFAULT       ( 5 )
+#define CFG_GO_KEEP_ALIVE_PERIOD_MIN           WNI_CFG_GO_KEEP_ALIVE_TIMEOUT_STAMIN
+#define CFG_GO_KEEP_ALIVE_PERIOD_MAX           WNI_CFG_GO_KEEP_ALIVE_TIMEOUT_STAMAX
+#define CFG_GO_KEEP_ALIVE_PERIOD_DEFAULT       WNI_CFG_GO_KEEP_ALIVE_TIMEOUT_STADEF
 
 #define CFG_AP_LINK_MONITOR_PERIOD_NAME          "gApLinkMonitorPeriod"
 #define CFG_AP_LINK_MONITOR_PERIOD_MIN           ( 3 )
@@ -622,7 +627,6 @@ typedef enum
 #define CFG_NUM_P2P_CHAN_COMBINED_CONC_MIN              ( 1 )
 #define CFG_NUM_P2P_CHAN_COMBINED_CONC_MAX              ( 255 )
 #define CFG_NUM_P2P_CHAN_COMBINED_CONC_DEFAULT          ( 1 )
-
 #endif
 
 #define CFG_MAX_PS_POLL_NAME                   "gMaxPsPoll"
@@ -645,7 +649,7 @@ typedef enum
 #define CFG_RSSI_FILTER_PERIOD_NAME            "gRssiFilterPeriod"
 #define CFG_RSSI_FILTER_PERIOD_MIN             WNI_CFG_RSSI_FILTER_PERIOD_STAMIN
 #define CFG_RSSI_FILTER_PERIOD_MAX             WNI_CFG_RSSI_FILTER_PERIOD_STAMAX
-// Increased this value for Non-CCX AP. This is cause FW RSSI Monitoring
+// Increased this value for Non-ESE AP. This is cause FW RSSI Monitoring
 // the consumer of this value is ON by default. So to impact power numbers
 // we are setting this to a high value.
 #define CFG_RSSI_FILTER_PERIOD_DEFAULT         WNI_CFG_RSSI_FILTER_PERIOD_STADEF
@@ -756,17 +760,17 @@ typedef enum
 #define CFG_QOS_WMM_INFRA_UAPSD_BK_SUS_INTV_MAX             (4294967295UL)
 #define CFG_QOS_WMM_INFRA_UAPSD_BK_SUS_INTV_DEFAULT         (2000)
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_NAME         "InfraInactivityInterval"
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MIN           (0)
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MAX           (4294967295UL)
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_DEFAULT       (0) //disabled
 
-#define CFG_CCX_FEATURE_ENABLED_NAME                       "CcxEnabled"
-#define CFG_CCX_FEATURE_ENABLED_MIN                         (0)
-#define CFG_CCX_FEATURE_ENABLED_MAX                         (1)
-#define CFG_CCX_FEATURE_ENABLED_DEFAULT                     (0) //disabled
-#endif // FEATURE_WLAN_CCX
+#define CFG_ESE_FEATURE_ENABLED_NAME                       "EseEnabled"
+#define CFG_ESE_FEATURE_ENABLED_MIN                         (0)
+#define CFG_ESE_FEATURE_ENABLED_MAX                         (1)
+#define CFG_ESE_FEATURE_ENABLED_DEFAULT                     (0) //disabled
+#endif // FEATURE_WLAN_ESE
 
 #ifdef FEATURE_WLAN_LFR
 #define CFG_LFR_FEATURE_ENABLED_NAME                       "FastRoamEnabled"
@@ -780,13 +784,13 @@ typedef enum
 #define CFG_LFR_MAWC_FEATURE_ENABLED_DEFAULT                (0) /* disabled */
 #endif // FEATURE_WLAN_LFR
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
-// This flag will control fasttransition in case of 11r and ccx.
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
+// This flag will control fasttransition in case of 11r and ese.
 // Basically with this the whole neighbor roam, pre-auth, reassoc
 // can be turned ON/OFF.
 // With this turned OFF 11r will completely not work.
 // For 11r this flag has to be ON.
-// For CCX fastroam will not work.
+// For ESE fastroam will not work.
 #define CFG_FAST_TRANSITION_ENABLED_NAME                    "FastTransitionEnabled"
 #define CFG_FAST_TRANSITION_ENABLED_NAME_MIN                (0)
 #define CFG_FAST_TRANSITION_ENABLED_NAME_MAX                (1)
@@ -832,7 +836,7 @@ typedef enum
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (3)
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_MAX                    (300)
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_DEFAULT                (CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN)
-#endif /* (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR) */
+#endif /* (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR) */
 
 #ifdef FEATURE_WLAN_OKC
 #define CFG_OKC_FEATURE_ENABLED_NAME                       "OkcEnabled"
@@ -1434,6 +1438,16 @@ typedef enum
 #define CFG_VHT_ENABLE_GID_FEATURE_DEFAULT      ( 0 )
 #endif
 
+#define CFG_VHT_ENABLE_1x1_TX_CHAINMASK         "gSetTxChainmask1x1"
+#define CFG_VHT_ENABLE_1x1_TX_CHAINMASK_MIN     ( 1 )
+#define CFG_VHT_ENABLE_1x1_TX_CHAINMASK_MAX     ( 2 )
+#define CFG_VHT_ENABLE_1x1_TX_CHAINMASK_DEFAULT ( 1 )
+
+#define CFG_VHT_ENABLE_1x1_RX_CHAINMASK         "gSetRxChainmask1x1"
+#define CFG_VHT_ENABLE_1x1_RX_CHAINMASK_MIN     ( 1 )
+#define CFG_VHT_ENABLE_1x1_RX_CHAINMASK_MAX     ( 2 )
+#define CFG_VHT_ENABLE_1x1_RX_CHAINMASK_DEFAULT ( 1 )
+
 #define CFG_ENABLE_AMPDUPS_FEATURE              "gEnableAMPDUPS"
 #define CFG_ENABLE_AMPDUPS_FEATURE_MIN          ( 0 )
 #define CFG_ENABLE_AMPDUPS_FEATURE_MAX          ( 1 )
@@ -1493,6 +1507,16 @@ typedef enum
 #define CFG_ENABLE_SSR_MIN                  ( 0 )
 #define CFG_ENABLE_SSR_MAX                  ( 1 )
 #define CFG_ENABLE_SSR_DEFAULT              ( 1 )
+
+#define CFG_ENABLE_OVERLAP_CH               "gEnableOverLapCh"
+#define CFG_ENABLE_OVERLAP_CH_MIN           ( 0 )
+#define CFG_ENABLE_OVERLAP_CH_MAX           ( 1 )
+#define CFG_ENABLE_OVERLAP_CH_DEFAULT       ( 0 )
+
+#define CFG_PPS_ENABLE_5G_EBT                 "gEnable5gEBT"
+#define CFG_PPS_ENABLE_5G_EBT_FEATURE_MIN     ( 0 )
+#define CFG_PPS_ENABLE_5G_EBT_FEATURE_MAX     ( 1 )
+#define CFG_PPS_ENABLE_5G_EBT_FEATURE_DEFAULT ( 0 )
 
 /*
  * VOS Trace Enable Control
@@ -1583,6 +1607,24 @@ typedef enum
 #define CFG_SAP_AUTO_CHANNEL_SELECTION_MIN        ( 0 )
 #define CFG_SAP_AUTO_CHANNEL_SELECTION_MAX        ( 1 )
 #define CFG_SAP_AUTO_CHANNEL_SELECTION_DEFAULT    ( 0 )
+
+#define CFG_ONLY_ALLOWED_CHANNELS                   "gACSAllowedChannels"
+#define CFG_ONLY_ALLOWED_CHANNELS_DEFAULT           ""
+
+/* ACS Scan band preference
+ * 0 -- No preference
+ * 1 -- Scan 2.4G first
+ * 2 -- Scan 5G first
+*/
+#define CFG_SAP_SCAN_BAND_PREFERENCE              "gAcsScanBandPreference"
+#define CFG_SAP_SCAN_BAND_PREFERENCE_MIN          (0)
+#define CFG_SAP_SCAN_BAND_PREFERENCE_MAX          (2)
+#define CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT      (0)
+#define CFG_ACS_BAND_SWITCH_THRESHOLD             "gACSBandSwitchThreshold"
+#define CFG_ACS_BAND_SWITCH_THRESHOLD_MIN         (0)
+#define CFG_ACS_BAND_SWITCH_THRESHOLD_MAX         (4444)
+/* 2 BSS, maximus RSSI -90 */
+#define CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT     (296)
 
 /*BMPS Logic
  * Notes:
@@ -2243,6 +2285,27 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_SET_TXPOWER_LIMIT5G_MAX                ( 30 )
 #define CFG_SET_TXPOWER_LIMIT5G_DEFAULT            ( 15 )
 
+#ifdef QCA_LL_TX_FLOW_CT
+#define CFG_LL_TX_STA_FLOW_LWM                     "TxStaFlowLowWaterMark"
+#define CFG_LL_TX_STA_FLOW_LWM_MIN                 ( 0 )
+#define CFG_LL_TX_STA_FLOW_LWM_MAX                 ( 1000 )
+#define CFG_LL_TX_STA_FLOW_LWM_DEFAULT             ( 406 )
+
+#define CFG_LL_TX_STA_FLOW_HWM_OFFSET              "TxStaFlowHighWaterMarkOffset"
+#define CFG_LL_TX_STA_FLOW_HWM_OFFSET_MIN          ( 0 )
+#define CFG_LL_TX_STA_FLOW_HWM_OFFSET_MAX          ( 300 )
+#define CFG_LL_TX_STA_FLOW_HWM_OFFSET_DEFAULT      ( 50 )
+
+#define CFG_LL_TX_IBSS_FLOW_LWM                    "TxIbssFlowLowWaterMark"
+#define CFG_LL_TX_IBSS_FLOW_LWM_MIN                ( 0 )
+#define CFG_LL_TX_IBSS_FLOW_LWM_MAX                ( 1000 )
+#define CFG_LL_TX_IBSS_FLOW_LWM_DEFAULT            ( 550 )
+
+#define CFG_LL_TX_IBSS_FLOW_HWM_OFFSET             "TxIbssFlowHighWaterMarkOffset"
+#define CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MIN         ( 0 )
+#define CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_MAX         ( 300 )
+#define CFG_LL_TX_IBSS_FLOW_HWM_OFFSET_DEFAULT     ( 50 )
+#endif /* QCA_LL_TX_FLOW_CT */
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2443,11 +2506,11 @@ typedef struct
    v_BOOL_t                     isFastRoamIniFeatureEnabled;
    v_BOOL_t                     MAWCEnabled;
 #endif
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
    v_U32_t                      InfraInactivityInterval;
-   v_BOOL_t                     isCcxIniFeatureEnabled;
+   v_BOOL_t                     isEseIniFeatureEnabled;
 #endif
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    v_BOOL_t                     isFastTransitionEnabled;
    v_U8_t                       RoamRssiDiff;
    v_U8_t                       nImmediateRoamRssiDiff;
@@ -2563,7 +2626,7 @@ typedef struct
    v_U8_t                      ShortGI40MhzEnable;
    eHddLinkSpeedReportType     reportMaxLinkSpeed;
    v_S31_t                     linkSpeedRssiHigh;
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    v_BOOL_t                    nRoamPrefer5GHz;
    v_BOOL_t                    nRoamIntraBand;
    v_U8_t                      nProbes;
@@ -2587,6 +2650,8 @@ typedef struct
    v_U8_t                      vhtRxMCS2x2;
    v_U8_t                      vhtTxMCS2x2;
    v_BOOL_t                    enable2x2;
+   v_BOOL_t                    txchainmask1x1;
+   v_BOOL_t                    rxchainmask1x1;
    v_BOOL_t                    enableMuBformee;
    v_BOOL_t                    enableVhtpAid;
    v_BOOL_t                    enableVhtGid;
@@ -2604,6 +2669,7 @@ typedef struct
    v_BOOL_t                    enableRxSTBC;
    v_BOOL_t                    enableTxSTBC;
    v_BOOL_t                    enableRxLDPC;
+   v_BOOL_t                    enable5gEBT;
 #ifdef FEATURE_WLAN_TDLS
    v_BOOL_t                    fEnableTDLSSupport;
    v_BOOL_t                    fEnableTDLSImplicitTrigger;
@@ -2708,7 +2774,21 @@ typedef struct
    v_U32_t                     gEnableDebugLog;
    v_U8_t                      enableRxThread;
    v_BOOL_t                    fDfsPhyerrFilterOffload;
+   v_BOOL_t                    fRegChangeDefCountry;
+   v_U8_t                      acsScanBandPreference;
+#ifdef QCA_LL_TX_FLOW_CT
+   v_U32_t                     TxStaFlowLowWaterMark;
+   v_U32_t                     TxStaFlowHighWaterMarkOffset;
+   v_U32_t                     TxIbssFlowLowWaterMark;
+   v_U32_t                     TxIbssFlowHighWaterMarkOffset;
+#endif /* QCA_LL_TX_FLOW_CT */
+
+   v_BOOL_t                    gEnableOverLapCh;
+   char                        acsAllowedChnls[CFG_MAX_STR_LEN];
+   v_U16_t                     acsBandSwitchThreshold;
+
 } hdd_config_t;
+
 /*---------------------------------------------------------------------------
   Function declarations and documenation
   -------------------------------------------------------------------------*/

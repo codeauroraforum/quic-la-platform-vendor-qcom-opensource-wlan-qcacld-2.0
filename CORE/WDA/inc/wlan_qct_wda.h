@@ -1110,7 +1110,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_EXCLUDE_UNENCRYPTED_IND    SIR_HAL_EXCLUDE_UNENCRYPTED_IND
 #endif
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 #define WDA_TSM_STATS_REQ              SIR_HAL_TSM_STATS_REQ
 #define WDA_TSM_STATS_RSP              SIR_HAL_TSM_STATS_RSP
 #endif
@@ -1226,7 +1226,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_SET_PNO_CHANGED_IND     SIR_HAL_SET_PNO_CHANGED_IND
 #endif // FEATURE_WLAN_SCAN_PNO
 
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 #define WDA_SET_PLM_REQ             SIR_HAL_SET_PLM_REQ
 #endif
 
@@ -1331,6 +1331,11 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
  */
 #define WDA_DFS_BEACON_TX_SUCCESS_IND   SIR_HAL_BEACON_TX_SUCCESS_IND
 #define WDA_FW_STATS_IND           SIR_HAL_FW_STATS_IND
+#define WDA_DISASSOC_TX_COMP       SIR_HAL_DISASSOC_TX_COMP
+#define WDA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
+
+#define WDA_MODEM_POWER_STATE_IND SIR_HAL_MODEM_POWER_STATE_IND
+
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 

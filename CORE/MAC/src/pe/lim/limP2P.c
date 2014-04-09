@@ -1113,6 +1113,12 @@ send_frame1:
     // Paranoia:
     vos_mem_set(pFrame, nBytes, 0);
 
+#ifdef QCA_WIFI_2_0
+    /* Add sequence number to action frames */
+    /* Frames are handed over in .11 format by supplicant already */
+    limPopulateP2pMacHeader(pMac, (tANI_U8*)pMbMsg->data);
+#endif /* QCA_WIFI_2_0 */
+
     if ((noaLen > 0) && (noaLen<(SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN)))
     {
         // Add 2 bytes for length and Arribute field
@@ -1152,7 +1158,7 @@ send_frame1:
     }
     else
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.mgmtFrameSessionId = pMbMsg->sessionId;
         halstatus = halTxFrameWithTxComplete( pMac, pPacket, (tANI_U16)nBytes,
                         HAL_TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
                         7,/*SMAC_SWBD_TX_TID_MGMT_HIGH */ limTxComplete, pFrame,

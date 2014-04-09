@@ -1442,23 +1442,9 @@ hif_pci_remove(struct pci_dev *pdev)
 
     mem = (void __iomem *)sc->mem;
 
-#if defined(CPU_WARM_RESET_WAR)
-    /* Currently CPU warm reset sequence is tested only for AR9888_REV2
-     * Need to enable for AR9888_REV1 once CPU warm reset sequence is
-     * verified for AR9888_REV1
-     */
-    if (scn->target_version == AR9888_REV2_VERSION) {
-        hif_pci_device_warm_reset(sc);
-    }
-    else {
-        hif_pci_device_reset(sc);
-    }
-#else
-        hif_pci_device_reset(sc);
-#endif
-
     pci_disable_msi(pdev);
     A_FREE(scn);
+    A_FREE(sc->hif_device);
     A_FREE(sc);
     pci_set_drvdata(pdev, NULL);
     pci_iounmap(pdev, mem);
@@ -1526,6 +1512,7 @@ void hif_pci_shutdown(struct pci_dev *pdev)
 
 void hif_pci_crash_shutdown(struct pci_dev *pdev)
 {
+#ifdef TARGET_RAMDUMP_AFTER_KERNEL_PANIC
     struct hif_pci_softc *sc;
     struct ol_softc *scn;
     int status;
@@ -1554,6 +1541,11 @@ void hif_pci_crash_shutdown(struct pci_dev *pdev)
         printk("%s: RAM dump collecting timeout!\n", __func__);
         return;
     }
+#else
+    printk("%s: Collecting target RAM dump after kernel panic is disabled!\n",
+           __func__);
+    return;
+#endif
 }
 #endif
 
@@ -1594,6 +1586,12 @@ hif_pci_suspend(struct pci_dev *pdev, pm_message_t state)
         printk("%s: WDA module is NULL\n", __func__);
         return (-1);
     }
+
+    if (wma_check_scan_in_progress(temp_module)) {
+        printk("%s: Scan in progress. Aborting suspend\n", __func__);
+        return (-1);
+    }
+
     if (wma_is_wow_mode_selected(temp_module)) {
           if(wma_enable_wow_in_fw(temp_module))
                 return (-1);
@@ -1657,6 +1655,9 @@ hif_pci_resume(struct pci_dev *pdev)
         (val == PM_EVENT_HIBERNATE || val == PM_EVENT_SUSPEND)) {
         return wma_resume_target(temp_module);
     }
+    else if (wma_disable_wow_in_fw(temp_module))
+        return (-1);
+
 
     return 0;
 }
@@ -1738,4 +1739,25 @@ void hif_disable_isr(void *ol_sc)
 #endif
 	/* Cancel the pending tasklet */
 	tasklet_kill(&hif_sc->intr_tq);
+}
+
+void hif_reset_soc(void *ol_sc)
+{
+	struct ol_softc *scn = (struct ol_softc *)ol_sc;
+	struct hif_pci_softc *sc = scn->hif_sc;
+
+#if defined(CPU_WARM_RESET_WAR)
+	/* Currently CPU warm reset sequence is tested only for AR9888_REV2
+	* Need to enable for AR9888_REV1 once CPU warm reset sequence is
+	* verified for AR9888_REV1
+	*/
+	if (scn->target_version == AR9888_REV2_VERSION) {
+		hif_pci_device_warm_reset(sc);
+	}
+	else {
+		hif_pci_device_reset(sc);
+	}
+#else
+	hif_pci_device_reset(sc);
+#endif
 }

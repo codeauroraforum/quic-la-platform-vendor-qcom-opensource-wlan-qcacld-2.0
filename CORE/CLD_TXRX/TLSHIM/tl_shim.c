@@ -45,7 +45,9 @@
 #include "adf_nbuf.h"
 #include "wma_api.h"
 #include "vos_utils.h"
-
+#ifdef QCA_LL_TX_FLOW_CT
+#include "wdi_out.h"
+#endif /* QCA_LL_TX_FLOW_CT */
 #define ENTER() VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO, "Enter:%s", __func__)
 
 #define TLSHIM_LOGD(args...) \
@@ -57,7 +59,7 @@
 #define TLSHIM_LOGP(args...) \
 	VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_FATAL, ## args)
 
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 
 /************************/
 /*   Internal defines   */
@@ -186,7 +188,7 @@ tlshim_mgmt_over_data_rx_handler(struct work_struct *ptr_work)
         * if not native wifi populate: copy just part after 802.11 hdr
         * i.e. part starting from snap header
         */
-        tpCcxIappHdr iapp_hdr_ptr = (tpCcxIappHdr)&data[ETHERNET_HDR_LEN];
+        tpEseIappHdr iapp_hdr_ptr = (tpEseIappHdr)&data[ETHERNET_HDR_LEN];
         u_int8_t *snap_hdr_ptr = &(((u_int8_t*)wh)[SIZEOF_80211_HDR]);
         tpSirMacFrameCtl ptr_80211_FC = (tpSirMacFrameCtl)&wh->i_fc;
         ptr_80211_FC->protVer = SIR_MAC_PROTOCOL_VERSION;
@@ -318,7 +320,7 @@ tlshim_check_n_process_iapp_frame (pVosContextType pVosGCtx,
     /* if returned false the packet will be handled by the upper layer */
     return false;
 }
-#endif /* defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD) */
+#endif /* defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD) */
 
 
 #ifdef QCA_WIFI_ISOC
@@ -418,6 +420,7 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
         struct wma_txrx_node *iface = NULL;
 	tp_wma_handle wma;
 	u_int8_t *efrm, *orig_hdr;
+        u_int16_t key_id;
 #endif /* WLAN_FEATURE_11W */
 
 	vos_pkt_t *rx_pkt;
@@ -580,8 +583,18 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 				 IEEE80211_IS_MULTICAST(wh->i_addr1))
 			{
 				efrm = adf_nbuf_data(wbuf) + adf_nbuf_len(wbuf);
+
+				key_id = (u_int16_t)*(efrm - vos_get_mmie_size() + 2);
+				if (!((key_id == WMA_IGTK_KEY_INDEX_4) ||
+					(key_id == WMA_IGTK_KEY_INDEX_5))) {
+					TLSHIM_LOGE("Invalid KeyID(%d)"
+					" dropping the frame", key_id);
+					vos_pkt_return_packet(rx_pkt);
+					return 0;
+				}
+
 				if (vos_is_mmie_valid(iface->key.key,
-					 iface->key.ipn,
+				    iface->key.key_id[key_id - WMA_IGTK_KEY_INDEX_4].ipn,
 					 (u_int8_t *)wh, efrm))
 				{
 					TLSHIM_LOGD("Protected BC/MC frame MMIE"
@@ -740,7 +753,7 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 {
 	struct txrx_tl_shim_ctx *tl_shim;
 #if defined(IPA_OFFLOAD) || \
-    (defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD))
+    (defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD))
 	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, context);
 #endif
 	struct tlshim_sta_info *sta_info;
@@ -802,7 +815,7 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 		if (ret == VOS_STATUS_E_INVAL) {
 #endif
 
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 			/*
 			 * in case following returns true, a defered task was created
 			 * inside function, which does following:
@@ -911,6 +924,9 @@ void WLANTL_RegisterVdev(void *vos_ctx, void *vdev)
 		return;
 	}
 
+#ifdef QCA_LL_TX_FLOW_CT
+	txrx_ops.tx.flow_control_cb = WLANTL_TXFlowControlCb;
+#endif /* QCA_LL_TX_FLOW_CT */
 	txrx_ops.rx.std = tlshim_data_rx_handler;
 	wdi_in_osif_vdev_register(vdev_handle, tl_shim, &txrx_ops);
 	/* TODO: Keep vdev specific tx callback, if needed */
@@ -966,7 +982,7 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 			((pVosContextType) vos_ctx)->pdev_txrx_ctx,
 			sta_id);
 	if (!peer) {
-		TLSHIM_LOGE("Invalid peer");
+		TLSHIM_LOGW("Invalid peer");
 		return skb;
 	}
 
@@ -1351,6 +1367,9 @@ VOS_STATUS WLANTL_RegisterMgmtFrmClient(void *vos_ctx,
 VOS_STATUS WLANTL_GetRssi(void *vos_ctx, u_int8_t sta_id, v_S7_t *rssi, void *pGetRssiReq)
 {
 	tp_wma_handle wma_handle;
+	struct txrx_tl_shim_ctx *tl_shim;
+	struct tlshim_sta_info *sta_info;
+	v_S7_t first_rssi;
 
 	ENTER();
 
@@ -1360,12 +1379,26 @@ VOS_STATUS WLANTL_GetRssi(void *vos_ctx, u_int8_t sta_id, v_S7_t *rssi, void *pG
 		return VOS_STATUS_E_FAILURE;
 	}
 
+	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if (!tl_shim) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return VOS_STATUS_E_FAULT;
+	}
+
+	if (sta_id >= WLAN_MAX_STA_COUNT) {
+		TLSHIM_LOGE("Invalid sta id :%d", sta_id);
+		return VOS_STATUS_E_INVAL;
+	}
+
+	sta_info = &tl_shim->sta_info[sta_id];
+	first_rssi = sta_info->first_rssi;
+
 	if(VOS_STATUS_SUCCESS !=
-		wma_send_snr_request(wma_handle, pGetRssiReq))
-	{
+		wma_send_snr_request(wma_handle, pGetRssiReq, first_rssi)) {
 		TLSHIM_LOGE("Failed to Trigger wma stats request");
 		return VOS_STATUS_E_FAILURE;
 	}
+
 	/* dont send success, otherwise call back
 	 * will released with out values */
 	return VOS_STATUS_E_BUSY;
@@ -1479,6 +1512,7 @@ VOS_STATUS WLANTL_ClearSTAClient(void *vos_ctx, u_int8_t sta_id)
 	adf_os_spin_lock_bh(&tl_shim->sta_info[sta_id].stainfo_lock);
 	tl_shim->sta_info[sta_id].registered = 0;
 	tl_shim->sta_info[sta_id].data_rx = NULL;
+	tl_shim->sta_info[sta_id].first_rssi = 0;
 	adf_os_spin_unlock_bh(&tl_shim->sta_info[sta_id].stainfo_lock);
 
 	return VOS_STATUS_SUCCESS;
@@ -1522,6 +1556,7 @@ VOS_STATUS WLANTL_RegisterSTAClient(void *vos_ctx,
 	adf_os_spin_lock_bh(&sta_info->stainfo_lock);
 	sta_info->data_rx = rxcb;
 	sta_info->registered = true;
+	sta_info->first_rssi = rssi;
 	adf_os_spin_unlock_bh(&sta_info->stainfo_lock);
 
 	param.qos_capable =  sta_desc->ucQosEnabled;
@@ -1576,7 +1611,11 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 		return VOS_STATUS_E_FAILURE;
 	}
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef QCA_LL_TX_FLOW_CT
+	adf_os_mem_free(tl_shim->session_flow_control);
+#endif /* QCA_LL_TX_FLOW_CT */
+
+#ifdef FEATURE_WLAN_ESE
 	vos_flush_work(&tl_shim->iapp_work.deferred_work);
 #endif
 	vos_flush_work(&tl_shim->cache_flush_work);
@@ -1598,6 +1637,9 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	struct txrx_tl_shim_ctx *tl_shim;
 	VOS_STATUS status;
 	u_int8_t i;
+#ifdef QCA_LL_TX_FLOW_CT
+	int max_vdev;
+#endif /* QCA_LL_TX_FLOW_CT */
 
 	ENTER();
 	status = vos_alloc_context(vos_ctx, VOS_MODULE_ID_TL,
@@ -1626,7 +1668,7 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	}
 
 	INIT_WORK(&tl_shim->cache_flush_work, tl_shim_cache_flush_work);
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
     INIT_WORK(&(tl_shim->iapp_work.deferred_work),
         tlshim_mgmt_over_data_rx_handler);
 #endif
@@ -1634,6 +1676,23 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	 * TODO: Allocate memory for tx callback for maximum supported
 	 * vdevs to maintain tx callbacks per vdev.
 	 */
+
+#ifdef QCA_LL_TX_FLOW_CT
+	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
+	tl_shim->session_flow_control = adf_os_mem_alloc(NULL,
+			max_vdev * sizeof(struct tlshim_session_flow_Control));
+	if (!tl_shim->session_flow_control) {
+		TLSHIM_LOGE("Failed to allocate memory for tx flow control");
+		vos_free_context(vos_ctx, VOS_MODULE_ID_TL, tl_shim);
+		return VOS_STATUS_E_NOMEM;
+	}
+
+	for (i = 0; i < max_vdev; i++) {
+		tl_shim->session_flow_control[i].flowControl = NULL;
+		tl_shim->session_flow_control[i].sessionId = 0xFF;
+		tl_shim->session_flow_control[i].adpaterCtxt = NULL;
+	}
+#endif /* QCA_LL_TX_FLOW_CT */
 
 	tl_shim->ip_checksum_offload = tl_cfg->ip_checksum_offload;
 	tl_shim->delay_interval = tl_cfg->uDelayedTriggerFrmInt;
@@ -1713,3 +1772,152 @@ void *tl_shim_get_vdev_by_sta_id(void *vos_context, uint8_t sta_id)
 
 	return peer->vdev;
 }
+
+#ifdef QCA_LL_TX_FLOW_CT
+/*=============================================================================
+  FUNCTION    WLANTL_GetTxResource
+
+  DESCRIPTION
+    This function will query WLAN kernel driver TX resource availability.
+    Per STA/VDEV instance, if TX resource is not available, should back
+    pressure to OS NET layer.
+
+  DEPENDENCIES
+    NONE
+
+  PARAMETERS
+   IN
+   vos_context   : Pointer to VOS global context
+   sta_id : STA/VDEV instance to query TX resource
+
+  RETURN VALUE
+    VOS_TRUE : Enough resource available, Not need to PAUSE TX OS Q
+    VOS_FALSE : TX resource is not enough, stop OS TX Q
+
+  SIDE EFFECTS
+
+==============================================================================*/
+v_BOOL_t WLANTL_GetTxResource
+(
+	void *vos_context,
+	uint8_t sta_id,
+	unsigned int low_watermark,
+	unsigned int high_watermark_offset
+)
+{
+	struct ol_txrx_peer_t *peer = NULL;
+
+	/* If low watermark is zero, TX flow control is not enabled at all
+	 * return TRUE by default */
+	if ((!vos_context) || (!low_watermark)) {
+		return VOS_TRUE;
+	}
+
+	peer = ol_txrx_peer_find_by_local_id(
+		((pVosContextType) vos_context)->pdev_txrx_ctx,
+		sta_id);
+	if (!peer) {
+		return VOS_TRUE;
+	}
+
+	return (v_BOOL_t)wdi_in_get_tx_resource(peer->vdev,
+				low_watermark,
+				high_watermark_offset);
+}
+
+/*=============================================================================
+  FUNCTION    WLANTL_TXFlowControlCb
+
+  DESCRIPTION
+    This function will be called bu TX resource management unit.
+    If TC resource management unit reserved enough resource for TX session,
+    Call this function to resume OS TX Q.
+
+  PARAMETERS
+   IN
+   tlContext : Pointer to TL SHIM context
+   sessionId : STA/VDEV instance to query TX resource
+   resume_tx : Resume OS TX Q or not
+
+  RETURN VALUE
+    NONE
+
+  SIDE EFFECTS
+
+==============================================================================*/
+void WLANTL_TXFlowControlCb
+(
+	void  *tlContext,
+	v_U8_t sessionId,
+	v_BOOL_t resume_tx
+)
+{
+	struct txrx_tl_shim_ctx *tl_shim;
+	WLANTL_TxFlowControlCBType flow_control_cb = NULL;
+	void *adpter_ctxt = NULL;
+
+	tl_shim = (struct txrx_tl_shim_ctx *)tlContext;
+	if (!tl_shim) {
+		TLSHIM_LOGE("%s, tl_shim is NULL", __func__);
+		/* Invalid instace */
+		return;
+	}
+
+	if ((tl_shim->session_flow_control[sessionId].sessionId == sessionId) &&
+		(tl_shim->session_flow_control[sessionId].flowControl)) {
+		flow_control_cb = tl_shim->session_flow_control[sessionId].flowControl;
+		adpter_ctxt = tl_shim->session_flow_control[sessionId].adpaterCtxt;
+	}
+
+	if ((flow_control_cb) && (adpter_ctxt)) {
+		flow_control_cb(adpter_ctxt, resume_tx);
+	}
+	return;
+}
+
+/*=============================================================================
+  FUNCTION    WLANTL_RegisterTXFlowControl
+
+  DESCRIPTION
+    This function will be called by TL client.
+    Any device want to enable TX flow control, should register Cb function
+    And needed information into TL SHIM
+
+  PARAMETERS
+   IN
+   vos_ctx : Global OS context context
+   sta_id  : STA/VDEV instance index
+   flowControl : Flow control callback function pointer
+   sessionId : VDEV ID
+   adpaterCtxt : VDEV os interface adapter context
+
+  RETURN VALUE
+    NONE
+
+  SIDE EFFECTS
+
+==============================================================================*/
+void WLANTL_RegisterTXFlowControl
+(
+	void *vos_ctx,
+	WLANTL_TxFlowControlCBType flowControl,
+	v_U8_t sessionId,
+	void *adpaterCtxt
+)
+{
+	struct txrx_tl_shim_ctx *tl_shim;
+
+	tl_shim = vos_get_context(VOS_MODULE_ID_TL, vos_ctx);
+	if ((!tl_shim) || (!tl_shim->session_flow_control)) {
+		TLSHIM_LOGE("tl_shim is NULL");
+		return;
+	}
+
+	tl_shim->session_flow_control[sessionId].flowControl = flowControl;
+	tl_shim->session_flow_control[sessionId].sessionId = sessionId;
+	tl_shim->session_flow_control[sessionId].adpaterCtxt = adpaterCtxt;
+
+	return;
+}
+#endif /* QCA_LL_TX_FLOW_CT */
+

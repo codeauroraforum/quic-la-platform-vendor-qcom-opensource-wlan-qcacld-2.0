@@ -50,9 +50,10 @@ ifeq ($(KERNEL_BUILD), 0)
 
 endif
 
-# To enable CCX upload, dependent config
-# CONFIG_QCOM_CCX must be enabled.
-CONFIG_QCOM_CCX_UPLOAD := n
+# To enable ESE upload, dependent config
+# CONFIG_QCOM_ESE must be enabled.
+CONFIG_QCOM_ESE := n
+CONFIG_QCOM_ESE_UPLOAD := n
 
 # Feature flags which are not (currently) configurable via Kconfig
 
@@ -140,6 +141,9 @@ CONFIG_QCA_SIGNED_SPLIT_BINARY_SUPPORT := 0
 
 #Enable single firmware binary format
 CONFIG_QCA_SINGLE_BINARY_SUPPORT := 0
+
+#Enable collecting target RAM dump after kernel panic
+CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC := 1
 
 ifeq ($(CONFIG_CFG80211),y)
 HAVE_CFG80211 := 1
@@ -332,9 +336,9 @@ MAC_LIM_OBJS := $(MAC_SRC_DIR)/pe/lim/limAIDmgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/limTrace.o \
 		$(MAC_SRC_DIR)/pe/lim/limUtils.o
 
-ifeq ($(CONFIG_QCOM_CCX),y)
-ifneq ($(CONFIG_QCOM_CCX_UPLOAD),y)
-MAC_LIM_OBJS += $(MAC_SRC_DIR)/pe/lim/limProcessCcxFrame.o
+ifeq ($(CONFIG_QCOM_ESE),y)
+ifneq ($(CONFIG_QCOM_ESE_UPLOAD),y)
+MAC_LIM_OBJS += $(MAC_SRC_DIR)/pe/lim/limProcessEseFrame.o
 endif
 endif
 
@@ -413,9 +417,9 @@ SME_CSR_OBJS := $(SME_SRC_DIR)/csr/csrApiRoam.o \
 		$(SME_SRC_DIR)/csr/csrNeighborRoam.o \
 		$(SME_SRC_DIR)/csr/csrUtil.o
 
-ifeq ($(CONFIG_QCOM_CCX),y)
-ifneq ($(CONFIG_QCOM_CCX_UPLOAD),y)
-SME_CSR_OBJS += $(SME_SRC_DIR)/csr/csrCcx.o
+ifeq ($(CONFIG_QCOM_ESE),y)
+ifneq ($(CONFIG_QCOM_ESE_UPLOAD),y)
+SME_CSR_OBJS += $(SME_SRC_DIR)/csr/csrEse.o
 endif
 endif
 
@@ -870,6 +874,7 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DFEATURE_WLAN_PAL_MEM_DISABLE \
                 -DQCA_SUPPORT_TXRX_VDEV_PAUSE_LL \
 		-DQCA_SUPPORT_TX_THROTTLE_LL \
+		-DWMI_INTERFACE_EVENT_LOGGING\
 
 ifeq ($(CONFIG_ARCH_MSM), y)
 CDEFINES += -DMSM_PLATFORM
@@ -879,8 +884,14 @@ ifeq ($(CONFIG_QCA_WIFI_2_0), 0)
 CDEFINES +=	-DWLANTL_DEBUG
 else
 CDEFINES +=	-DOSIF_NEED_RX_PEER_ID \
-		-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID \
-		-DQCA_PKT_PROTO_TRACE
+		-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID
+CDEFINES +=	-DQCA_LL_TX_FLOW_CT
+endif
+
+ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
+ifeq ($(CONFIG_DEBUG_LL),y)
+CDEFINES +=    	-DQCA_PKT_PROTO_TRACE
+endif
 endif
 
 ifneq ($(CONFIG_QCA_CLD_WLAN),)
@@ -912,12 +923,12 @@ CDEFINES += -DUSE_80211_WMMTSPEC_FOR_RIC
 endif
 endif
 
-ifeq ($(CONFIG_QCOM_CCX),y)
-CDEFINES += -DFEATURE_WLAN_CCX
+ifeq ($(CONFIG_QCOM_ESE),y)
+CDEFINES += -DFEATURE_WLAN_ESE
 CDEFINES += -DQCA_COMPUTE_TX_DELAY
 CDEFINES += -DQCA_COMPUTE_TX_DELAY_PER_TID
-ifeq ($(CONFIG_QCOM_CCX_UPLOAD),y)
-CDEFINES += -DFEATURE_WLAN_CCX_UPLOAD
+ifeq ($(CONFIG_QCOM_ESE_UPLOAD),y)
+CDEFINES += -DFEATURE_WLAN_ESE_UPLOAD
 endif
 endif
 
@@ -1123,6 +1134,11 @@ endif
 #Enable single firmware binary format
 ifeq ($(CONFIG_QCA_SINGLE_BINARY_SUPPORT), 1)
 CDEFINES += -DQCA_SINGLE_BINARY_SUPPORT
+endif
+
+#Enable collecting target RAM dump after kernel panic
+ifeq ($(CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC), 1)
+CDEFINES += -DTARGET_RAMDUMP_AFTER_KERNEL_PANIC
 endif
 
 # Fix build for GCC 4.7

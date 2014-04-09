@@ -178,6 +178,7 @@
 #define WLAN_HDD_WFA_P2P_OUI_TYPE 0x09
 #define WLAN_HDD_P2P_SOCIAL_CHANNELS 3
 #define WLAN_HDD_P2P_SINGLE_CHANNEL_SCAN 1
+#define WLAN_HDD_PUBLIC_ACTION_FRAME_SUB_TYPE_OFFSET 6
 
 #define WLAN_HDD_IS_SOCIAL_CHANNEL(center_freq) \
 (((center_freq) == 2412) || ((center_freq) == 2437) || ((center_freq) == 2462))
@@ -222,6 +223,16 @@
 
 #define HDD_MAC_ADDR_LEN    6
 #define HDD_SESSION_ID_ANY  50 //This should be same as CSR_SESSION_ID_ANY
+
+#ifdef MSM_PLATFORM
+/* Threshold value for number of packets recevied in 3sec */
+#define HDD_HIGH_BUS_BANDWIDTH_THRESHOLD_RX 40000
+#define HDD_HIGH_BUS_BANDWIDTH_THRESHOLD_TX 40000
+#define HDD_MEDIUM_BUS_BANDWIDTH_THRESHOLD_TX 5000
+#define HDD_MEDIUM_BUS_BANDWIDTH_THRESHOLD_RX 5000
+#define HDD_BUS_BANDWIDTH_COMPUTE_INTERVAL  3000
+#endif
+
 typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
 /*
@@ -568,6 +579,13 @@ typedef struct
    v_BOOL_t             qBlocked;
 } hdd_thermal_mitigation_info_t;
 
+typedef struct action_pkt_buffer
+{
+   tANI_U8* frame_ptr;
+   tANI_U32 frame_length;
+   tANI_U16 freq;
+}action_pkt_buffer_t;
+
 typedef struct hdd_remain_on_chan_ctx
 {
   struct net_device *dev;
@@ -577,6 +595,8 @@ typedef struct hdd_remain_on_chan_ctx
   u64 cookie;
   rem_on_channel_request_type_t rem_on_chan_request;
   v_U32_t p2pRemOnChanTimeStamp;
+  vos_timer_t hdd_remain_on_chan_timer;
+  action_pkt_buffer_t action_pkt_buff;
 }hdd_remain_on_chan_ctx_t;
 
 typedef enum{
@@ -606,6 +626,7 @@ typedef struct hdd_cfg80211_state_s
   size_t len;
   struct sk_buff *skb;
   hdd_remain_on_chan_ctx_t* remain_on_chan_ctx;
+  struct mutex remain_on_chan_ctx_lock;
   eP2PActionFrameState actionFrmState;
 }hdd_cfg80211_state_t;
 
@@ -631,7 +652,7 @@ struct hdd_station_ctx
 
    roaming_info_t roam_info;
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    int     ft_carrier_on;
 #endif
 
@@ -1016,19 +1037,26 @@ struct hdd_adapter_s
 #endif
 
    hdd_scaninfo_t scan_info;
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
    tAniTrafStrmMetrics tsmStats;
 #endif
    /* Flag to ensure PSB is configured through framework */
    v_U8_t psbChanged;
    /* UAPSD psb value configured through framework */
    v_U8_t configuredPsb;
-#ifdef QCA_WIFI_2_0
-   v_BOOL_t internalCancelRemainOnChReq;
-#endif
 #ifdef IPA_OFFLOAD
     void *ipa_context;
 #endif
+#ifdef MSM_PLATFORM
+    unsigned long prev_rx_packets;
+    unsigned long prev_tx_packets;
+    int connection;
+#endif
+    v_BOOL_t is_roc_inprogress;
+
+#ifdef QCA_LL_TX_FLOW_CT
+    vos_timer_t  tx_flow_control_timer;
+#endif /* QCA_LL_TX_FLOW_CT */
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1266,6 +1294,17 @@ struct hdd_context_s
     * TX_rx_pkt_count_timer
     */
     vos_timer_t    tx_rx_trafficTmr;
+
+#ifdef MSM_PLATFORM
+   /* DDR bus bandwidth compute timer
+    */
+    vos_timer_t    bus_bw_timer;
+    int            cur_bus_bw;
+    v_BOOL_t       bus_bw_triggered;
+    spinlock_t     bus_bw_lock;
+    int            sta_cnt;
+#endif
+
     v_U8_t         drvr_miracast;
     v_U8_t         issplitscan_enabled;
 
@@ -1386,6 +1425,20 @@ void hdd_checkandupdate_phymode( hdd_context_t *pHddCtx);
 
 int hdd_wmmps_helper(hdd_adapter_t *pAdapter, tANI_U8 *ptr);
 int wlan_hdd_set_mc_rate(hdd_adapter_t *pAdapter, int targetRate);
+#ifdef MSM_PLATFORM
+void hdd_start_bus_bw_compute_timer(hdd_adapter_t *pAdapter);
+void hdd_stop_bus_bw_compute_timer(hdd_adapter_t *pAdapter);
+#else
+static inline void hdd_start_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
+{
+    return;
+}
+
+static inline void hdd_stop_bus_bw_computer_timer(hdd_adapter_t *pAdapter)
+{
+    return;
+}
+#endif
 
 int hdd_wlan_startup(struct device *dev, void *hif_sc);
 void __hdd_wlan_exit(void);
