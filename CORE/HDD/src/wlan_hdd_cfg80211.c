@@ -2804,7 +2804,6 @@ static int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 #endif //(LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0))
 
-
 static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
                                       struct net_device *dev,
                                       struct bss_parameters *params)
@@ -2813,12 +2812,21 @@ static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     int ret = 0;
     eHalStatus halStatus;
+    v_CONTEXT_t pVosContext = pHddCtx->pvosContext;
+    ptSapContext pSapCtx = NULL;
 
     ENTER();
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: device_mode = %d, ap_isolate = %d",
                                __func__,pAdapter->device_mode,
                                params->ap_isolate);
+    if (!pVosContext)
+        return -EINVAL;
+
+    pSapCtx = VOS_GET_SAP_CB(pVosContext);
+
+    if (!pSapCtx)
+        return -EINVAL;
 
     if((pAdapter->device_mode == WLAN_HDD_SOFTAP)
      ||  (pAdapter->device_mode == WLAN_HDD_P2P_GO)
@@ -2831,7 +2839,7 @@ static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
             pAdapter->sessionCtx.ap.apDisableIntraBssFwd = !!params->ap_isolate;
 
             halStatus = sme_ApDisableIntraBssFwd(pHddCtx->hHal,
-                        pAdapter->sessionId,
+                        pSapCtx->sessionId,
                         pAdapter->sessionCtx.ap.apDisableIntraBssFwd);
             if (!HAL_STATUS_SUCCESS(halStatus))
             {
