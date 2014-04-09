@@ -3224,6 +3224,11 @@ REG_VARIABLE( CFG_ENABLE_OVERLAP_CH, WLAN_PARAM_Integer,
                CFG_ENABLE_OVERLAP_CH_DEFAULT,
                CFG_ENABLE_OVERLAP_CH_MIN,
                CFG_ENABLE_OVERLAP_CH_MAX ),
+
+REG_VARIABLE_STRING( CFG_ONLY_ALLOWED_CHANNELS, WLAN_PARAM_String,
+                     hdd_config_t, acsAllowedChnls,
+                     VAR_FLAGS_OPTIONAL,
+                     (void *)CFG_ONLY_ALLOWED_CHANNELS_DEFAULT),
 };
 
 /*
