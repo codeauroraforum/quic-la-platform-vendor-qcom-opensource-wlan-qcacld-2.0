@@ -1538,6 +1538,10 @@ typedef enum
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_MAX     ( 1 )
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_DEFAULT ( 0 )
 
+#define CFG_ENABLE_HYSTERETIC_MODE            "gEnableHystereticMode"
+#define CFG_ENABLE_HYSTERETIC_MODE_MIN        ( 0 )
+#define CFG_ENABLE_HYSTERETIC_MODE_MAX        ( 1 )
+#define CFG_ENABLE_HYSTERETIC_MODE_DEFAULT    ( 0 )
 /*
  * VOS Trace Enable Control
  * Notes:
@@ -2827,6 +2831,7 @@ typedef struct
    char                        acsAllowedChnls[CFG_MAX_STR_LEN];
    v_U16_t                     acsBandSwitchThreshold;
    v_U8_t                      apMaxOffloadPeers;
+   v_BOOL_t                    enableHystereticMode;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
