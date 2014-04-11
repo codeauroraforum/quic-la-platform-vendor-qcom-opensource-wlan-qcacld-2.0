@@ -593,9 +593,9 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, int len,
 			get_wmi_cmd_string(cmd_id), cmd_id);
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
-	adf_os_spin_lock_bh(&wmi_handle->wmi_cmd_record_lock);
+	adf_os_spin_lock_bh(&wmi_handle->wmi_record_lock);
 	WMI_COMMAND_RECORD(cmd_id);
-	adf_os_spin_unlock_bh(&wmi_handle->wmi_cmd_record_lock);
+	adf_os_spin_unlock_bh(&wmi_handle->wmi_record_lock);
 #endif
 
 	status = HTCSendPkt(wmi_handle->htc_handle, pkt);
@@ -665,6 +665,7 @@ int wmi_unified_unregister_event_handler(wmi_unified_t wmi_handle,
     return 0;
 }
 
+#if 0 /* currently not used */
 static int wmi_unified_event_rx(struct wmi_unified *wmi_handle,
 				wmi_buf_t evt_buf)
 {
@@ -699,6 +700,7 @@ end:
 	adf_nbuf_free(evt_buf);
 	return status;
 }
+#endif /* 0 */
 
 /*
  * Temporarily added to support older WMI events. We should move all events to unified
@@ -765,9 +767,9 @@ void __wmi_control_rx(struct wmi_unified *wmi_handle, wmi_buf_t evt_buf)
 		}
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
-		adf_os_spin_lock_bh(&wmi_handle->wmi_event_record_lock);
+		adf_os_spin_lock_bh(&wmi_handle->wmi_record_lock);
 		WMI_EVENT_RECORD(id);
-		adf_os_spin_unlock_bh(&wmi_handle->wmi_event_record_lock);
+		adf_os_spin_unlock_bh(&wmi_handle->wmi_record_lock);
 #endif
 		/* Call the WMI registered event handler */
 		wmi_handle->event_handler[idx](wmi_handle->scn_handle,
@@ -833,8 +835,7 @@ wmi_unified_attach(ol_scn_t scn_handle)
     INIT_WORK(&wmi_handle->rx_event_work, wmi_rx_event_work);
 #endif
 #ifdef WMI_INTERFACE_EVENT_LOGGING
-    adf_os_spinlock_init(&wmi_handle->wmi_cmd_record_lock);
-    adf_os_spinlock_init(&wmi_handle->wmi_event_record_lock);
+    adf_os_spinlock_init(&wmi_handle->wmi_record_lock);
 #endif
     return wmi_handle;
 }

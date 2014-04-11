@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2391,7 +2391,7 @@ dump_lim_get_pkts_rcvd_per_rssi_values( tpAniSirGlobal pMac, tANI_U32 arg1, tANI
 #endif
 
 
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 static char *
 dump_send_plm_start(tpAniSirGlobal pMac, tANI_U32 arg1, tANI_U32 arg2,
              tANI_U32 arg3, tANI_U32 arg4, char *p)
@@ -2436,6 +2436,7 @@ dump_send_plm_start(tpAniSirGlobal pMac, tANI_U32 arg1, tANI_U32 arg2,
 }
 #endif
 
+#ifndef QCA_WIFI_2_0
 /* API to fill Rate Info based on mac efficiency
  * arg 1: mac efficiency to be used to calculate mac thorughput for a given rate index
  * arg 2: starting rateIndex to apply the macEfficiency to
@@ -2448,6 +2449,7 @@ dump_limRateInfoBasedOnMacEff(tpAniSirGlobal pMac, tANI_U32 arg1, tANI_U32 arg2,
     WDTS_FillRateInfo((tANI_U8)(arg1), (tANI_U16)(arg2), (tANI_U16)(arg3));
     return p;
 }
+#endif /* QCA_WIFI_2_0 */
 
 static tDumpFuncEntry limMenuDumpTable[] = {
     {0,     "PE (300-499)",                                          NULL},
@@ -2527,8 +2529,8 @@ static tDumpFuncEntry limMenuDumpTable[] = {
 #ifndef QCA_WIFI_2_0
     {371,   "PE.LIM: MAS RX stats MAC eff <MAC eff in percentage>",  dump_limRateInfoBasedOnMacEff},
 #endif /* QCA_WIFI_2_0 */
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
-    {376,   "PE.LIM: send PLM start command Usage: iwpriv wlan0 376", dump_send_plm_start },
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
+    {372,   "PE.LIM: send PLM start command Usage: iwpriv wlan0 372", dump_send_plm_start },
 #endif
 };
 
