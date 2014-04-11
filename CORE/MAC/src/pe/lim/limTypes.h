@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -666,7 +666,9 @@ void limProcessDeauthFrame(tpAniSirGlobal, tANI_U8 *,tpPESession);
 void limProcessActionFrame(tpAniSirGlobal, tANI_U8 *,tpPESession);
 void limProcessActionFrameNoSession(tpAniSirGlobal pMac, tANI_U8 *pRxMetaInfo);
 
-
+#ifdef QCA_WIFI_2_0
+void limPopulateP2pMacHeader(tpAniSirGlobal, tANI_U8*);
+#endif /* QCA_WIFI_2_0 */
 tSirRetStatus limPopulateMacHeader(tpAniSirGlobal, tANI_U8*, tANI_U8, tANI_U8, tSirMacAddr,tSirMacAddr);
 tSirRetStatus limSendProbeReqMgmtFrame(tpAniSirGlobal, tSirMacSSid *, tSirMacAddr, tANI_U8, tSirMacAddr, tANI_U32, tANI_U32, tANI_U8 *);
 void limSendProbeRspMgmtFrame(tpAniSirGlobal, tSirMacAddr, tpAniSSID, short, tANI_U8, tpPESession, tANI_U8);
@@ -707,7 +709,7 @@ tSirRetStatus limSendLinkReportActionFrame(tpAniSirGlobal, tpSirMacLinkReport, t
 tSirRetStatus limSendRadioMeasureReportActionFrame(tpAniSirGlobal, tANI_U8, tANI_U8, tpSirMacRadioMeasureReport, tSirMacAddr, tpPESession);
 #endif
 
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 void limProcessIappFrame(tpAniSirGlobal, tANI_U8 *,tpPESession);
 #endif
 
@@ -1089,6 +1091,10 @@ void limProcessDisassocAckTimeout(tpAniSirGlobal pMac);
 void limProcessDeauthAckTimeout(tpAniSirGlobal pMac);
 eHalStatus limSendDisassocCnf(tpAniSirGlobal pMac);
 eHalStatus limSendDeauthCnf(tpAniSirGlobal pMac);
+eHalStatus limDisassocTxCompleteCnf(tpAniSirGlobal pMac,
+                tANI_U32 txCompleteSuccess);
+eHalStatus limDeauthTxCompleteCnf(tpAniSirGlobal pMac,
+                tANI_U32 txCompleteSuccess);
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
 typedef struct sSetLinkCbackParams

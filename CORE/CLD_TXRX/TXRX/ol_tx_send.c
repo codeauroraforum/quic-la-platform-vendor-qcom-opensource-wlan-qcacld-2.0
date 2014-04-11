@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -109,6 +109,27 @@
 #define OL_TX_TARGET_CREDIT_INCR_INT(pdev, delta)  /* no-op */
 #endif
 
+#ifdef QCA_LL_TX_FLOW_CT
+#define OL_TX_FLOW_CT_UNPAUSE_OS_Q(pdev)                                          \
+do {                                                                              \
+    struct ol_txrx_vdev_t *vdev;                                                  \
+    TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {                       \
+        if (adf_os_atomic_read(&vdev->os_q_paused)) {                             \
+            adf_os_spin_lock(&pdev->tx_mutex);                                    \
+            if (pdev->tx_desc.num_free > vdev->tx_fl_hwm) {                       \
+               vdev->osif_flow_control_cb(vdev->osif_dev,                         \
+                                          vdev->vdev_id, A_TRUE);                 \
+               adf_os_atomic_set(&vdev->os_q_paused, 0);                          \
+            }                                                                     \
+            adf_os_spin_unlock(&pdev->tx_mutex);                                  \
+        }                                                                         \
+    }                                                                             \
+} while(0)
+#else
+#define OL_TX_FLOW_CT_UNPAUSE_OS_Q(pdev)
+#endif /* QCA_LL_TX_FLOW_CT */
+
+
 static inline u_int16_t
 ol_tx_send_base(
     struct ol_txrx_pdev_t *pdev,
@@ -212,6 +233,8 @@ ol_tx_send_nonstd(
     failed = htt_tx_send_nonstd(
         pdev->htt_pdev, msdu, id, pkt_type);
     if (failed) {
+        TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+                "Error: freeing tx frame after htt_tx failed");
         OL_TX_TARGET_CREDIT_INCR_INT(pdev, msdu_credit_consumed);
         ol_tx_desc_frame_free_nonstd(pdev, tx_desc, 1 /* had error */);
     }
@@ -516,6 +539,9 @@ ol_tx_completion_handler(
     } else {
         OL_TX_TARGET_CREDIT_ADJUST(num_msdus, pdev, NULL);
     }
+
+    /* UNPAUSE OS Q */
+    OL_TX_FLOW_CT_UNPAUSE_OS_Q(pdev);
     /* Do one shot statistics */
     TXRX_STATS_UPDATE_TX_STATS(pdev, status, num_msdus, byte_cnt);
 }

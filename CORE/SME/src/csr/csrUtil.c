@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -44,10 +44,10 @@
 #include "smeQosInternal.h"
 #include "wlan_qct_wda.h"
 
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 #include "vos_utils.h"
-#include "csrCcx.h"
-#endif /* FEATURE_WLAN_CCX && !FEATURE_WLAN_CCX_UPLOAD*/
+#include "csrEse.h"
+#endif /* FEATURE_WLAN_ESE && !FEATURE_WLAN_ESE_UPLOAD*/
 
 tANI_U8 csrWpaOui[][ CSR_WPA_OUI_SIZE ] = {
     { 0x00, 0x50, 0xf2, 0x00 },
@@ -56,9 +56,9 @@ tANI_U8 csrWpaOui[][ CSR_WPA_OUI_SIZE ] = {
     { 0x00, 0x50, 0xf2, 0x03 },
     { 0x00, 0x50, 0xf2, 0x04 },
     { 0x00, 0x50, 0xf2, 0x05 },
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
     { 0x00, 0x40, 0x96, 0x00 }, // CCKM
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 };
 
 tANI_U8 csrRSNOui[][ CSR_RSN_OUI_SIZE ] = {
@@ -2653,7 +2653,7 @@ tANI_BOOLEAN csrIsProfileWpa( tCsrRoamProfile *pProfile )
         case eCSR_AUTH_TYPE_WPA:
         case eCSR_AUTH_TYPE_WPA_PSK:
         case eCSR_AUTH_TYPE_WPA_NONE:
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         case eCSR_AUTH_TYPE_CCKM_WPA:
 #endif
             fWpaProfile = TRUE;
@@ -2695,7 +2695,7 @@ tANI_BOOLEAN csrIsProfileRSN( tCsrRoamProfile *pProfile )
         case eCSR_AUTH_TYPE_FT_RSN:
         case eCSR_AUTH_TYPE_FT_RSN_PSK:
 #endif
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         case eCSR_AUTH_TYPE_CCKM_RSN:
 #endif
 #ifdef WLAN_FEATURE_11W
@@ -2893,6 +2893,16 @@ tANI_U16 csrCalculateMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U16 sta_bi, tAN
     //if GO's given beacon Interval is greater than or equal to 100
     else
        go_cbi = 100 + (go_gbi % 100);
+
+    if ( sta_bi == 0 )
+    {
+        /* There is possibility to receive zero as value.
+           Which will cause divide by zero. Hence initialise with 100
+        */
+        sta_bi =  100;
+        smsLog(pMac, LOGW,
+            FL("sta_bi 2nd parameter is zero, initialise to %d"), sta_bi);
+    }
 
     // check, if either one is multiple of another
     if (sta_bi > go_cbi)
@@ -3137,10 +3147,10 @@ tANI_BOOLEAN csrIsProfile11r( tCsrRoamProfile *pProfile )
 
 #endif
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 
-/* Function to return TRUE if the authtype is CCX */
-tANI_BOOLEAN csrIsAuthTypeCCX( eCsrAuthType AuthType )
+/* Function to return TRUE if the authtype is ESE */
+tANI_BOOLEAN csrIsAuthTypeESE( eCsrAuthType AuthType )
 {
     switch ( AuthType )
     {
@@ -3154,10 +3164,10 @@ tANI_BOOLEAN csrIsAuthTypeCCX( eCsrAuthType AuthType )
     return FALSE;
 }
 
-/* Function to return TRUE if the profile is CCX */
-tANI_BOOLEAN csrIsProfileCCX( tCsrRoamProfile *pProfile )
+/* Function to return TRUE if the profile is ESE */
+tANI_BOOLEAN csrIsProfileESE( tCsrRoamProfile *pProfile )
 {
-    return (csrIsAuthTypeCCX( pProfile->negotiatedAuthType ));
+    return (csrIsAuthTypeESE( pProfile->negotiatedAuthType ));
 }
 
 #endif
@@ -3381,21 +3391,21 @@ static tANI_BOOLEAN csrIsFTAuthRSNPsk( tpAniSirGlobal pMac, tANI_U8 AllSuites[][
 
 #endif
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 
 /*
- * Function for CCX CCKM AKM Authentication. We match the CCKM AKM Authentication Key Management suite
+ * Function for ESE CCKM AKM Authentication. We match the CCKM AKM Authentication Key Management suite
  * here. This matches for CCKM AKM Auth with the 802.1X exchange.
  *
  */
-static tANI_BOOLEAN csrIsCcxCckmAuthRSN( tpAniSirGlobal pMac, tANI_U8 AllSuites[][CSR_RSN_OUI_SIZE],
+static tANI_BOOLEAN csrIsEseCckmAuthRSN( tpAniSirGlobal pMac, tANI_U8 AllSuites[][CSR_RSN_OUI_SIZE],
                                   tANI_U8 cAllSuites,
                                   tANI_U8 Oui[] )
 {
     return( csrIsOuiMatch( pMac, AllSuites, cAllSuites, csrRSNOui[06], Oui ) );
 }
 
-static tANI_BOOLEAN csrIsCcxCckmAuthWpa( tpAniSirGlobal pMac, tANI_U8 AllSuites[][CSR_WPA_OUI_SIZE],
+static tANI_BOOLEAN csrIsEseCckmAuthWpa( tpAniSirGlobal pMac, tANI_U8 AllSuites[][CSR_WPA_OUI_SIZE],
                                 tANI_U8 cAllSuites,
                                 tANI_U8 Oui[] )
 {
@@ -3618,9 +3628,9 @@ tANI_BOOLEAN csrGetRSNInformation( tHalHandle hHal, tCsrAuthList *pAuthType, eCs
                         negAuthType = eCSR_AUTH_TYPE_FT_RSN_PSK;
                 }
 #endif
-#ifdef FEATURE_WLAN_CCX
-                /* CCX only supports 802.1X.  No PSK. */
-                if ( (negAuthType == eCSR_AUTH_TYPE_UNKNOWN) && csrIsCcxCckmAuthRSN( pMac, AuthSuites, cAuthSuites, Authentication ) )
+#ifdef FEATURE_WLAN_ESE
+                /* ESE only supports 802.1X.  No PSK. */
+                if ( (negAuthType == eCSR_AUTH_TYPE_UNKNOWN) && csrIsEseCckmAuthRSN( pMac, AuthSuites, cAuthSuites, Authentication ) )
                 {
                     if (eCSR_AUTH_TYPE_CCKM_RSN == pAuthType->authType[i])
                         negAuthType = eCSR_AUTH_TYPE_CCKM_RSN;
@@ -3896,7 +3906,7 @@ tANI_BOOLEAN csrGetWapiInformation( tHalHandle hHal, tCsrAuthList *pAuthType, eC
     tANI_U8 Authentication[ CSR_WAPI_OUI_SIZE ];
     tANI_U8 MulticastCyphers[ CSR_WAPI_MAX_MULTICAST_CYPHERS ][ CSR_WAPI_OUI_SIZE ];
     eCsrAuthType negAuthType = eCSR_AUTH_TYPE_UNKNOWN;
-
+    tANI_U8 wapiOuiIndex = 0;
     do{
         if ( pWapiIe->present )
         {
@@ -3917,12 +3927,18 @@ tANI_BOOLEAN csrGetWapiInformation( tHalHandle hHal, tCsrAuthList *pAuthType, eC
 
             if( !fAcceptableCyphers ) break;
 
-
             //Unicast is supported. Pick the first matching Group cipher, if any.
             for( i = 0 ; i < pMCEncryption->numEntries ; i++ )
             {
+                wapiOuiIndex = csrGetOUIIndexFromCipher( pMCEncryption->encryptionType[i] );
+                if (wapiOuiIndex >= CSR_WAPI_OUI_SIZE)
+                {
+                    smsLog(pMac, LOGE, FL("Wapi OUI index = %d out of limit"), wapiOuiIndex);
+                    fAcceptableCyphers = FALSE;
+                    break;
+                }
                 fAcceptableCyphers = csrMatchWapiOUIIndex( pMac, MulticastCyphers,  cMulticastCyphers,
-                csrGetOUIIndexFromCipher( pMCEncryption->encryptionType[i] ), Multicast );
+                        wapiOuiIndex, Multicast );
                 if(fAcceptableCyphers)
                 {
                     break;
@@ -4201,13 +4217,13 @@ tANI_BOOLEAN csrGetWpaCyphers( tpAniSirGlobal pMac, tCsrAuthList *pAuthType, eCs
                     if (eCSR_AUTH_TYPE_WPA_PSK == pAuthType->authType[i])
                     negAuthType = eCSR_AUTH_TYPE_WPA_PSK;
                 }
-#ifdef FEATURE_WLAN_CCX
-                if ( (negAuthType == eCSR_AUTH_TYPE_UNKNOWN) && csrIsCcxCckmAuthWpa( pMac, pWpaIe->auth_suites, cAuthSuites, Authentication ) )
+#ifdef FEATURE_WLAN_ESE
+                if ( (negAuthType == eCSR_AUTH_TYPE_UNKNOWN) && csrIsEseCckmAuthWpa( pMac, pWpaIe->auth_suites, cAuthSuites, Authentication ) )
                 {
                     if (eCSR_AUTH_TYPE_CCKM_WPA == pAuthType->authType[i])
                         negAuthType = eCSR_AUTH_TYPE_CCKM_WPA;
                 }
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 
                 // The 1st auth type in the APs WPA IE, to match stations connecting
                 // profiles auth type will cause us to exit this loop
@@ -5007,8 +5023,8 @@ tANI_BOOLEAN csrIsSsidMatch( tpAniSirGlobal pMac, tANI_U8 *ssid1, tANI_U8 ssid1L
             if ( eANI_BOOLEAN_FALSE == fSsidRequired )
             {
                 fMatch = TRUE;
+                break;
             }
-            break;
         }
 
         // Check for the specification of the Broadcast SSID at the beginning of the list.
@@ -6556,7 +6572,8 @@ tANI_BOOLEAN csrIsChannelPresentInList(
     }
 
     // Look for the channel in the list
-    for (i = 0; i < numChannels; i++)
+    for (i = 0; (i < numChannels) &&
+            (i < WNI_CFG_VALID_CHANNEL_LIST_LEN); i++)
     {
         if (pChannelList[i] == channel)
             return TRUE;

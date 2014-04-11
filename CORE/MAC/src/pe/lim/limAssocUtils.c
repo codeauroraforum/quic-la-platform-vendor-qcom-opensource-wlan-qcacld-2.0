@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -687,12 +687,12 @@ limCleanupRxPath(tpAniSirGlobal pMac, tpDphHashNode pStaDs,tpPESession psessionE
         pMac->lim.gLastBeaconDtimCount = 0;
         pMac->lim.gLastBeaconDtimPeriod = 0;
 
-#ifdef FEATURE_WLAN_CCX
-#ifdef FEATURE_WLAN_CCX_UPLOAD
+#ifdef FEATURE_WLAN_ESE
+#ifdef FEATURE_WLAN_ESE_UPLOAD
         limSendSmeTsmIEInd(pMac, psessionEntry, 0, 0, 0);
 #else
         limDeactivateAndChangeTimer(pMac,eLIM_TSM_TIMER);
-#endif /* FEATURE_WLAN_CCX_UPLOAD */
+#endif /* FEATURE_WLAN_ESE_UPLOAD */
 #endif
 
         /**
@@ -2313,7 +2313,7 @@ limAddSta(
     tSirMsgQ msgQ;
     tSirRetStatus     retCode = eSIR_SUCCESS;
     tSirMacAddr     staMac, *pStaAddr;
-    tANI_U8 i;
+    tANI_U8 i, nwType11b = 0;
     tpSirAssocReq   pAssocReq;
     tLimIbssPeerNode *pPeerNode; /* for IBSS mode */
     tDot11fIEVHTCaps vht_caps;   /* for IBSS mode */
@@ -2656,7 +2656,26 @@ limAddSta(
     if (pAddStaParams->respReqd)
         SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
 
-    pAddStaParams->nwType = psessionEntry->nwType;
+    for (i = 0; i < SIR_NUM_11A_RATES; i++)
+    {
+        if (sirIsArate(pStaDs->supportedRates.llaRates[i] & 0x7F))
+        {
+            nwType11b = 0;
+            break;
+        }
+        else
+        {
+            nwType11b = 1;
+        }
+    }
+    if (nwType11b)
+    {
+        pAddStaParams->nwType = eSIR_11B_NW_TYPE;
+    }
+    else
+    {
+        pAddStaParams->nwType = psessionEntry->nwType;
+    }
 
     msgQ.type = WDA_ADD_STA_REQ;
 
@@ -4638,7 +4657,7 @@ void limSendSmeUnprotectedMgmtFrameInd(
 }
 #endif
 
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 /** -------------------------------------------------------------
 \fn     limSendSmeTsmIEInd
 \brief  Forwards the TSM IE information to SME.
@@ -4680,4 +4699,4 @@ void limSendSmeTsmIEInd(tpAniSirGlobal pMac, tpPESession psessionEntry,
     limSysProcessMmhMsgApi(pMac, &mmhMsg, ePROT);
     return;
 }
-#endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
+#endif /* FEATURE_WLAN_ESE && FEATURE_WLAN_ESE_UPLOAD */

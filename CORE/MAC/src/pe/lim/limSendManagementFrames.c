@@ -209,6 +209,71 @@ void limMergeExtCapIEStruct(tDot11fIEExtCap *pDst,
     }
 }
 
+#ifdef QCA_WIFI_2_0
+/**
+ *
+ * \brief This function is called to add the sequence number to the
+ * management frames
+ *
+ * \param  pMac Pointer to Global MAC structure
+ *
+ * \param  pMacHdr Pointer to MAC management header
+ *
+ * The pMacHdr argument points to the MAC management header. The
+ * sequence number stored in the pMac structure will be incremented
+ * and updated to the MAC management header. The start sequence
+ * number is WLAN_HOST_SEQ_NUM_MIN and the end value is
+ * WLAN_HOST_SEQ_NUM_MAX. After reaching the MAX value, the sequence
+ * number will roll over.
+ *
+ */
+void
+limAddMgmtSeqNum (tpAniSirGlobal pMac, tpSirMacMgmtHdr pMacHdr)
+{
+    if (pMac->mgmtSeqNum >= WLAN_HOST_SEQ_NUM_MAX) {
+        pMac->mgmtSeqNum = WLAN_HOST_SEQ_NUM_MIN-1;
+    }
+
+    pMac->mgmtSeqNum++;
+
+    pMacHdr->seqControl.seqNumLo = (pMac->mgmtSeqNum & LOW_SEQ_NUM_MASK);
+    pMacHdr->seqControl.seqNumHi =
+            ((pMac->mgmtSeqNum & HIGH_SEQ_NUM_MASK) >> HIGH_SEQ_NUM_OFFSET);
+}
+
+/**
+ *
+ * \brief This function is called before sending a p2p action frame
+ * inorder to add sequence numbers to action packets
+ *
+ * \param  pMac Pointer to Global MAC structure
+ *
+ * \param pBD Pointer to the frame buffer that needs to be populate
+ *
+ * The pMacHdr argument points to the MAC management header. The
+ * sequence number stored in the pMac structure will be incremented
+ * and updated to the MAC management header. The start sequence
+ * number is WLAN_HOST_SEQ_NUM_MIN and the end value is
+ * WLAN_HOST_SEQ_NUM_MAX. After reaching the MAX value, the sequence
+ * number will roll over.
+ *
+ */
+void
+limPopulateP2pMacHeader(tpAniSirGlobal pMac, tANI_U8* pBD)
+{
+    tpSirMacMgmtHdr pMacHdr;
+
+    /// Prepare MAC management header
+    pMacHdr = (tpSirMacMgmtHdr) (pBD);
+
+    /* Prepare sequence number */
+    limAddMgmtSeqNum(pMac, pMacHdr);
+    limLog(pMac, LOG1,"seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d",
+            pMacHdr->seqControl.seqNumLo,
+            pMacHdr->seqControl.seqNumHi,
+            pMac->mgmtSeqNum);
+}
+#endif /* QCA_WIFI_2_0 */
 
 /**
  *
@@ -264,6 +329,16 @@ tSirRetStatus limPopulateMacHeader( tpAniSirGlobal pMac,
     vos_mem_copy(  (tANI_U8 *) pMacHdr->bssId,
                    (tANI_U8 *) peerAddr,
                    sizeof( tSirMacAddr ));
+
+#ifdef QCA_WIFI_2_0
+    /* Prepare sequence number */
+    limAddMgmtSeqNum(pMac, pMacHdr);
+    limLog(pMac, LOG1,"seqNumLo=%d, seqNumHi=%d, mgmtSeqNum=%d",
+            pMacHdr->seqControl.seqNumLo,
+            pMacHdr->seqControl.seqNumHi,
+            pMac->mgmtSeqNum);
+#endif /* QCA_WIFI_2_0 */
+
     return statusCode;
 } /*** end limPopulateMacHeader() ***/
 
@@ -1116,7 +1191,7 @@ limSendAddtsReqActionFrame(tpAniSirGlobal    pMac,
     tANI_U32               nPayload, nBytes, nStatus;
     tpSirMacMgmtHdr        pMacHdr;
     void                  *pPacket;
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
     tANI_U32               phyMode;
 #endif
     eHalStatus             halstatus;
@@ -1210,7 +1285,7 @@ limSendAddtsReqActionFrame(tpAniSirGlobal    pMac,
         WMMAddTSReq.StatusCode.statusCode = 0;
 
         PopulateDot11fWMMTSPEC( &pAddTS->tspec, &WMMAddTSReq.WMMTSPEC );
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         limGetPhyMode(pMac, &phyMode, psessionEntry);
 
         if( phyMode == WNI_CFG_PHY_MODE_11G || phyMode == WNI_CFG_PHY_MODE_11A)
@@ -1221,7 +1296,7 @@ limSendAddtsReqActionFrame(tpAniSirGlobal    pMac,
         {
             pAddTS->tsrsIE.rates[0] = TSRS_11B_RATE_5_5MBPS;
         }
-        PopulateDot11TSRSIE(pMac,&pAddTS->tsrsIE, &WMMAddTSReq.CCXTrafStrmRateSet,sizeof(tANI_U8));
+        PopulateDot11TSRSIE(pMac,&pAddTS->tsrsIE, &WMMAddTSReq.ESETrafStrmRateSet,sizeof(tANI_U8));
 #endif
         // fillWmeTspecIE
 
@@ -1386,7 +1461,7 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
     tANI_BOOLEAN         isVHTEnabled = eANI_BOOLEAN_FALSE;
     tANI_U16             addStripoffIELen = 0;
     tDot11fIEExtCap      extractedExtCap;
-    tANI_BOOLEAN         extractedExtCapFlag = eANI_BOOLEAN_TRUE;
+    tANI_BOOLEAN         extractedExtCapFlag = eANI_BOOLEAN_FALSE;
     if(NULL == psessionEntry)
     {
         return;
@@ -1575,12 +1650,15 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
                                       &addIE[0],
                                       &addStripoffIELen,
                                       &extractedExtCap );
-                    addnIELen = addStripoffIELen;
                     if(eSIR_SUCCESS != nSirStatus)
                     {
-                        extractedExtCapFlag = eANI_BOOLEAN_FALSE;
                         limLog(pMac, LOG1,
                             FL("Unable to Stripoff ExtCap IE from Assoc Rsp"));
+                    }
+                    else
+                    {
+                        addnIELen = addStripoffIELen;
+                        extractedExtCapFlag = eANI_BOOLEAN_TRUE;
                     }
                     nBytes = nBytes + addnIELen;
                 }
@@ -2399,19 +2477,19 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
     }
 #endif
 
-#ifdef FEATURE_WLAN_CCX
-    /* CCX Version IE will be included in association request
-       when CCX is enabled on DUT through ini */
-    if (psessionEntry->pLimJoinReq->isCCXFeatureIniEnabled)
+#ifdef FEATURE_WLAN_ESE
+    /* ESE Version IE will be included in association request
+       when ESE is enabled on DUT through ini */
+    if (psessionEntry->pLimJoinReq->isESEFeatureIniEnabled)
     {
-        PopulateDot11fCCXVersion(&pFrm->CCXVersion);
+        PopulateDot11fESEVersion(&pFrm->ESEVersion);
     }
-    /* For CCX Associations fill the CCX IEs */
-    if (psessionEntry->isCCXconnection &&
-        psessionEntry->pLimJoinReq->isCCXFeatureIniEnabled)
+    /* For ESE Associations fill the ESE IEs */
+    if (psessionEntry->isESEconnection &&
+        psessionEntry->pLimJoinReq->isESEFeatureIniEnabled)
     {
 #ifndef FEATURE_DISABLE_RM
-        PopulateDot11fCCXRadMgmtCap(&pFrm->CCXRadMgmtCap);
+        PopulateDot11fESERadMgmtCap(&pFrm->ESERadMgmtCap);
 #endif
     }
 #endif
@@ -2566,7 +2644,7 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
 } // End limSendAssocReqMgmtFrame
 
 
-#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
 /*------------------------------------------------------------------------------------
  *
  * Send Reassoc Req with FTIEs.
@@ -2592,11 +2670,12 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
     tANI_U8               *pBody;
     tANI_U16              nAddIELen;
     tANI_U8               *pAddIE;
-#if defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
     tANI_U8               *wpsIe = NULL;
 #endif
     tANI_U8               txFlag = 0;
     tANI_U8               smeSessionId = 0;
+    tANI_BOOLEAN          isVHTEnabled = eANI_BOOLEAN_FALSE;
 
     if (NULL == psessionEntry)
     {
@@ -2696,7 +2775,7 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
     // for rsnie and fties. Instead we just add
     // the rsnie and fties at the end of the pack routine for 11r.
     // This should ideally! be fixed.
-#if defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
     //
     // The join request *should* contain zero or one of the WPA and RSN
     // IEs.  The payload send along with the request is a
@@ -2732,32 +2811,32 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
                     &frm.WPAOpaque );
         }
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         if (psessionEntry->pLimReAssocReq->cckmIE.length)
         {
-            PopulateDot11fCCXCckmOpaque( pMac, &( psessionEntry->pLimReAssocReq->cckmIE ),
-                    &frm.CCXCckmOpaque );
+            PopulateDot11fESECckmOpaque( pMac, &( psessionEntry->pLimReAssocReq->cckmIE ),
+                    &frm.ESECckmOpaque );
         }
-#endif //FEATURE_WLAN_CCX
+#endif //FEATURE_WLAN_ESE
     }
 
-#ifdef FEATURE_WLAN_CCX
-    /* CCX Version IE will be included in reassociation request
-       when CCX is enabled on DUT through ini */
-    if (psessionEntry->pLimReAssocReq->isCCXFeatureIniEnabled)
+#ifdef FEATURE_WLAN_ESE
+    /* ESE Version IE will be included in reassociation request
+       when ESE is enabled on DUT through ini */
+    if (psessionEntry->pLimReAssocReq->isESEFeatureIniEnabled)
     {
-        PopulateDot11fCCXVersion(&frm.CCXVersion);
+        PopulateDot11fESEVersion(&frm.ESEVersion);
     }
-    // For CCX Associations fill the CCX IEs
-    if (psessionEntry->isCCXconnection &&
-        psessionEntry->pLimReAssocReq->isCCXFeatureIniEnabled)
+    // For ESE Associations fill the ESE IEs
+    if (psessionEntry->isESEconnection &&
+        psessionEntry->pLimReAssocReq->isESEFeatureIniEnabled)
     {
 #ifndef FEATURE_DISABLE_RM
-        PopulateDot11fCCXRadMgmtCap(&frm.CCXRadMgmtCap);
+        PopulateDot11fESERadMgmtCap(&frm.ESERadMgmtCap);
 #endif
     }
-#endif //FEATURE_WLAN_CCX
-#endif //FEATURE_WLAN_CCX || FEATURE_WLAN_LFR
+#endif //FEATURE_WLAN_ESE
+#endif //FEATURE_WLAN_ESE || FEATURE_WLAN_LFR
 
     // include WME EDCA IE as well
     if ( fWmeEnabled )
@@ -2776,16 +2855,16 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
         {
             PopulateDot11fWMMCaps( &frm.WMMCaps );
         }
-#ifdef FEATURE_WLAN_CCX
-        if (psessionEntry->isCCXconnection)
+#ifdef FEATURE_WLAN_ESE
+        if (psessionEntry->isESEconnection)
         {
             PopulateDot11fReAssocTspec(pMac, &frm, psessionEntry);
 
             // Populate the TSRS IE if TSPEC is included in the reassoc request
-            if (psessionEntry->pLimReAssocReq->ccxTspecInfo.numTspecs)
+            if (psessionEntry->pLimReAssocReq->eseTspecInfo.numTspecs)
             {
                 tANI_U32 phyMode;
-                tSirMacCCXTSRSIE    tsrsIE;
+                tSirMacESETSRSIE    tsrsIE;
                 limGetPhyMode(pMac, &phyMode, psessionEntry);
 
                 tsrsIE.tsid = 0;
@@ -2797,7 +2876,7 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
                 {
                     tsrsIE.rates[0] = TSRS_11B_RATE_5_5MBPS;
                 }
-                PopulateDot11TSRSIE(pMac,&tsrsIE, &frm.CCXTrafStrmRateSet, sizeof(tANI_U8));
+                PopulateDot11TSRSIE(pMac,&tsrsIE, &frm.ESETrafStrmRateSet, sizeof(tANI_U8));
             }
         }
 #endif
@@ -2811,14 +2890,26 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
 
 #if defined WLAN_FEATURE_VOWIFI_11R
     if ( psessionEntry->pLimReAssocReq->bssDescription.mdiePresent && (0 == pMac->ft.ftSmeContext.reassoc_ft_ies_length)
-#if defined FEATURE_WLAN_CCX
-           && !psessionEntry->isCCXconnection
+#if defined FEATURE_WLAN_ESE
+           && !psessionEntry->isESEconnection
 #endif
        )
     {
         PopulateMDIE( pMac, &frm.MobilityDomain, psessionEntry->pLimReAssocReq->bssDescription.mdie);
     }
 #endif
+
+#ifdef WLAN_FEATURE_11AC
+    if ( psessionEntry->vhtCapability &&
+             psessionEntry->vhtCapabilityPresentInBeacon)
+    {
+        limLog( pMac, LOG1, FL("Populate VHT IEs in Re-Assoc Request"));
+        PopulateDot11fVHTCaps( pMac, psessionEntry, &frm.VHTCaps );
+        isVHTEnabled = eANI_BOOLEAN_TRUE;
+    }
+#endif
+
+    PopulateDot11fExtCap(pMac, isVHTEnabled, &frm.ExtCap);
 
     nStatus = dot11fGetPackedReAssocRequestSize( pMac, &frm, &nPayload );
     if ( DOT11F_FAILED( nStatus ) )
@@ -2865,7 +2956,7 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
     // Paranoia:
     vos_mem_set( pFrame, nBytes + ft_ies_length, 0);
 
-#if defined WLAN_FEATURE_VOWIFI_11R_DEBUG || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined WLAN_FEATURE_VOWIFI_11R_DEBUG || defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
     limPrintMacAddr(pMac, psessionEntry->limReAssocbssId, LOG1);
 #endif
     // Next, we fill out the buffer descriptor:
@@ -3649,7 +3740,7 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
          ( psessionEntry->pePersona == VOS_P2P_GO_MODE)
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
        || ((NULL != pMac->ft.ftPEContext.pFTPreAuthReq)
            && ( SIR_BAND_5_GHZ == limGetRFBand(pMac->ft.ftPEContext.pFTPreAuthReq->preAuthchannelNum)))
 #endif
@@ -3781,8 +3872,8 @@ eHalStatus limSendDisassocCnf(tpAniSirGlobal pMac)
 #ifdef WLAN_FEATURE_VOWIFI_11R
         if  ( (psessionEntry->limSystemRole == eLIM_STA_ROLE ) &&
                 (
-#ifdef FEATURE_WLAN_CCX
-                 (psessionEntry->isCCXconnection ) ||
+#ifdef FEATURE_WLAN_ESE
+                 (psessionEntry->isESEconnection ) ||
 #endif
 #ifdef FEATURE_WLAN_LFR
                  (psessionEntry->isFastRoamIniFeatureEnabled ) ||
@@ -3800,16 +3891,16 @@ eHalStatus limSendDisassocCnf(tpAniSirGlobal pMac)
         {
             PELOGE(limLog(pMac, LOGE,
                    FL("No FT Preauth Session Cleanup in role %d"
-#ifdef FEATURE_WLAN_CCX
-                   " isCCX %d"
+#ifdef FEATURE_WLAN_ESE
+                   " isESE %d"
 #endif
 #ifdef FEATURE_WLAN_LFR
                    " isLFR %d"
 #endif
                    " is11r %d reason %d"),
                    psessionEntry->limSystemRole,
-#ifdef FEATURE_WLAN_CCX
-                   psessionEntry->isCCXconnection,
+#ifdef FEATURE_WLAN_ESE
+                   psessionEntry->isESEconnection,
 #endif
 #ifdef FEATURE_WLAN_LFR
                    psessionEntry->isFastRoamIniFeatureEnabled,
@@ -3853,46 +3944,12 @@ end:
 
 eHalStatus limDisassocTxCompleteCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess)
 {
-    eHalStatus status = eHAL_STATUS_FAILURE;
-
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-        return status;
-    }
-    status = limSendDisassocCnf(pMac);
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-        return eHAL_STATUS_FAILURE;
-    }
-    return status;
+    return limSendDisassocCnf(pMac);
 }
 
 eHalStatus limDeauthTxCompleteCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess)
 {
-    eHalStatus status = eHAL_STATUS_FAILURE;
-
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-        return status;
-    }
-    status = limSendDeauthCnf(pMac);
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-        return eHAL_STATUS_FAILURE;
-    }
-    return status;
+    return limSendDeauthCnf(pMac);
 }
 
 /**

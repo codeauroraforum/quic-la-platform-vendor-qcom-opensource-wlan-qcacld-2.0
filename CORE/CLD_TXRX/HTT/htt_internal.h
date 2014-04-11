@@ -140,6 +140,7 @@ static inline
 void
 htt_print_rx_desc(struct htt_host_rx_desc_base *rx_desc)
 {
+    adf_os_print("----------------------RX DESC----------------------------\n");
     adf_os_print("attention: %#010x\n",
                  (unsigned int)(*(u_int32_t *) &rx_desc->attention));
     adf_os_print("frag_info: %#010x\n",
@@ -201,7 +202,7 @@ htt_print_rx_desc(struct htt_host_rx_desc_base *rx_desc)
                   (unsigned int)(((u_int32_t *) &rx_desc->ppdu_end)[19]),
                   (unsigned int)(((u_int32_t *) &rx_desc->ppdu_end)[20]),
                   (unsigned int)(((u_int32_t *) &rx_desc->ppdu_end)[21]));
-
+    adf_os_print("---------------------------------------------------------\n");
 }
 
 
@@ -382,5 +383,13 @@ htt_htc_pkt_free(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
 
 void
 htt_htc_pkt_pool_free(struct htt_pdev_t *pdev);
+
+#ifdef ATH_11AC_TXCOMPACT
+void
+htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
+
+void
+htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev);
+#endif
 
 #endif /* _HTT_INTERNAL__H_ */

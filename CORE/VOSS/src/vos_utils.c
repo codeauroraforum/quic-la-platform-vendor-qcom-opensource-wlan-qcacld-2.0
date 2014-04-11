@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -166,8 +166,6 @@ VOS_STATUS vos_crypto_deinit( v_U32_t hCryptProv )
 VOS_STATUS vos_rand_get_bytes( v_U32_t cryptHandle, v_U8_t *pbBuf, v_U32_t numBytes )
 {
    VOS_STATUS uResult = VOS_STATUS_E_FAILURE;
-   //v_UINT_t uCode;
-//   HCRYPTPROV hCryptProv = (HCRYPTPROV) cryptHandle;
 
    //check for invalid pointer
    if ( NULL == pbBuf )
@@ -176,13 +174,9 @@ VOS_STATUS vos_rand_get_bytes( v_U32_t cryptHandle, v_U8_t *pbBuf, v_U32_t numBy
       return ( uResult );
    }
 
-//#if 0
-   // get_random_bytes() is a void procedure
    get_random_bytes( pbBuf, numBytes);
    // "Random sequence generated."
    uResult = VOS_STATUS_SUCCESS;
-//#endif
-
    return ( uResult );
 }
 
@@ -227,7 +221,7 @@ v_BOOL_t vos_is_mmie_valid(v_U8_t *igtk, v_U8_t *ipn,
     {
         /* Replay error */
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-            " mmie ipn %02X %02X %02X %02X %02X %02X"
+            "Replay error mmie ipn %02X %02X %02X %02X %02X %02X"
             " drvr ipn %02X %02X %02X %02X %02X %02X",
             rx_ipn[0], rx_ipn[1], rx_ipn[2], rx_ipn[3], rx_ipn[4], rx_ipn[5],
             ipn[0], ipn[1], ipn[2], ipn[3], ipn[4], ipn[5]);
@@ -855,4 +849,13 @@ v_U8_t vos_freq_to_chan(v_U32_t freq)
     else
         chan = (freq - VOS_5_GHZ_BASE_FREQ)/VOS_CHAN_SPACING_5MHZ;
     return chan;
+}
+
+
+v_U8_t vos_freq_to_band(v_U32_t freq)
+{
+    if (freq <= VOS_CHAN_14_FREQ)
+        return VOS_BAND_2GHZ;
+
+    return VOS_BAND_5GHZ;
 }

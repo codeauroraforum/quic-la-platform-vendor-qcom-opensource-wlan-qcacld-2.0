@@ -318,7 +318,24 @@ limResumeLink(tpAniSirGlobal pMac, SUSPEND_RESUME_LINK_CALLBACK callback, tANI_U
 
    pMac->lim.gpLimResumeCallback = callback;
    pMac->lim.gpLimResumeData = data;
-   limSendHalFinishScanReq(pMac, eLIM_HAL_RESUME_LINK_WAIT_STATE );
+
+   /* eLIM_HAL_IDLE_SCAN_STATE state indicate limSendHalInitScanReq failed.
+    * In case limSendHalInitScanReq is success, Scanstate would be
+    * eLIM_HAL_SUSPEND_LINK_STATE
+    */
+   if( eLIM_HAL_IDLE_SCAN_STATE != pMac->lim.gLimHalScanState )
+   {
+      limSendHalFinishScanReq(pMac, eLIM_HAL_RESUME_LINK_WAIT_STATE );
+   }
+   else
+   {
+      limLog(pMac, LOGW, FL("Init Scan failed, we will not call finish scan."
+                   " calling the callback with failure status"));
+      pMac->lim.gpLimResumeCallback( pMac, eSIR_FAILURE, pMac->lim.gpLimResumeData);
+      pMac->lim.gpLimResumeCallback = NULL;
+      pMac->lim.gpLimResumeData = NULL;
+      pMac->lim.gLimSystemInScanLearnMode = 0;
+   }
 
    if(limIsInMCC(pMac))
    {
@@ -2190,7 +2207,7 @@ limProcessMlmPostJoinSuspendLink(tpAniSirGlobal pMac, eHalStatus status, tANI_U3
     secChanOffset = psessionEntry->htSecondaryChannelOffset;
     //store the channel switch sessionEntry in the lim global var
     psessionEntry->channelChangeReasonCode = LIM_SWITCH_CHANNEL_JOIN;
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
     psessionEntry->pLimMlmReassocRetryReq = NULL;
 #endif
 
@@ -2923,21 +2940,7 @@ limProcessMlmDisassocReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_
                                  psessionEntry, FALSE);
 
              /* Send Disassoc CNF and receive path cleanup */
-             if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-                 (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-             {
-                 PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-                 return;
-             }
              limSendDisassocCnf(pMac);
-             if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-                 (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-             {
-                 PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-                 return;
-             }
         }
         else
         {
@@ -2945,6 +2948,12 @@ limProcessMlmDisassocReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_
                                  pMlmDisassocReq->reasonCode,
                                  pMlmDisassocReq->peerMacAddr,
                                  psessionEntry, TRUE);
+             /*
+              * Abort Tx so that data frames won't be sent to the AP
+              * after sending Disassoc.
+              */
+             if (eLIM_STA_ROLE == psessionEntry->limSystemRole)
+                  WDA_TxAbort(psessionEntry->smeSessionId);
         }
     }
     else
@@ -3062,21 +3071,7 @@ void limCleanUpDisassocDeauthReq(tpAniSirGlobal pMac,
 
 void limProcessDisassocAckTimeout(tpAniSirGlobal pMac)
 {
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-        return;
-    }
     limSendDisassocCnf(pMac);
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-        return;
-    }
 }
 
 /**
@@ -3355,21 +3350,7 @@ end:
 
 void limProcessDeauthAckTimeout(tpAniSirGlobal pMac)
 {
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_acquire
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock aquire failed!"));)
-        return;
-    }
     limSendDeauthCnf(pMac);
-    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_release
-         (&pMac->lim.limDisassocDeauthCnfReq.deauthDisassocInprogress)))
-    {
-        PELOGE(limLog(pMac, LOGE, FL
-                     ("deauth/disassoc process lock release failed!"));)
-        return;
-    }
 }
 
 /**
@@ -4446,7 +4427,7 @@ limProcessAssocFailureTimeout(tpAniSirGlobal pMac, tANI_U32 MsgType)
                 limPostSmeMessage(pMac, LIM_MLM_ASSOC_CNF, (tANI_U32 *) &mlmAssocCnf);
             else
             {
-                /* Will come here only in case of 11r, CCx FT when reassoc rsp
+                /* Will come here only in case of 11r, Ese FT when reassoc rsp
                    is not received and we receive a reassoc - timesout */
                 mlmAssocCnf.resultCode = eSIR_SME_FT_REASSOC_TIMEOUT_FAILURE;
                 limPostSmeMessage(pMac, LIM_MLM_REASSOC_CNF, (tANI_U32 *) &mlmAssocCnf);

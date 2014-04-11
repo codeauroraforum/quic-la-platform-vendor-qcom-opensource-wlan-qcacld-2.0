@@ -81,9 +81,9 @@ v_U8_t ccpWpaOui02[ HDD_WPA_OUI_SIZE ] = { 0x00, 0x50, 0xf2, 0x02 };
 v_U8_t ccpWpaOui03[ HDD_WPA_OUI_SIZE ] = { 0x00, 0x50, 0xf2, 0x03 };
 v_U8_t ccpWpaOui04[ HDD_WPA_OUI_SIZE ] = { 0x00, 0x50, 0xf2, 0x04 };
 v_U8_t ccpWpaOui05[ HDD_WPA_OUI_SIZE ] = { 0x00, 0x50, 0xf2, 0x05 };
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 v_U8_t ccpWpaOui06[ HDD_WPA_OUI_SIZE ] = { 0x00, 0x40, 0x96, 0x00 }; // CCKM
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 #define HDD_RSN_OUI_SIZE 4
 v_U8_t ccpRSNOui00[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x00 }; // group cipher
 v_U8_t ccpRSNOui01[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x01 }; // WEP-40 or RSN
@@ -91,9 +91,9 @@ v_U8_t ccpRSNOui02[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x02 }; // TKIP or 
 v_U8_t ccpRSNOui03[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x03 }; // Reserved
 v_U8_t ccpRSNOui04[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x04 }; // AES-CCMP
 v_U8_t ccpRSNOui05[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x05 }; // WEP-104
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 v_U8_t ccpRSNOui06[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x40, 0x96, 0x00 }; // CCKM
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 #ifdef WLAN_FEATURE_11W
 v_U8_t ccpRSNOui07[ HDD_RSN_OUI_SIZE ] = { 0x00, 0x0F, 0xAC, 0x06 }; // RSN-PSK-SHA256
 #endif
@@ -113,18 +113,18 @@ void hdd_indicateUnprotMgmtFrame(hdd_adapter_t *pAdapter,
                             tANI_U8 frameType );
 #endif
 
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 static void hdd_indicateTsmIe(hdd_adapter_t *pAdapter, tANI_U8 tid,
                             tANI_U8  state,
                             tANI_U16 measInterval );
 static void hdd_indicateCckmPreAuth(hdd_adapter_t *pAdapter,
                                     tCsrRoamInfo *pRoamInfo);
-static void hdd_indicateCcxAdjApRepInd(hdd_adapter_t *pAdapter,
+static void hdd_indicateEseAdjApRepInd(hdd_adapter_t *pAdapter,
                                        tCsrRoamInfo *pRoamInfo);
-static void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
+static void hdd_indicateEseBcnReportInd(const hdd_adapter_t *pAdapter,
                                         const tCsrRoamInfo *pRoamInfo);
 
-#endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
+#endif /* FEATURE_WLAN_ESE && FEATURE_WLAN_ESE_UPLOAD */
 
 static eHalStatus hdd_RoamSetKeyCompleteHandler( hdd_adapter_t *pAdapter,
                                                 tCsrRoamInfo *pRoamInfo,
@@ -307,6 +307,8 @@ void hdd_connSaveConnectInfo( hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo, 
 
           // Save  dot11mode in which STA associated to AP
           pHddStaCtx->conn_info.dot11Mode = pRoamInfo->u.pConnectedProfile->dot11Mode;
+
+          pHddStaCtx->conn_info.proxyARPService = pRoamInfo->u.pConnectedProfile->proxyARPService;
       }
    }
 
@@ -319,7 +321,7 @@ void hdd_connSaveConnectInfo( hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo, 
 /*
  * Send the 11R key information to the supplicant.
  * Only then can the supplicant generate the PMK-R1.
- * (BTW, the CCX supplicant also needs the Assoc Resp IEs
+ * (BTW, the ESE supplicant also needs the Assoc Resp IEs
  * for the same purpose.)
  *
  * Mainly the Assoc Rsp IEs are passed here. For the IMDA
@@ -497,10 +499,10 @@ void hdd_SendFTEvent(hdd_adapter_t *pAdapter)
 
 #endif /* WLAN_FEATURE_VOWIFI_11R */
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 
 /*
- * Send the CCX required "new AP Channel info" to the supplicant.
+ * Send the ESE required "new AP Channel info" to the supplicant.
  * (This keeps the supplicant "up to date" on the current channel.)
  *
  * The current (new AP) channel information is passed in.
@@ -529,7 +531,7 @@ static void hdd_SendNewAPChannelInfo(struct net_device *dev, hdd_adapter_t *pAda
     wireless_send_event(pAdapter->dev, SIOCGIWFREQ, &wrqu, NULL);
 }
 
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 
 void hdd_SendUpdateBeaconIEsEvent(hdd_adapter_t *pAdapter, tCsrRoamInfo *pCsrRoamInfo)
 {
@@ -543,13 +545,13 @@ void hdd_SendUpdateBeaconIEsEvent(hdd_adapter_t *pAdapter, tCsrRoamInfo *pCsrRoa
 
     if (0 == pCsrRoamInfo->nBeaconLength)
     {
-        hddLog(LOGE, "%s: pCsrRoamInfo->nBeaconFrameLength = 0", __func__);
+        hddLog(LOGW, "%s: pCsrRoamInfo->nBeaconFrameLength = 0", __func__);
         return;
     }
     pBeaconIes = (u8 *)(pCsrRoamInfo->pbFrames + BEACON_FRAME_IES_OFFSET);
     if (pBeaconIes == NULL)
     {
-        hddLog(LOGE, "%s: Beacon IEs is NULL", __func__);
+        hddLog(LOGW, "%s: Beacon IEs is NULL", __func__);
         return;
     }
 
@@ -603,6 +605,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
     int we_event;
     char *msg;
     int type = -1;
+    unsigned long flags;
 #ifdef QCA_WIFI_2_0
     v_MACADDR_t peerMacAddr;
 #endif
@@ -653,6 +656,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                 MAC_ADDR_ARRAY(wrqu.ap_addr.sa_data));
         hdd_SendUpdateBeaconIEsEvent(pAdapter, pCsrRoamInfo);
 
+
         /* Send IWEVASSOCRESPIE Event if WLAN_FEATURE_CIQ_METRICS is Enabled Or
          * Send IWEVASSOCRESPIE Event if WLAN_FEATURE_VOWIFI_11R is Enabled
          * and fFTEnable is TRUE */
@@ -660,7 +664,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         // Send FT Keys to the supplicant when FT is enabled
         if ((pRoamProfile->AuthType.authType[0] == eCSR_AUTH_TYPE_FT_RSN_PSK) ||
             (pRoamProfile->AuthType.authType[0] == eCSR_AUTH_TYPE_FT_RSN)
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
             || (pRoamProfile->AuthType.authType[0] == eCSR_AUTH_TYPE_CCKM_RSN) ||
             (pRoamProfile->AuthType.authType[0] == eCSR_AUTH_TYPE_CCKM_WPA)
 #endif
@@ -682,6 +686,20 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                                    pHddStaCtx->conn_info.operationChannel);
         }
 #endif
+
+#ifdef MSM_PLATFORM
+        /* start timer in sta/p2p_cli */
+        spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+        pHddCtx->sta_cnt++;
+        pAdapter->connection++;
+        if (1 == pAdapter->connection) {
+            pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
+            pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
+        }
+        if (1 == pHddCtx->sta_cnt)
+            hdd_start_bus_bw_compute_timer(pAdapter);
+        spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+#endif
     }
     else if (eConnectionState_IbssConnected == pHddStaCtx->conn_info.connState) // IBss Associated
     {
@@ -695,6 +713,8 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         pr_info("wlan: disconnected\n");
         type = WLAN_STA_DISASSOC_DONE_IND;
         memset(wrqu.ap_addr.sa_data,'\0',ETH_ALEN);
+
+
 #ifdef QCA_WIFI_2_0
         if (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
         {
@@ -707,6 +727,20 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                                      pHddStaCtx->conn_info.operationChannel);
         }
 #endif
+
+#ifdef MSM_PLATFORM
+        /* stop timer in sta/p2p_cli */
+        spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+        pHddCtx->sta_cnt--;
+        pAdapter->connection--;
+        if (0 == pAdapter->connection) {
+            pAdapter->prev_tx_packets = 0;
+            pAdapter->prev_rx_packets = 0;
+        }
+        if (0 == pHddCtx->sta_cnt)
+            hdd_stop_bus_bw_compute_timer(pAdapter);
+        spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+#endif
     }
     hdd_dump_concurrency_info(pHddCtx);
 
@@ -717,7 +751,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         (pHddCtx->isUnloadInProgress != TRUE))
     {
         wireless_send_event(dev, we_event, &wrqu, msg);
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
         if(eConnectionState_Associated == pHddStaCtx->conn_info.connState)/* Associated */
         {
             if ( (pRoamProfile->AuthType.authType[0] == eCSR_AUTH_TYPE_CCKM_RSN) ||
@@ -747,6 +781,7 @@ void hdd_connRemoveConnectInfo( hdd_station_ctx_t *pHddStaCtx )
    // Set not-connected state
    pHddStaCtx->conn_info.connDot11DesiredBssType = eCSR_BSS_TYPE_ANY;
    hdd_connSetConnectionState( pHddStaCtx, eConnectionState_NotConnected );
+   pHddStaCtx->conn_info.proxyARPService = 0;
 
    vos_mem_zero( &pHddStaCtx->conn_info.SSID, sizeof( tCsrSSIDInfo ) );
 }
@@ -1035,9 +1070,9 @@ static VOS_STATUS hdd_roamRegisterSTA( hdd_adapter_t *pAdapter,
 
    }
 
-#ifdef FEATURE_WLAN_CCX
-   staDesc.ucIsCcxSta = pRoamInfo->isCCXAssoc;
-#endif //FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
+   staDesc.ucIsEseSta = pRoamInfo->isESEAssoc;
+#endif //FEATURE_WLAN_ESE
 
 #ifdef VOLANS_ENABLE_SW_REPLAY_CHECK
    /* check whether replay check is valid for the station or not */
@@ -1243,7 +1278,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
     VOS_STATUS vosStatus;
     v_U8_t reqRsnIe[DOT11F_IE_RSN_MAX_LEN];
     tANI_U32 reqRsnLength = DOT11F_IE_RSN_MAX_LEN;
-#if  defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR) || defined (WLAN_FEATURE_VOWIFI_11R)
+#if  defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR) || defined (WLAN_FEATURE_VOWIFI_11R)
     int ft_carrier_on = FALSE;
 #endif
     int status;
@@ -1279,7 +1314,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
            kernel. we have registered net device notifier for device change notification. With this we will come to
            know that the device is getting activated properly.
            */
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
         if (pHddStaCtx->ft_carrier_on == FALSE)
         {
 #endif
@@ -1302,7 +1337,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
             // Disable Linkup Event Servicing - no more service required from the net device notifier call
             pAdapter->isLinkUpSvcNeeded = FALSE;
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
         }
         else {
             pHddStaCtx->ft_carrier_on = FALSE;
@@ -1451,11 +1486,11 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                         pAdapter->sessionId,
                         &rspRsnLength,
                         rspRsnIe);
-#if  defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
                 if(ft_carrier_on)
                     hdd_SendReAssocEvent(dev, pAdapter, pRoamInfo, reqRsnIe, reqRsnLength);
                 else
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 
                 {
                     /* inform connect result to nl80211 */
@@ -1857,8 +1892,6 @@ static eHalStatus roamIbssConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo 
              __func__, pAdapter->dev->name);
       return eHAL_STATUS_FAILURE;
    }
-   /* send ibss join indication to nl80211 */
-   cfg80211_ibss_joined(pAdapter->dev, &pRoamInfo->bssid[0], GFP_KERNEL);
    cfg80211_put_bss(
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
                     WLAN_HDD_GET_CTX(pAdapter)->wiphy,
@@ -2314,7 +2347,7 @@ eHalStatus hdd_RoamTdlsStatusUpdateHandler(hdd_adapter_t *pAdapter,
     tANI_U8 staIdx;
 
 #ifdef WLAN_FEATURE_TDLS_DEBUG
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
     ("hdd_tdlsStatusUpdate: %s staIdx %d " MAC_ADDRESS_STR),
       roamResult == eCSR_ROAM_RESULT_ADD_TDLS_PEER ? "ADD_TDLS_PEER" :
       roamResult == eCSR_ROAM_RESULT_DELETE_TDLS_PEER ? "DEL_TDLS_PEER" :
@@ -2336,7 +2369,7 @@ eHalStatus hdd_RoamTdlsStatusUpdateHandler(hdd_adapter_t *pAdapter,
 #ifdef CONFIG_TDLS_IMPLICIT
     if (!pHddTdlsCtx)
     {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                   "%s: TDLS ctx is null, ignore roamResult (%d)",
                   __func__, roamResult);
         return status;
@@ -2680,8 +2713,8 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
             }
             break;
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
-            /* We did pre-auth,then we attempted a 11r or ccx reassoc.
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
+            /* We did pre-auth,then we attempted a 11r or ese reassoc.
              * reassoc failed due to failure, timeout, reject from ap
              * in any case tell the OS, our carrier is off and mark
              * interface down */
@@ -2696,7 +2729,7 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
             break;
 
         case eCSR_ROAM_FT_START:
-            // When we roam for CCX and 11r, we dont want the
+            // When we roam for ESE and 11r, we dont want the
             // OS to be informed that the link is down. So mark
             // the link ready for ft_start. After this the
             // eCSR_ROAM_SHOULD_ROAM will be received.
@@ -2740,16 +2773,16 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
                 hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
                 // notify apps that we can't pass traffic anymore
                 netif_tx_disable(dev);
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
                 if (pHddStaCtx->ft_carrier_on == FALSE)
                 {
 #endif
                     netif_carrier_off(dev);
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
                 }
 #endif
 
-#if  !(defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR))
+#if  !(defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR))
                 //We should clear all sta register with TL, for now, only one.
                 status = hdd_roamDeregisterSTA( pAdapter, pHddStaCtx->conn_info.staId [0] );
                 if ( !VOS_IS_STATUS_SUCCESS(status ) )
@@ -2977,7 +3010,7 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
                                          pRoamInfo->frameType);
             break;
 #endif
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
        case eCSR_ROAM_TSM_IE_IND:
             hdd_indicateTsmIe(pAdapter, pRoamInfo->tsmIe.tsid,
                 pRoamInfo->tsmIe.state, pRoamInfo->tsmIe.msmt_interval);
@@ -2993,18 +3026,18 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
               break;
           }
 
-       case eCSR_ROAM_CCX_ADJ_AP_REPORT_IND:
+       case eCSR_ROAM_ESE_ADJ_AP_REPORT_IND:
          {
-             hdd_indicateCcxAdjApRepInd(pAdapter, pRoamInfo);
+             hdd_indicateEseAdjApRepInd(pAdapter, pRoamInfo);
              break;
          }
 
-       case eCSR_ROAM_CCX_BCN_REPORT_IND:
+       case eCSR_ROAM_ESE_BCN_REPORT_IND:
          {
-            hdd_indicateCcxBcnReportInd(pAdapter, pRoamInfo);
+            hdd_indicateEseBcnReportInd(pAdapter, pRoamInfo);
             break;
          }
-#endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
+#endif /* FEATURE_WLAN_ESE && FEATURE_WLAN_ESE_UPLOAD */
         default:
             break;
     }
@@ -3034,12 +3067,12 @@ eCsrAuthType hdd_TranslateRSNToCsrAuthType( u_int8_t auth_suite[4])
         auth_type = eCSR_AUTH_TYPE_FT_RSN;
     } else
 #endif
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
     if (memcmp(auth_suite , ccpRSNOui06, 4) == 0)
     {
         auth_type = eCSR_AUTH_TYPE_CCKM_RSN;
     } else
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
 #ifdef WLAN_FEATURE_11W
     if (memcmp(auth_suite , ccpRSNOui07, 4) == 0)
     {
@@ -3065,12 +3098,12 @@ hdd_TranslateWPAToCsrAuthType(u_int8_t auth_suite[4])
     {
         auth_type = eCSR_AUTH_TYPE_WPA_PSK;
     } else
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
     if (memcmp(auth_suite , ccpWpaOui06, 4) == 0)
     {
         auth_type = eCSR_AUTH_TYPE_CCKM_WPA;
     } else
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
     {
         auth_type = eCSR_AUTH_TYPE_UNKNOWN;
     }
@@ -3186,7 +3219,11 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
     // Validity checks
     if ((gen_ie_len < VOS_MIN(DOT11F_IE_RSN_MIN_LEN, DOT11F_IE_WPA_MIN_LEN)) ||
             (gen_ie_len > VOS_MAX(DOT11F_IE_RSN_MAX_LEN, DOT11F_IE_WPA_MAX_LEN)) )
+    {
+        hddLog(LOGE, "%s: Invalid DOT11F IE Length passed :%d",
+               __func__,  gen_ie_len);
         return -EINVAL;
+    }
     // Type check
     if ( gen_ie[0] ==  DOT11F_EID_RSN)
     {
@@ -3194,6 +3231,8 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         if ((gen_ie_len < DOT11F_IE_RSN_MIN_LEN ) ||
                 (gen_ie_len > DOT11F_IE_RSN_MAX_LEN) )
         {
+            hddLog(LOGE, "%s: Invalid DOT11F RSN IE length :%d",
+                   __func__, gen_ie_len);
             return -EINVAL;
         }
         // Skip past the EID byte and length byte
@@ -3227,10 +3266,12 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         {
             if ( pBssid == NULL)
             {
+                hddLog(LOGE, "%s: pBssid passed is NULL", __func__);
                 break;
             }
             if ( hdd_IsMACAddrNULL( (u_char *) pBssid->ether_addr_octet , 6))
             {
+                hddLog(LOGE, "%s: Invalid MAC adrr", __func__);
                 break;
             }
             updatePMKCache = TRUE;
@@ -3259,6 +3300,8 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         if ((gen_ie_len < DOT11F_IE_WPA_MIN_LEN ) ||
                     (gen_ie_len > DOT11F_IE_WPA_MAX_LEN))
         {
+            hddLog(LOGE, "%s: Invalid DOT11F WPA IE length :%d",
+                   __func__, gen_ie_len);
             return -EINVAL;
         }
         // Skip past the EID byte and length byte - and four byte WiFi OUI
@@ -3370,7 +3413,7 @@ int hdd_set_csr_auth_type ( hdd_adapter_t  *pAdapter, eCsrAuthType RSNAuthType)
     switch( pHddStaCtx->conn_info.authType)
     {
        case eCSR_AUTH_TYPE_OPEN_SYSTEM:
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
        case eCSR_AUTH_TYPE_CCKM_WPA:
        case eCSR_AUTH_TYPE_CCKM_RSN:
 #endif
@@ -3380,7 +3423,7 @@ int hdd_set_csr_auth_type ( hdd_adapter_t  *pAdapter, eCsrAuthType RSNAuthType)
         } else
         if (pWextState->wpaVersion & IW_AUTH_WPA_VERSION_WPA) {
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
             if ((RSNAuthType == eCSR_AUTH_TYPE_CCKM_WPA) &&
                 ((pWextState->authKeyMgmt & IW_AUTH_KEY_MGMT_802_1X)
                  == IW_AUTH_KEY_MGMT_802_1X)) {
@@ -3404,7 +3447,7 @@ int hdd_set_csr_auth_type ( hdd_adapter_t  *pAdapter, eCsrAuthType RSNAuthType)
             }
         }
         if (pWextState->wpaVersion & IW_AUTH_WPA_VERSION_WPA2) {
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
             if ((RSNAuthType == eCSR_AUTH_TYPE_CCKM_RSN) &&
                 ((pWextState->authKeyMgmt & IW_AUTH_KEY_MGMT_802_1X)
                  == IW_AUTH_KEY_MGMT_802_1X)) {
@@ -3455,9 +3498,9 @@ int hdd_set_csr_auth_type ( hdd_adapter_t  *pAdapter, eCsrAuthType RSNAuthType)
           break;
         default:
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
            hddLog( LOG1, "%s: In default, unknown auth type.\n", __func__);
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
            pRoamProfile->AuthType.authType[0] = eCSR_AUTH_TYPE_UNKNOWN;
            break;
     }
@@ -3833,7 +3876,7 @@ int iw_set_auth(struct net_device *dev,struct iw_request_info *info,
 
       case IW_AUTH_KEY_MGMT:
       {
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 #define IW_AUTH_KEY_MGMT_CCKM       8  /* Should be in linux/wireless.h */
          /*Check for CCKM AKM type */
          if ( wrqu->param.value & IW_AUTH_KEY_MGMT_CCKM) {
@@ -3846,7 +3889,7 @@ int iw_set_auth(struct net_device *dev,struct iw_request_info *info,
             pWextState->authKeyMgmt |= IW_AUTH_KEY_MGMT_CCKM;
             /*Set the key management to 802.1X*/
             //pWextState->authKeyMgmt = IW_AUTH_KEY_MGMT_802_1X;
-            pWextState->isCCXConnection = eANI_BOOLEAN_TRUE;
+            pWextState->isESEConnection = eANI_BOOLEAN_TRUE;
             //This is test code. I need to actually KNOW whether this is an RSN Assoc or WPA.
             pWextState->collectedAuthType = eCSR_AUTH_TYPE_CCKM_RSN;
          } else if ( wrqu->param.value & IW_AUTH_KEY_MGMT_PSK) {
@@ -3869,7 +3912,7 @@ int iw_set_auth(struct net_device *dev,struct iw_request_info *info,
 #else
          /*Save the key management*/
          pWextState->authKeyMgmt = wrqu->param.value;
-#endif /* FEATURE_WLAN_CCX */
+#endif /* FEATURE_WLAN_ESE */
       }
       break;
 
@@ -4174,7 +4217,7 @@ void hdd_indicateUnprotMgmtFrame( hdd_adapter_t *pAdapter,
 }
 #endif
 
-#if defined (FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined (FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 void hdd_indicateTsmIe(hdd_adapter_t *pAdapter, tANI_U8 tid,
                                   tANI_U8 state,
                                   tANI_U16 measInterval )
@@ -4241,7 +4284,7 @@ void hdd_indicateCckmPreAuth(hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo)
     wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
 }
 
-void hdd_indicateCcxAdjApRepInd(hdd_adapter_t *pAdapter,
+void hdd_indicateEseAdjApRepInd(hdd_adapter_t *pAdapter,
                                 tCsrRoamInfo *pRoamInfo)
 {
     union iwreq_data wrqu;
@@ -4266,7 +4309,7 @@ void hdd_indicateCcxAdjApRepInd(hdd_adapter_t *pAdapter,
     wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
 }
 
-void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
+void hdd_indicateEseBcnReportInd(const hdd_adapter_t *pAdapter,
                                  const tCsrRoamInfo *pRoamInfo)
 {
     union iwreq_data wrqu;
@@ -4276,10 +4319,10 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
     tANI_U8 i = 0, len = 0;
     tANI_U8 tot_bcn_ieLen = 0;  /* total size of the beacon report data */
     tANI_U8 lastSent = 0, sendBss = 0;
-    int bcnRepFieldSize = sizeof(pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[0].bcnReportFields);
+    int bcnRepFieldSize = sizeof(pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[0].bcnReportFields);
     tANI_U8 ieLenByte = 1;
     /* CCXBCNREP=meas_tok<sp>flag<sp>no_of_bss<sp>tot_bcn_ie_len = 18 bytes */
-#define CCXBCNREPHEADER_LEN  (18)
+#define ESEBCNREPHEADER_LEN  (18)
 
     if ((NULL == pAdapter) || (NULL == pRoamInfo))
         return;
@@ -4293,7 +4336,7 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
          CCXBCNREP=meas_tok<sp>flag<sp>no_of_bss<sp>tot_bcn_ie_len = 18 bytes
     */
 
-    if ((pRoamInfo->pCcxBcnReportRsp->flag >> 1) && (!pRoamInfo->pCcxBcnReportRsp->numBss))
+    if ((pRoamInfo->pEseBcnReportRsp->flag >> 1) && (!pRoamInfo->pEseBcnReportRsp->numBss))
     {
         hddLog(VOS_TRACE_LEVEL_INFO, "Measurement Done but no scan results");
         /* If the measurement is none and no scan results found,
@@ -4302,12 +4345,12 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
         memset(buf, '\0', sizeof(buf));
 
         hddLog(VOS_TRACE_LEVEL_INFO, "CCXBCNREP=%d %d %d %d",
-            pRoamInfo->pCcxBcnReportRsp->measurementToken, pRoamInfo->pCcxBcnReportRsp->flag,
-            pRoamInfo->pCcxBcnReportRsp->numBss, tot_bcn_ieLen);
+            pRoamInfo->pEseBcnReportRsp->measurementToken, pRoamInfo->pEseBcnReportRsp->flag,
+            pRoamInfo->pEseBcnReportRsp->numBss, tot_bcn_ieLen);
 
         nBytes = snprintf(pos, freeBytes, "CCXBCNREP=%d %d %d",
-            pRoamInfo->pCcxBcnReportRsp->measurementToken, pRoamInfo->pCcxBcnReportRsp->flag,
-            pRoamInfo->pCcxBcnReportRsp->numBss);
+            pRoamInfo->pEseBcnReportRsp->measurementToken, pRoamInfo->pEseBcnReportRsp->flag,
+            pRoamInfo->pEseBcnReportRsp->numBss);
 
         wrqu.data.pointer = buf;
         wrqu.data.length = nBytes;
@@ -4316,7 +4359,7 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
     }
     else
     {
-        while (lastSent < pRoamInfo->pCcxBcnReportRsp->numBss)
+        while (lastSent < pRoamInfo->pEseBcnReportRsp->numBss)
         {
             memset(&wrqu, '\0', sizeof(wrqu));
             memset(buf, '\0', sizeof(buf));
@@ -4325,10 +4368,10 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
             pos = buf;
             freeBytes = IW_CUSTOM_MAX;
 
-            for (i = lastSent; i < pRoamInfo->pCcxBcnReportRsp->numBss; i++)
+            for (i = lastSent; i < pRoamInfo->pEseBcnReportRsp->numBss; i++)
             {
-                len = bcnRepFieldSize + ieLenByte + pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i].ieLen;
-                if ((len + tot_bcn_ieLen) > (IW_CUSTOM_MAX - CCXBCNREPHEADER_LEN))
+                len = bcnRepFieldSize + ieLenByte + pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i].ieLen;
+                if ((len + tot_bcn_ieLen) > (IW_CUSTOM_MAX - ESEBCNREPHEADER_LEN))
                 {
                     break;
                 }
@@ -4337,17 +4380,17 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
                 hddLog(VOS_TRACE_LEVEL_INFO, "i(%d) sizeof bcnReportFields(%d)"
                              "IeLength(%d) Length of Ie(%d) totLen(%d)",
                               i, bcnRepFieldSize, 1,
-                              pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i].ieLen,
+                              pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i].ieLen,
                               tot_bcn_ieLen);
             }
 
             hddLog(VOS_TRACE_LEVEL_INFO, "Sending %d BSS Info", sendBss);
             hddLog(VOS_TRACE_LEVEL_INFO, "CCXBCNREP=%d %d %d %d",
-                pRoamInfo->pCcxBcnReportRsp->measurementToken, pRoamInfo->pCcxBcnReportRsp->flag,
+                pRoamInfo->pEseBcnReportRsp->measurementToken, pRoamInfo->pEseBcnReportRsp->flag,
                 sendBss, tot_bcn_ieLen);
 
             nBytes = snprintf(pos, freeBytes, "CCXBCNREP=%d %d %d ",
-                pRoamInfo->pCcxBcnReportRsp->measurementToken, pRoamInfo->pCcxBcnReportRsp->flag,
+                pRoamInfo->pEseBcnReportRsp->measurementToken, pRoamInfo->pEseBcnReportRsp->flag,
                 sendBss);
             pos += nBytes;
             freeBytes -= nBytes;
@@ -4363,37 +4406,37 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
                        " PhyType(%d) RecvSigPower(%d) ParentTSF(%u)"
                        " TargetTSF[0](%u) TargetTSF[1](%u) BeaconInterval(%u)"
                        " CapabilityInfo(%d) BSSID(%02X:%02X:%02X:%02X:%02X:%02X)",
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.ChanNum,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Spare,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.MeasDuration,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.PhyType,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.RecvSigPower,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.ParentTsf,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.TargetTsf[0],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.TargetTsf[1],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.BcnInterval,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.CapabilityInfo,
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[0],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[1],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[2],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[3],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[4],
-                        pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[5]);
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.ChanNum,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Spare,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.MeasDuration,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.PhyType,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.RecvSigPower,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.ParentTsf,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.TargetTsf[0],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.TargetTsf[1],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.BcnInterval,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.CapabilityInfo,
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[0],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[1],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[2],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[3],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[4],
+                        pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields.Bssid[5]);
 
                 /* bcn report fields are copied */
-                len = sizeof(pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields);
-                vos_mem_copy(pos, (char*)&pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields, len);
+                len = sizeof(pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields);
+                vos_mem_copy(pos, (char*)&pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].bcnReportFields, len);
                 pos += len;
                 freeBytes -= len;
 
                 /* Add 1 byte of ie len */
-                len = pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].ieLen;
+                len = pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].ieLen;
                 vos_mem_copy(pos, (char*)&len, sizeof(len));
                 pos += sizeof(len);
                 freeBytes -= sizeof(len);
 
                 /* copy IE from scan results */
-                vos_mem_copy(pos, (char*)pRoamInfo->pCcxBcnReportRsp->bcnRepBssInfo[i+lastSent].pBuf, len);
+                vos_mem_copy(pos, (char*)pRoamInfo->pEseBcnReportRsp->bcnRepBssInfo[i+lastSent].pBuf, len);
                 pos += len;
                 freeBytes -= len;
             }
@@ -4408,4 +4451,4 @@ void hdd_indicateCcxBcnReportInd(const hdd_adapter_t *pAdapter,
     }
 }
 
-#endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
+#endif /* FEATURE_WLAN_ESE && FEATURE_WLAN_ESE_UPLOAD */

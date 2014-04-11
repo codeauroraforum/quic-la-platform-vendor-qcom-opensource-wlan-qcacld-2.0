@@ -85,9 +85,9 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #include "smeRrmInternal.h"
 #include "rrmGlobal.h"
 #endif
-#if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
-#include "ccxApi.h"
-#include "ccxGlobal.h"
+#if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
+#include "eseApi.h"
+#include "eseGlobal.h"
 #endif
 #include "p2p_Api.h"
 
@@ -142,6 +142,13 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #define EQUALS_TO_ASCII_VALUE (61)
 #endif
 
+#ifdef QCA_WIFI_2_0
+#define WLAN_HOST_SEQ_NUM_MIN				2048
+#define WLAN_HOST_SEQ_NUM_MAX				4095
+#define LOW_SEQ_NUM_MASK				0x000F
+#define HIGH_SEQ_NUM_MASK				0x0FF0
+#define HIGH_SEQ_NUM_OFFSET				4
+#endif /* QCA_WIFI_2_0 */
 
 // -------------------------------------------------------------------
 // Change channel generic scheme
@@ -231,8 +238,8 @@ typedef struct sLimTimers
     TX_TIMER           gLimFTPreAuthRspTimer;
 #endif
 
-#ifdef FEATURE_WLAN_CCX
-    TX_TIMER           gLimCcxTsmTimer;
+#ifdef FEATURE_WLAN_ESE
+    TX_TIMER           gLimEseTsmTimer;
 #endif
     TX_TIMER           gLimRemainOnChannelTimer;
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
@@ -261,7 +268,6 @@ typedef struct sLimTimers
 typedef struct {
     void *pMlmDisassocReq;
     void *pMlmDeauthReq;
-    vos_spin_lock_t deauthDisassocInprogress;
 }tLimDisassocDeauthCnfReq;
 
 typedef struct sAniSirLim
@@ -657,7 +663,7 @@ typedef struct sAniSirLim
 
     // admission control policy information
     tLimAdmitPolicyInfo admitPolicyInfo;
-    vos_spin_lock_t lkPeGlobalLock;
+    vos_lock_t lkPeGlobalLock;
     tANI_U8 disableLDPCWithTxbfAP;
 #ifdef FEATURE_WLAN_TDLS
     tANI_U8 gLimTDLSBufStaEnabled;
@@ -907,7 +913,7 @@ tLimMlmOemDataRsp       *gpLimMlmOemDataRsp;
     tANI_U32    mgmtFrameSessionId;
     tSirBackgroundScanMode gLimBackgroundScanMode;
 
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
     tpPESession  pSessionEntry;
     tANI_U8 reAssocRetryAttempt;
 #endif
@@ -1096,6 +1102,10 @@ typedef struct sAniSirGlobal
     tANI_U8 lteCoexAntShare;
     tANI_U8 beacon_offload;
     tANI_U32 fEnableDebugLog;
+#ifdef QCA_WIFI_2_0
+    tANI_U16 mgmtSeqNum;
+#endif /* QCA_WIFI_2_0 */
+    v_BOOL_t enable5gEBT;
 } tAniSirGlobal;
 
 typedef enum

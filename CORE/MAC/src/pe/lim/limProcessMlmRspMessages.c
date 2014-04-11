@@ -910,7 +910,7 @@ limProcessMlmReassocCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         psessionEntry->pLimReAssocReq = NULL;
     }
 
-    PELOGE(limLog(pMac, LOGE, FL("Rcv MLM_REASSOC_CNF with result code %d"), pLimMlmReassocCnf->resultCode);)
+    PELOG1(limLog(pMac, LOG1, FL("Rcv MLM_REASSOC_CNF with result code %d"), pLimMlmReassocCnf->resultCode);)
     if (pLimMlmReassocCnf->resultCode == eSIR_SME_SUCCESS) {
         // Successful Reassociation
         PELOG1(limLog(pMac, LOG1, FL("*** Reassociated with new BSS ***"));)
@@ -2478,12 +2478,12 @@ limProcessApMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ)
         if (psessionEntry->privacy)
         {
             if ((psessionEntry->gStartBssRSNIe.present) || (psessionEntry->gStartBssWPAIe.present))
-                limLog(pMac, LOGP, FL("WPA/WPA2 SAP configuration\n"));
+                limLog(pMac, LOG1, FL("WPA/WPA2 SAP configuration\n"));
             else
             {
                 if (pMac->lim.gLimAssocStaLimit > MAX_SUPPORTED_PEERS_WEP)
                 {
-                    limLog(pMac, LOGP, FL("WEP SAP Configuration\n"));
+                    limLog(pMac, LOG1, FL("WEP SAP Configuration\n"));
                     pMac->lim.gLimAssocStaLimit = MAX_SUPPORTED_PEERS_WEP;
                     isWepEnabled = TRUE;
                 }
@@ -2806,7 +2806,7 @@ limProcessStaMlmAddBssRspFT(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ, tpPESession 
         mlmReassocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
         goto end;
     }
-#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
     pMac->lim.pSessionEntry = psessionEntry;
     if(NULL == pMac->lim.pSessionEntry->pLimMlmReassocRetryReq)
     {
@@ -2928,6 +2928,8 @@ limProcessStaMlmAddBssRspFT(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ, tpPESession 
 
     wlan_cfgGetInt(pMac, WNI_CFG_DOT11_MODE, &selfStaDot11Mode);
     pAddStaParams->supportedRates.opRateMode = limGetStaRateMode((tANI_U8)selfStaDot11Mode);
+    pAddStaParams->encryptType = psessionEntry->encryptType;
+
     // Lets save this for when we receive the Reassoc Rsp
     pMac->ft.ftPEContext.pAddStaReq = pAddStaParams;
 
@@ -3010,7 +3012,7 @@ limProcessStaMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,tpPESession ps
         goto end;
     }
     if (eLIM_MLM_WT_ADD_BSS_RSP_REASSOC_STATE == psessionEntry->limMlmState
-#if defined(WLAN_FEATURE_VOWIFI_11R) || defined(FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if defined(WLAN_FEATURE_VOWIFI_11R) || defined(FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
      || (eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE == psessionEntry->limMlmState)
 #endif
     )
@@ -3033,7 +3035,7 @@ limProcessStaMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,tpPESession ps
 
     if( eHAL_STATUS_SUCCESS == pAddBssParams->status )
     {
-#if defined(WLAN_FEATURE_VOWIFI_11R) || defined(FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
+#if defined(WLAN_FEATURE_VOWIFI_11R) || defined(FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
         if( eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE == psessionEntry->limMlmState )
         {
 #ifdef WLAN_FEATURE_VOWIFI_11R_DEBUG
@@ -3535,10 +3537,15 @@ void limProcessInitScanRsp(tpAniSirGlobal pMac,  void *body)
         case eLIM_HAL_SUSPEND_LINK_WAIT_STATE:
             if( pMac->lim.gpLimSuspendCallback )
             {
-               if( status == eHAL_STATUS_SUCCESS )
+               if( eHAL_STATUS_SUCCESS == status )
+               {
                   pMac->lim.gLimHalScanState = eLIM_HAL_SUSPEND_LINK_STATE;
+               }
                else
+               {
                   pMac->lim.gLimHalScanState = eLIM_HAL_IDLE_SCAN_STATE;
+                  pMac->lim.gLimSystemInScanLearnMode = 0;
+               }
 
                pMac->lim.gpLimSuspendCallback( pMac, status, pMac->lim.gpLimSuspendData );
                pMac->lim.gpLimSuspendCallback = NULL;
@@ -3786,7 +3793,6 @@ void limProcessSwitchChannelRsp(tpAniSirGlobal pMac,  void *body)
 
     if((psessionEntry = peFindSessionBySessionId(pMac, peSessionId))== NULL)
     {
-        vos_mem_free(body);
         limLog(pMac, LOGP, FL("session does not exist for given sessionId"));
         return;
     }

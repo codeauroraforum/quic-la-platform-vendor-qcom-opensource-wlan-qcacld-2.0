@@ -573,6 +573,7 @@ WLANSAP_StartBss
     ptSapContext  pSapCtx = NULL;
     tANI_BOOLEAN restartNeeded;
     tHalHandle hHal;
+    int ret;
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -597,7 +598,19 @@ WLANSAP_StartBss
         /* Channel selection is auto or configured */
         pSapCtx->channel = pConfig->channel;
         pSapCtx->scanBandPreference = pConfig->scanBandPreference;
+        pSapCtx->acsBandSwitchThreshold = pConfig->acsBandSwitchThreshold;
         pSapCtx->pUsrContext = pUsrContext;
+
+        pSapCtx->enableOverLapCh = pConfig->enOverLapCh;
+        if (strlen(pConfig->acsAllowedChnls) > 0)
+        {
+            ret = sapSetPreferredChannel(pConfig->acsAllowedChnls);
+            if (0 != ret)
+            {
+                VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                       "%s: ACS set preferred channel failed!", __func__);
+            }
+        }
 
         //Set the BSSID to your "self MAC Addr" read the mac address from Configuation ITEM received from HDD
         pSapCtx->csrRoamProfile.BSSIDs.numOfBSSIDs = 1;

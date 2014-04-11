@@ -79,7 +79,9 @@
 #define WMA_READY_EVENTID_TIMEOUT          2000
 #define WMA_TGT_SUSPEND_COMPLETE_TIMEOUT   1000
 #define WMA_WAKE_LOCK_TIMEOUT              1000
-#define MAX_MEM_CHUNKS 32
+#define WMA_MAX_RESUME_RETRY               10
+#define WMA_RESUME_TIMEOUT                 1000
+#define MAX_MEM_CHUNKS                     32
 /*
    In prima 12 HW stations are supported including BCAST STA(staId 0)
    and SELF STA(staId 1) so total ASSOC stations which can connect to Prima
@@ -162,6 +164,10 @@
 
 #define WMA_INVALID_KEY_IDX	0xff
 #define WMA_DFS_RADAR_FOUND   1
+
+#define WMA_MAX_RF_CHAINS(x)	((1 << x) - 1)
+#define WMA_MIN_RF_CHAINS		(1)
+
 typedef struct {
 	HTC_ENDPOINT_ID endpoint_id;
 }t_cfg_nv_param;
@@ -294,6 +300,7 @@ struct pps {
 	v_BOOL_t delim_fail;
 	v_BOOL_t nsts_zero;
 	v_BOOL_t rssi_chk;
+	v_BOOL_t ebt_5g;
 };
 
 struct qpower_params {
@@ -346,6 +353,7 @@ typedef struct {
 	u_int32_t erx_slop_step;
 	u_int32_t erx_init_slop;
 	u_int32_t erx_adj_pause;
+	u_int32_t erx_dri_sample;
         struct pps pps_params;
 	struct qpower_params qpower_params;
 	gtx_config_t gtx_info;
@@ -383,11 +391,23 @@ struct wma_wow {
 	v_BOOL_t gtk_err_enable;
 };
 #ifdef WLAN_FEATURE_11W
-#define CMAC_IPN_LEN 6
+#define CMAC_IPN_LEN         (6)
+#define WMA_IGTK_KEY_INDEX_4 (4)
+#define WMA_IGTK_KEY_INDEX_5 (5)
+
+typedef struct {
+	u_int8_t  ipn[CMAC_IPN_LEN];
+} wma_igtk_ipn_t;
+
 typedef struct {
 	u_int16_t key_length;
 	u_int8_t  key[CSR_AES_KEY_LEN];
-	u_int8_t  ipn[CMAC_IPN_LEN];
+
+	/* IPN is maintained per iGTK keyID
+	 * 0th index for iGTK keyID = 4;
+	 * 1st index for iGTK KeyID = 5
+	*/
+        wma_igtk_ipn_t key_id[2];
 } wma_igtk_key_t;
 #endif
 
@@ -409,7 +429,7 @@ struct wma_txrx_node {
 	v_BOOL_t nlo_match_evt_received;
 	v_BOOL_t pno_in_progress;
 #endif
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
+#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 	v_BOOL_t plm_in_progress;
 #endif
 	v_BOOL_t ptrn_match_enable;
@@ -444,6 +464,9 @@ struct wma_txrx_node {
 	tPowerdBm  tx_power; /* TX power in dBm */
 	tPowerdBm  max_tx_power; /* max Tx power in dBm */
         u_int32_t  nwType;
+#if defined WLAN_FEATURE_VOWIFI_11R
+        void    *staKeyParams;
+#endif
 };
 
 #if defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
@@ -483,6 +506,7 @@ typedef struct {
 	vos_event_t cfg_nv_rx_complete;
 #endif
 	vos_event_t wma_ready_event;
+	vos_event_t wma_resume_event;
 	vos_event_t target_suspend;
 	t_cfg_nv_param cfg_nv;
 
@@ -518,6 +542,11 @@ typedef struct {
 	/* Ack Complete Callback registered by umac */
 	pWDAAckFnTxComp umac_ota_ack_cb[SIR_MAC_MGMT_RESERVED15];
 	pWDAAckFnTxComp umac_data_ota_ack_cb;
+
+	/* timestamp when OTA of last umac data was done */
+	v_TIME_t last_umac_data_ota_timestamp;
+	/* cache nbuf ptr for the last umac data buf */
+	adf_nbuf_t last_umac_data_nbuf;
 
 	v_BOOL_t needShutdown;
 #if !defined(QCA_WIFI_ISOC) && !defined(CONFIG_HL_SUPPORT)
@@ -558,6 +587,7 @@ typedef struct {
 	u_int8_t powersave_mode;
 	v_BOOL_t ptrn_match_enable_all_vdev;
 	void* pGetRssiReq;
+	v_S7_t first_rssi;
 	t_thermal_mgmt thermal_mgmt_info;
         u_int32_t roam_offload_vdev_id;
         v_BOOL_t  roam_offload_enabled;
@@ -1228,7 +1258,8 @@ VOS_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, u_int32_t vdev_id,
 			tp_wma_trigger_uapsd_params trigger_uapsd_params);
 
 /* added to get average snr for both data and beacon */
-VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq);
+VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq,
+				v_S7_t first_rssi);
 
 #ifdef FEATURE_WLAN_SCAN_PNO
 
@@ -1368,7 +1399,8 @@ typedef enum {
 	WMI_VDEV_PPS_DELIM_CRC_FAIL = 6,
 	WMI_VDEV_PPS_GID_NSTS_ZERO = 7,
 	WMI_VDEV_PPS_RSSI_CHECK = 8,
-	WMI_VDEV_VHT_SET_GID_MGMT = 9
+	WMI_VDEV_VHT_SET_GID_MGMT = 9,
+	WMI_VDEV_PPS_5G_EBT = 10
 } packet_power_save;
 
 typedef enum {
@@ -1484,4 +1516,5 @@ enum uapsd_up {
 	UAPSD_UP_MAX
 };
 
+#define WMA_TGT_INVALID_SNR (-1)
 #endif

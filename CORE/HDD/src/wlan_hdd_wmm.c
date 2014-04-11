@@ -440,7 +440,7 @@ static v_BOOL_t hdd_wmm_is_access_allowed(hdd_adapter_t* pAdapter,
    return VOS_TRUE;
 }
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 /**
   @brief hdd_wmm_inactivity_timer_cb() - timer handler function which is
   called for every inactivity interval per AC. This function gets the
@@ -581,7 +581,7 @@ VOS_STATUS hdd_wmm_disable_inactivity_timer(hdd_wmm_qos_context_t* pQosContext)
 
     return vos_status;
 }
-#endif // FEATURE_WLAN_CCX
+#endif // FEATURE_WLAN_ESE
 
 /**
   @brief hdd_wmm_sme_callback() - callback registered by HDD with SME for receiving
@@ -682,7 +682,7 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
          hdd_wmm_notify_app(pQosContext);
       }
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
       // Check if the inactivity interval is specified
       if (pCurrentQosInfo && pCurrentQosInfo->inactivity_interval) {
          VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
@@ -690,7 +690,7 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
                  __func__, pCurrentQosInfo->inactivity_interval, acType);
          hdd_wmm_enable_inactivity_timer(pQosContext, pCurrentQosInfo->inactivity_interval);
       }
-#endif // FEATURE_WLAN_CCX
+#endif // FEATURE_WLAN_ESE
 
       // notify TL to enable trigger frames if necessary
       hdd_wmm_enable_tl_uapsd(pQosContext);
@@ -792,6 +792,7 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
                 "%s: Setup Invalid Params, notify TL",
                 __func__);
       // QoS setup failed
+      pAc->wmmAcAccessAllowed = VOS_FALSE;
 
       if (HDD_WMM_HANDLE_IMPLICIT == pQosContext->handle)
       {
@@ -975,7 +976,6 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
       VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
                 "%s: Release is complete",
                 __func__);
-      pAc->wmmAcAccessGranted = VOS_FALSE;
 
       if (pCurrentQosInfo)
       {
@@ -1000,6 +1000,9 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
 
          // this is the last flow active for this AC so update the AC state
          pAc->wmmAcTspecValid = VOS_FALSE;
+
+         // DELTS is successful, do not allow
+         pAc->wmmAcAccessAllowed = VOS_FALSE;
 
          // need to tell TL to update its UAPSD handling
          hdd_wmm_disable_tl_uapsd(pQosContext);
@@ -1046,6 +1049,8 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
 
       // current TSPEC is no longer valid
       pAc->wmmAcTspecValid = VOS_FALSE;
+      // AP has sent DELTS, do not allow
+      pAc->wmmAcAccessAllowed = VOS_FALSE;
 
       // need to tell TL to update its UAPSD handling
       hdd_wmm_disable_tl_uapsd(pQosContext);
@@ -1211,20 +1216,26 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
       VOS_ASSERT(0);
    }
 
+#ifndef QCA_WIFI_2_0
    // our access to the particular access category may have changed.
    // some of the implicit QoS cases above may have already set this
    // prior to invoking TL (so that we will properly service the
    // Tx queues) but let's consistently handle all cases here
    pAc->wmmAcAccessAllowed = hdd_wmm_is_access_allowed(pAdapter, pAc);
-
-   //hdd_wmm_is_access_allowed returns true for explicit case. This is
-   //not always true. If Access to particular AC fails and if
-   //admission is required for that particular AC, then access is not
-   //allowed to that AC.
-   if ((pAc->wmmAcAccessFailed && pAc->wmmAcAccessRequired) ||
-        !pAc->wmmAcAccessGranted) {
+#else
+   // if Tspec only allows downstream traffic then access is not allowed
+   if (pAc->wmmAcTspecValid &&
+       (pAc->wmmAcTspecInfo.ts_info.direction == SME_QOS_WMM_TS_DIR_DOWNLINK)) {
       pAc->wmmAcAccessAllowed = VOS_FALSE;
    }
+
+   // if we have valid Tpsec or if ACM bit is not set, allow access
+   if ((pAc->wmmAcTspecValid &&
+       (pAc->wmmAcTspecInfo.ts_info.direction != SME_QOS_WMM_TS_DIR_DOWNLINK)) ||
+       !pAc->wmmAcAccessRequired) {
+         pAc->wmmAcAccessAllowed = VOS_TRUE;
+   }
+#endif
 
    VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
              "%s: complete, access for TL AC %d is%sallowed",
@@ -1396,7 +1407,7 @@ static void hdd_wmm_do_implicit_qos(struct work_struct *work)
       qosInfo.suspension_interval = (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->InfraUapsdBkSuspIntv;
       break;
    }
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
    qosInfo.inactivity_interval = (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->InfraInactivityInterval;
 #endif
    qosInfo.ts_info.burst_size_defn = (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->burstSizeDefinition;
@@ -1631,7 +1642,7 @@ VOS_STATUS hdd_wmm_adapter_close ( hdd_adapter_t* pAdapter )
    {
       pQosContext = list_first_entry(&pAdapter->hddWmmStatus.wmmContextList,
                                      hdd_wmm_qos_context_t, node);
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
       hdd_wmm_disable_inactivity_timer(pQosContext);
 #endif
       vos_flush_work(&pQosContext->wmmAcSetupImplicitQos);
@@ -2024,7 +2035,9 @@ VOS_STATUS hdd_wmm_acquire_access( hdd_adapter_t* pAdapter,
    VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO_LOW,
              "%s: Entered for AC %d", __func__, acType);
 
-   if (!hdd_wmm_is_active(pAdapter) || !(WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->bImplicitQosEnabled)
+   if (!hdd_wmm_is_active(pAdapter) ||
+       !(WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->bImplicitQosEnabled ||
+       !pAdapter->hddWmmStatus.wmmAcStatus[acType].wmmAcAccessRequired)
    {
       // either we don't want QoS or the AP doesn't support QoS
       // or we don't want to do implicit QoS
@@ -2311,6 +2324,12 @@ VOS_STATUS hdd_wmm_connect( hdd_adapter_t* pAdapter,
          pAdapter->hddWmmStatus.wmmAcStatus[ac].wmmAcAccessRequired = VOS_TRUE;
          pAdapter->hddWmmStatus.wmmAcStatus[ac].wmmAcAccessAllowed = VOS_FALSE;
          pAdapter->hddWmmStatus.wmmAcStatus[ac].wmmAcAccessGranted = VOS_FALSE;
+         //after reassoc if we have valid tspec, allow access
+         if (pAdapter->hddWmmStatus.wmmAcStatus[ac].wmmAcTspecValid &&
+               (pAdapter->hddWmmStatus.wmmAcStatus[ac].wmmAcTspecInfo.ts_info.direction !=
+                SME_QOS_WMM_TS_DIR_DOWNLINK)) {
+            pAdapter->hddWmmStatus.wmmAcStatus[ac].wmmAcAccessAllowed = VOS_TRUE;
+         }
       }
       else
       {
@@ -2646,7 +2665,7 @@ hdd_wlan_wmm_status_e hdd_wmm_delts( hdd_adapter_t* pAdapter,
       // need to tell TL to stop trigger timer, etc
       hdd_wmm_disable_tl_uapsd(pQosContext);
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
       // disable the inactivity timer
       hdd_wmm_disable_inactivity_timer(pQosContext);
 #endif

@@ -265,7 +265,7 @@ int hdd_hostapd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
     if ((SIOCDEVPRIVATE + 1) == cmd)
     {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
            "***HOSTAPD*** : Received %s cmd from Wi-Fi GUI***", command);
 
         if(strncmp(command, "P2P_SET_NOA", 11) == 0 )
@@ -474,6 +474,9 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     hdd_context_t *pHddCtx;
     hdd_scaninfo_t *pScanInfo  = NULL;
     struct iw_michaelmicfailure msg;
+#ifdef MSM_PLATFORM
+    unsigned long flags;
+#endif
 
     dev = (struct net_device *)usrDataForCallback;
     if (!dev)
@@ -526,6 +529,8 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             else
             {
                 pHddApCtx->uBCStaId = pSapEvent->sapevt.sapStartBssCompleteEvent.staId;
+                pHostapdAdapter->sessionId =
+                        pSapEvent->sapevt.sapStartBssCompleteEvent.sessionId;
                 //@@@ need wep logic here to set privacy bit
                 hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
             }
@@ -759,6 +764,20 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                   pHostapdAdapter->sessionId, pHddApCtx->operatingChannel);
             }
 #endif
+
+#ifdef MSM_PLATFORM
+            /* start timer in sap/p2p_go */
+            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+            pHddCtx->sta_cnt++;
+            pHostapdAdapter->connection++;
+            if (1 == pHostapdAdapter->connection) {
+                pHostapdAdapter->prev_tx_packets = pHostapdAdapter->stats.tx_packets;
+                pHostapdAdapter->prev_rx_packets = pHostapdAdapter->stats.rx_packets;
+            }
+            if (1 == pHddCtx->sta_cnt)
+                hdd_start_bus_bw_compute_timer(pHostapdAdapter);
+            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+#endif
             break;
         case eSAP_STA_DISASSOC_EVENT:
             memcpy(wrqu.addr.sa_data, &pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac,
@@ -831,6 +850,20 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                   ePeerDisconnected, 0,
                   pHostapdAdapter->sessionId, pHddApCtx->operatingChannel);
             }
+#endif
+
+#ifdef MSM_PLATFORM
+            /*stop timer in sap/p2p_go */
+            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+            pHddCtx->sta_cnt--;
+            pHostapdAdapter->connection--;
+            if (0 == pHostapdAdapter->connection) {
+                pHostapdAdapter->prev_tx_packets = 0;
+                pHostapdAdapter->prev_rx_packets = 0;
+            }
+            if (0 == pHddCtx->sta_cnt)
+                hdd_stop_bus_bw_compute_timer(pHostapdAdapter);
+            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 #endif
             break;
         case eSAP_WPS_PBC_PROBE_REQ_EVENT:
@@ -1151,6 +1184,19 @@ static iw_softap_setparam(struct net_device *dev,
                 WLANSAP_SetMode(pVosContext, set_value);
             }
             break;
+
+        case QCSAP_PARAM_AUTO_CHANNEL:
+            if ((0 != set_value) && (1 != set_value))
+            {
+                hddLog(LOGE, FL("Invalid setAutoChannel value %d"), set_value);
+                ret = -EINVAL;
+            }
+            else
+            {
+                (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->apAutoChannelSelection = set_value;
+            }
+            break;
+
         case QCSAP_PARAM_MAX_ASSOC:
             if (WNI_CFG_ASSOC_STA_LIMIT_STAMIN > set_value)
             {
@@ -3770,7 +3816,8 @@ static const struct iw_priv_args hostapd_private_args[] = {
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,  "setMccLatency" },
    { QCSAP_PARAM_SET_MCC_CHANNEL_QUOTA,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,  "setMccQuota" },
-
+   { QCSAP_PARAM_AUTO_CHANNEL,
+      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,  "setAutoChannel" },
 
 #ifdef QCA_WIFI_2_0
  /* Sub-cmds DBGLOG specific commands */
