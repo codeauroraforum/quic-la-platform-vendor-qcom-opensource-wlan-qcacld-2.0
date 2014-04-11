@@ -635,6 +635,9 @@ typedef struct sSirSmeStartBssReq
     tSirMacAddr             selfMacAddr;     //Added for BT-AMP Support
     tANI_U16                beaconInterval;  //Added for BT-AMP Support
     tANI_U8                 dot11mode;
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    tANI_U8                 cc_switch_mode;
+#endif
     tSirBssType             bssType;
     tSirMacSSid             ssId;
     tANI_U8                 channelId;
@@ -662,6 +665,12 @@ typedef struct sSirSmeStartBssReq
     tSirMacRateSet          operationalRateSet;// Has 11a or 11b rates
     tSirMacRateSet          extendedRateSet;    // Has 11g rates
     tSirHTConfig            htConfig;
+
+#ifdef WLAN_FEATURE_11W
+    tANI_BOOLEAN            pmfCapable;
+    tANI_BOOLEAN            pmfRequired;
+#endif
+
 } tSirSmeStartBssReq, *tpSirSmeStartBssReq;
 
 #define GET_IE_LEN_IN_BSS(lenInBss) ( lenInBss + sizeof(lenInBss) - \
@@ -714,6 +723,22 @@ typedef struct sSirBssDescription
     tANI_U32             ieFields[1];
 } tSirBssDescription, *tpSirBssDescription;
 
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+typedef struct sSirSmeHTProfile
+{
+    tANI_U8             dot11mode;
+    tANI_U8             htCapability;
+    tANI_U8             htSupportedChannelWidthSet;
+    tANI_U8             htRecommendedTxWidthSet;
+    ePhyChanBondState   htSecondaryChannelOffset;
+#ifdef WLAN_FEATURE_11AC
+    tANI_U8             vhtCapability;
+    tANI_U8             vhtTxChannelWidthSet;
+    tANI_U8             apCenterChan;
+    tANI_U8             apChanWidth;
+#endif
+} tSirSmeHTProfile;
+#endif
 /// Definition for response message to previously
 /// issued start BSS request
 /// MAC --->
@@ -728,6 +753,9 @@ typedef struct sSirSmeStartBssRsp
     tANI_U16            beaconInterval;//Beacon Interval for both type
     tANI_U32            staId;//Staion ID for Self
     tSirBssDescription  bssDescription;//Peer BSS description
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    tSirSmeHTProfile    HTProfile;
+#endif
 } tSirSmeStartBssRsp, *tpSirSmeStartBssRsp;
 
 
@@ -1026,6 +1054,9 @@ typedef struct sSirSmeJoinReq
     tSirMacAddr         selfMacAddr;            // self Mac address
     tSirBssType         bsstype;                // add new type for BT -AMP STA and AP Modules
     tANI_U8             dot11mode;              // to support BT-AMP
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    tANI_U8             cc_switch_mode;
+#endif
     tVOS_CON_MODE       staPersona;             //Persona
     ePhyChanBondState   cbMode;                 // Pass CB mode value in Join.
 
@@ -1136,6 +1167,9 @@ typedef struct sSirSmeJoinRsp
     tANI_U8            timingMeasCap;
 
     tANI_U8         frames[ 1 ];
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    tSirSmeHTProfile    HTProfile;
+#endif
 } tSirSmeJoinRsp, *tpSirSmeJoinRsp;
 
 /// Definition for Authentication indication from peer

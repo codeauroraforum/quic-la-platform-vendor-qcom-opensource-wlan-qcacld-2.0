@@ -2353,21 +2353,8 @@ VOS_STATUS vos_nv_getNVBuffer(v_VOID_t **pNvBuffer,v_SIZE_t *pSize)
 VOS_STATUS vos_nv_getNVEncodedBuffer(v_VOID_t **pNvBuffer,v_SIZE_t *pSize)
 {
    /* Send the NV structure and size */
-   VOS_STATUS status;
-
-   status = vos_nv_isEmbeddedNV();
-
-   if (VOS_STATUS_SUCCESS == status)
-   {
-      *pNvBuffer = (v_VOID_t *)(pEncodedBuf);
-      *pSize = nvReadEncodeBufSize;
-   }
-   else
-   {
-      *pNvBuffer = (v_VOID_t *)(&pnvEFSTable->halnv);
-      *pSize = sizeof(sHalNv);
-   }
-
+   *pNvBuffer = (v_VOID_t *)(pEncodedBuf);
+   *pSize = nvReadEncodeBufSize;
    return VOS_STATUS_SUCCESS;
 }
 
@@ -3369,6 +3356,17 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                "cfg80211 reg notifier callback for country for initiator %d", request->initiator);
 
+    if (TRUE == isWDresetInProgress())
+    {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("SSR is in progress") );
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+       return;
+#else
+       return 0;
+#endif
+    }
+
     if (NULL == pHddCtx)
     {
        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -3849,6 +3847,8 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
     {
        int status;
        wiphy_dbg(wiphy, "info: set by user\n");
+       memset(ccode, 0, WNI_CFG_COUNTRY_CODE_LEN);
+       memcpy(ccode, request->alpha2, 2);
        init_completion(&change_country_code);
        /* We will process hints by user from nl80211 in driver.
        * sme_ChangeCountryCode will set the country to driver
@@ -3864,7 +3864,7 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
        status = sme_ChangeCountryCode(pHddCtx->hHal,
                                    (void *)(tSmeChangeCountryCallback)
                                    vos_nv_change_country_code_cb,
-                                   request->alpha2,
+                                   ccode,
                                    &change_country_code,
                                    pHddCtx->pvosContext,
                                    eSIR_FALSE,
@@ -4025,7 +4025,8 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
                       wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
                       wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
                       wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
-                     ((ccode[0]== 'U'&& ccode[1]=='S') && pHddCtx->nEnableStrictRegulatoryForFCC))
+                     ((domainIdCurrent == REGDOMAIN_FCC) &&
+                                       pHddCtx->nEnableStrictRegulatoryForFCC))
                  {
                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
                  }
@@ -4033,7 +4034,8 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
                            wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
                            wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
                            wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
-                          ((ccode[0]!= 'U'&& ccode[1]!='S') || !pHddCtx->nEnableStrictRegulatoryForFCC))
+                          ((domainIdCurrent != REGDOMAIN_FCC) ||
+                                      !pHddCtx->nEnableStrictRegulatoryForFCC))
                  {
                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
                  }
