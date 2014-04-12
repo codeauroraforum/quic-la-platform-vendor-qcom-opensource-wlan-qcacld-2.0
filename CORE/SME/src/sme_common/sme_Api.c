@@ -4820,6 +4820,9 @@ eHalStatus sme_RoamSetKey(tHalHandle hHal, tANI_U8 sessionId, tCsrRoamSetKey *pS
       smsLog(pMac, LOGE, FL("Invalid key length %d"), pSetKey->keyLength);
       return eHAL_STATUS_FAILURE;
    }
+   /*Once Setkey is done, we can go in BMPS*/
+   if(pSetKey->keyLength)
+     pMac->pmc.remainInPowerActiveTillDHCP = FALSE;
 
    status = sme_AcquireGlobalLock( &pMac->sme );
    if ( HAL_STATUS_SUCCESS( status ) )
@@ -7473,6 +7476,25 @@ tANI_U8 sme_GetConcurrentOperationChannel( tHalHandle hHal )
 
    return (channel);
 }
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+v_U16_t sme_CheckConcurrentChannelOverlap( tHalHandle hHal, v_U16_t sap_ch,
+                                 eCsrPhyMode sapPhyMode, v_U8_t cc_switch_mode)
+{
+   eHalStatus status = eHAL_STATUS_FAILURE;
+   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+   v_U16_t channel = 0;
+
+   status = sme_AcquireGlobalLock( &pMac->sme );
+   if ( HAL_STATUS_SUCCESS( status ) )
+   {
+      channel = csrCheckConcurrentChannelOverlap( pMac, sap_ch, sapPhyMode,
+                                                  cc_switch_mode);
+      sme_ReleaseGlobalLock( &pMac->sme );
+   }
+
+   return (channel);
+}
+#endif
 
 #ifdef FEATURE_WLAN_SCAN_PNO
 /******************************************************************************
@@ -10379,6 +10401,12 @@ VOS_STATUS sme_ChangeTdlsPeerSta(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr
     eHalStatus          status    = eHAL_STATUS_SUCCESS;
     tpAniSirGlobal      pMac      = PMAC_STRUCT(hHal);
 
+    if (NULL == pstaParams)
+    {
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                "%s :pstaParams is NULL",__func__);
+        return eHAL_STATUS_FAILURE;
+    }
     status = sme_AcquireGlobalLock( &pMac->sme );
     if ( HAL_STATUS_SUCCESS( status ) )
     {
@@ -10754,7 +10782,12 @@ VOS_STATUS sme_SelectCBMode(tHalHandle hHal, eCsrPhyMode eCsrPhyMode, tANI_U8 ch
          eCSR_DOT11_MODE_11ac_ONLY != eCsrPhyMode &&
 #endif
          eCSR_DOT11_MODE_11n != eCsrPhyMode &&
-         eCSR_DOT11_MODE_11n_ONLY != eCsrPhyMode
+         eCSR_DOT11_MODE_11n_ONLY != eCsrPhyMode &&
+
+         eCSR_DOT11_MODE_11a != eCsrPhyMode &&
+         eCSR_DOT11_MODE_11a_ONLY != eCsrPhyMode &&
+
+         eCSR_DOT11_MODE_abg != eCsrPhyMode
       )
    {
       return VOS_STATUS_SUCCESS;
@@ -10825,6 +10858,20 @@ VOS_STATUS sme_SelectCBMode(tHalHandle hHal, eCsrPhyMode eCsrPhyMode, tANI_U8 ch
          smeConfig.csrConfig.channelBondingMode5GHz = 0;
       }
    }
+
+   /*
+      for 802.11a phy mode, channel bonding should be zero.
+      From default config, it is set as PHY_DOUBLE_CHANNEL_HIGH_PRIMARY = 3
+      through csrChangeDefaultConfigParam function. We will override this
+      value here.
+   */
+   if (  eCSR_DOT11_MODE_11a == eCsrPhyMode ||
+         eCSR_DOT11_MODE_11a_ONLY == eCsrPhyMode ||
+         eCSR_DOT11_MODE_abg == eCsrPhyMode)
+   {
+      smeConfig.csrConfig.channelBondingMode5GHz = 0;
+   }
+
    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
          "cbmode selected=%d", smeConfig.csrConfig.channelBondingMode5GHz);
 

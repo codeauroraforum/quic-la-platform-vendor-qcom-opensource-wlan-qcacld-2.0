@@ -61,6 +61,9 @@
 #include "wlan_hdd_tdls.h"
 #endif
 #include "wlan_hdd_cfg80211.h"
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+#include <adf_os_defer.h>
+#endif
 #ifdef WLAN_FEATURE_MBSSID
 #include "sapApi.h"
 #endif
@@ -894,6 +897,11 @@ struct hdd_adapter_s
    /** Handle to the network device */
    struct net_device *dev;
 
+   /** IPv4 notifier callback for handling ARP offload on change in IP */
+   struct notifier_block ipv4_notifier;
+   bool ipv4_notifier_registered;
+   struct work_struct  ipv4NotifierWorkQueue;
+
    //TODO Move this to sta Ctx
    struct wireless_dev wdev ;
    struct cfg80211_scan_request *request ;
@@ -1370,7 +1378,9 @@ struct hdd_context_s
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
     vos_timer_t hdd_wlan_shutdown_timer;
 #endif
-
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    adf_os_work_t  sta_ap_intf_check_work;
+#endif
 };
 
 
@@ -1378,6 +1388,10 @@ struct hdd_context_s
 /*---------------------------------------------------------------------------
   Function declarations and documenation
   -------------------------------------------------------------------------*/
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *sta_pAdapter);
+#endif
+
 VOS_STATUS hdd_get_front_adapter( hdd_context_t *pHddCtx,
                                   hdd_adapter_list_node_t** ppAdapterNode);
 
@@ -1453,6 +1467,7 @@ void hdd_reset_pwrparams(hdd_context_t *pHddCtx);
 int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
 v_BOOL_t hdd_is_valid_mac_address(const tANI_U8* pMacAddr);
 VOS_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
+void hdd_ipv4_notifier_work_queue(struct work_struct *work);
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 int wlan_hdd_setIPv6Filter(hdd_context_t *pHddCtx, tANI_U8 filterType, tANI_U8 sessionId);
 #endif
