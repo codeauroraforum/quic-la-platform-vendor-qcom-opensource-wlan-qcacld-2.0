@@ -12471,6 +12471,8 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 	HTCCancelDeferredTargetSleep(scn);
 
 	wma->wow.wow_enable_cmd_sent = TRUE;
+
+	wmi_set_target_suspend(wma->wmi_handle, TRUE);
 	return VOS_STATUS_SUCCESS;
 
 error:
@@ -13183,6 +13185,9 @@ static VOS_STATUS wma_send_host_wakeup_ind_to_fw(tp_wma_handle wma)
 	} else {
 		WMA_LOGD("Host wakeup received");
 	}
+
+	if (VOS_STATUS_SUCCESS == vos_status)
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
 
 	return vos_status;
 }
@@ -18559,6 +18564,7 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 
 	HTCCancelDeferredTargetSleep(scn);
 
+	wmi_set_target_suspend(wma_handle->wmi_handle, TRUE);
 	return 0;
 }
 
@@ -18613,6 +18619,9 @@ int wma_resume_target(WMA_HANDLE handle)
 		WMA_LOGE("Failed to deliver WMI_PDEV_RESUME_CMDID command %d\n", timeout);
 		ret = -1;
 	}
+
+	if (EOK == ret)
+		wmi_set_target_suspend(wma_handle->wmi_handle, FALSE);
 
 	return ret;
 }
