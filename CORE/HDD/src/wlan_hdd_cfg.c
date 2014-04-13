@@ -74,25 +74,6 @@ static void cbNotifySetImmediateRoamRssiDiff(hdd_context_t *pHddCtx, unsigned lo
 
 static void cbNotifySetRoamRssiDiff(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
-    if (pHddCtx->cfg_ini->nSelect5GHzMargin)
-    {
-        /*
-           LFR2.0 firmware posts roam candidates whose RSSI is above the
-           look down threshold and RoamRssiDiff better than current AP Rssi.
-           if gSelect5GHzMargin is non-zero; then the expectation is firmware
-           should post all the roam candidates whose RSSI is above lookdown
-           threshold and don't ignore the APs in RoamRssiDiff zone.
-
-           For ex: RoamRssiDiff=5, Lookdown threshold=-78 and
-           gSelect5GHzMargin=30 then firmware selects APs
-           with Rssi -73 or better as roam candidates.
-           if the 5G AP Rssi is -75 it will be ignored.
-           if 2.4G AP Rssi is -45 and 5G AP with -75 is available,
-           STA should connect to 5G AP, hence RoamRssiDiff is set to 0.
-        */
-        pHddCtx->cfg_ini->RoamRssiDiff = 0;
-    }
-
     sme_UpdateRoamRssiDiff((tHalHandle)(pHddCtx->hHal),
                                     pHddCtx->cfg_ini->RoamRssiDiff);
 }
@@ -3321,6 +3302,20 @@ REG_VARIABLE( CFG_ADVERTISE_CONCURRENT_OPERATION_NAME , WLAN_PARAM_Integer,
               CFG_ADVERTISE_CONCURRENT_OPERATION_DEFAULT,
               CFG_ADVERTISE_CONCURRENT_OPERATION_MIN,
               CFG_ADVERTISE_CONCURRENT_OPERATION_MAX ),
+
+REG_VARIABLE( CFG_ENABLE_HYSTERETIC_MODE, WLAN_PARAM_Integer,
+              hdd_config_t, enableHystereticMode,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_ENABLE_HYSTERETIC_MODE_DEFAULT,
+              CFG_ENABLE_HYSTERETIC_MODE_MIN,
+              CFG_ENABLE_HYSTERETIC_MODE_MAX ),
+
+      REG_VARIABLE( CFG_DEFAULT_RATE_INDEX_24GH, WLAN_PARAM_Integer,
+                 hdd_config_t, defaultRateIndex24Ghz,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_DEFAULT_RATE_INDEX_24GH_DEFAULT,
+                 CFG_DEFAULT_RATE_INDEX_24GH_MIN,
+                 CFG_DEFAULT_RATE_INDEX_24GH_MAX ),
 };
 
 /*
@@ -5182,6 +5177,14 @@ v_BOOL_t hdd_update_config_dat( hdd_context_t *pHddCtx )
       hddLog(LOGE, "Could not pass on WNI_CFG_ANTENNA_DIVESITY to CCM");
    }
 
+   if (ccmCfgSetInt(pHddCtx->hHal,
+                    WNI_CFG_DEFAULT_RATE_INDEX_24GHZ,
+                    pConfig->defaultRateIndex24Ghz,
+                    NULL, eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
+   {
+       fStatus = FALSE;
+       hddLog(LOGE, "Could not pass on WNI_CFG_DEFAULT_RATE_INDEX_24GHZ to CCM");
+   }
    return fStatus;
 }
 
@@ -5356,10 +5359,6 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
 #endif
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
    smeConfig.csrConfig.isFastTransitionEnabled = pConfig->isFastTransitionEnabled;
-   if (pConfig->nSelect5GHzMargin)
-   {
-       pConfig->RoamRssiDiff = 0;
-   }
    smeConfig.csrConfig.RoamRssiDiff = pConfig->RoamRssiDiff;
    smeConfig.csrConfig.nImmediateRoamRssiDiff = pConfig->nImmediateRoamRssiDiff;
    smeConfig.csrConfig.isWESModeEnabled = pConfig->isWESModeEnabled;

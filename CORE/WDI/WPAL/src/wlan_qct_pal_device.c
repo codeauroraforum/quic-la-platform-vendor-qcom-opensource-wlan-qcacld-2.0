@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -59,7 +59,11 @@
 #include <linux/irqreturn.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#ifdef EXISTS_MSM_SMSM
 #include <mach/msm_smsm.h>
+#else
+#include <soc/qcom/smsm.h>
+#endif
 #include "wlan_qct_pal_api.h"
 #include "wlan_qct_pal_device.h"
 #include "wlan_hdd_main.h"
@@ -566,7 +570,7 @@ wpt_status wpalWriteDeviceMemory
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
-   memcpy(gpEnv->mmio + (address - WCNSS_BASE_ADDRESS), s_buffer, len);
+   vos_mem_copy(gpEnv->mmio + (address - WCNSS_BASE_ADDRESS), s_buffer, len);
    wmb();
 
    return eWLAN_PAL_STATUS_SUCCESS;
@@ -611,7 +615,7 @@ wpt_status wpalReadDeviceMemory
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
-   memcpy(d_buffer, gpEnv->mmio + (address - WCNSS_BASE_ADDRESS), len);
+   vos_mem_copy(d_buffer, gpEnv->mmio + (address - WCNSS_BASE_ADDRESS), len);
    rmb();
 
    return eWLAN_PAL_STATUS_SUCCESS;

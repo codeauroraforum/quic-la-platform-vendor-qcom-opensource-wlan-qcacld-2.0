@@ -341,6 +341,7 @@ typedef enum eSirResultCodes
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
     eSIR_SME_GTK_OFFLOAD_GETINFO_REQ_FAILED,
 #endif // WLAN_FEATURE_GTK_OFFLOAD
+    eSIR_SME_DEAUTH_STATUS,
     eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE
 } tSirResultCodes;
 
@@ -3538,7 +3539,7 @@ typedef struct sSirUpdateAPWPARSNIEsReq
 } tSirUpdateAPWPARSNIEsReq, *tpSirUpdateAPWPARSNIEsReq;
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
-#define SIR_ROAM_MAX_CHANNELS            NUM_RF_CHANNELS
+#define SIR_ROAM_MAX_CHANNELS            80
 #define SIR_ROAM_SCAN_MAX_PB_REQ_SIZE    450
 #define CHANNEL_LIST_STATIC                   1 /* Occupied channel list remains static */
 #define CHANNEL_LIST_DYNAMIC_INIT             2 /* Occupied channel list can be learnt after init */

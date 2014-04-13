@@ -799,7 +799,7 @@ eHalStatus csrScanRequest(tpAniSirGlobal pMac, tANI_U16 sessionId,
 
                         pChnInfo->numOfChannels = (tANI_U8)numChn;
                         p11dScanCmd->command = eSmeCommandScan;
-                        p11dScanCmd->u.scanCmd.callback = NULL;
+                        p11dScanCmd->u.scanCmd.callback = pMac->scan.callback11dScanDone;
                         p11dScanCmd->u.scanCmd.pContext = NULL;
                         p11dScanCmd->u.scanCmd.scanID = pMac->scan.nextScanID++;
                         scanReq.BSSType = eCSR_BSS_TYPE_ANY;
@@ -3007,7 +3007,7 @@ static void csrMoveTempScanResultsToMainList( tpAniSirGlobal pMac, tANI_U8 reaso
 
     tmpSsid.length = 0;
     cand_Bss_rssi = -128; // RSSI coming from PE is -ve
-    rssi_of_current_country = -128;
+    rssi_of_current_country = pMac->scan.currentCountryRSSI;
 
     // remove the BSS descriptions from temporary list
     while( ( pEntry = csrLLRemoveTail( &pMac->scan.tempScanResults, LL_ACCESS_LOCK ) ) != NULL)
@@ -3113,6 +3113,7 @@ static void csrMoveTempScanResultsToMainList( tpAniSirGlobal pMac, tANI_U8 reaso
                                pBssDescription->Result.BssDescriptor.rssi * (-1),
                                pIesLocal->Country.country[0],pIesLocal->Country.country[1] );
             rssi_of_current_country =  pBssDescription->Result.BssDescriptor.rssi ;
+            pMac->scan.currentCountryRSSI = rssi_of_current_country;
         }
 
 
@@ -5383,6 +5384,14 @@ tANI_BOOLEAN csrScanAgeOutBss(tpAniSirGlobal pMac, tCsrScanResult *pResult)
                 //No need to hold the spin lock because caller should hold the lock for pMac->scan.scanResultList
                 if( csrLLRemoveEntry(&pMac->scan.scanResultList, &pResult->Link, LL_ACCESS_NOLOCK) )
                 {
+                    if (csrIsMacAddressEqual(pMac,
+                                        (tCsrBssid *) pResult->Result.BssDescriptor.bssId,
+                                        (tCsrBssid *) pMac->scan.currentCountryBssid))
+                    {
+                        smsLog(pMac, LOGW, "Aging out 11d BSS "MAC_ADDRESS_STR,
+                               MAC_ADDR_ARRAY(pResult->Result.BssDescriptor.bssId));
+                        pMac->scan.currentCountryRSSI = -128;
+                    }
                     csrFreeScanResultEntry(pMac, pResult);
                     fRet = eANI_BOOLEAN_TRUE;
                 }
@@ -7563,6 +7572,11 @@ void csrSetCfgValidChannelList( tpAniSirGlobal pMac, tANI_U8 *pChannelList, tANI
     tANI_U32 dataLen = sizeof( tANI_U8 ) * NumChannels;
     eHalStatus status;
 
+    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                "%s: dump valid channel list(NumChannels(%d))",
+                __func__,NumChannels);
+    VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                       pChannelList, NumChannels);
     ccmCfgSetStr(pMac, WNI_CFG_VALID_CHANNEL_LIST, pChannelList, dataLen, NULL, eANI_BOOLEAN_FALSE);
 
     if (pMac->fScanOffload)
@@ -7748,6 +7762,10 @@ void csrSetCfgScanControlList( tpAniSirGlobal pMac, tANI_U8 *countryCode, tCsrCh
                 }
 
             }
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                      "%s: dump scan control list",__func__);
+            VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                               pControlList, len);
 
             ccmCfgSetStr(pMac, WNI_CFG_SCAN_CONTROL_LIST, pControlList, len, NULL, eANI_BOOLEAN_FALSE);
         }//Successfully getting scan control list

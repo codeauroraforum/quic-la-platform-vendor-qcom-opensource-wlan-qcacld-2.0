@@ -1558,6 +1558,21 @@ typedef enum
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_MAX     ( 1 )
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_DEFAULT ( 0 )
 
+#define CFG_ENABLE_HYSTERETIC_MODE            "gEnableHystereticMode"
+#define CFG_ENABLE_HYSTERETIC_MODE_MIN        ( 0 )
+#define CFG_ENABLE_HYSTERETIC_MODE_MAX        ( 1 )
+#define CFG_ENABLE_HYSTERETIC_MODE_DEFAULT    ( 0 )
+
+/* In cfg.dat 1=1MBPS, 2=2MBPS, 3=5_5MBPS, 4=11MBPS, 5=6MBPS, 6=9MBPS,
+ * 7=12MBPS, 8=18MBPS, 9=24MBPS. But 6=9MBPS and 8=18MBPS are not basic
+ * 11g rates and should not be set by gDefaultRateIndex24Ghz.
+*/
+
+#define CFG_DEFAULT_RATE_INDEX_24GH               "gDefaultRateIndex24Ghz"
+#define CFG_DEFAULT_RATE_INDEX_24GH_MIN           ( 1 )
+#define CFG_DEFAULT_RATE_INDEX_24GH_MAX           ( 9 )
+#define CFG_DEFAULT_RATE_INDEX_24GH_DEFAULT       ( 1 )
+
 /*
  * VOS Trace Enable Control
  * Notes:
@@ -2863,6 +2878,8 @@ typedef struct
    v_U16_t                     acsBandSwitchThreshold;
    v_U8_t                      apMaxOffloadPeers;
    v_BOOL_t                    advertiseConcurrentOperation;
+   v_BOOL_t                    enableHystereticMode;
+   v_U32_t                     defaultRateIndex24Ghz;
 } hdd_config_t;
 /*---------------------------------------------------------------------------
   Function declarations and documenation
