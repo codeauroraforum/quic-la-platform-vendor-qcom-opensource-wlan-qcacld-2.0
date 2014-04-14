@@ -4090,7 +4090,7 @@ tANI_BOOLEAN csrGetWapiInformation( tHalHandle hHal, tCsrAuthList *pAuthType, eC
             }
 
             wapiOuiIndex = csrGetOUIIndexFromCipher( enType );
-            if (wapiOuiIndex >= CSR_WAPI_OUI_SIZE)
+            if (wapiOuiIndex >= CSR_OUI_WAPI_WAI_MAX_INDEX)
             {
                 smsLog(pMac, LOGE, FL("Wapi OUI index = %d out of limit"), wapiOuiIndex);
                 fAcceptableCyphers = FALSE;
@@ -4106,7 +4106,7 @@ tANI_BOOLEAN csrGetWapiInformation( tHalHandle hHal, tCsrAuthList *pAuthType, eC
             for( i = 0 ; i < pMCEncryption->numEntries ; i++ )
             {
                 wapiOuiIndex = csrGetOUIIndexFromCipher( pMCEncryption->encryptionType[i] );
-                if (wapiOuiIndex >= CSR_WAPI_OUI_SIZE)
+                if (wapiOuiIndex >= CSR_OUI_WAPI_WAI_MAX_INDEX)
                 {
                     smsLog(pMac, LOGE, FL("Wapi OUI index = %d out of limit"), wapiOuiIndex);
                     fAcceptableCyphers = FALSE;
@@ -6082,7 +6082,7 @@ tSirResultCodes csrGetDeAuthRspStatusCode( tSirSmeDeauthRsp *pSmeRsp )
     tANI_U8 *pBuffer = (tANI_U8 *)pSmeRsp;
     tANI_U32 ret;
 
-    pBuffer += (sizeof(tANI_U16) + sizeof(tANI_U16) + sizeof(tSirMacAddr));
+    pBuffer += (sizeof(tANI_U16) + sizeof(tANI_U16) + sizeof(tANI_U8) +sizeof(tANI_U16));
     //tSirResultCodes is an enum, assuming is 32bit
     //If we cannot make this assumption, use copymemory
     pal_get_U32( pBuffer, &ret );

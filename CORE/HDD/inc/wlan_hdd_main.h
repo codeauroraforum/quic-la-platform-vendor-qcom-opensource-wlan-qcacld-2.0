@@ -342,6 +342,9 @@ typedef struct hdd_tx_rx_stats_s
    // flush stats
    __u32    txFlushed;
    __u32    txFlushedAC[NUM_TX_QUEUES];
+   // Deque depressure stats
+   __u32    txDequeDePressured;
+   __u32    txDequeDePressuredAC[NUM_TX_QUEUES];
    // rx stats
    __u32    rxChains;
    __u32    rxPackets;
@@ -901,6 +904,12 @@ struct hdd_adapter_s
    struct notifier_block ipv4_notifier;
    bool ipv4_notifier_registered;
    struct work_struct  ipv4NotifierWorkQueue;
+#ifdef WLAN_NS_OFFLOAD
+   /** IPv6 notifier callback for handling NS offload on change in IP */
+   struct notifier_block ipv6_notifier;
+   bool ipv6_notifier_registered;
+   struct work_struct  ipv6NotifierWorkQueue;
+#endif
 
    //TODO Move this to sta Ctx
    struct wireless_dev wdev ;
@@ -1210,6 +1219,10 @@ struct hdd_context_s
 
    v_BOOL_t isRxThreadSuspended;
 
+#ifdef QCA_CONFIG_SMP
+   v_BOOL_t isTlshimRxThreadSuspended;
+#endif
+
    volatile v_BOOL_t isLogpInProgress;
 
    v_BOOL_t isLoadInProgress;
@@ -1471,6 +1484,11 @@ void hdd_ipv4_notifier_work_queue(struct work_struct *work);
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 int wlan_hdd_setIPv6Filter(hdd_context_t *pHddCtx, tANI_U8 filterType, tANI_U8 sessionId);
 #endif
+
+#ifdef WLAN_NS_OFFLOAD
+void hdd_ipv6_notifier_work_queue(struct work_struct *work);
+#endif
+
 
 #ifdef CONFIG_ENABLE_LINUX_REG
 void hdd_checkandupdate_phymode( hdd_context_t *pHddCtx);

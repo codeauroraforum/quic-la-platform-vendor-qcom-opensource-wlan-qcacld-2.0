@@ -750,6 +750,7 @@ typedef struct tagCsrScanStruct
     v_REGDOMAIN_t domainIdDefault;  //default regulatory domain
     v_REGDOMAIN_t domainIdCurrent;  //current regulatory domain
     tCsrBssid currentCountryBssid;  // Bssid for current country code
+    tANI_S8 currentCountryRSSI;     // RSSI for current country code
     tANI_BOOLEAN f11dInfoApplied;
     tANI_BOOLEAN fCancelIdleScan;
 #ifdef FEATURE_WLAN_WAPI
@@ -793,6 +794,7 @@ typedef struct tagCsrScanStruct
     tCsrChannel occupiedChannels;   //This includes all channels on which candidate APs are found
     tANI_S8     inScanResultBestAPRssi;
     eCsrBand  scanBandPreference;  //This defines the band perference for scan
+    csrScanCompleteCallback callback11dScanDone;
 }tCsrScanStruct;
 
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
@@ -1024,6 +1026,7 @@ typedef struct tagCsrRoamStruct
     tANI_U8        RoamRssiDiff;
     tANI_BOOLEAN   isWESModeEnabled;
 #endif
+    tANI_U32 deauthRspStatus;
 }tCsrRoamStruct;
 
 

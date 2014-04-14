@@ -3283,6 +3283,11 @@ eHalStatus sme_RoamConnect(tHalHandle hHal, tANI_U8 sessionId, tCsrRoamProfile *
     eHalStatus status = eHAL_STATUS_FAILURE;
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
 
+    if (!pMac)
+    {
+        return eHAL_STATUS_FAILURE;
+    }
+
     MTRACE(macTraceNew(pMac, VOS_MODULE_ID_SME,
                    TRACE_CODE_SME_RX_HDD_MSG_CONNECT, sessionId, 0));
     smsLog(pMac, LOG2, FL("enter"));
@@ -4561,6 +4566,26 @@ eHalStatus sme_RegisterPowerSaveCheck (
        status = pmcRegisterPowerSaveCheck (hHal, checkRoutine, checkContext);
        sme_ReleaseGlobalLock( &pMac->sme );
    }
+
+   return (status);
+}
+
+/* ---------------------------------------------------------------------------
+    \fn sme_Register11dScanDoneCallback
+    \brief  Register a routine of type csrScanCompleteCallback which is
+            called whenever an 11d scan is done
+    \param  hHal - The handle returned by macOpen.
+    \param  callback -  11d scan complete routine to be registered
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
+eHalStatus sme_Register11dScanDoneCallback (
+   tHalHandle hHal,
+   csrScanCompleteCallback callback)
+{
+   eHalStatus status = eHAL_STATUS_SUCCESS;
+   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+
+   pMac->scan.callback11dScanDone = callback;
 
    return (status);
 }
@@ -11155,6 +11180,11 @@ eHalStatus sme_SetBatchScanReq
 {
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
     eHalStatus status;
+
+    if (!pMac)
+    {
+        return eHAL_STATUS_FAILURE;
+    }
 
     if ( eHAL_STATUS_SUCCESS == ( status = sme_AcquireGlobalLock( &pMac->sme )))
     {
