@@ -2077,6 +2077,7 @@ typedef enum
 #define CFG_LIST_OF_NON_DFS_COUNTRY_CODE                    "gListOfNonDfsCountryCode"
 #define CFG_LIST_OF_NON_DFS_COUNTRY_CODE_DEFAULT            "JO,MA"
 
+
 /*
  * IBSS Operating Channels for 2.4G and 5GHz channels
  */
@@ -2925,6 +2926,7 @@ typedef struct
    v_BOOL_t                    gEnableOverLapCh;
    char                        acsAllowedChnls[CFG_MAX_STR_LEN];
    v_U16_t                     acsBandSwitchThreshold;
+   v_BOOL_t                    gEnableStrictRegulatoryForFCC;
    v_U8_t                      apMaxOffloadPeers;
    v_BOOL_t                    enableHystereticMode;
 
