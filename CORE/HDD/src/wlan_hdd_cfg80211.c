@@ -5567,23 +5567,36 @@ int wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     /* set BSSType to default type */
     scanRequest.BSSType = eCSR_BSS_TYPE_ANY;
 
+    if (MAX_CHANNEL < request->n_channels)
+    {
+        hddLog(VOS_TRACE_LEVEL_WARN,"No of Scan Channels exceeded limit: %d",
+               request->n_channels);
+        request->n_channels = MAX_CHANNEL;
+    }
+
     hddLog(VOS_TRACE_LEVEL_INFO,
            "No of Scan Channels: %d", request->n_channels);
 
     if (request->n_channels)
     {
-       channelList = vos_mem_malloc(request->n_channels);
-       if (NULL == channelList)
-       {
-          hddLog(VOS_TRACE_LEVEL_ERROR,
-                 "channelList memory alloc failed channelList");
-          status = -ENOMEM;
-          goto free_mem;
-       }
-       for (i = 0; i < request->n_channels ; i++ )
-       {
-          channelList[i] = request->channels[i]->hw_value;
-       }
+        char chList [(request->n_channels*5)+1];
+        int len;
+        channelList = vos_mem_malloc(request->n_channels);
+        if (NULL == channelList)
+        {
+            hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: memory alloc failed channelList", __func__);
+            status = -ENOMEM;
+                goto free_mem;
+        }
+        for (i = 0, len = 0; i < request->n_channels ; i++ )
+        {
+            channelList[i] = request->channels[i]->hw_value;
+            len += snprintf(chList+len, 5, "%d ", channelList[i]);
+        }
+
+        hddLog(VOS_TRACE_LEVEL_INFO, "Channel-List: %s", chList);
+
     }
     scanRequest.ChannelInfo.numOfChannels = request->n_channels;
     scanRequest.ChannelInfo.ChannelList = channelList;
