@@ -3213,8 +3213,8 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                     }
                 }
 
-                break;
 #endif
+                break;
 
 #else
                 status = wlan_hdd_change_iface_to_sta_mode(ndev, type);
