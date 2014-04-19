@@ -857,6 +857,7 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 		p_inactivity->staIdx = peer_id;
 		vos_mem_copy(p_inactivity->peerAddr, macaddr, IEEE80211_ADDR_LEN);
 		wma_send_msg(wma, WDA_IBSS_PEER_INACTIVITY_IND, (void *)p_inactivity, 0);
+		goto exit_handler;
 		break;
 
 #ifdef FEATURE_WLAN_TDLS
@@ -876,6 +877,7 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 		del_sta_ctx->reasonCode = HAL_DEL_STA_REASON_CODE_KEEP_ALIVE;
 		wma_send_msg(wma, SIR_LIM_DELETE_STA_CONTEXT_IND, (void *)del_sta_ctx,
 			0);
+		goto exit_handler;
 		break;
 #endif /* FEATURE_WLAN_TDLS */
 
@@ -898,6 +900,7 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 		    WMA_LOGW("%s: WMI_PEER_STA_KICKOUT_REASON_XRETRY event for STA",
 				__func__);
 		    wma_beacon_miss_handler(wma, vdev_id);
+		    goto exit_handler;
 		}
 		break;
 
@@ -923,27 +926,32 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 		    WMA_LOGW("%s: WMI_PEER_STA_KICKOUT_REASON_UNSPECIFIED event for STA",
 				__func__);
 		    wma_beacon_miss_handler(wma, vdev_id);
+		    goto exit_handler;
 		}
 		break;
 
 	    case WMI_PEER_STA_KICKOUT_REASON_INACTIVITY:
 	    default:
-		del_sta_ctx =
-			(tpDeleteStaContext)vos_mem_malloc(sizeof(tDeleteStaContext));
-		if (!del_sta_ctx) {
-			WMA_LOGE("VOS MEM Alloc Failed for tDeleteStaContext");
-			return -EINVAL;
-		}
-
-		del_sta_ctx->staId = peer_id;
-		vos_mem_copy(del_sta_ctx->addr2, macaddr, IEEE80211_ADDR_LEN);
-		vos_mem_copy(del_sta_ctx->bssId, wma->interfaces[vdev_id].addr,
-				IEEE80211_ADDR_LEN);
-		del_sta_ctx->reasonCode = HAL_DEL_STA_REASON_CODE_KEEP_ALIVE;
-		wma_send_msg(wma, SIR_LIM_DELETE_STA_CONTEXT_IND, (void *)del_sta_ctx,
-			0);
 		break;
 	}
+
+	/*
+	 * default action is to send delete station context indication to LIM
+	 */
+	del_sta_ctx = (tpDeleteStaContext)vos_mem_malloc(sizeof(tDeleteStaContext));
+	if (!del_sta_ctx) {
+		WMA_LOGE("VOS MEM Alloc Failed for tDeleteStaContext");
+		return -EINVAL;
+	}
+
+	del_sta_ctx->staId = peer_id;
+	vos_mem_copy(del_sta_ctx->addr2, macaddr, IEEE80211_ADDR_LEN);
+	vos_mem_copy(del_sta_ctx->bssId, wma->interfaces[vdev_id].addr,
+		IEEE80211_ADDR_LEN);
+	del_sta_ctx->reasonCode = HAL_DEL_STA_REASON_CODE_KEEP_ALIVE;
+	wma_send_msg(wma, SIR_LIM_DELETE_STA_CONTEXT_IND, (void *)del_sta_ctx, 0);
+
+exit_handler:
 	WMA_LOGD("%s: Exit", __func__);
 	return 0;
 }
@@ -5094,6 +5102,9 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
         scan_params->idle_time = scan_params->min_rest_time;
         scan_params->burst_duration = WMA_ROAM_DWELL_TIME_PASSIVE_DEFAULT;
     }
+    if (!pMac->roam.configParam.allowDFSChannelRoam) {
+        scan_params->scan_ctrl_flags |= WMI_SCAN_BYPASS_DFS_CHN;
+    }
     WMA_LOGI("%s: Rome roam scan parameters:"
              " dwell_time_active = %d, dwell_time_passive = %d",
              __func__,
@@ -5106,11 +5117,12 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
              scan_params->max_rest_time,
              scan_params->repeat_probe_time);
     WMA_LOGI("%s: max_scan_time = %d, idle_time = %d,"
-             " burst_duration = %d",
+             " burst_duration = %d, scan_ctrl_flags = 0x%x",
              __func__,
              scan_params->max_scan_time,
              scan_params->idle_time,
-             scan_params->burst_duration);
+             scan_params->burst_duration,
+             scan_params->scan_ctrl_flags);
 }
 
 /* function   : wma_roam_scan_offload_ap_profile
@@ -12463,6 +12475,8 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 	HTCCancelDeferredTargetSleep(scn);
 
 	wma->wow.wow_enable_cmd_sent = TRUE;
+
+	wmi_set_target_suspend(wma->wmi_handle, TRUE);
 	return VOS_STATUS_SUCCESS;
 
 error:
@@ -13175,6 +13189,9 @@ static VOS_STATUS wma_send_host_wakeup_ind_to_fw(tp_wma_handle wma)
 	} else {
 		WMA_LOGD("Host wakeup received");
 	}
+
+	if (VOS_STATUS_SUCCESS == vos_status)
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
 
 	return vos_status;
 }
@@ -16483,15 +16500,26 @@ u_int8_t wma_thermal_mgmt_get_level(void *handle, u_int32_t temp)
 {
 	tp_wma_handle wma = (tp_wma_handle) handle;
 	int i;
-	t_thermal_level_info thermal_info;
+	u_int8_t level;
 
-	for (i = 0; i < (WLAN_WMA_MAX_THERMAL_LEVELS - 1); i++) {
-		thermal_info = wma->thermal_mgmt_info.thermalLevels[i];
-		if (temp < thermal_info.maxTempThreshold) {
-			return i;
-		}
+	level = i = wma->thermal_mgmt_info.thermalCurrLevel;
+	while (temp < wma->thermal_mgmt_info.thermalLevels[i].minTempThreshold &&
+		   i > 0) {
+		i--;
+		level = i;
 	}
-	return (WLAN_WMA_MAX_THERMAL_LEVELS - 1);
+
+	i = wma->thermal_mgmt_info.thermalCurrLevel;
+	while (temp > wma->thermal_mgmt_info.thermalLevels[i].maxTempThreshold &&
+		   i < (WLAN_WMA_MAX_THERMAL_LEVELS - 1)) {
+		i++;
+		level = i;
+	}
+
+	WMA_LOGW("Change thermal level from %d -> %d\n",
+			  wma->thermal_mgmt_info.thermalCurrLevel, level);
+
+	return level;
 }
 
 /* function   : wma_thermal_mgmt_evt_handler
@@ -18551,6 +18579,7 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 
 	HTCCancelDeferredTargetSleep(scn);
 
+	wmi_set_target_suspend(wma_handle->wmi_handle, TRUE);
 	return 0;
 }
 
@@ -18605,6 +18634,9 @@ int wma_resume_target(WMA_HANDLE handle)
 		WMA_LOGE("Failed to deliver WMI_PDEV_RESUME_CMDID command %d\n", timeout);
 		ret = -1;
 	}
+
+	if (EOK == ret)
+		wmi_set_target_suspend(wma_handle->wmi_handle, FALSE);
 
 	return ret;
 }
