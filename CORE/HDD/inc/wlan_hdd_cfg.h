@@ -2348,6 +2348,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT          (2)
 #endif
 
+#define CFG_ROAMING_DFS_CHANNEL_NAME                "gAllowDFSChannelRoam"
+#define CFG_ROAMING_DFS_CHANNEL_MIN                 (0)
+#define CFG_ROAMING_DFS_CHANNEL_MAX                 (1)
+#define CFG_ROAMING_DFS_CHANNEL_DEFAULT             (0)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2832,6 +2837,8 @@ typedef struct
    v_U16_t                     acsBandSwitchThreshold;
    v_U8_t                      apMaxOffloadPeers;
    v_BOOL_t                    enableHystereticMode;
+
+   v_BOOL_t                    allowDFSChannelRoam;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
