@@ -3285,6 +3285,13 @@ REG_VARIABLE( CFG_ENABLE_HYSTERETIC_MODE, WLAN_PARAM_Integer,
               CFG_ENABLE_HYSTERETIC_MODE_DEFAULT,
               CFG_ENABLE_HYSTERETIC_MODE_MIN,
               CFG_ENABLE_HYSTERETIC_MODE_MAX ),
+
+   REG_VARIABLE( CFG_ROAMING_DFS_CHANNEL_NAME , WLAN_PARAM_Integer,
+              hdd_config_t, allowDFSChannelRoam,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_ROAMING_DFS_CHANNEL_DEFAULT,
+              CFG_ROAMING_DFS_CHANNEL_MIN,
+              CFG_ROAMING_DFS_CHANNEL_MAX ),
 };
 
 /*
@@ -3686,7 +3693,7 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gEnableOverLapCh] Value = [%u] ",pHddCtx->cfg_ini->gEnableOverLapCh);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gAcsScanBandPreference] Value = [%u] ",pHddCtx->cfg_ini->acsScanBandPreference);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gMaxOffloadPeers] Value = [%u] ",pHddCtx->cfg_ini->apMaxOffloadPeers);
-
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gAllowDFSChannelRoam] Value = [%u] ",pHddCtx->cfg_ini->allowDFSChannelRoam);
 }
 
 
@@ -5361,6 +5368,7 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
 
    smeConfig.csrConfig.addTSWhenACMIsOff = pConfig->AddTSWhenACMIsOff;
    smeConfig.csrConfig.fValidateList = pConfig->fValidateScanList;
+   smeConfig.csrConfig.allowDFSChannelRoam = pConfig->allowDFSChannelRoam;
 
    //Enable/Disable MCC
    smeConfig.csrConfig.fEnableMCCMode = pConfig->enableMCC;

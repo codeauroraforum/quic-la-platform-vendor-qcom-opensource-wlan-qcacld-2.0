@@ -1562,6 +1562,12 @@ VOS_STATUS hdd_wlan_shutdown(void)
       complete(&vosSchedContext->ResumeRxEvent);
       pHddCtx->isRxThreadSuspended= FALSE;
    }
+#ifdef QCA_CONFIG_SMP
+   if (TRUE == pHddCtx->isTlshimRxThreadSuspended) {
+      complete(&vosSchedContext->ResumeTlshimRxEvent);
+      pHddCtx->isTlshimRxThreadSuspended = FALSE;
+    }
+#endif
 
    /* Reset the Suspend Variable */
    pHddCtx->isWlanSuspended = FALSE;
@@ -1992,8 +1998,8 @@ err_vosclose:
        /* Clean up HDD Nlink Service */
        send_btc_nlink_msg(WLAN_MODULE_DOWN_IND, 0);
 #ifdef WLAN_KD_READY_NOTIFIER
-       nl_srv_exit(pHddCtx->ptt_pid);
        cnss_diag_notify_wlan_close();
+       nl_srv_exit(pHddCtx->ptt_pid);
 #else
        nl_srv_exit();
 #endif /* WLAN_KD_READY_NOTIFIER */
