@@ -188,6 +188,16 @@ typedef enum
    eCSR_SCAN_FOUND_PEER,
 }eCsrScanStatus;
 
+/* Reason to abort the scan
+ * The reason can used later to decide whether to update the scan results
+ * to upper layer or not
+ */
+typedef enum
+{
+    eCSR_SCAN_ABORT_DEFAULT,
+    eCSR_SCAN_ABORT_DUE_TO_BAND_CHANGE, //Scan aborted due to band change
+}eCsrAbortReason;
+
 #define CSR_SCAN_TIME_DEFAULT       0
 #define CSR_VALUE_IGNORED           0xFFFFFFFF
 #define CSR_RSN_PMKID_SIZE          16
@@ -1421,6 +1431,7 @@ typedef struct tagCsrTdlsSendMgmt
         tANI_U8 dialog;
         tANI_U16 statusCode;
         tANI_U8 responder;
+        tANI_U32 peerCapability;
         tANI_U8 *buf;
         tANI_U8 len;
 

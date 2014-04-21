@@ -300,6 +300,14 @@ static struct sk_buff* hdd_mon_tx_fetch_pkt(hdd_adapter_t* pAdapter)
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    hdd_list_node_t *anchor = NULL;
 
+   if (NULL == pAdapter)
+   {
+      VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+       FL("pAdapter is NULL"));
+      VOS_ASSERT(0);
+      return NULL;
+   }
+
    // do we have any packets pending in this AC?
    hdd_list_size( &pAdapter->wmm_tx_queue[ac], &size );
    if( size == 0 )
@@ -959,7 +967,7 @@ int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       STAId = pHddStaCtx->conn_info.staId[0];
    }
 
-#ifdef QCA_LL_TX_FLOW_CT
+#if defined(QCA_LL_TX_FLOW_CT) && !defined(CONFIG_HL_SUPPORT)
    if (VOS_FALSE == WLANTL_GetTxResource((WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
                                          pAdapter->sessionId,
                                          pAdapter->tx_flow_low_watermark,
@@ -973,7 +981,7 @@ int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
                           WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
        }
    }
-#endif /* QCA_LL_TX_FLOW_CT */
+#endif /* defined(QCA_LL_TX_FLOW_CT) && !defined(CONFIG_HL_SUPPORT) */
 
    //Get TL AC corresponding to Qdisc queue index/AC.
    ac = hdd_QdiscAcToTlAC[skb->queue_mapping];
