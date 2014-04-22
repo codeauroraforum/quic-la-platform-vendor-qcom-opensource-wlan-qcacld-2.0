@@ -1048,6 +1048,7 @@ static int wma_vdev_stop_resp_handler(void *handle, u_int8_t *cmd_param_info,
         ol_txrx_vdev_handle vdev;
 #endif
 	struct wma_txrx_node *iface;
+	int32_t status = 0;
 
 	WMA_LOGI("%s: Enter", __func__);
 	param_buf = (WMI_VDEV_STOPPED_EVENTID_param_tlvs *) cmd_param_info;
@@ -1067,7 +1068,9 @@ static int wma_vdev_stop_resp_handler(void *handle, u_int8_t *cmd_param_info,
 	pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
 	if (!pdev) {
 		WMA_LOGE("%s: pdev is NULL", __func__);
-		return -EINVAL;
+		status = -EINVAL;
+		vos_timer_stop(&req_msg->event_timeout);
+		goto free_req_msg;
 	}
 
 	vos_timer_stop(&req_msg->event_timeout);
@@ -1080,7 +1083,8 @@ static int wma_vdev_stop_resp_handler(void *handle, u_int8_t *cmd_param_info,
 		if (resp_event->vdev_id > wma->max_bssid) {
 			WMA_LOGE("%s: Invalid vdev_id %d", __func__,
 				resp_event->vdev_id);
-			return -EINVAL;
+			status = -EINVAL;
+			goto free_req_msg;
 		}
 
 		iface = &wma->interfaces[resp_event->vdev_id];
@@ -1156,9 +1160,10 @@ static int wma_vdev_stop_resp_handler(void *handle, u_int8_t *cmd_param_info,
 			wma_vdev_detach(wma, iface->del_staself_req, 1);
 		}
 	}
+free_req_msg:
 	vos_timer_destroy(&req_msg->event_timeout);
 	adf_os_mem_free(req_msg);
-	return 0;
+	return status;
 }
 
 static void wma_update_pdev_stats(tp_wma_handle wma,
@@ -6237,7 +6242,8 @@ void wma_vdev_resp_timer(void *data)
 
 	if (NULL == pdev) {
 		WMA_LOGE("%s: Failed to get pdev", __func__);
-		return;
+		vos_timer_stop(&tgt_req->event_timeout);
+		goto free_tgt_req;
 	}
 
 	WMA_LOGA("%s: request %d is timed out", __func__, tgt_req->msg_type);
@@ -6260,7 +6266,8 @@ void wma_vdev_resp_timer(void *data)
 		if (tgt_req->vdev_id > wma->max_bssid) {
 			WMA_LOGE("%s: Invalid vdev_id %d", __func__,
 				tgt_req->vdev_id);
-			return;
+			vos_timer_stop(&tgt_req->event_timeout);
+			goto free_tgt_req;
 		}
 
 		iface = &wma->interfaces[tgt_req->vdev_id];
@@ -6382,6 +6389,7 @@ error0:
 					params->sessionId, peer);
 		wma_send_msg(wma, WDA_ADD_BSS_RSP, (void *)params, 0);
 	}
+free_tgt_req:
 	vos_timer_destroy(&tgt_req->event_timeout);
 	adf_os_mem_free(tgt_req);
 }
