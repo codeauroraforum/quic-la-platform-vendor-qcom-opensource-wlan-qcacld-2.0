@@ -2038,6 +2038,11 @@ typedef enum
 
 #endif
 
+//Enable debug for remain on channel issues
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME    "gDebugP2pRemainOnChannel"
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_DEFAULT ( 0 )
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN     ( 0 )
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX     ( 1 )
 
 /*
  * SAP ALLOW All Channels
@@ -2911,6 +2916,7 @@ typedef struct
 
    v_BOOL_t                    allowDFSChannelRoam;
 
+   v_BOOL_t                    debugP2pRemainOnChannel;
 } hdd_config_t;
 /*---------------------------------------------------------------------------
   Function declarations and documenation
