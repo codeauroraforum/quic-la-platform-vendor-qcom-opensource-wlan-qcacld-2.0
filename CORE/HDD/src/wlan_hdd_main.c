@@ -2139,7 +2139,7 @@ hdd_sendactionframe(hdd_adapter_t *pAdapter, const tANI_U8 *bssid,
 
    /* if the target bssid is different from currently associated AP,
       then no need to send action frame */
-   if (!memcmp(bssid, pHddStaCtx->conn_info.bssId, VOS_MAC_ADDR_SIZE)) {
+   if (memcmp(bssid, pHddStaCtx->conn_info.bssId, VOS_MAC_ADDR_SIZE)) {
       hddLog(VOS_TRACE_LEVEL_INFO, "%s: STA is not associated to this AP",
              __func__);
       ret = -EINVAL;
@@ -2494,7 +2494,7 @@ hdd_parse_set_roam_scan_channels(hdd_adapter_t *pAdapter,
    return ret;
 }
 
-#endif /* WLAN_FEATURE_VOWIFI_11R || FEATURE_WLAN_ESE || FEATURE_WLAN_LFR */
+#endif/*End of FEATURE_WLAN_BATCH_SCAN*/
 
 /**---------------------------------------------------------------------------
 
