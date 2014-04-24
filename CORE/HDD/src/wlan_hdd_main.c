@@ -10344,6 +10344,14 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_config;
    }
 
+#ifdef MEMORY_DEBUG
+   if (pHddCtx->cfg_ini->IsMemoryDebugSupportEnabled)
+      vos_mem_init();
+
+   hddLog(VOS_TRACE_LEVEL_INFO, "%s: gEnableMemoryDebug=%d",
+          __func__, pHddCtx->cfg_ini->IsMemoryDebugSupportEnabled);
+#endif
+
    pHddCtx->current_intf_count=0;
    pHddCtx->max_intf_count = WLAN_MAX_INTERFACES;
 
@@ -11249,10 +11257,6 @@ static int hdd_driver_init( void)
          ret_status = -1;
          break;
       }
-#endif
-
-#ifdef MEMORY_DEBUG
-      vos_mem_init();
 #endif
 
 #ifdef TIMER_MANAGER
