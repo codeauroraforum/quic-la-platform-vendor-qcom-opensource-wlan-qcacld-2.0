@@ -3141,8 +3141,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
     eCsrRoamBssType LastBSSType;
     hdd_config_t *pConfig = NULL;
     eMib_dot11DesiredBssType connectedBssType;
-    VOS_STATUS status;
     long ret;
+    VOS_STATUS vstatus;
+    eHalStatus hstatus;
+    int status;
 
     ENTER();
 
@@ -3150,19 +3152,11 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Adapter context is null", __func__);
-        return VOS_STATUS_E_FAILURE;
+        return -ENODEV;
     }
 
     pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
-    if (!pHddCtx)
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: HDD context is null", __func__);
-        return VOS_STATUS_E_FAILURE;
-    }
-
     status = wlan_hdd_validate_context(pHddCtx);
-
     if (0 != status)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -3184,8 +3178,8 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
     {
         pHddCtx->isAmpAllowed = VOS_FALSE;
         // stop AMP traffic
-        status = WLANBAP_StopAmp();
-        if(VOS_STATUS_SUCCESS != status )
+        vstatus = WLANBAP_StopAmp();
+        if (VOS_STATUS_SUCCESS != vstatus )
         {
             pHddCtx->isAmpAllowed = VOS_TRUE;
             hddLog(VOS_TRACE_LEVEL_FATAL,
@@ -3207,7 +3201,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
         {
             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                       "%s: pWextState is null", __func__);
-            return VOS_STATUS_E_FAILURE;
+            return -EINVAL;
         }
         pRoamProfile = &pWextState->roamProfile;
         LastBSSType = pRoamProfile->BSSType;
@@ -3262,9 +3256,9 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                 break;
 
 #else
-                status = wlan_hdd_change_iface_to_sta_mode(ndev, type);
-                if (status != VOS_STATUS_SUCCESS)
-                    return status;
+                vstatus = wlan_hdd_change_iface_to_sta_mode(ndev, type);
+                if (vstatus != VOS_STATUS_SUCCESS)
+                    return -EINVAL;
 
 #ifdef QCA_LL_TX_FLOW_CT
                 if (NL80211_IFTYPE_P2P_CLIENT == type)
@@ -3387,18 +3381,17 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                 if((NL80211_IFTYPE_AP == type) &&
                    (memcmp(pConfig->apCntryCode, CFG_AP_COUNTRY_CODE_DEFAULT, 3) != 0))
                 {
-                    int status = 0;
                     VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_INFO,
                          "%s: setting country code from INI ", __func__);
                     init_completion(&pAdapter->change_country_code);
-                    status = (int)sme_ChangeCountryCode(pHddCtx->hHal,
+                    hstatus = sme_ChangeCountryCode(pHddCtx->hHal,
                                      (void *)(tSmeChangeCountryCallback)
                                       wlan_hdd_change_country_code_cb,
                                       pConfig->apCntryCode, pAdapter,
                                       pHddCtx->pvosContext,
                                       eSIR_FALSE,
                                       eSIR_TRUE);
-                    if (eHAL_STATUS_SUCCESS == status)
+                    if (eHAL_STATUS_SUCCESS == hstatus)
                     {
                         /* Wait for completion */
                         ret = wait_for_completion_interruptible_timeout(
@@ -3418,8 +3411,8 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                          return -EINVAL;
                     }
                 }
-                status = hdd_init_ap_mode(pAdapter);
-                if(status != VOS_STATUS_SUCCESS)
+                vstatus = hdd_init_ap_mode(pAdapter);
+                if (vstatus != VOS_STATUS_SUCCESS)
                 {
                     hddLog(VOS_TRACE_LEVEL_FATAL,
                            "%s: Error initializing the ap mode", __func__);
