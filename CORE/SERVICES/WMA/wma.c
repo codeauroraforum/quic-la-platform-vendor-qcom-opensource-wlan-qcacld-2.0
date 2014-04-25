@@ -4908,7 +4908,6 @@ VOS_STATUS wma_roam_scan_offload_chan_list(tp_wma_handle wma_handle,
         roam_chan_list_array[i] = vos_chan_to_freq(chan_list[i]);
         WMA_LOGI("%d,",roam_chan_list_array[i]);
     }
-    WMA_LOGI("\n");
 
     status = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
             len, WMI_ROAM_CHAN_LIST);
@@ -6757,7 +6756,8 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 	u_int32_t num_peer_ht_rates;
 	u_int32_t num_peer_11b_rates=0;
 	u_int32_t num_peer_11a_rates=0;
-        u_int32_t phymode;
+	u_int32_t phymode;
+	u_int32_t peer_nss=1;
 
 	struct wma_txrx_node *intr = &wma->interfaces[params->smesessionId];
 
@@ -6812,6 +6812,10 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 		if (params->supportedRates.supportedMCSSet[i / 8] &
 					(1 << (i % 8))) {
 			rate_pos[peer_ht_rates.num_rates++] = i;
+			if (i >= 8) {
+				/* MCS8 or higher rate is present, must be 2x2 */
+				peer_nss = 2;
+			}
 		}
 		if (peer_ht_rates.num_rates == max_rates)
 		       break;
@@ -7014,7 +7018,7 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_STRUC_wmi_vht_rate_set,
 		       WMITLV_GET_STRUCT_TLVLEN(wmi_vht_rate_set));
 
-	cmd->peer_nss = MAX((peer_ht_rates.num_rates + 7) / 8, 1);
+	cmd->peer_nss = peer_nss;
 
 	WMA_LOGD("peer_nss %d peer_ht_rates.num_rates %d ", cmd->peer_nss,
                   peer_ht_rates.num_rates);
@@ -7027,8 +7031,12 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
                 mcs->tx_max_rate = params->supportedRates.vhtTxHighestDataRate;
                 mcs->tx_mcs_set  = params->supportedRates.vhtTxMCSMap;
 
-                cmd->peer_nss = ((mcs->rx_mcs_set & VHT2x2MCSMASK)
-                                    == VHT2x2MCSMASK) ? 1 : 2;
+                if(params->vhtSupportedRxNss) {
+                    cmd->peer_nss = params->vhtSupportedRxNss;
+                } else {
+                    cmd->peer_nss = ((mcs->rx_mcs_set & VHT2x2MCSMASK)
+                                       == VHT2x2MCSMASK) ? 1 : 2;
+                }
 	}
 
 	intr->nss = cmd->peer_nss;
@@ -7036,12 +7044,13 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 
         WMA_LOGD("%s: vdev_id %d associd %d peer_flags %x rate_caps %x "
                  "peer_caps %x listen_intval %d ht_caps %x max_mpdu %d "
-                 "nss %d phymode %d peer_mpdu_density %d", __func__,
+                 "nss %d phymode %d peer_mpdu_density %d"
+                 "cmd->peer_vht_caps %x", __func__,
                  cmd->vdev_id, cmd->peer_associd, cmd->peer_flags,
                  cmd->peer_rate_caps, cmd->peer_caps,
                  cmd->peer_listen_intval, cmd->peer_ht_caps,
                  cmd->peer_max_mpdu, cmd->peer_nss, cmd->peer_phymode,
-                 cmd->peer_mpdu_density);
+                 cmd->peer_mpdu_density, cmd->peer_vht_caps);
 
 	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
 				   WMI_PEER_ASSOC_CMDID);
@@ -13537,11 +13546,21 @@ static void wma_finish_scan_req(tp_wma_handle wma_handle,
 static void wma_process_update_opmode(tp_wma_handle wma_handle,
                                 tUpdateVHTOpMode *update_vht_opmode)
 {
-        WMA_LOGD("%s: Update Opmode", __func__);
+        WMA_LOGD("%s: opMode = %d", __func__, update_vht_opmode->opMode);
 
         wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
                            WMI_PEER_CHWIDTH, update_vht_opmode->opMode,
                            update_vht_opmode->smesessionId);
+}
+
+static void wma_process_update_rx_nss(tp_wma_handle wma_handle,
+                                tUpdateRxNss *update_rx_nss)
+{
+        WMA_LOGD("%s: Rx Nss = %d", __func__, update_rx_nss->rxNss);
+
+        wma_set_peer_param(wma_handle, update_rx_nss->peer_mac,
+                           WMI_PEER_NSS, update_rx_nss->rxNss,
+                           update_rx_nss->smesessionId);
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -15871,6 +15890,11 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
                                        (tUpdateVHTOpMode *)msg->bodyptr);
                         vos_mem_free(msg->bodyptr);
                         break;
+                case WDA_UPDATE_RX_NSS:
+                        wma_process_update_rx_nss(wma_handle,
+                                       (tUpdateRxNss *)msg->bodyptr);
+                        vos_mem_free(msg->bodyptr);
+                        break;
 #ifdef WLAN_FEATURE_11AC
                 case WDA_UPDATE_MEMBERSHIP:
                         wma_process_update_membership(wma_handle,
@@ -17028,9 +17052,9 @@ static int wma_channel_avoid_evt_handler(void *handle, u_int8_t *event,
 		afr_desc = (wmi_avoid_freq_range_desc *) ((void *)param_buf->avd_freq_range
 			+ freq_range_idx * sizeof(wmi_avoid_freq_range_desc));
 		sca_indication->avoid_freq_range[freq_range_idx].start_freq =
-			afr_desc->start_freq + 10;
-		sca_indication->avoid_freq_range[freq_range_idx].end_freq = afr_desc->end_freq
-			- 10;
+			afr_desc->start_freq;
+		sca_indication->avoid_freq_range[freq_range_idx].end_freq =
+			afr_desc->end_freq;
 	}
 
 	sme_msg.type = eWNI_SME_CH_AVOID_IND;
