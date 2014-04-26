@@ -3089,9 +3089,10 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
                         return -EINVAL;
                     }
                 }
-#endif
 
                 break;
+#endif
+
 #else
                 status = wlan_hdd_change_iface_to_sta_mode(ndev, type);
                 if (status != VOS_STATUS_SUCCESS)
@@ -3111,8 +3112,9 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
                 }
 #endif /* QCA_LL_TX_FLOW_CT */
 
-                goto done;
 #endif
+                goto done;
+
             case NL80211_IFTYPE_ADHOC:
                 hddLog(VOS_TRACE_LEVEL_INFO,
                   "%s: setting interface Type to ADHOC", __func__);
