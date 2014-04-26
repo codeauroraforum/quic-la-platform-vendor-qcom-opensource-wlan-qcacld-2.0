@@ -1573,12 +1573,11 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         }
 #endif
 
-    PopulateDot11fExtCap(pMac, isVHTEnabled, &frm.ExtCap);
+        PopulateDot11fExtCap(pMac, isVHTEnabled, &frm.ExtCap);
 
     } // End if on non-NULL 'pSta'.
 
-
-   vos_mem_set(( tANI_U8* )&beaconParams, sizeof( tUpdateBeaconParams), 0);
+    vos_mem_set(( tANI_U8* )&beaconParams, sizeof( tUpdateBeaconParams), 0);
 
     if( psessionEntry->limSystemRole == eLIM_AP_ROLE ){
         if(psessionEntry->gLimProtectionControl != WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
