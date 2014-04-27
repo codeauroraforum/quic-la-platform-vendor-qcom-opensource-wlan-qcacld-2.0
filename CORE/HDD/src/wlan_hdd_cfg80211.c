@@ -64,7 +64,6 @@
 #include <wlan_hdd_includes.h>
 #include <net/arp.h>
 #include <net/cfg80211.h>
-#include <vos_trace.h>
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
 #endif
@@ -1302,37 +1301,17 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
 
     ENTER();
     if (params->head && !params->head_len)
-    {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  FL("head_len is NULL"));
         return -EINVAL;
-    }
 
     old = pAdapter->sessionCtx.ap.beacon;
 
     if (!params->head && !old)
-    {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  FL("session(%d) old and new heads points to NULL"),
-                     pAdapter->sessionId);
         return -EINVAL;
-    }
-
-    if (params->tail && !params->tail_len)
-    {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                   FL("tail_len is zero but tail is not NULL"));
-        return -EINVAL;
-    }
 
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,38))
     /* Kernel 3.0 is not updating dtim_period for set beacon */
     if (!params->dtim_period)
-    {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  FL("dtim period is 0"));
         return -EINVAL;
-    }
 #endif
 
     if(params->head)
@@ -1350,11 +1329,7 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     beacon = kzalloc(size, GFP_KERNEL);
 
     if( beacon == NULL )
-    {
-       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 FL("Mem allocation for beacon failed"));
-       return -ENOMEM;
-    }
+        return -ENOMEM;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
     if(params->dtim_period || !old )
@@ -1626,7 +1601,6 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
     if (0 != wlan_hdd_add_ie(pHostapdAdapter, genie,
                               &total_ielen, WPS_OUI_TYPE, WPS_OUI_TYPE_SIZE))
     {
-        hddLog(LOGE, FL("Adding WPS IE failed"));
          ret = -EINVAL;
          goto done;
     }
@@ -1635,7 +1609,6 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
     if (0 != wlan_hdd_add_ie(pHostapdAdapter, genie,
                               &total_ielen, WFD_OUI_TYPE, WFD_OUI_TYPE_SIZE))
     {
-        hddLog(LOGE, FL("Adding WFD IE failed"));
          ret = -EINVAL;
          goto done;
     }
@@ -1644,7 +1617,6 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
     if (0 != wlan_hdd_add_ie(pHostapdAdapter, genie,
                               &total_ielen, P2P_OUI_TYPE, P2P_OUI_TYPE_SIZE))
     {
-       hddLog(LOGE, FL("Adding P2P IE failed"));
          ret = -EINVAL;
          goto done;
     }
@@ -2634,12 +2606,7 @@ static int wlan_hdd_cfg80211_add_beacon(struct wiphy *wiphy,
         old = pAdapter->sessionCtx.ap.beacon;
 
         if (old)
-        {
-            hddLog(VOS_TRACE_LEVEL_WARN,
-                   FL("already beacon info added to session(%d)"),
-                      pAdapter->sessionId);
             return -EALREADY;
-        }
 
         status = wlan_hdd_cfg80211_alloc_new_beacon(pAdapter,&new,params);
 
@@ -2696,12 +2663,7 @@ static int wlan_hdd_cfg80211_set_beacon(struct wiphy *wiphy,
         old = pAdapter->sessionCtx.ap.beacon;
 
         if (!old)
-        {
-            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                      FL("session(%d) old and new heads points to NULL"),
-                         pAdapter->sessionId);
             return -ENOENT;
-        }
 
         status = wlan_hdd_cfg80211_alloc_new_beacon(pAdapter,&new,params);
 
@@ -2774,19 +2736,25 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
 
     if ((pScanInfo != NULL) && pScanInfo->mScanPending && staAdapter)
     {
-        long ret;
-
         INIT_COMPLETION(pScanInfo->abortscan_event_var);
         hdd_abort_mac_scan(staAdapter->pHddCtx, pAdapter->sessionId,
                            eCSR_SCAN_ABORT_DEFAULT);
-        ret = wait_for_completion_interruptible_timeout(
+        status = wait_for_completion_interruptible_timeout(
                            &pScanInfo->abortscan_event_var,
                            msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-        if (0 >= ret)
+        if (!status)
         {
             VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                       FL("Timeout occurred while waiting for abortscan %ld"),
-                          ret);
+                         "%s: Timeout occurred while waiting for abortscan" ,
+                         __func__);
+
+            if (pHddCtx->isLogpInProgress)
+            {
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                          "%s: LOGP in Progress. Ignore!!!", __func__);
+                return -EAGAIN;
+            }
+
             VOS_ASSERT(pScanInfo->mScanPending);
         }
     }
@@ -2802,12 +2770,7 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
         old = pAdapter->sessionCtx.ap.beacon;
 
         if (!old)
-        {
-            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                      FL("session(%d) beacon data points to NULL"),
-                         pAdapter->sessionId);
             return -ENOENT;
-        }
 
         hdd_cleanup_actionframe(pHddCtx, pAdapter);
 
@@ -3007,12 +2970,7 @@ static int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
         old = pAdapter->sessionCtx.ap.beacon;
 
         if (!old)
-        {
-            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                      FL("session(%d) beacon data points to NULL"),
-                         pAdapter->sessionId);
             return -ENOENT;
-        }
 
         status = wlan_hdd_cfg80211_alloc_new_beacon(pAdapter, &new, params, 0);
 
@@ -3151,7 +3109,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
     eCsrRoamBssType LastBSSType;
     hdd_config_t *pConfig = NULL;
     eMib_dot11DesiredBssType connectedBssType;
-    long ret;
     VOS_STATUS vstatus;
     eHalStatus hstatus;
     int status;
@@ -3256,8 +3213,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                 {
                     if (0 != wlan_hdd_tdls_init (pAdapter))
                     {
-                        hddLog(VOS_TRACE_LEVEL_ERROR,
-                               "%s: tdls initialization failed", __func__);
                         return -EINVAL;
                     }
                 }
@@ -3404,14 +3359,21 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                     if (eHAL_STATUS_SUCCESS == hstatus)
                     {
                         /* Wait for completion */
-                        ret = wait_for_completion_interruptible_timeout(
+                        status = wait_for_completion_interruptible_timeout(
                                        &pAdapter->change_country_code,
                                        msecs_to_jiffies(WLAN_WAIT_TIME_COUNTRY));
-                        if (ret <= 0)
+                        if (status <= 0)
                         {
                             VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                                      FL("SME Timed out while setting country code %ld"),
-                                         ret);
+                                   "%s: SME Timed out while setting country code ",
+                                                 __func__);
+
+                            if (pHddCtx->isLogpInProgress)
+                            {
+                                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                                          "%s: LOGP in Progress. Ignore!!!", __func__);
+                                return -EAGAIN;
+                            }
                         }
                     }
                     else
@@ -3527,8 +3489,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
     }
     else
     {
-      hddLog(VOS_TRACE_LEVEL_ERROR,"%s: unsupported device mode(%d)",
-             __func__, pAdapter->device_mode);
       return -EOPNOTSUPP;
     }
 
@@ -3553,15 +3513,9 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                                 pAdapter->sessionId,
                                 eCSR_DISCONNECT_REASON_UNSPECIFIED ) )
                 {
-                    ret = wait_for_completion_interruptible_timeout(
-                                  &pAdapter->disconnect_comp_var,
-                                  msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
-                    if (ret <= 0)
-                    {
-                        hddLog(VOS_TRACE_LEVEL_ERROR,
-                               FL("wait on disconnect_comp_var failed %ld"), ret);
-                     }
-
+                    wait_for_completion_interruptible_timeout(
+                              &pAdapter->disconnect_comp_var,
+                              msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
                 }
             }
         }
@@ -3619,7 +3573,6 @@ static int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
     VOS_STATUS status;
     hddTdlsPeer_t *pTdlsPeer;
     tANI_U16 numCurrTdlsPeers;
-    long ret;
 
     ENTER();
 
@@ -3772,17 +3725,16 @@ static int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
                                        pAdapter->sessionId, mac, StaParams);
     }
 
-     ret = wait_for_completion_interruptible_timeout(&pAdapter->tdls_add_station_comp,
+    status = wait_for_completion_interruptible_timeout(&pAdapter->tdls_add_station_comp,
            msecs_to_jiffies(WAIT_TIME_TDLS_ADD_STA));
 
-    if (ret <= 0)
+    if (!status)
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: timeout waiting for tdls add station indication %ld",
-                  __func__, ret);
+                "%s: timeout waiting for tdls add station indication",
+                __func__);
         return -EPERM;
     }
-
     if ( eHAL_STATUS_SUCCESS != pAdapter->tdlsAddStaStatus)
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -4340,7 +4292,6 @@ static int wlan_hdd_cfg80211_get_key(
 
     if (CSR_MAX_NUM_KEY <= key_index)
     {
-        hddLog(VOS_TRACE_LEVEL_ERROR, FL("invalid key index %d"), key_index);
         return -EINVAL;
     }
 
@@ -4844,8 +4795,8 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
     }
     else
     {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: invalid chan_no %d", __func__, chan_no);
+        hddLog(VOS_TRACE_LEVEL_ERROR, "%s Invalid chan_no:%d",
+               __func__, chan_no);
         kfree(mgmt);
         return NULL;
     }
@@ -5224,7 +5175,6 @@ static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
     struct cfg80211_scan_request *req = NULL;
     bool aborted = false;
     int ret = 0;
-    long waitRet = 0;
 
     ENTER();
 
@@ -5236,13 +5186,11 @@ static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
     pScanInfo->mScanPendingCounter = 0;
 
     //Block on scan req completion variable. Can't wait forever though.
-    waitRet = wait_for_completion_interruptible_timeout(
+    ret = wait_for_completion_interruptible_timeout(
                          &pScanInfo->scan_req_completion_event,
                          msecs_to_jiffies(WLAN_WAIT_TIME_SCAN_REQ));
-    if (waitRet <= 0)
+    if (!ret)
     {
-        hddLog(VOS_TRACE_LEVEL_ERROR,
-               "%s wait on scan_req_completion_event failed %ld",__func__, waitRet);
        VOS_ASSERT(pScanInfo->mScanPending);
        goto allow_suspend;
     }
@@ -5656,7 +5604,7 @@ int wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
             if (NULL == channelList)
             {
                 hddLog(VOS_TRACE_LEVEL_ERROR,
-                       "channelList memory alloc failed channelList");
+                       "%s: memory alloc failed channelList", __func__);
                 status = -ENOMEM;
                 goto free_mem;
             }
@@ -8273,8 +8221,6 @@ static int wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
     EXIT();
     if (VOS_STATUS_E_FAILURE == vos_status)
     {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  "%s: failed to enter bmps mode", __func__);
         return -EINVAL;
     }
     return 0;
@@ -9511,7 +9457,6 @@ static int wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device *d
         case NL80211_TDLS_ENABLE_LINK:
             {
                 VOS_STATUS status;
-                long ret;
                 tCsrTdlsLinkEstablishParams tdlsLinkEstablishParams;
 
                 if (!TDLS_STA_INDEX_VALID(pTdlsPeer->staId))
@@ -9524,6 +9469,7 @@ static int wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device *d
 
                 if (eTDLS_LINK_CONNECTED != pTdlsPeer->link_status)
                 {
+                    long ret;
                     if (IS_ADVANCE_TDLS_ENABLE) {
 
                         if (0 != wlan_hdd_tdls_get_link_establish_params(
@@ -9660,13 +9606,8 @@ static int wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device *d
         case NL80211_TDLS_SETUP:
         case NL80211_TDLS_DISCOVERY_REQ:
             /* We don't support in-driver setup/teardown/discovery */
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
-                      "%s: We don't support in-driver setup/teardown/discovery "
-                      ,__func__);
             return -ENOTSUPP;
         default:
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                      "%s: unsupported event",__func__);
             return -ENOTSUPP;
     }
     return 0;
