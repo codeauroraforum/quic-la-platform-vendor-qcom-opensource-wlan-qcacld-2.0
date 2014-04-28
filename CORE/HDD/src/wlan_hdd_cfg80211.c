@@ -1048,11 +1048,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
     /*signal strength in mBm (100*dBm) */
     wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
     wiphy->max_remain_on_channel_duration = 1000;
-#endif
-
     wiphy->n_vendor_commands = ARRAY_SIZE(hdd_wiphy_vendor_commands);
     wiphy->vendor_commands = hdd_wiphy_vendor_commands;
 
@@ -1323,12 +1319,6 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
 
     if (!params->head && !old)
         return -EINVAL;
-
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,38))
-    /* Kernel 3.0 is not updating dtim_period for set beacon */
-    if (!params->dtim_period)
-        return -EINVAL;
-#endif
 
     if(params->head)
         head_len = params->head_len;
@@ -3934,20 +3924,12 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
  * FUNCTION: wlan_hdd_cfg80211_add_key
  * This function is used to initialize the key information
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
                                       struct net_device *ndev,
                                       u8 key_index, bool pairwise,
                                       const u8 *mac_addr,
                                       struct key_params *params
                                       )
-#else
-static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
-                                      struct net_device *ndev,
-                                      u8 key_index, const u8 *mac_addr,
-                                      struct key_params *params
-                                      )
-#endif
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( ndev );
     tCsrRoamSetKey  setKey;
@@ -4088,13 +4070,7 @@ static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
     hddLog(VOS_TRACE_LEVEL_INFO_MED, "%s: encryption type %d",
             __func__, setKey.encType);
 
-    if (
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
-                (!pairwise)
-#else
-                (!mac_addr || is_broadcast_ether_addr(mac_addr))
-#endif
-       )
+    if (!pairwise)
     {
         /* set group key*/
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
@@ -4183,11 +4159,7 @@ static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
         hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
         hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
         if (!pairwise)
-#else
-        if (!mac_addr || is_broadcast_ether_addr(mac_addr))
-#endif
         {
             /* set group key*/
             if (pHddStaCtx->roam_info.deferKeyComplete)
@@ -4310,7 +4282,6 @@ static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
  * FUNCTION: wlan_hdd_cfg80211_get_key
  * This function is used to get the key information
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 static int wlan_hdd_cfg80211_get_key(
                         struct wiphy *wiphy,
                         struct net_device *ndev,
@@ -4318,14 +4289,6 @@ static int wlan_hdd_cfg80211_get_key(
                         const u8 *mac_addr, void *cookie,
                         void (*callback)(void *cookie, struct key_params*)
                         )
-#else
-static int wlan_hdd_cfg80211_get_key(
-                        struct wiphy *wiphy,
-                        struct net_device *ndev,
-                        u8 key_index, const u8 *mac_addr, void *cookie,
-                        void (*callback)(void *cookie, struct key_params*)
-                        )
-#endif
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( ndev );
     hdd_wext_state_t *pWextState= WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
@@ -4388,20 +4351,12 @@ static int wlan_hdd_cfg80211_get_key(
  * FUNCTION: wlan_hdd_cfg80211_del_key
  * This function is used to delete the key information
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 static int wlan_hdd_cfg80211_del_key( struct wiphy *wiphy,
                                       struct net_device *ndev,
                                       u8 key_index,
                                       bool pairwise,
                                       const u8 *mac_addr
                                     )
-#else
-static int wlan_hdd_cfg80211_del_key( struct wiphy *wiphy,
-                                      struct net_device *ndev,
-                                      u8 key_index,
-                                      const u8 *mac_addr
-                                    )
-#endif
 {
     int status = 0;
 
@@ -4502,16 +4457,10 @@ static int wlan_hdd_cfg80211_del_key( struct wiphy *wiphy,
  * FUNCTION: wlan_hdd_cfg80211_set_default_key
  * This function is used to set the default tx key index
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 static int wlan_hdd_cfg80211_set_default_key( struct wiphy *wiphy,
                                               struct net_device *ndev,
                                               u8 key_index,
                                               bool unicast, bool multicast)
-#else
-static int wlan_hdd_cfg80211_set_default_key( struct wiphy *wiphy,
-                                              struct net_device *ndev,
-                                              u8 key_index)
-#endif
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( ndev );
     int status;
@@ -4684,7 +4633,6 @@ static struct cfg80211_bss* wlan_hdd_cfg80211_inform_bss(
        return bss;
     }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,38))
     if (chan_no <= ARRAY_SIZE(hdd_channels_2_4_GHZ))
     {
         freq = ieee80211_channel_to_frequency(chan_no, IEEE80211_BAND_2GHZ);
@@ -4693,9 +4641,6 @@ static struct cfg80211_bss* wlan_hdd_cfg80211_inform_bss(
     {
         freq = ieee80211_channel_to_frequency(chan_no, IEEE80211_BAND_5GHZ);
     }
-#else
-    freq = ieee80211_channel_to_frequency(chan_no);
-#endif
 
     chan = __ieee80211_get_channel(wiphy, freq);
 
@@ -4837,7 +4782,6 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
                    (u16)(IEEE80211_FTYPE_MGMT | IEEE80211_STYPE_BEACON);
     }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,38))
     if (chan_no <= ARRAY_SIZE(hdd_channels_2_4_GHZ) &&
         (wiphy->bands[IEEE80211_BAND_2GHZ] != NULL))
     {
@@ -4856,9 +4800,6 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
         kfree(mgmt);
         return NULL;
     }
-#else
-    freq = ieee80211_channel_to_frequency(chan_no);
-#endif
     chan = __ieee80211_get_channel(wiphy, freq);
     /*when the band is changed on the fly using the GUI, three things are done
      * 1. scan abort 2.flush scan results from cache 3.update the band with the new band user specified(refer to the hdd_setBand_helper function)
@@ -7597,11 +7538,7 @@ static int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
         struct wireless_dev *wdev,
 #endif
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,35)
-        enum tx_power_setting type,
-#else
         enum nl80211_tx_power_setting type,
-#endif
         int dbm)
 {
     hdd_context_t *pHddCtx = (hdd_context_t*) wiphy_priv(wiphy);
@@ -8295,7 +8232,6 @@ static int wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 }
 
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
                          struct net_device *netdev,
                          u8 key_index)
@@ -8303,7 +8239,6 @@ static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
     ENTER();
     return 0;
 }
-#endif //LINUX_VERSION_CODE
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
 static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
@@ -8313,7 +8248,7 @@ static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
     ENTER();
     return 0;
 }
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
+#else
 static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
                    struct ieee80211_txq_params *params)
 {
@@ -10633,11 +10568,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops =
     .remain_on_channel = wlan_hdd_cfg80211_remain_on_channel,
     .cancel_remain_on_channel =  wlan_hdd_cfg80211_cancel_remain_on_channel,
     .mgmt_tx = wlan_hdd_mgmt_tx,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
      .mgmt_tx_cancel_wait = wlan_hdd_cfg80211_mgmt_tx_cancel_wait,
      .set_default_mgmt_key = wlan_hdd_set_default_mgmt_key,
      .set_txq_params = wlan_hdd_set_txq_params,
-#endif
      .get_station = wlan_hdd_cfg80211_get_station,
      .set_power_mgmt = wlan_hdd_cfg80211_set_power_mgmt,
      .del_station  = wlan_hdd_cfg80211_del_station,
