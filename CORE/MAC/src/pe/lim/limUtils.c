@@ -7747,7 +7747,6 @@ void limPmfSaQueryTimerHandler(void *pMacGlobal, tANI_U32 param)
     {
         limLog(pMac, LOGE, FL("Session does not exist for given session ID %d"),
                timerId.fields.sessionId);
-        pSta->pmfSaQueryState = DPH_SA_QUERY_NOT_IN_PROGRESS;
         return;
     }
     if ((pSta = dphGetHashEntry(pMac, timerId.fields.peerIdx,
@@ -7755,7 +7754,6 @@ void limPmfSaQueryTimerHandler(void *pMacGlobal, tANI_U32 param)
     {
         limLog(pMac, LOGE, FL("Entry does not exist for given peer index %d"),
                timerId.fields.peerIdx);
-        pSta->pmfSaQueryState = DPH_SA_QUERY_NOT_IN_PROGRESS;
         return;
     }
     if (DPH_SA_QUERY_IN_PROGRESS != pSta->pmfSaQueryState)

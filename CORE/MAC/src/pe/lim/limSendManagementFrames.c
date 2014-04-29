@@ -1580,8 +1580,6 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
 
         PopulateDot11fExtCap(pMac, isVHTEnabled, &frm.ExtCap);
 
-    } // End if on non-NULL 'pSta'.
-
 #ifdef WLAN_FEATURE_11W
     if( eSIR_MAC_TRY_AGAIN_LATER == statusCode )
     {
@@ -1598,6 +1596,8 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
                    (maxRetries - pSta->pmfSaQueryRetryCount) * retryInterval );
     }
 #endif
+    } // End if on non-NULL 'pSta'.
+
     vos_mem_set(( tANI_U8* )&beaconParams, sizeof( tUpdateBeaconParams), 0);
 
     if( psessionEntry->limSystemRole == eLIM_AP_ROLE ){
