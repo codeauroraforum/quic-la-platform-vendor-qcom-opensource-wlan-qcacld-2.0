@@ -256,12 +256,34 @@ eHalStatus wlan_hdd_remain_on_channel_callback( tHalHandle hHal, void* pCtx,
 void wlan_hdd_cancel_existing_remain_on_channel(hdd_adapter_t *pAdapter)
 {
     hdd_cfg80211_state_t *cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
+    hdd_remain_on_chan_ctx_t *pRemainChanCtx;
     int status = 0;
 
+    mutex_lock(&cfgState->remain_on_chan_ctx_lock);
     if(cfgState->remain_on_chan_ctx != NULL)
     {
         hddLog( LOG1, "Cancel Existing Remain on Channel");
 
+        vos_timer_stop(&cfgState->remain_on_chan_ctx->hdd_remain_on_chan_timer);
+        pRemainChanCtx = cfgState->remain_on_chan_ctx;
+        if (pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress == TRUE)
+        {
+            mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
+            hddLog( LOG1,
+                    "ROC timer cancellation in progress,"
+                    " wait for completion");
+            status = wait_for_completion_interruptible_timeout(&pAdapter->cancel_rem_on_chan_var,
+                               msecs_to_jiffies(WAIT_CANCEL_REM_CHAN));
+            if (0 >= status)
+            {
+                hddLog( LOGE,
+                        "%s:wait on cancel_rem_on_chan_var failed %d",
+                         __func__, status);
+            }
+            return;
+        }
+        pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress = TRUE;
+        mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
         /* Wait till remain on channel ready indication before issuing cancel
          * remain on channel request, otherwise if remain on channel not
          * received and if the driver issues cancel remain on channel then lim
@@ -308,7 +330,8 @@ void wlan_hdd_cancel_existing_remain_on_channel(hdd_adapter_t *pAdapter)
                     __func__);
         }
         hdd_allow_suspend();
-    }
+    } else
+        mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
 }
 
 int wlan_hdd_check_remain_on_channel(hdd_adapter_t *pAdapter)
@@ -358,6 +381,13 @@ void wlan_hdd_remain_on_chan_timeout(void *data)
         return;
     }
 
+    if ( TRUE == pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress )
+    {
+        hddLog( LOGE, FL("Cancellation already in progress"));
+        return;
+    }
+
+    pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress = TRUE;
     hddLog( LOG1,"%s: Cancel Remain on Channel on timeout", __func__);
 
     if ( ( WLAN_HDD_INFRA_STATION == pAdapter->device_mode ) ||
@@ -463,6 +493,7 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
     pRemainChanCtx->action_pkt_buff.freq = 0;
     pRemainChanCtx->action_pkt_buff.frame_ptr = NULL;
     pRemainChanCtx->action_pkt_buff.frame_length = 0;
+    pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress = FALSE;
 
     /* Initialize Remain on chan timer */
     vos_status = vos_timer_init(&pRemainChanCtx->hdd_remain_on_chan_timer,
@@ -604,11 +635,18 @@ void hdd_remainChanReadyHandler( hdd_adapter_t *pAdapter )
                       vos_timer_get_system_time() - READY_EVENT_PROPOGATE_TIME;
 
         //start timer for actual duration
+        if(VOS_TIMER_STATE_RUNNING ==
+           vos_timer_getCurrentState(&pRemainChanCtx->hdd_remain_on_chan_timer))
+        {
+            hddLog( LOGE, "Timer Started before ready event!!!");
+            vos_timer_stop(&pRemainChanCtx->hdd_remain_on_chan_timer);
+        }
         status = vos_timer_start(&pRemainChanCtx->hdd_remain_on_chan_timer,
                                 (pRemainChanCtx->duration + COMPLETE_EVENT_PROPOGATE_TIME));
         if (status != VOS_STATUS_SUCCESS)
         {
-            hddLog( LOGE, "Remain on Channel timer start failed");
+            hddLog( LOGE, "%s: Remain on Channel timer start failed",
+                          __func__);
         }
 
         if( REMAIN_ON_CHANNEL_REQUEST == pRemainChanCtx->rem_on_chan_request)
@@ -683,6 +721,7 @@ int wlan_hdd_cfg80211_cancel_remain_on_channel( struct wiphy *wiphy,
 #endif
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     hdd_cfg80211_state_t *cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
+    hdd_remain_on_chan_ctx_t *pRemainChanCtx = cfgState->remain_on_chan_ctx;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
     int status;
 
@@ -708,6 +747,30 @@ int wlan_hdd_cfg80211_cancel_remain_on_channel( struct wiphy *wiphy,
              __func__);
         mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
         return -EINVAL;
+    }
+
+    if (NULL != cfgState->remain_on_chan_ctx)
+    {
+        vos_timer_stop(&cfgState->remain_on_chan_ctx->hdd_remain_on_chan_timer);
+        if (TRUE == pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress)
+        {
+            mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
+            hddLog( LOG1,
+                    FL("ROC timer cancellation in progress,"
+                       " wait for completion"));
+            status = wait_for_completion_interruptible_timeout(
+                                             &pAdapter->cancel_rem_on_chan_var,
+                                             msecs_to_jiffies(WAIT_CANCEL_REM_CHAN));
+            if (0 >= status)
+            {
+                hddLog( LOGE,
+                        "%s:wait on cancel_rem_on_chan_var failed %d",
+                        __func__, status);
+            }
+            return 0;
+        }
+        else
+            pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress = TRUE;
     }
     mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
 
@@ -798,6 +861,7 @@ int wlan_hdd_action( struct wiphy *wiphy, struct net_device *dev,
 #endif
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( dev );
     hdd_cfg80211_state_t *cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
+    hdd_remain_on_chan_ctx_t *pRemainChanCtx = cfgState->remain_on_chan_ctx;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
     tANI_U16 extendedWait = 0;
     tANI_U8 type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
@@ -954,20 +1018,42 @@ int wlan_hdd_action( struct wiphy *wiphy, struct net_device *dev,
                cfgState->remain_on_chan_ctx &&
                cfgState->current_freq == chan->center_freq )
          {
-               if(wait)
+               if(VOS_TIMER_STATE_RUNNING == vos_timer_getCurrentState(
+                   &cfgState->remain_on_chan_ctx->hdd_remain_on_chan_timer))
                {
                    vos_timer_stop(&cfgState->remain_on_chan_ctx->hdd_remain_on_chan_timer);
                    status = vos_timer_start(&cfgState->remain_on_chan_ctx->hdd_remain_on_chan_timer,
                                                         wait);
                    if(status != VOS_STATUS_SUCCESS)
                    {
-                       hddLog( LOGE, "Remain on Channel timer start failed");
+                      hddLog( LOGE, "%s: Remain on Channel timer start failed",
+                                    __func__);
                    }
+                   mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
+                   goto send_frame;
+               } else {
+
+                  if(pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress == TRUE)
+                  {
+                      mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
+                      hddLog(VOS_TRACE_LEVEL_INFO,
+                          "action frame tx: waiting for completion of ROC ");
+
+                      status = wait_for_completion_interruptible_timeout(
+                          &pAdapter->cancel_rem_on_chan_var,
+                          msecs_to_jiffies(WAIT_CANCEL_REM_CHAN));
+                      if (0 >= status)
+                      {
+                          hddLog( LOGE,
+                              "%s:wait on cancel_rem_on_chan_var failed %d",
+                              __func__, status);
+                      }
+
+                  } else
+                      mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
                }
-               mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
-               goto send_frame;
-         }
-         mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
+         } else
+             mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
 
         if((cfgState->remain_on_chan_ctx != NULL) &&
            (cfgState->current_freq == chan->center_freq)
@@ -1811,12 +1897,21 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
 
                       if(completion_done(&pAdapter->rem_on_chan_ready_event))
                       {
-                          vos_timer_stop(&pRemainChanCtx->hdd_remain_on_chan_timer);
-                          status = vos_timer_start(&pRemainChanCtx->hdd_remain_on_chan_timer,
-                                            extend_time);
-                          if (status != VOS_STATUS_SUCCESS)
+                          if(VOS_TIMER_STATE_RUNNING ==
+                            vos_timer_getCurrentState(&pRemainChanCtx->hdd_remain_on_chan_timer))
                           {
-                              hddLog( LOGE, "Remain on Channel timer start failed");
+                              vos_timer_stop(&pRemainChanCtx->hdd_remain_on_chan_timer);
+                              status = vos_timer_start(
+                                  &pRemainChanCtx->hdd_remain_on_chan_timer,
+                                            extend_time);
+                              if (status != VOS_STATUS_SUCCESS)
+                              {
+                                  hddLog( LOGE, "%s: Remain on Channel timer start failed",
+                                          __func__);
+                              }
+                          } else {
+                              hddLog( LOG1, "%s: Rcvd action frame after timer expired",
+                                      __func__);
                           }
                       } else {
                         // Buffer Packet

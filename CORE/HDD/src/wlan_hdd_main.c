@@ -7662,13 +7662,6 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          if( NULL == pAdapter )
             return NULL;
 
-#ifdef FEATURE_WLAN_TDLS
-         /* A Mutex Lock is introduced while changing/initializing the mode to
-          * protect the concurrent access for the Adapters by TDLS module.
-          */
-         mutex_lock(&pHddCtx->tdls_lock);
-#endif
-
          pAdapter->wdev.iftype = (session_type == WLAN_HDD_P2P_CLIENT) ?
                                   NL80211_IFTYPE_P2P_CLIENT:
                                   NL80211_IFTYPE_STATION;
@@ -7676,9 +7669,6 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          pAdapter->device_mode = session_type;
 
          status = hdd_init_station_mode( pAdapter );
-#ifdef FEATURE_WLAN_TDLS
-         mutex_unlock(&pHddCtx->tdls_lock);
-#endif
          if( VOS_STATUS_SUCCESS != status )
             goto err_free_netdev;
 
@@ -7732,6 +7722,19 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
             hdd_deinit_adapter(pHddCtx, pAdapter);
             goto err_free_netdev;
          }
+
+#ifdef QCA_LL_TX_FLOW_CT
+         /* SAP mode default TX Flow control instance
+          * This instance will be used SAP concurrency */
+         vos_timer_init(&pAdapter->tx_flow_control_timer,
+                     VOS_TIMER_TYPE_SW,
+                     hdd_softap_tx_resume_timer_expired_handler,
+                     pAdapter);
+         WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
+                     hdd_softap_tx_resume_cb,
+                     pAdapter->sessionId,
+                     (void *)pAdapter);
+#endif /* QCA_LL_TX_FLOW_CT */
 
          netif_tx_disable(pAdapter->dev);
          netif_carrier_off(pAdapter->dev);
@@ -8064,6 +8067,8 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
 
    ENTER();
 
+   netif_tx_disable(pAdapter->dev);
+   netif_carrier_off(pAdapter->dev);
    switch(pAdapter->device_mode)
    {
       case WLAN_HDD_INFRA_STATION:
@@ -8246,11 +8251,7 @@ VOS_STATUS hdd_stop_all_adapters( hdd_context_t *pHddCtx )
    while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
    {
       pAdapter = pAdapterNode->pAdapter;
-      netif_tx_disable(pAdapter->dev);
-      netif_carrier_off(pAdapter->dev);
-
       hdd_stop_adapter( pHddCtx, pAdapter );
-
       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
       pAdapterNode = pNext;
    }
