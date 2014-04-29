@@ -529,7 +529,7 @@ static void __schBeaconProcessForSession( tpAniSirGlobal      pMac,
                    }
                 limCheckVHTOpModeChange(pMac, psessionEntry,
                       pBeacon->OperatingMode.chanWidth,
-                      pStaDs->staIndex);
+                      pStaDs->staIndex, pMh->sa);
              }
           }
           else if (psessionEntry->vhtCapability && pBeacon->VHTOperation.present)
@@ -582,7 +582,7 @@ static void __schBeaconProcessForSession( tpAniSirGlobal      pMac,
                       }
                    }
                 limCheckVHTOpModeChange(pMac, psessionEntry,
-                      chWidth, pStaDs->staIndex);
+                      chWidth, pStaDs->staIndex, pMh->sa);
              }
           }
        }
