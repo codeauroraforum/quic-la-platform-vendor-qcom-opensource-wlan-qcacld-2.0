@@ -1362,6 +1362,11 @@ typedef enum
 #define CFG_ENABLE_HOST_ARPOFFLOAD_MAX          ( 1 )
 #define CFG_ENABLE_HOST_ARPOFFLOAD_DEFAULT      ( 0 )
 
+#define CFG_ENABLE_HOST_SSDP_NAME              "ssdp"
+#define CFG_ENABLE_HOST_SSDP_MIN               ( 0 )
+#define CFG_ENABLE_HOST_SSDP_MAX               ( 1 )
+#define CFG_ENABLE_HOST_SSDP_DEFAULT           ( 1 )
+
 #define CFG_ENABLE_HOST_NSOFFLOAD_NAME         "hostNSOffload"
 #define CFG_ENABLE_HOST_NSOFFLOAD_MIN          ( 0 )
 #define CFG_ENABLE_HOST_NSOFFLOAD_MAX          ( 1 )
@@ -2615,6 +2620,7 @@ typedef struct
    v_BOOL_t                    bSingleTidRc;
    v_U8_t                      mcastBcastFilterSetting;
    v_BOOL_t                    fhostArpOffload;
+   v_BOOL_t                    ssdp;
 #ifdef FEATURE_WLAN_SCAN_PNO
    v_BOOL_t                    PnoOffload;
 #endif
