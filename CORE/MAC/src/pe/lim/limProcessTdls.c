@@ -5447,6 +5447,7 @@ tSirRetStatus limProcesSmeTdlsLinkEstablishReq(tpAniSirGlobal pMac,
     pMsgTdlsLinkEstablishReq->uapsdQueues = pTdlsLinkEstablishReq->uapsdQueues;
     pMsgTdlsLinkEstablishReq->maxSp = pTdlsLinkEstablishReq->maxSp;
     pMsgTdlsLinkEstablishReq->isBufsta = pTdlsLinkEstablishReq->isBufSta;
+
     msg.type = WDA_SET_TDLS_LINK_ESTABLISH_REQ;
     msg.reserved = 0;
     msg.bodyptr = pMsgTdlsLinkEstablishReq;
