@@ -137,19 +137,6 @@ ifeq ($(CONFIG_ROME_IF),usb)
 #CONFIG_ATH_PCI := 1
 endif
 
-ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
-CONFIG_HIF_PCI := 0
-else
-CONFIG_HIF_PCI := 1
-endif
-
-#Enable pci read/write config functions
-ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
-CONFIG_ATH_PCI := 0
-else
-CONFIG_ATH_PCI := 1
-endif
-
 #Enable IBSS support on CLD
 CONFIG_QCA_IBSS_SUPPORT := 1
 
@@ -986,6 +973,7 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
                 -DQCA_SUPPORT_TXRX_VDEV_PAUSE_LL \
 		-DQCA_SUPPORT_TX_THROTTLE_LL \
 		-DWMI_INTERFACE_EVENT_LOGGING\
+		-DATH_SUPPORT_WAPI\
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 CDEFINES +=     -DCONFIG_HL_SUPPORT \
@@ -1003,7 +991,9 @@ CDEFINES +=	-DWLANTL_DEBUG
 else
 CDEFINES +=	-DOSIF_NEED_RX_PEER_ID \
 		-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID
+ifeq ($(CONFIG_ROME_IF),pci)
 CDEFINES +=	-DQCA_LL_TX_FLOW_CT
+endif
 endif
 
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
@@ -1266,6 +1256,9 @@ CDEFINES += -DWLAN_FEATURE_MBSSID
 #Green AP feature
 CDEFINES += -DFEATURE_GREEN_AP
 
+#Enable 4address scheme for mdm9630
+CDEFINES += -DFEATURE_WLAN_STA_4ADDR_SCHEME
+
 else
 
 #Open P2P device interface only for non-MDM9630 platform
@@ -1300,6 +1293,14 @@ CDEFINES += -DEXISTS_MSM_SMSM
 endif
 
 KBUILD_CPPFLAGS += $(CDEFINES)
+
+# Currently, for versions of gcc which support it, the kernel Makefile
+# is disabling the maybe-uninitialized warning.  Re-enable it for the
+# WLAN driver.  Note that we must use EXTRA_CFLAGS here so that it
+# will override the kernel settings.
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
 
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -225,13 +225,30 @@ htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
     msg_word++;
     *msg_word = 0;
 #ifndef REMOVE_PKT_LOG
-    enable_ctrl_data = 1;
-    enable_mgmt_data = 1;
-    enable_null_data = 1;
-    enable_phy_data  = 1;
-    enable_hdr       = 1;
-    enable_ppdu_start= 1;
-    enable_ppdu_end  = 1;
+ if (ol_cfg_is_packet_log_enabled(pdev->ctrl_pdev))
+   {
+       enable_ctrl_data = 1;
+       enable_mgmt_data = 1;
+       enable_null_data = 1;
+       enable_phy_data  = 1;
+       enable_hdr       = 1;
+       enable_ppdu_start= 1;
+       enable_ppdu_end  = 1;
+       /* Disable ASPM when pkt log is enabled */
+       adf_os_print("Pkt log is enabled\n");
+       htt_htc_disable_aspm();
+   }
+   else
+   {
+       adf_os_print("Pkt log is disabled\n");
+       enable_ctrl_data = 0;
+       enable_mgmt_data = 0;
+       enable_null_data = 0;
+       enable_phy_data  = 0;
+       enable_hdr       = 0;
+       enable_ppdu_start= 0;
+       enable_ppdu_end  = 0;
+   }
 #else
     enable_ctrl_data = 0;
     enable_mgmt_data = 0;

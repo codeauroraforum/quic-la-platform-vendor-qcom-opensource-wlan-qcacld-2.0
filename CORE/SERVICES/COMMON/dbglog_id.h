@@ -681,7 +681,9 @@ extern "C" {
 #define WAL_DBGID_SMPS_DISABLE                      63
 #define WAL_DBGID_SMPS_ENABLE_HW_CNTRL              64
 #define WAL_DBGID_SMPS_SWSEL_CHAINMASK              65
-#define WAL_DBGID_DEFINITION_END                    66
+#define WAL_DBGID_SUSPEND                           66
+#define WAL_DBGID_RESUME                            67
+#define WAL_DBGID_DEFINITION_END                    68
 
 #define ANI_DBGID_POLL                               0
 #define ANI_DBGID_CONTROL                            1
@@ -1020,6 +1022,15 @@ extern "C" {
 #define RMC_SET_MODE                           14
 #define RMC_SET_ACTION_PERIOD                  15
 #define RMC_DBGID_DEFINITION_END               16
+
+/* Stats Module DBGIDs */
+#define WLAN_STATS_DBGID_DEFINITION_START                0
+#define WLAN_STATS_DBGID_EST_LINKSPEED_VDEV_EN_DIS       1
+#define WLAN_STATS_DBGID_EST_LINKSPEED_CHAN_TIME_START   2
+#define WLAN_STATS_DBGID_EST_LINKSPEED_CHAN_TIME_END     3
+#define WLAN_STATS_DBGID_EST_LINKSPEED_CALC              4
+#define WLAN_STATS_DBGID_EST_LINKSPEED_UPDATE_HOME_CHAN  5
+#define WLAN_STATS_DBGID_DEFINITION_END                  6
 
 #ifdef __cplusplus
 }
