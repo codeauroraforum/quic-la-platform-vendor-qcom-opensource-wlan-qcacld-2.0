@@ -568,6 +568,19 @@ eHalStatus sme_ScanGetResult(tHalHandle hHal, tANI_U8 sessionId, tCsrScanResultF
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_ScanFlushResult(tHalHandle hHal, tANI_U8 sessionId);
+
+/*
+ * ---------------------------------------------------------------------------
+ *  \fn sme_FilterScanResults
+ *  \brief a wrapper function to request CSR to filter the scan results based
+ *   on valid chennel list.
+ *  \param hHal - The handle returned by macOpen.
+ *  \param sessionId - the sessionId returned by sme_OpenSession.
+ *  \return eHalStatus
+ *---------------------------------------------------------------------------
+ */
+eHalStatus sme_FilterScanResults(tHalHandle hHal, tANI_U8 sessionId);
+
 eHalStatus sme_ScanFlushP2PResult(tHalHandle hHal, tANI_U8 sessionId);
 
 /* ---------------------------------------------------------------------------
@@ -910,9 +923,25 @@ eHalStatus sme_GetStatistics(tHalHandle hHal, eCsrStatsRequesterType requesterId
   ---------------------------------------------------------------------------*/
 tANI_U16 smeGetTLSTAState(tHalHandle hHal, tANI_U8 staId);
 
+/* ---------------------------------------------------------------------------
+    \fn sme_GetRssi
+    \brief a wrapper function that client calls to register a callback to get
+           RSSI
+
+    \param hHal - HAL handle for device
+    \param callback - SME sends back the requested stats using the callback
+    \param staId -    The station ID for which the stats is requested for
+    \param bssid - The bssid of the connected session
+    \param lastRSSI - RSSI value at time of request. In case fw cannot provide
+                      RSSI, do not hold up but return this value.
+    \param pContext - user context to be passed back along with the callback
+    \param pVosContext - vos context
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
 eHalStatus sme_GetRssi(tHalHandle hHal,
-                             tCsrRssiCallback callback,
-                             tANI_U8 staId, tCsrBssid bssId, void *pContext, void* pVosContext);
+                       tCsrRssiCallback callback,
+                       tANI_U8 staId, tCsrBssid bssId, tANI_S8 lastRSSI,
+                       void *pContext, void* pVosContext);
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetSnr

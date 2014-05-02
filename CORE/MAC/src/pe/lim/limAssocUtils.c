@@ -899,7 +899,8 @@ limSendDelStaCnf(tpAniSirGlobal pMac, tSirMacAddr staDsAddr,
 
         //if it is a reassoc failure to join new AP
         if((mlmStaContext.resultCode == eSIR_SME_FT_REASSOC_TIMEOUT_FAILURE) ||
-           (mlmStaContext.resultCode == eSIR_SME_FT_REASSOC_FAILURE))
+           (mlmStaContext.resultCode == eSIR_SME_FT_REASSOC_FAILURE) ||
+           (mlmStaContext.resultCode == eSIR_SME_REASSOC_TIMEOUT_RESULT_CODE))
         {
             if(mlmStaContext.resultCode != eSIR_SME_SUCCESS )
             {
@@ -3933,6 +3934,7 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
             PELOGE(limLog(pMac, LOGE, FL("Couldn't get assoc id for "
                        "MAC ADDR: " MAC_ADDRESS_STR),
                        MAC_ADDR_ARRAY(pAddBssParams->staContext.staMac));)
+            return eSIR_FAILURE;
         }
 
         if(!pMac->psOffloadEnabled)
