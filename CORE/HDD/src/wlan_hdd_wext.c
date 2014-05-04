@@ -613,7 +613,7 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
     tSirVersionString wcnss_SW_version;
     const char *pSWversion;
     const char *pHWversion;
-    v_U32_t CBId = 0, CBSId = 0, CRMId = 0;
+    v_U32_t MSPId = 0, mSPId = 0, SIId = 0, CRMId = 0;
 #ifndef QCA_WIFI_2_0
     VOS_STATUS status;
     tSirVersionString wcnss_HW_version;
@@ -635,8 +635,9 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
         pHddContext->target_fw_version);
 
     pSWversion = wcnss_SW_version;
-    CBId = (pHddContext->target_fw_version & 0xf8000000) >> 27;
-    CBSId = (pHddContext->target_fw_version & 0x07000000) >> 24;
+    MSPId = (pHddContext->target_fw_version & 0xf0000000) >> 28;
+    mSPId = (pHddContext->target_fw_version & 0xf000000) >> 24;
+    SIId = (pHddContext->target_fw_version & 0xf00000) >> 20;
     CRMId = pHddContext->target_fw_version & 0x7fff;
 
     for (i = 0; i < ARRAY_SIZE(qwlan_hw_list); i++) {
@@ -674,17 +675,19 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
 
     if (wrqu) {
         wrqu->data.length = scnprintf(extra, WE_MAX_STR_LEN,
-                                     "Host SW:%s, FW:%d.%d.%d, HW:%s",
+                                     "Host SW:%s, FW:%d.%d.%d.%d, HW:%s",
                                      QWLAN_VERSIONSTR,
-                                     CBId,
-                                     CBSId,
+                                     MSPId,
+                                     mSPId,
+                                     SIId,
                                      CRMId,
                                      pHWversion);
     } else {
-        pr_info("Host SW:%s, FW:%d.%d.%d, HW:%s\n",
+        pr_info("Host SW:%s, FW:%d.%d.%d.%d, HW:%s\n",
                 QWLAN_VERSIONSTR,
-                CBId,
-                CBSId,
+                MSPId,
+                mSPId,
+                SIId,
                 CRMId,
                 pHWversion);
     }
@@ -9301,9 +9304,16 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     eCsrBand band;
+
+    VOS_STATUS status;
+    hdd_context_t *pHddCtx;
+    hdd_adapter_list_node_t *pAdapterNode, *pNext;
     eCsrBand currBand = eCSR_BAND_MAX;
+
+    pAdapterNode = NULL;
+    pNext = NULL;
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
     switch(ui_band)
     {
@@ -9359,50 +9369,65 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
                 "%s: Current band value = %u, new setting %u ",
                  __func__, currBand, band);
 
-        hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId);
-
-        if (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))
+        status =  hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+        while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
         {
-             hdd_station_ctx_t *pHddStaCtx = &(pAdapter)->sessionCtx.station;
-             eHalStatus status = eHAL_STATUS_SUCCESS;
-             long lrc;
+            pAdapter = pAdapterNode->pAdapter;
+            hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
+            hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId);
 
-             /* STA already connected on current band, So issue disconnect first,
-                        * then change the band*/
+            /* Handling is done only for STA and P2P */
+            if (((pAdapter->device_mode == WLAN_HDD_INFRA_STATION) ||
+                 (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)) &&
+                 (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))
+               )
+            {
+                 hdd_station_ctx_t *pHddStaCtx = &(pAdapter)->sessionCtx.station;
+                 eHalStatus status = eHAL_STATUS_SUCCESS;
+                 long lrc;
 
-             hddLog(VOS_TRACE_LEVEL_INFO,
-                     "%s STA connected in band %u, Changing band to %u, Issuing Disconnect",
-                        __func__, csrGetCurrentBand(hHal), band);
+                 /* STA already connected on current band, So issue disconnect
+                  * first, then change the band*/
 
-             pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
-             INIT_COMPLETION(pAdapter->disconnect_comp_var);
+                 hddLog(VOS_TRACE_LEVEL_INFO,
+                         "%s STA (Device mode=%d) connected in band %u, Changing band to %u, Issuing Disconnect",
+                            __func__, pAdapter->device_mode,
+                            currBand, band);
 
-             status = sme_RoamDisconnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
-             pAdapter->sessionId, eCSR_DISCONNECT_REASON_UNSPECIFIED);
+                 pHddStaCtx->conn_info.connState = eConnectionState_Disconnecting;
+                 INIT_COMPLETION(pAdapter->disconnect_comp_var);
 
-             if ( eHAL_STATUS_SUCCESS != status)
-             {
-                 hddLog(VOS_TRACE_LEVEL_ERROR,
-                         "%s csrRoamDisconnect failure, returned %d",
-                           __func__, (int)status );
-                 return -EINVAL;
-             }
+                 status = sme_RoamDisconnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
+                 pAdapter->sessionId, eCSR_DISCONNECT_REASON_UNSPECIFIED);
 
-             lrc = wait_for_completion_interruptible_timeout(
-                     &pAdapter->disconnect_comp_var,
-                     msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+                 if ( eHAL_STATUS_SUCCESS != status)
+                 {
+                     hddLog(VOS_TRACE_LEVEL_ERROR,
+                             "%s csrRoamDisconnect failure, returned %d",
+                               __func__, (int)status );
+                     return -EINVAL;
+                 }
 
-             if (lrc <= 0) {
+                 lrc = wait_for_completion_timeout(
+                         &pAdapter->disconnect_comp_var,
+                         msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
 
-                hddLog(VOS_TRACE_LEVEL_ERROR,"%s: %s while waiting for csrRoamDisconnect ",
-                 __func__, (0 == lrc) ? "Timeout" : "Interrupt");
+                 if (lrc == 0) {
+                    hddLog(VOS_TRACE_LEVEL_ERROR,"%s:Timeout while waiting for csrRoamDisconnect",
+                                __func__);
+                    return -ETIMEDOUT ;
+                 }
 
-                return (0 == lrc) ? -ETIMEDOUT : -EINTR;
-             }
+                 pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
+            }
+
+            sme_ScanFlushResult(hHal, pAdapter->sessionId);
+
+            status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+            pAdapterNode = pNext;
         }
 
-        sme_ScanFlushResult(hHal, pAdapter->sessionId);
-        if (eHAL_STATUS_SUCCESS != sme_SetFreqBand(hHal, (eCsrBand)band))
+        if (eHAL_STATUS_SUCCESS != sme_SetFreqBand(hHal, band))
         {
              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                      "%s: failed to set the band value to %u ",

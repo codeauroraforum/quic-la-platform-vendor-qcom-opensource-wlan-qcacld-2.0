@@ -270,6 +270,11 @@ extern int hdd_ftm_stop(hdd_context_t *pHddCtx);
 #endif
 
 
+/* Store WLAN driver version info in a global variable such that crash debugger
+   can extract it from driver debug symbol and crashdump for post processing */
+tANI_U8 g_wlan_driver_version[ ] = QWLAN_VERSIONSTR;
+
+
 #if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
 VOS_STATUS hdd_parse_get_cckm_ie(tANI_U8 *pValue,
                                  tANI_U8 **pCckmIe,
@@ -10145,7 +10150,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if(pHddCtx->cfg_ini == NULL)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Failed kmalloc hdd_config_t",__func__);
-      goto err_free_hdd_context;
+      goto err_free_adf_context;
    }
 
    vos_mem_zero(pHddCtx->cfg_ini, sizeof( hdd_config_t ));
@@ -10947,6 +10952,10 @@ err_config:
    kfree(pHddCtx->cfg_ini);
    pHddCtx->cfg_ini= NULL;
 
+err_free_adf_context:
+#ifdef QCA_WIFI_2_0
+   vos_mem_free(adf_ctx);
+#endif
 err_free_hdd_context:
    hdd_allow_suspend();
    wiphy_free(wiphy) ;
