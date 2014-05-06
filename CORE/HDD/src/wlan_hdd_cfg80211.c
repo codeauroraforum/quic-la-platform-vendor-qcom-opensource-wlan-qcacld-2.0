@@ -1091,6 +1091,7 @@ int wlan_hdd_cfg80211_register(struct wiphy *wiphy)
 */
 void wlan_hdd_cfg80211_update_wiphy_caps(struct wiphy *wiphy)
 {
+#ifdef FEATURE_WLAN_SCAN_PNO
    hdd_context_t *pHddCtx = wiphy_priv(wiphy);
    hdd_config_t *pCfg = pHddCtx->cfg_ini;
 
@@ -1103,6 +1104,7 @@ void wlan_hdd_cfg80211_update_wiphy_caps(struct wiphy *wiphy)
        wiphy->max_match_sets = 0;
        wiphy->max_sched_scan_ie_len = 0;
    }
+#endif
 }
 #endif
 
