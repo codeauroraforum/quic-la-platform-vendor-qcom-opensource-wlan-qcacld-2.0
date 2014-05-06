@@ -7348,8 +7348,7 @@ void wlan_hdd_release_intf_addr(hdd_context_t* pHddCtx, tANI_U8* releaseAddr)
    return;
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29))
-  static struct net_device_ops wlan_drv_ops = {
+static struct net_device_ops wlan_drv_ops = {
       .ndo_open = hdd_open,
       .ndo_stop = hdd_stop,
       .ndo_uninit = hdd_uninit,
@@ -7376,24 +7375,12 @@ void wlan_hdd_release_intf_addr(hdd_context_t* pHddCtx, tANI_U8* releaseAddr)
       .ndo_get_stats = hdd_stats,
       .ndo_do_ioctl = hdd_ioctl,
       .ndo_set_mac_address = hdd_set_mac_address,
- };
+};
 
-#endif
 
 void hdd_set_station_ops( struct net_device *pWlanDev )
 {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29))
       pWlanDev->netdev_ops = &wlan_drv_ops;
-#else
-      pWlanDev->open = hdd_open;
-      pWlanDev->stop = hdd_stop;
-      pWlanDev->uninit = hdd_uninit;
-      pWlanDev->hard_start_xmit = NULL;
-      pWlanDev->tx_timeout = hdd_tx_timeout;
-      pWlanDev->get_stats = hdd_stats;
-      pWlanDev->do_ioctl = hdd_ioctl;
-      pWlanDev->set_mac_address = hdd_set_mac_address;
-#endif
 }
 
 static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMacAddr macAddr, const char* name )
@@ -7423,9 +7410,7 @@ static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMac
       init_completion(&pAdapter->linkup_event_var);
       init_completion(&pAdapter->cancel_rem_on_chan_var);
       init_completion(&pAdapter->rem_on_chan_ready_event);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
       init_completion(&pAdapter->offchannel_tx_event);
-#endif
       init_completion(&pAdapter->tx_action_cnf_event);
 #ifdef FEATURE_WLAN_TDLS
       init_completion(&pAdapter->tdls_add_station_comp);
@@ -7458,6 +7443,7 @@ static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMac
       vos_event_init(&pAdapter->scan_info.scan_finished_event);
       pAdapter->scan_info.scan_pending_option = WEXT_SCAN_PENDING_GIVEUP;
 
+      pAdapter->offloads_configured = FALSE;
       pAdapter->isLinkUpSvcNeeded = FALSE;
       pAdapter->higherDtimTransition = eANI_BOOLEAN_TRUE;
       //Init the net_device structure
@@ -7625,12 +7611,6 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
       status = VOS_STATUS_E_FAILURE;
       goto error_register_wext;
    }
-   //Safe to register the hard_start_xmit function again
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29))
-   wlan_drv_ops.ndo_start_xmit = hdd_hard_start_xmit;
-#else
-   pWlanDev->hard_start_xmit = hdd_hard_start_xmit;
-#endif
 
    //Set the Connection State to Not Connected
    pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
@@ -8213,19 +8193,6 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
             goto err_free_netdev;
          }
 
-#ifdef QCA_LL_TX_FLOW_CT
-         /* SAP mode default TX Flow control instance
-          * This instance will be used SAP concurrency */
-         vos_timer_init(&pAdapter->tx_flow_control_timer,
-                     VOS_TIMER_TYPE_SW,
-                     hdd_softap_tx_resume_timer_expired_handler,
-                     pAdapter);
-         WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
-                     hdd_softap_tx_resume_cb,
-                     pAdapter->sessionId,
-                     (void *)pAdapter);
-#endif /* QCA_LL_TX_FLOW_CT */
-
          netif_tx_disable(pAdapter->dev);
          netif_carrier_off(pAdapter->dev);
 
@@ -8245,12 +8212,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          pAdapter->wdev.iftype = NL80211_IFTYPE_MONITOR;
          pAdapter->device_mode = session_type;
          status = hdd_register_interface( pAdapter, rtnl_held );
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29)
          pAdapter->dev->netdev_ops = &wlan_mon_drv_ops;
-#else
-         pAdapter->dev->open = hdd_mon_open;
-         pAdapter->dev->hard_start_xmit = hdd_mon_hard_start_xmit;
-#endif
          hdd_init_tx_rx( pAdapter );
          set_bit(INIT_TX_RX_SUCCESS, &pAdapter->event_flags);
          //Set adapter to be used for data tx. It will use either GO or softap.
@@ -8417,6 +8379,8 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
 
 #endif
 
+#ifdef CONFIG_FW_LOGS_BASED_ON_INI
+
   /* Enable FW logs based on INI configuration */
   if ((VOS_FTM_MODE != vos_get_conparam()) &&
              (pHddCtx->cfg_ini->enableFwLogType))
@@ -8476,6 +8440,8 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          count += 2;
      }
   }
+
+#endif
 
 
    return pAdapter;
