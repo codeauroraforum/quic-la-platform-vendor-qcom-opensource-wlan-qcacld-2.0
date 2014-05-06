@@ -3342,17 +3342,26 @@ REG_VARIABLE( CFG_SAP_MAX_NO_PEERS, WLAN_PARAM_Integer,
 #endif
 
    REG_VARIABLE( CFG_ROAMING_DFS_CHANNEL_NAME , WLAN_PARAM_Integer,
-              hdd_config_t, allowDFSChannelRoam,
-              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-              CFG_ROAMING_DFS_CHANNEL_DEFAULT,
-              CFG_ROAMING_DFS_CHANNEL_MIN,
-              CFG_ROAMING_DFS_CHANNEL_MAX ),
-REG_VARIABLE( CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME, WLAN_PARAM_Integer,
-              hdd_config_t, debugP2pRemainOnChannel,
-              VAR_FLAGS_OPTIONAL,
-              CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_DEFAULT,
-              CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN,
-              CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX ),
+                 hdd_config_t, allowDFSChannelRoam,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_ROAMING_DFS_CHANNEL_DEFAULT,
+                 CFG_ROAMING_DFS_CHANNEL_MIN,
+                 CFG_ROAMING_DFS_CHANNEL_MAX ),
+
+   REG_VARIABLE( CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME, WLAN_PARAM_Integer,
+                 hdd_config_t, debugP2pRemainOnChannel,
+                 VAR_FLAGS_OPTIONAL,
+                 CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_DEFAULT,
+                 CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN,
+                 CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX ),
+
+   REG_VARIABLE( CFG_ENABLE_PACKET_LOG, WLAN_PARAM_Integer,
+                 hdd_config_t, enablePacketLog,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_ENABLE_PACKET_LOG_DEFAULT,
+                 CFG_ENABLE_PACKET_LOG_MIN,
+                 CFG_ENABLE_PACKET_LOG_MAX ),
+
 };
 
 /*
