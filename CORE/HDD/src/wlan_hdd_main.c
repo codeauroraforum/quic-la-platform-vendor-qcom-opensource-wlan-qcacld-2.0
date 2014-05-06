@@ -10410,85 +10410,151 @@ static VOS_STATUS wlan_hdd_reg_init(hdd_context_t *hdd_ctx)
 #endif
 
 #ifdef MSM_PLATFORM
-enum cnss_bus_width_type hdd_get_vote_level(unsigned long tx,
-                                            unsigned long rx)
+void hdd_cnss_request_bus_bandwidth(hdd_context_t *pHddCtx,
+        uint64_t tx_packets, uint64_t rx_packets)
 {
-    if (tx > HDD_HIGH_BUS_BANDWIDTH_THRESHOLD_TX ||
-        rx > HDD_HIGH_BUS_BANDWIDTH_THRESHOLD_RX)
-        return CNSS_BUS_WIDTH_HIGH;
-    else if (tx > HDD_MEDIUM_BUS_BANDWIDTH_THRESHOLD_TX ||
-             rx > HDD_MEDIUM_BUS_BANDWIDTH_THRESHOLD_RX)
-        return CNSS_BUS_WIDTH_MEDIUM;
+    uint64_t total = tx_packets + rx_packets;
+    enum cnss_bus_width_type next_vote_level = CNSS_BUS_WIDTH_NONE;
+
+    if (total > pHddCtx->cfg_ini->busBandwidthHighThreshold)
+        next_vote_level = CNSS_BUS_WIDTH_HIGH;
+    else if (total > pHddCtx->cfg_ini->busBandwidthMediumThreshold)
+        next_vote_level = CNSS_BUS_WIDTH_MEDIUM;
     else
-        return CNSS_BUS_WIDTH_LOW;
+        next_vote_level = CNSS_BUS_WIDTH_LOW;
+
+    if (pHddCtx->cur_vote_level != next_vote_level) {
+        hddLog(VOS_TRACE_LEVEL_DEBUG,
+               "%s: trigger level %d, tx_packets: %lld, rx_packets: %lld",
+               __func__, next_vote_level, tx_packets, rx_packets);
+        pHddCtx->cur_vote_level = next_vote_level;
+        cnss_request_bus_bandwidth(next_vote_level);
+    }
 }
 
-static void hdd_bus_bw_compute_cbk(void *phddctx)
+#define HDD_BW_GET_DIFF(x, y) ((x) >= (y) ? (x) - (y) : (ULONG_MAX - (y) + (x)))
+static void hdd_bus_bw_compute_cbk(void *priv)
 {
-    unsigned long tx_pkts;
-    unsigned long rx_pkts;
-    enum cnss_bus_width_type vote_level;
-    enum cnss_bus_width_type vote_level_max = CNSS_BUS_WIDTH_NONE;
-    hdd_adapter_t *pAdapter;
-    hdd_context_t *pHddCtx = (hdd_context_t *)phddctx;
+    hdd_context_t *pHddCtx = (hdd_context_t *)priv;
+    hdd_adapter_t *pAdapter = NULL;
+    uint64_t tx_packets= 0, rx_packets= 0;
+    unsigned long flags;
     hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
     VOS_STATUS status = 0;
-    unsigned long flags;
+    v_BOOL_t connected = FALSE;
 
-    /* iterate through all adapters and determine the final
-     * voting level based on the highest bandwidth requirement
-     */
     spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-    status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
-    while (NULL != pAdapterNode && VOS_STATUS_SUCCESS == status)
-    {
+
+    status = hdd_get_front_adapter( pHddCtx, &pAdapterNode );
+    while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status ) {
         pAdapter = pAdapterNode->pAdapter;
-        if (pAdapter) {
-            if (0 == pAdapter->connection) {
-                status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
-                pAdapterNode = pNext;
-                continue;
-            }
-            tx_pkts = pAdapter->stats.tx_packets - pAdapter->prev_tx_packets;
-            rx_pkts = pAdapter->stats.rx_packets - pAdapter->prev_rx_packets;
-            pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
-            pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
-            vote_level = hdd_get_vote_level(tx_pkts, rx_pkts);
-            vote_level_max = (vote_level > vote_level_max) ?
-                             (vote_level) : (vote_level_max);
+        if (pAdapter && (pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
+                    pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) &&
+                WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)->conn_info.connState
+                != eConnectionState_Associated) {
+
+            status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+            pAdapterNode = pNext;
+            continue;
         }
+
+        if (pAdapter && (pAdapter->device_mode == WLAN_HDD_SOFTAP ||
+                    pAdapter->device_mode == WLAN_HDD_P2P_GO) &&
+                WLAN_HDD_GET_AP_CTX_PTR(pAdapter)->bApActive == VOS_FALSE) {
+
+            status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+            pAdapterNode = pNext;
+            continue;
+        }
+        tx_packets += HDD_BW_GET_DIFF(pAdapter->stats.tx_packets,
+                pAdapter->prev_tx_packets);
+        rx_packets += HDD_BW_GET_DIFF(pAdapter->stats.rx_packets,
+                pAdapter->prev_rx_packets);
+
+        pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
+        pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
+        connected = TRUE;
+
         status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
         pAdapterNode = pNext;
     }
     spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 
-    if (CNSS_BUS_WIDTH_NONE == vote_level_max) {
+    if (!connected) {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "bus bandwidth timer running in disconnected state");
         return;
     }
 
-    /* skip the one followed by the trigger */
-    if (pHddCtx->bus_bw_triggered) {
-        pHddCtx->bus_bw_triggered = 0;
-        goto exit;
-    }
+    hdd_cnss_request_bus_bandwidth(pHddCtx, tx_packets, rx_packets);
 
-    if (pHddCtx->cur_bus_bw != vote_level_max) {
-        hddLog(VOS_TRACE_LEVEL_DEBUG,
-               "trigger level %d", vote_level_max);
-        pHddCtx->bus_bw_triggered = 1;
-        pHddCtx->cur_bus_bw = vote_level_max;
-#ifdef CONFIG_CNSS
-        cnss_request_bus_bandwidth(vote_level_max);
-#endif
-    }
-
-exit:
     vos_timer_start(&pHddCtx->bus_bw_timer,
-                    HDD_BUS_BANDWIDTH_COMPUTE_INTERVAL);
+            pHddCtx->cfg_ini->busBandwidthComputeInterval);
 }
 #endif
+
+#if defined(WLAN_AUTOGEN_MACADDR_FEATURE) && defined (QCA_WIFI_ISOC)
+/**---------------------------------------------------------------------------
+
+  \brief hdd_generate_iface_mac_addr_auto() - HDD Mac Interface Auto
+                                              generate function
+
+  This is generate the random mac address for WLAN interface
+
+  \param  - pHddCtx  - Pointer to HDD context
+            idx      - Start interface index to get auto
+                       generated mac addr.
+            mac_addr - Mac address
+
+  \return -  0 for success, < 0 for failure
+
+  --------------------------------------------------------------------------*/
+
+static int hdd_generate_iface_mac_addr_auto(hdd_context_t *pHddCtx,
+                                            int idx, v_MACADDR_t mac_addr)
+{
+   int i;
+   unsigned int serialno;
+   serialno = wcnss_get_serial_number();
+
+   if (0 != serialno)
+   {
+      /* MAC address has 3 bytes of OUI so we have a maximum of 3
+         bytes of the serial number that can be used to generate
+         the other 3 bytes of the MAC address.  Mask off all but
+         the lower 3 bytes (this will also make sure we don't
+         overflow in the next step) */
+      serialno &= 0x00FFFFFF;
+
+      /* we need a unique address for each session */
+      serialno *= VOS_MAX_CONCURRENCY_PERSONA;
+
+      /* autogen other Mac addresses */
+      for (i = idx; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
+      {
+         /* start with the entire default address */
+         pHddCtx->cfg_ini->intfMacAddr[i] = mac_addr;
+         /* then replace the lower 3 bytes */
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[3] = (serialno >> 16) & 0xFF;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[4] = (serialno >> 8) & 0xFF;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = serialno & 0xFF;
+
+         serialno++;
+         hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: Derived Mac Addr: "
+                   MAC_ADDRESS_STR, __func__,
+                   MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
+      }
+
+   }
+   else
+   {
+      hddLog(LOGE, FL("Failed to Get Serial NO"));
+      return -1;
+   }
+   return 0;
+}
+#endif // WLAN_AUTOGEN_MACADDR_FEATURE && QCA_WIFI_ISOC
 
 /**---------------------------------------------------------------------------
   \brief hdd_11d_scan_done - callback to be executed when 11d scan is
@@ -12678,13 +12744,16 @@ void hdd_start_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
     if (VOS_TIMER_STATE_RUNNING ==
         vos_timer_getCurrentState(&pHddCtx->bus_bw_timer))
         return;
-    pHddCtx->bus_bw_triggered = 0;
+
     vos_timer_start(&pHddCtx->bus_bw_timer,
-                    HDD_BUS_BANDWIDTH_COMPUTE_INTERVAL);
+            pHddCtx->cfg_ini->busBandwidthComputeInterval);
 }
 
 void hdd_stop_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
 {
+    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
+    VOS_STATUS status;
+    v_BOOL_t can_stop = VOS_TRUE;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
     if (VOS_TIMER_STATE_RUNNING !=
@@ -12694,10 +12763,35 @@ void hdd_stop_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
                   "bus band width compute timer is not running");
         return;
     }
-    vos_timer_stop(&pHddCtx->bus_bw_timer);
-    pHddCtx->bus_bw_triggered = 0;
+
+    if (vos_concurrent_sessions_running()) {
+        status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
+
+        while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status ) {
+            pAdapter = pAdapterNode->pAdapter;
+            if (pAdapter && (pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
+                        pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) &&
+                    WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)->conn_info.connState
+                    == eConnectionState_Associated) {
+                can_stop = VOS_FALSE;
+                break;
+            }
+            if (pAdapter && (pAdapter->device_mode == WLAN_HDD_SOFTAP ||
+                        pAdapter->device_mode == WLAN_HDD_P2P_GO) &&
+                    WLAN_HDD_GET_AP_CTX_PTR(pAdapter)->bApActive == VOS_TRUE) {
+                can_stop = VOS_FALSE;
+                break;
+            }
+            status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
+            pAdapterNode = pNext;
+        }
+    }
+
+    if(can_stop == VOS_TRUE)
+        vos_timer_stop(&pHddCtx->bus_bw_timer);
 }
 #endif
+
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 void wlan_hdd_restart_sap(hdd_adapter_t *ap_pAdapter)
