@@ -45,9 +45,7 @@
 #include "adf_nbuf.h"
 #include "wma_api.h"
 #include "vos_utils.h"
-#ifdef QCA_LL_TX_FLOW_CT
 #include "wdi_out.h"
-#endif /* QCA_LL_TX_FLOW_CT */
 #define ENTER() VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO, "Enter:%s", __func__)
 
 #define TLSHIM_LOGD(args...) \
@@ -937,6 +935,7 @@ void WLANTL_RegisterVdev(void *vos_ctx, void *vdev)
 	wdi_in_osif_vdev_register(vdev_handle, tl_shim, &txrx_ops);
 	/* TODO: Keep vdev specific tx callback, if needed */
 	tl_shim->tx = txrx_ops.tx.std;
+	adf_os_atomic_set(&tl_shim->vdev_active[vdev_handle->vdev_id], 1);
 }
 
 /*
@@ -953,6 +952,7 @@ void WLANTL_UnRegisterVdev(void *vos_ctx, u_int8_t vdev_id)
 		return;
 	}
 
+	adf_os_atomic_set(&tl_shim->vdev_active[vdev_id], 0);
 #ifdef QCA_LL_TX_FLOW_CT
 	WLANTL_DeRegisterTXFlowControl(vos_ctx, vdev_id);
 #endif /* QCA_LL_TX_FLOW_CT */
@@ -1037,13 +1037,18 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 
 #ifdef IPA_OFFLOAD
 adf_nbuf_t WLANTL_SendIPA_DataFrame(void *vos_ctx, void *vdev,
-                                    adf_nbuf_t skb)
+                                    adf_nbuf_t skb,  v_U8_t interface_id)
 {
     struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
                                                            vos_ctx);
 	adf_nbuf_t ret;
 
 	ENTER();
+
+	if (!adf_os_atomic_read(&tl_shim->vdev_active[interface_id])) {
+		TLSHIM_LOGW("INACTIVE VDEV");
+		return nbuf;
+	}
 
 	if ((tl_shim->ip_checksum_offload) && (skb->protocol == htons(ETH_P_IP))
 		 && (skb->ip_summed == CHECKSUM_PARTIAL))
@@ -1653,7 +1658,7 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 	}
 	adf_os_mem_free(tl_shim->session_flow_control);
 #endif /* QCA_LL_TX_FLOW_CT */
-
+	adf_os_mem_free(tl_shim->vdev_active);
 #ifdef FEATURE_WLAN_ESE
 	vos_flush_work(&tl_shim->iapp_work.deferred_work);
 #endif
@@ -1676,9 +1681,7 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	struct txrx_tl_shim_ctx *tl_shim;
 	VOS_STATUS status;
 	u_int8_t i;
-#ifdef QCA_LL_TX_FLOW_CT
 	int max_vdev;
-#endif /* QCA_LL_TX_FLOW_CT */
 
 	ENTER();
 	status = vos_alloc_context(vos_ctx, VOS_MODULE_ID_TL,
@@ -1715,9 +1718,15 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	 * TODO: Allocate memory for tx callback for maximum supported
 	 * vdevs to maintain tx callbacks per vdev.
 	 */
+	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
+	tl_shim->vdev_active = adf_os_mem_alloc(NULL,
+		max_vdev * sizeof(adf_os_atomic_t));
+	for (i = 0; i < max_vdev; i++) {
+		adf_os_atomic_init(&tl_shim->vdev_active[i]);
+		adf_os_atomic_set(&tl_shim->vdev_active[i], 0);
+	}
 
 #ifdef QCA_LL_TX_FLOW_CT
-	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
 	tl_shim->session_flow_control = adf_os_mem_alloc(NULL,
 			max_vdev * sizeof(struct tlshim_session_flow_Control));
 	if (!tl_shim->session_flow_control) {
