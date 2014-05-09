@@ -1339,6 +1339,8 @@ struct hdd_context_s
 
     /* defining the chip/rom version */
     v_U32_t target_hw_version;
+    /* defining the chip/rom revision */
+    v_U32_t target_hw_revision;
 #endif
     struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
