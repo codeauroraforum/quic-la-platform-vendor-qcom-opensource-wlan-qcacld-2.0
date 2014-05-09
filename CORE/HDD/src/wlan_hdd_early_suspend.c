@@ -2243,6 +2243,8 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    }
 #endif
 
+   wlan_hdd_send_svc_nlink_msg(WLAN_SVC_FW_CRASHED_IND);
+
    /* Allow the phone to go to sleep */
    hdd_allow_suspend();
    /* register for riva power on lock */
@@ -2253,8 +2255,6 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
       goto err_unregister_pmops;
    }
    vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
-
-   wlan_hdd_send_svc_nlink_msg(WLAN_SVC_FW_CRASHED_IND);
 
    goto success;
 
