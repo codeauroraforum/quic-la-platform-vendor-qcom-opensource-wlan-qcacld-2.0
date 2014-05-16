@@ -840,6 +840,7 @@ typedef struct sSirSmeScanReq
      */
     tANI_U32 minChannelTimeBtc;    //in units of milliseconds
     tANI_U32 maxChannelTimeBtc;    //in units of milliseconds
+    tANI_U32 restTime;              //in units of milliseconds, ignored when not connected
     tANI_U8              returnAfterFirstMatch;
 
     /**
@@ -4474,6 +4475,7 @@ typedef struct sSirScanOffloadReq {
     tSirScanType scanType;
     tANI_U32 minChannelTime;
     tANI_U32 maxChannelTime;
+    tANI_U32 restTime;              //in units of milliseconds, ignored when not connected
     tSirP2pScanType p2pScanType;
     tANI_U16 uIEFieldLen;
     tANI_U16 uIEFieldOffset;
