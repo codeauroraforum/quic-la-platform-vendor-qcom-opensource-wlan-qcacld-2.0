@@ -397,11 +397,6 @@ typedef enum
 #define CFG_SHORT_PREAMBLE_MAX                 WNI_CFG_SHORT_PREAMBLE_STAMAX
 #define CFG_SHORT_PREAMBLE_DEFAULT             WNI_CFG_SHORT_PREAMBLE_STADEF
 
-#define CFG_IBSS_AUTO_BSSID_NAME               "gAutoIbssBssid"
-#define CFG_IBSS_AUTO_BSSID_MIN                WNI_CFG_IBSS_AUTO_BSSID_STAMIN
-#define CFG_IBSS_AUTO_BSSID_MAX                WNI_CFG_IBSS_AUTO_BSSID_STAMAX
-#define CFG_IBSS_AUTO_BSSID_DEFAULT            WNI_CFG_IBSS_AUTO_BSSID_STADEF
-
 #define CFG_IBSS_BSSID_NAME                    "gIbssBssid"
 #define CFG_IBSS_BSSID_MIN                     "000000000000"
 #define CFG_IBSS_BSSID_MAX                     "ffffffffffff"
@@ -2436,14 +2431,20 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_NAME                "gEnableStrictRegulatoryForFCC"
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MIN                 ( 0 )
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MAX                 ( 1 )
-#define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_DEFAULT             ( 1 )
+#define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_DEFAULT             ( 0 )
 
 #ifdef QCA_WIFI_2_0
 #define CFG_SAP_MAX_OFFLOAD_PEERS                  "gMaxOffloadPeers"
 #define CFG_SAP_MAX_OFFLOAD_PEERS_MIN              (2)
 #define CFG_SAP_MAX_OFFLOAD_PEERS_MAX              (5)
 #define CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT          (2)
+
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS          "gMaxOffloadReorderBuffs"
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_MIN      (0)
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_MAX      (3)
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_DEFAULT  (2)
 #endif
+
 //Enable Memory Debug
 #ifdef MEMORY_DEBUG
 #define CFG_ENABLE_MEMORY_DEBUG_NAME             "gEnableMemoryDebug"
@@ -2586,7 +2587,6 @@ typedef struct
    v_U32_t       nScanAgeTimeCPS;
    v_U8_t        nRssiCatGap;
    v_BOOL_t      fIsShortPreamble;
-   v_BOOL_t      fIsAutoIbssBssid;
    v_MACADDR_t   IbssBssid;
    v_U32_t       AdHocChannel5G;
    v_U32_t       AdHocChannel24G;
@@ -2998,6 +2998,7 @@ typedef struct
    v_U16_t                     acsBandSwitchThreshold;
    v_BOOL_t                    gEnableStrictRegulatoryForFCC;
    v_U8_t                      apMaxOffloadPeers;
+   v_U8_t                      apMaxOffloadReorderBuffs;
    v_BOOL_t                    advertiseConcurrentOperation;
    v_BOOL_t                    enableHystereticMode;
 

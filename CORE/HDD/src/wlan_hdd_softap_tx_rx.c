@@ -559,6 +559,19 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       goto drop_pkt;
    }
 
+   /*
+    * If the device is operating on a DFS Channel
+    * then check if SAP is in CAC WAIT state and
+    * drop the packets. In CAC WAIT state device
+    * is expected not to transmit any frames.
+    * SAP starts Tx only after the BSS START is
+    * done.
+    */
+   if (pHddApCtx->dfs_cac_block_tx)
+   {
+        goto drop_pkt;
+   }
+
    pDestMacAddress = (v_MACADDR_t*)skb->data;
 
    VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_INFO,
@@ -616,7 +629,7 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        {
           netif_tx_stop_all_queues(dev);
           vos_timer_start(&pAdapter->tx_flow_control_timer,
-                          WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
+                          WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
        }
    }
 #endif /* defined(QCA_LL_TX_FLOW_CT) && !defined(CONFIG_HL_SUPPORT) */
@@ -624,26 +637,6 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
    //Get TL AC corresponding to Qdisc queue index/AC.
    ac = hdd_QdiscAcToTlAC[skb->queue_mapping];
    ++pAdapter->hdd_stats.hddTxRxStats.txXmitClassifiedAC[ac];
-
-#if defined (IPA_OFFLOAD)
-   if(!(NBUF_OWNER_ID(skb) == IPA_NBUF_OWNER_ID)) {
-#endif
-   // Check if the buffer has enough header room
-   skb = skb_unshare(skb, GFP_ATOMIC);
-   if (!skb)
-       goto drop_pkt;
-
-   if (skb_headroom(skb) < dev->hard_header_len) {
-       struct sk_buff *tmp;
-       tmp = skb;
-       skb = skb_realloc_headroom(tmp, dev->hard_header_len);
-       dev_kfree_skb(tmp);
-       if (!skb)
-           goto drop_pkt;
-   }
-#if defined (IPA_OFFLOAD)
-   }
-#endif
 
 #ifdef QCA_PKT_PROTO_TRACE
    if ((hddCtxt->cfg_ini->gEnableDebugLog & VOS_PKT_TRAC_TYPE_EAPOL) ||

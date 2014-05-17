@@ -301,6 +301,7 @@ extern spinlock_t hdd_context_lock;
 /* MAX OS Q block time value in msec
  * Prevent from permanent stall, resume OS Q if timer expired */
 #define WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME 1000
+#define WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME 100
 #define WLAN_HDD_TX_FLOW_CONTROL_MAX_24BAND_CH   14
 #endif /* QCA_LL_TX_FLOW_CT */
 
@@ -776,6 +777,7 @@ struct hdd_ap_ctx_s
    /* SAP Context */
    v_PVOID_t sapContext;
 #endif
+   v_BOOL_t dfs_cac_block_tx;
 };
 
 struct hdd_mon_ctx_s
@@ -1419,6 +1421,8 @@ struct hdd_context_s
 
     /* defining the chip/rom version */
     v_U32_t target_hw_version;
+    /* defining the chip/rom revision */
+    v_U32_t target_hw_revision;
 #endif
     struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
