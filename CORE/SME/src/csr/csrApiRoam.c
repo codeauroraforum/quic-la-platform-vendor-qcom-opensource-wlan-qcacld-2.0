@@ -14451,16 +14451,16 @@ eHalStatus csrRoamOpenSession(tpAniSirGlobal pMac,
     tCsrRoamSession *pSession;
     *pbSessionId = CSR_SESSION_ID_INVALID;
 
-    for( i = 0; i < CSR_ROAM_SESSION_MAX; i++ )
+    for( i = 0; i < pMac->sme.max_intf_count; i++ )
     {
-        if ((v_U8_t)i >= pMac->sme.max_intf_count) {
-            smsLog(pMac, LOGE, "%s: Reached max interfaces! Session creation will fail", __func__);
-            break;
-        }
-
         if( !CSR_IS_SESSION_VALID( pMac, i ) )
         {
             pSession = CSR_GET_SESSION( pMac, i );
+            if (!pSession)
+            {
+                smsLog(pMac, LOGE, FL("Session does not exist for interface %d"), i);
+                break;
+            }
             status = eHAL_STATUS_SUCCESS;
             pSession->sessionActive = eANI_BOOLEAN_TRUE;
             pSession->sessionId = (tANI_U8)i;
@@ -14505,9 +14505,11 @@ eHalStatus csrRoamOpenSession(tpAniSirGlobal pMac,
             break;
         }
     }
-    if( CSR_ROAM_SESSION_MAX == i )
+    if( pMac->sme.max_intf_count == i )
     {
         //No session is available
+        smsLog(pMac, LOGE, "%s: Reached max interfaces: %d! Session creation will fail",
+               __func__, pMac->sme.max_intf_count);
         status = eHAL_STATUS_RESOURCES;
     }
     return ( status );
@@ -17784,7 +17786,7 @@ csrRoamChannelChangeReq( tpAniSirGlobal pMac, tCsrBssid bssid,
     pMsg->messageLen = sizeof(tSirChanChangeRequest);
     pMsg->targetChannel = targetChannel;
     pMsg->cbMode = cbMode;
-    vos_mem_copy(pMsg->bssid, bssid, WNI_CFG_BSSID_LEN);
+    vos_mem_copy(pMsg->bssid, bssid, VOS_MAC_ADDR_SIZE);
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 
@@ -17813,7 +17815,7 @@ eHalStatus csrRoamStartBeaconReq( tpAniSirGlobal pMac, tCsrBssid bssid,
     pMsg->messageType = pal_cpu_to_be16((tANI_U16)eWNI_SME_START_BEACON_REQ);
     pMsg->messageLen = sizeof(tSirStartBeaconIndication);
     pMsg->beaconStartStatus  = dfsCacWaitStatus;
-    vos_mem_copy(pMsg->bssid, bssid, WNI_CFG_BSSID_LEN);
+    vos_mem_copy(pMsg->bssid, bssid, VOS_MAC_ADDR_SIZE);
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 
@@ -17849,7 +17851,7 @@ csrRoamSendChanSwIERequest(tpAniSirGlobal pMac, tCsrBssid bssid,
 
     pMsg->targetChannel = targetChannel;
     pMsg->csaIeRequired = csaIeReqd;
-    vos_mem_copy(pMsg->bssid, bssid, WNI_CFG_BSSID_LEN);
+    vos_mem_copy(pMsg->bssid, bssid, VOS_MAC_ADDR_SIZE);
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 

@@ -141,11 +141,12 @@ int hdd_hostapd_open (struct net_device *dev)
        goto done;
    }
 
+   WLAN_HDD_GET_AP_CTX_PTR(pAdapter)->dfs_cac_block_tx = VOS_TRUE;
+
    //Turn ON carrier state
    netif_carrier_on(dev);
    //Enable all Tx queues
    netif_tx_start_all_queues(dev);
-
 done:
    EXIT();
    return 0;
@@ -744,10 +745,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             if (VOS_TRUE == pHddCtx->dfs_radar_found)
             {
                pHddCtx->dfs_radar_found = VOS_FALSE;
-               if (WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode)
-               {
-                  netif_tx_start_all_queues(dev);
-               }
+            }
+            else
+            {
+                if (NV_CHANNEL_DFS !=
+                    vos_nv_getChannelEnabledState(pHddApCtx->operatingChannel))
+                {
+                    pHddApCtx->dfs_cac_block_tx = VOS_FALSE;
+                }
             }
 
             //Fill the params for sending IWEVCUSTOM Event with SOFTAP.enabled
@@ -798,6 +803,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
         case eSAP_DFS_CAC_END:
             wlan_hdd_send_svc_nlink_msg(WLAN_SVC_DFS_CAC_END_IND);
+            pHddApCtx->dfs_cac_block_tx = VOS_FALSE;
             break;
 
         case eSAP_DFS_RADAR_DETECT:
@@ -1359,6 +1365,75 @@ int hdd_softap_unpackIE(
         return VOS_STATUS_E_FAILURE;
     }
     return VOS_STATUS_SUCCESS;
+}
+
+int
+static iw_softap_set_ini_cfg(struct net_device *dev,
+                          struct iw_request_info *info,
+                          union iwreq_data *wrqu, char *extra)
+{
+    VOS_STATUS vstatus;
+    int ret = 0; /* success */
+    hdd_adapter_t *pAdapter = (netdev_priv(dev));
+    hdd_context_t *pHddCtx;
+
+    if (pAdapter == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                                        "%s: pAdapter is NULL!", __func__);
+        return -EINVAL;
+    }
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (ret != 0)
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: HDD context is not valid", __func__);
+        return ret;
+    }
+
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+              "%s: Received data %s", __func__, extra);
+
+    vstatus = hdd_execute_config_command(pHddCtx, extra);
+    if (VOS_STATUS_SUCCESS != vstatus)
+    {
+        ret = -EINVAL;
+    }
+
+    return ret;
+}
+
+int
+static iw_softap_get_ini_cfg(struct net_device *dev,
+                          struct iw_request_info *info,
+                          union iwreq_data *wrqu, char *extra)
+{
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+    hdd_context_t *pHddCtx;
+    int ret = 0;
+
+    if (pAdapter == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                                        "%s: pAdapter is NULL!", __func__);
+        return -EINVAL;
+    }
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (ret != 0)
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: HDD context is not valid", __func__);
+        return ret;
+    }
+
+    hdd_cfg_get_config(pHddCtx, extra, QCSAP_IOCTL_MAX_STR_LEN);
+    wrqu->data.length = strlen(extra)+1;
+
+    return 0;
 }
 
 int
@@ -3078,7 +3153,7 @@ static int iw_set_ap_encodeext(struct net_device *dev,
     int retval = 0;
     VOS_STATUS vstatus;
     struct iw_encode_ext *ext = (struct iw_encode_ext*)extra;
-    v_U8_t groupmacaddr[WNI_CFG_BSSID_LEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    v_U8_t groupmacaddr[VOS_MAC_ADDR_SIZE] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     int key_index;
     struct iw_point *encoding = &wrqu->encoding;
     tCsrRoamSetKey  setKey;
@@ -3104,10 +3179,10 @@ static int iw_set_ap_encodeext(struct net_device *dev,
          RemoveKey.keyId = key_index;
          if(ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY) {
               /*Key direction for group is RX only*/
-             vos_mem_copy(RemoveKey.peerMac,groupmacaddr,WNI_CFG_BSSID_LEN);
+             vos_mem_copy(RemoveKey.peerMac,groupmacaddr, VOS_MAC_ADDR_SIZE);
          }
          else {
-             vos_mem_copy(RemoveKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+             vos_mem_copy(RemoveKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
          }
          switch(ext->alg)
          {
@@ -3161,17 +3236,17 @@ static int iw_set_ap_encodeext(struct net_device *dev,
     if(ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY) {
       /*Key direction for group is RX only*/
        setKey.keyDirection = eSIR_RX_ONLY;
-       vos_mem_copy(setKey.peerMac,groupmacaddr,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,groupmacaddr, VOS_MAC_ADDR_SIZE);
     }
     else {
 
        setKey.keyDirection =  eSIR_TX_RX;
-       vos_mem_copy(setKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
     }
     if(ext->ext_flags & IW_ENCODE_EXT_SET_TX_KEY)
     {
        setKey.keyDirection = eSIR_TX_DEFAULT;
-       vos_mem_copy(setKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
     }
 
     /*For supplicant pae role is zero*/
@@ -4414,6 +4489,18 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
         "dataSnapshot" },
 
+    /* Set HDD CFG Ini param */
+    {   QCSAP_IOCTL_SET_INI_CFG,
+        IW_PRIV_TYPE_CHAR | QCSAP_IOCTL_MAX_STR_LEN,
+        0,
+        "setConfig" },
+
+    /* Get HDD CFG Ini param */
+    {   QCSAP_IOCTL_GET_INI_CFG,
+        0,
+        IW_PRIV_TYPE_CHAR | QCSAP_IOCTL_MAX_STR_LEN,
+        "getConfig" },
+
     /* handlers for main ioctl */
     {   QCSAP_IOCTL_SET_TRAFFIC_MONITOR,
         IW_PRIV_TYPE_INT| IW_PRIV_SIZE_FIXED | 1,
@@ -4445,6 +4532,8 @@ static const iw_handler hostapd_private[] = {
    [QCSAP_IOCTL_SET_TX_POWER - SIOCIWFIRSTPRIV]   = iw_softap_set_tx_power,
    [QCSAP_IOCTL_SET_MAX_TX_POWER - SIOCIWFIRSTPRIV]   = iw_softap_set_max_tx_power,
    [QCSAP_IOCTL_DATAPATH_SNAP_SHOT - SIOCIWFIRSTPRIV]  =   iw_display_data_path_snapshot,
+   [QCSAP_IOCTL_SET_INI_CFG - SIOCIWFIRSTPRIV]  =  iw_softap_set_ini_cfg,
+   [QCSAP_IOCTL_GET_INI_CFG - SIOCIWFIRSTPRIV]  =  iw_softap_get_ini_cfg,
    [QCSAP_IOCTL_SET_TRAFFIC_MONITOR - SIOCIWFIRSTPRIV]  =  iw_softap_set_trafficmonitor,
 };
 const struct iw_handler_def hostapd_handler_def = {
