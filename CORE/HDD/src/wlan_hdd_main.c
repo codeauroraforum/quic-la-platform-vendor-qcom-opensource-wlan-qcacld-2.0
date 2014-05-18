@@ -8021,25 +8021,12 @@ VOS_STATUS hdd_close_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
       wlan_hdd_clear_concurrency_mode(pHddCtx, pAdapter->device_mode);
       hdd_cleanup_adapter( pHddCtx, pAdapterNode->pAdapter, rtnl_held );
 
-#ifdef FEATURE_WLAN_TDLS
-
-      /* A Mutex Lock is introduced while changing/initializing the mode to
-       * protect the concurrent access for the Adapters by TDLS module.
-       */
-       mutex_lock(&pHddCtx->tdls_lock);
-#endif
-
       hdd_remove_adapter( pHddCtx, pAdapterNode );
       vos_mem_free( pAdapterNode );
 
       /* Adapter removed. Decrement vdev count */
       if (pHddCtx->current_intf_count != 0)
         pHddCtx->current_intf_count--;
-
-#ifdef FEATURE_WLAN_TDLS
-       mutex_unlock(&pHddCtx->tdls_lock);
-#endif
-
 
       /*
        * If Powersave Offload is enabled,
