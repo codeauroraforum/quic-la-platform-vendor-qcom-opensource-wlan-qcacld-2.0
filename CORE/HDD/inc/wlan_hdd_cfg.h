@@ -50,6 +50,10 @@
 #include <wlan_hdd_tgt_cfg.h>
 #endif
 
+#ifdef QCA_WIFI_2_0
+#define FW_MODULE_LOG_LEVEL_STRING_LENGTH  (255)
+#endif
+
 //Number of items that can be configured
 #define MAX_CFG_INI_ITEMS   512
 
@@ -833,9 +837,11 @@ typedef enum
 #define CFG_ROAM_SCAN_N_PROBES_DEFAULT                      (2)
 
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME                        "gRoamScanHomeAwayTime"
-#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (3)
+#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (0)   // 0 for disable
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_MAX                    (300)
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_DEFAULT                (CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN)
+                                                                  // disabled by default
+
 #endif /* (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR) */
 
 #ifdef FEATURE_WLAN_OKC
@@ -1552,6 +1558,24 @@ typedef enum
 #define CFG_ENABLE_PACKET_LOG_MIN        ( 0 )
 #define CFG_ENABLE_PACKET_LOG_MAX        ( 1 )
 #define CFG_ENABLE_PACKET_LOG_DEFAULT    ( 0 )
+
+#ifdef QCA_WIFI_2_0
+#define CFG_ENABLE_FW_LOG_TYPE            "gFwDebugLogType"
+#define CFG_ENABLE_FW_LOG_TYPE_MIN        ( 0 )
+#define CFG_ENABLE_FW_LOG_TYPE_MAX        ( 255 )
+#define CFG_ENABLE_FW_LOG_TYPE_DEFAULT    ( 0 )
+
+
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL          "gFwDebugLogLevel"
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MIN      ( 0 )
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MAX      ( 255 )
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_DEFAULT  ( 0 )
+
+
+#define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
+#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  ""
+#endif
+
 
 /*
  * VOS Trace Enable Control
@@ -2853,6 +2877,14 @@ typedef struct
    v_BOOL_t                    allowDFSChannelRoam;
 
    v_BOOL_t                    enablePacketLog;
+
+#ifdef QCA_WIFI_2_0
+   /* FW debug log parameters */
+   v_U32_t     enableFwLogType;
+   v_U32_t     enableFwLogLevel;
+   v_U8_t      enableFwModuleLogLevel[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
+#endif
+
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
@@ -2971,5 +3003,8 @@ static __inline unsigned long utilMin( unsigned long a, unsigned long b )
 void hdd_update_tgt_cfg(void *context, void *param);
 void hdd_dfs_indicate_radar(void *context, void *param);
 #endif /* QCA_WIFI_2_0 && !QCA_WIFI_ISOC */
+
+VOS_STATUS hdd_string_to_u8_array( char *str, tANI_U8 *intArray, tANI_U8 *len,
+               tANI_U8 intArrayMaxLen );
 
 #endif
