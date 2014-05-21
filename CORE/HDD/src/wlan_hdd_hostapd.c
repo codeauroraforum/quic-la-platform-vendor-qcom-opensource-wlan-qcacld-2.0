@@ -531,6 +531,17 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 pHddApCtx->uBCStaId = pSapEvent->sapevt.sapStartBssCompleteEvent.staId;
                 pHostapdAdapter->sessionId =
                         pSapEvent->sapevt.sapStartBssCompleteEvent.sessionId;
+
+#ifdef QCA_LL_TX_FLOW_CT
+                vos_timer_init(&pHostapdAdapter->tx_flow_control_timer,
+                               VOS_TIMER_TYPE_SW,
+                               hdd_tx_resume_timer_expired_handler,
+                               pHostapdAdapter);
+                WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
+                               hdd_tx_resume_cb,
+                               pHostapdAdapter->sessionId,
+                               (void *)pHostapdAdapter);
+#endif
                 //@@@ need wep logic here to set privacy bit
                 hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
             }
@@ -4278,6 +4289,7 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         vos_mem_copy(pWlanHostapdDev->dev_addr, (void *)macAddr,sizeof(tSirMacAddr));
         vos_mem_copy(pHostapdAdapter->macAddressCurrent.bytes, (void *)macAddr, sizeof(tSirMacAddr));
 
+        pHostapdAdapter->offloads_configured = FALSE;
         pWlanHostapdDev->destructor = free_netdev;
         pWlanHostapdDev->ieee80211_ptr = &pHostapdAdapter->wdev ;
         pHostapdAdapter->wdev.wiphy = pHddCtx->wiphy;

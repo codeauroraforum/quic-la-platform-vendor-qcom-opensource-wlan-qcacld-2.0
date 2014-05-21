@@ -1464,13 +1464,15 @@ eHalStatus sme_SetPlmRequest(tHalHandle hHal, tpSirPlmReq pPlmReq)
               {
                   if (NV_CHANNEL_DFS ==
                        vos_nv_getChannelEnabledState(pPlmReq->plmChList[count]))
-                  /* DFS channel is provided, no PLM bursts can be
-                  * transmitted. Ignoring these channels.
-                  */
-                  VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                            "%s DFS channel %d ignored for PLM", __func__,
-                            pPlmReq->plmChList[count]);
-                  continue;
+                  {
+                      /* DFS channel is provided, no PLM bursts can be
+                      * transmitted. Ignoring these channels.
+                      */
+                      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                                "%s DFS channel %d ignored for PLM", __func__,
+                                pPlmReq->plmChList[count]);
+                      continue;
+                  }
               }
               else if (!ret)
               {
@@ -4869,17 +4871,22 @@ eHalStatus sme_RoamRemoveKey(tHalHandle hHal, tANI_U8 sessionId,
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetRssi
-    \brief a wrapper function that client calls to register a callback to get RSSI
+    \brief a wrapper function that client calls to register a callback to get
+           RSSI
 
+    \param hHal - HAL handle for device
     \param callback - SME sends back the requested stats using the callback
-    \param staId - The station ID for which the stats is requested for
+    \param staId -    The station ID for which the stats is requested for
+    \param bssid - The bssid of the connected session
+    \param lastRSSI - RSSI value at time of request. In case fw cannot provide
+                      RSSI, do not hold up but return this value.
     \param pContext - user context to be passed back along with the callback
     \param pVosContext - vos context
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_GetRssi(tHalHandle hHal,
                              tCsrRssiCallback callback,
-                             tANI_U8 staId, tCsrBssid bssId,
+                             tANI_U8 staId, tCsrBssid bssId, tANI_S8 lastRSSI,
                              void *pContext, void* pVosContext)
 {
    eHalStatus status = eHAL_STATUS_FAILURE;
@@ -4891,7 +4898,8 @@ eHalStatus sme_GetRssi(tHalHandle hHal,
    if ( HAL_STATUS_SUCCESS( status ) )
    {
       status = csrGetRssi( pMac, callback,
-                                 staId, bssId, pContext, pVosContext);
+                           staId, bssId, lastRSSI,
+                           pContext, pVosContext);
       sme_ReleaseGlobalLock( &pMac->sme );
    }
    return (status);

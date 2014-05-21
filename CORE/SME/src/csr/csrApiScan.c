@@ -5347,6 +5347,7 @@ tANI_BOOLEAN csrScanAgeOutBss(tpAniSirGlobal pMac, tCsrScanResult *pResult)
     tANI_BOOLEAN fRet = eANI_BOOLEAN_FALSE;
     tANI_U32 i;
     tCsrRoamSession *pSession;
+    tANI_BOOLEAN isConnBssfound = eANI_BOOLEAN_FALSE;
 
     for( i = 0; i < CSR_ROAM_SESSION_MAX; i++ )
     {
@@ -5354,29 +5355,36 @@ tANI_BOOLEAN csrScanAgeOutBss(tpAniSirGlobal pMac, tCsrScanResult *pResult)
         {
             pSession = CSR_GET_SESSION( pMac, i );
             //Not to remove the BSS we are connected to.
-            if(csrIsConnStateDisconnected(pMac, i) || (NULL == pSession->pConnectBssDesc) ||
-              (!csrIsDuplicateBssDescription(pMac, &pResult->Result.BssDescriptor,
+            if(csrIsConnStateConnectedInfra(pMac, i) && (NULL != pSession->pConnectBssDesc) &&
+              (csrIsDuplicateBssDescription(pMac, &pResult->Result.BssDescriptor,
                                              pSession->pConnectBssDesc, NULL, FALSE))
               )
             {
-                smsLog(pMac, LOGW, "Aging out BSS "MAC_ADDRESS_STR" Channel %d",
-                       MAC_ADDR_ARRAY(pResult->Result.BssDescriptor.bssId),
-                       pResult->Result.BssDescriptor.channelId);
-                //No need to hold the spin lock because caller should hold the lock for pMac->scan.scanResultList
-                if( csrLLRemoveEntry(&pMac->scan.scanResultList, &pResult->Link, LL_ACCESS_NOLOCK) )
-                {
-                    csrFreeScanResultEntry(pMac, pResult);
-                    fRet = eANI_BOOLEAN_TRUE;
-                }
+                isConnBssfound = eANI_BOOLEAN_TRUE;
                 break;
             }
-        } //valid session
-    } //for
-    if( CSR_ROAM_SESSION_MAX == i && fRet != eANI_BOOLEAN_TRUE )
+        }
+    }
+
+    if( isConnBssfound )
     {
-        //reset the counter so this won't hapeen too soon
+        //Reset the counter so that aging out of connected BSS won't hapeen too soon
         pResult->AgingCount = (tANI_S32)pMac->roam.configParam.agingCount;
         pResult->Result.BssDescriptor.nReceivedTime = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
+
+        return (fRet);
+    }
+    else
+    {
+        smsLog(pMac, LOGW, "Aging out BSS "MAC_ADDRESS_STR" Channel %d",
+               MAC_ADDR_ARRAY(pResult->Result.BssDescriptor.bssId),
+               pResult->Result.BssDescriptor.channelId);
+        //No need to hold the spin lock because caller should hold the lock for pMac->scan.scanResultList
+        if( csrLLRemoveEntry(&pMac->scan.scanResultList, &pResult->Link, LL_ACCESS_NOLOCK) )
+        {
+            csrFreeScanResultEntry(pMac, pResult);
+            fRet = eANI_BOOLEAN_TRUE;
+        }
     }
 
     return (fRet);
@@ -7551,7 +7559,7 @@ void csrSetCfgValidChannelList( tpAniSirGlobal pMac, tANI_U8 *pChannelList, tANI
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                 "Scan offload is enabled, update default chan list");
-        status = csrUpdateChannelList(&pMac->scan);
+        status = csrUpdateChannelList(pMac);
         if (eHAL_STATUS_SUCCESS != status)
         {
             VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,

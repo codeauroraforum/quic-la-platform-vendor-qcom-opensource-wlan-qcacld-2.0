@@ -97,7 +97,7 @@
 #include <wlan_qct_wda.h>
 #include <if_pci.h>
 #endif
-#define HDD_SSR_BRING_UP_TIME 180000
+#define HDD_SSR_BRING_UP_TIME 10000
 
 static eHalStatus g_full_pwr_status;
 static eHalStatus g_standby_status;
@@ -112,10 +112,8 @@ extern void hdd_wlan_initial_scan(hdd_context_t *pHddCtx);
 extern struct notifier_block hdd_netdev_notifier;
 extern tVOS_CON_MODE hdd_get_conparam ( void );
 
-#ifdef QCA_WIFI_ISOC
 static struct timer_list ssr_timer;
 static bool ssr_timer_started;
-#endif /* QCA_WIFI_ISOC */
 
 //Callback invoked by PMC to report status of standby request
 void hdd_suspend_standby_cbk (void *callbackContext, eHalStatus status)
@@ -528,15 +526,26 @@ void hdd_conf_hostoffload(hdd_adapter_t *pAdapter, v_BOOL_t fenable)
                     pHddCtx->configuredMcastBcastFilter &=
                             ~(HDD_MCASTBCASTFILTER_FILTER_ALL_MULTICAST);
                 }
+
 #endif
+                /*
+                * This variable saves the state if offload were configured
+                * or not. helps in recovering when pcie fails to suspend
+                * because of ongoing scan and state is no longer associated.
+                */
+                pAdapter->offloads_configured = TRUE;
             }
         }
         else
         {
             //Disable ARPOFFLOAD
-            if (eConnectionState_Associated ==
-                    (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
+            if ( (eConnectionState_Associated ==
+                 (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState) ||
+                 (pAdapter->offloads_configured == TRUE)
+               )
             {
+                pAdapter->offloads_configured = FALSE;
+
                 if (pHddCtx->cfg_ini->fhostArpOffload)
                 {
                     vstatus = hdd_conf_arp_offload(pAdapter, fenable);
@@ -1442,7 +1451,6 @@ void hdd_set_wlan_suspend_mode(bool suspend)
         hdd_resume_wlan();
 }
 
-#ifdef QCA_WIFI_ISOC
 static void hdd_ssr_timer_init(void)
 {
     init_timer(&ssr_timer);
@@ -1456,15 +1464,7 @@ static void hdd_ssr_timer_del(void)
 
 static void hdd_ssr_timer_cb(unsigned long data)
 {
-    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: HDD SSR timer expired", __func__);
-
-#ifndef QCA_WIFI_2_0
-#ifdef WCN_PRONTO
-    if (wcnss_hardware_type() == WCNSS_PRONTO_HW)
-        wcnss_pronto_log_debug_regs();
-#endif
-#endif
-
+    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: HDD SSR timer expired!", __func__);
     VOS_BUG(0);
 }
 
@@ -1472,15 +1472,14 @@ static void hdd_ssr_timer_start(int msec)
 {
     if(ssr_timer_started)
     {
-        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: trying to start SSR timer when it's running"
-                ,__func__);
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Trying to start SSR timer when "
+               "it's running!", __func__);
     }
     ssr_timer.expires = jiffies + msecs_to_jiffies(msec);
     ssr_timer.function = hdd_ssr_timer_cb;
     add_timer(&ssr_timer);
     ssr_timer_started = true;
 }
-#endif /* QCA_WIFI_ISOC */
 
 /* the HDD interface to WLAN driver shutdown,
  * the primary shutdown function in SSR
@@ -1494,11 +1493,9 @@ VOS_STATUS hdd_wlan_shutdown(void)
 
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: WLAN driver shutting down! ",__func__);
 
-#ifdef QCA_WIFI_ISOC
-   /* if re-init never happens, then do SSR1 */
+   /* If SSR never completes, then do kernel panic. */
    hdd_ssr_timer_init();
    hdd_ssr_timer_start(HDD_SSR_BRING_UP_TIME);
-#endif
 
    /* Get the global VOSS context. */
    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
@@ -1710,10 +1707,6 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    hdd_adapter_t *pAdapter;
 #endif
 
-#ifdef QCA_WIFI_ISOC
-   hdd_ssr_timer_del();
-#endif
-
    hdd_prevent_suspend();
 
 #ifdef QCA_WIFI_ISOC
@@ -1755,13 +1748,13 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    }
 
    /* Initialize the adf_ctx handle */
-   adf_ctx = vos_mem_malloc(sizeof(adf_os_device_t));
+   adf_ctx = vos_mem_malloc(sizeof(*adf_ctx));
 
    if (!adf_ctx) {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Failed to allocate adf_ctx", __func__);
       goto err_re_init;
    }
-   vos_mem_zero(adf_ctx, sizeof(adf_os_device_t));
+   vos_mem_zero(adf_ctx, sizeof(*adf_ctx));
 
    hif_init_adf_ctx(adf_ctx, hif_sc);
    ((VosContextType*)pVosContext)->pHIFContext = hif_sc;
@@ -1780,6 +1773,22 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
       goto err_re_init;
    }
 #endif
+
+   /* Try to get an adapter from mode ID */
+   pAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_INFRA_STATION);
+   if (!pAdapter)
+   {
+      pAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_SOFTAP);
+      if (!pAdapter)
+      {
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+                   "%s: Failed to get Adapter!", __func__);
+         goto err_re_init;
+      }
+   }
+
+   /* Get WLAN HW/FW version */
+   hdd_wlan_get_version(pAdapter, NULL, NULL);
 
    /* Re-open VOSS, it is a re-open b'se control transport was never closed. */
    vosStatus = vos_open(&pVosContext, 0);
@@ -1880,24 +1889,6 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_start failed",__func__);
       goto err_vosclose;
    }
-#if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-
-   /* Get the Adapter context based on hardware address */
-   pAdapter = hdd_get_adapter_by_macaddr(pHddCtx,
-           pHddCtx->cfg_ini->intfMacAddr[0].bytes);
-
-   if ((NULL == pAdapter))
-   {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-               "invalid adapter ");
-       goto err_vosclose;
-   }
-   /* Get the wlan hw/fw version */
-   hdd_wlan_get_version(pAdapter, NULL, NULL);
-#else
-   /* Exchange capability info between Host and FW and also get versioning info from FW */
-   hdd_exchange_version_and_caps(pHddCtx);
-#endif
 
    vosStatus = hdd_post_voss_start_config( pHddCtx );
    if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
@@ -1934,12 +1925,14 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    vosStatus = WLANBAP_SetConfig(&btAmpConfig);
 #endif //WLAN_BTAMP_FEATURE
 
-    /* Restart all adapters */
+   /* Restart all adapters */
    hdd_start_all_adapters(pHddCtx);
+
    pHddCtx->isLogpInProgress = FALSE;
    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    pHddCtx->hdd_mcastbcast_filter_set = FALSE;
    hdd_register_mcast_bcast_filter(pHddCtx);
+   hdd_ssr_timer_del();
 
 #ifdef QCA_WIFI_ISOC
    /* Register with platform driver as client for Suspend/Resume */

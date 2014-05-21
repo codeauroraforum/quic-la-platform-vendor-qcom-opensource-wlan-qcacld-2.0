@@ -981,7 +981,7 @@ VOS_STATUS wlan_hdd_get_rssi(hdd_adapter_t *pAdapter, v_S7_t *rssi_value)
 
    hstatus = sme_GetRssi(pHddCtx->hHal, hdd_GetRssiCB,
                          pHddStaCtx->conn_info.staId[ 0 ],
-                         pHddStaCtx->conn_info.bssId,
+                         pHddStaCtx->conn_info.bssId, pAdapter->rssi,
                          &context, pHddCtx->pvosContext);
    if (eHAL_STATUS_SUCCESS != hstatus)
    {
@@ -7115,6 +7115,7 @@ static int iw_setnone_getnone(struct net_device *dev, struct iw_request_info *in
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                                   "%s:LOGP in Progress. Ignore!!!", __func__);
+        msleep(1000);
         return -EBUSY;
     }
 

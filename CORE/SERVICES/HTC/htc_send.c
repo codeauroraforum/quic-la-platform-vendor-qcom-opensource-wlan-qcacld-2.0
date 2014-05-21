@@ -573,7 +573,7 @@ void GetHTCSendPacketsCreditBased(HTC_TARGET        *target,
             INC_HTC_EP_STAT(pEndpoint, TxCreditsConsummed, creditsRequired);
 
                 /* check if we need credits back from the target */
-            if (pEndpoint->TxCredits < pEndpoint->TxCreditsPerMaxMsg) {
+            if (pEndpoint->TxCredits <= pEndpoint->TxCreditsPerMaxMsg) {
                     /* tell the target we need credits ASAP! */
                 sendFlags |= HTC_FLAGS_NEED_CREDIT_UPDATE;
                 INC_HTC_EP_STAT(pEndpoint, TxCreditLowIndications, 1);
@@ -1310,8 +1310,11 @@ static HTC_PACKET *HTCLookupTxPacket(HTC_TARGET *target, HTC_ENDPOINT *pEndpoint
     UNLOCK_HTC_TX(target);
 
     ITERATE_OVER_LIST_ALLOW_REMOVE(&lookupQueue.QueueHead,pPacket,HTC_PACKET,ListLink) {
-        if (NULL == pPacket)
-            return NULL;
+
+        if (NULL == pPacket){
+            pFoundPacket = pPacket;
+            break;
+        }
             /* check for removal */
         if (netbuf == (adf_nbuf_t)GET_HTC_PACKET_NET_BUF_CONTEXT(pPacket)) {
                 /* found it */
