@@ -1192,7 +1192,8 @@ void limHandleFTPreAuthRsp(tpAniSirGlobal pMac, tSirRetStatus status,
     {
         pbssDescription = pMac->ft.ftPEContext.pFTPreAuthReq->pbssDescription;
         if((pftSessionEntry = peCreateSession(pMac, pbssDescription->bssId,
-                                              &sessionId, pMac->lim.maxStation)) == NULL)
+                                              &sessionId, pMac->lim.maxStation,
+                                              psessionEntry->bssType)) == NULL)
         {
             limLog(pMac, LOGE, FL("Session Can not be created for pre-auth 11R AP"));
             return;
