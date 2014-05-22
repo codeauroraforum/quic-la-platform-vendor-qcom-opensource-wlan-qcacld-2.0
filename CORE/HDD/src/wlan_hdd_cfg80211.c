@@ -5382,6 +5382,7 @@ int wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     v_U8_t* pP2pIe = NULL;
 
     ENTER();
+    hddLog(VOS_TRACE_LEVEL_ERROR, "received scan request");
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: device_mode = %d",
            __func__, pAdapter->device_mode);
