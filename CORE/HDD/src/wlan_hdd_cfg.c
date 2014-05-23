@@ -693,32 +693,40 @@ REG_TABLE_ENTRY g_registry_table[] =
 
    REG_VARIABLE(CFG_SAP_CHANNEL_SELECT_START_CHANNEL , WLAN_PARAM_Integer,
                  hdd_config_t, apStartChannelNum,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
-                 | VAR_FLAGS_DYNAMIC_CFG,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_SAP_CHANNEL_SELECT_START_CHANNEL_DEFAULT,
                  CFG_SAP_CHANNEL_SELECT_START_CHANNEL_MIN,
                  CFG_SAP_CHANNEL_SELECT_START_CHANNEL_MAX ),
 
    REG_VARIABLE(CFG_SAP_CHANNEL_SELECT_END_CHANNEL , WLAN_PARAM_Integer,
                  hdd_config_t, apEndChannelNum,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
-                 | VAR_FLAGS_DYNAMIC_CFG,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_SAP_CHANNEL_SELECT_END_CHANNEL_DEFAULT,
                  CFG_SAP_CHANNEL_SELECT_END_CHANNEL_MIN,
                  CFG_SAP_CHANNEL_SELECT_END_CHANNEL_MAX ),
 
    REG_VARIABLE(CFG_SAP_CHANNEL_SELECT_OPERATING_BAND , WLAN_PARAM_Integer,
                  hdd_config_t, apOperatingBand,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
-                 | VAR_FLAGS_DYNAMIC_CFG,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_DEFAULT,
                  CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_MIN,
                  CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_MAX ),
 
    REG_VARIABLE(CFG_SAP_AUTO_CHANNEL_SELECTION_NAME , WLAN_PARAM_Integer,
                  hdd_config_t, apAutoChannelSelection,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
-                 | VAR_FLAGS_DYNAMIC_CFG,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_SAP_AUTO_CHANNEL_SELECTION_DEFAULT,
                  CFG_SAP_AUTO_CHANNEL_SELECTION_MIN,
                  CFG_SAP_AUTO_CHANNEL_SELECTION_MAX ),
@@ -3231,9 +3239,12 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
                CFG_ENABLE_OVERLAP_CH_MAX ),
 
    REG_VARIABLE_STRING( CFG_ONLY_ALLOWED_CHANNELS, WLAN_PARAM_String,
-               hdd_config_t, acsAllowedChnls,
-               VAR_FLAGS_OPTIONAL | VAR_FLAGS_DYNAMIC_CFG,
-               (void *)CFG_ONLY_ALLOWED_CHANNELS_DEFAULT),
+                        hdd_config_t, acsAllowedChnls,
+#ifndef WLAN_FEATURE_MBSSID
+                        VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                        VAR_FLAGS_OPTIONAL,
+                        (void *)CFG_ONLY_ALLOWED_CHANNELS_DEFAULT),
 
    REG_VARIABLE( CFG_REG_CHANGE_DEF_COUNTRY_NAME, WLAN_PARAM_Integer,
               hdd_config_t, fRegChangeDefCountry,
@@ -3243,12 +3254,14 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
               CFG_REG_CHANGE_DEF_COUNTRY_MAX),
 
    REG_VARIABLE( CFG_SAP_SCAN_BAND_PREFERENCE, WLAN_PARAM_Integer,
-               hdd_config_t, acsScanBandPreference,
-               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK
-               | VAR_FLAGS_DYNAMIC_CFG,
-               CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT,
-               CFG_SAP_SCAN_BAND_PREFERENCE_MIN,
-               CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
+                 hdd_config_t, acsScanBandPreference,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
+                 CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT,
+                 CFG_SAP_SCAN_BAND_PREFERENCE_MIN,
+                 CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
 
 #ifdef QCA_LL_TX_FLOW_CT
    REG_VARIABLE( CFG_LL_TX_LBW_FLOW_LWM, WLAN_PARAM_Integer,
@@ -3302,12 +3315,14 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
                CFG_INITIAL_DWELL_TIME_MAX ),
 
    REG_VARIABLE( CFG_ACS_BAND_SWITCH_THRESHOLD, WLAN_PARAM_Integer,
-              hdd_config_t, acsBandSwitchThreshold,
-              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK
-              | VAR_FLAGS_DYNAMIC_CFG,
-              CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT,
-              CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
-              CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
+                 hdd_config_t, acsBandSwitchThreshold,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
+                 CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT,
+                 CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
+                 CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
 
    REG_VARIABLE( CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_NAME, WLAN_PARAM_Integer,
                 hdd_config_t, gEnableStrictRegulatoryForFCC,
@@ -3367,6 +3382,9 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
 
    REG_VARIABLE( CFG_SAP_DOT11_MODE_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, sapDot11Mode,
+#ifndef WLAN_FEATURE_MBSSID
+                 VAR_FLAGS_DYNAMIC_CFG |
+#endif
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
                  CFG_SAP_DOT11_MODE_DEFAULT,
                  CFG_SAP_DOT11_MODE_MIN,
@@ -3457,6 +3475,74 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
                 CFG_ENABLE_HT_2040_COEX_MAX ),
 #endif
 };
+
+#ifdef WLAN_FEATURE_MBSSID
+REG_TABLE_ENTRY mbssid_sap_dyn_ini_reg_table[] =
+{
+   REG_VARIABLE( CFG_SAP_CHANNEL_SELECT_START_CHANNEL , WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, apStartChannelNum,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_SAP_CHANNEL_SELECT_START_CHANNEL_DEFAULT,
+                 CFG_SAP_CHANNEL_SELECT_START_CHANNEL_MIN,
+                 CFG_SAP_CHANNEL_SELECT_START_CHANNEL_MAX ),
+
+   REG_VARIABLE( CFG_SAP_CHANNEL_SELECT_END_CHANNEL , WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, apEndChannelNum,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_SAP_CHANNEL_SELECT_END_CHANNEL_DEFAULT,
+                 CFG_SAP_CHANNEL_SELECT_END_CHANNEL_MIN,
+                 CFG_SAP_CHANNEL_SELECT_END_CHANNEL_MAX ),
+
+   REG_VARIABLE( CFG_SAP_CHANNEL_SELECT_OPERATING_BAND , WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, apOperatingBand,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_DEFAULT,
+                 CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_MIN,
+                 CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_MAX ),
+
+   REG_VARIABLE( CFG_SAP_AUTO_CHANNEL_SELECTION_NAME , WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, apAutoChannelSelection,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_SAP_AUTO_CHANNEL_SELECTION_DEFAULT,
+                 CFG_SAP_AUTO_CHANNEL_SELECTION_MIN,
+                 CFG_SAP_AUTO_CHANNEL_SELECTION_MAX ),
+
+
+   REG_VARIABLE_STRING( CFG_ONLY_ALLOWED_CHANNELS, WLAN_PARAM_String,
+                        mbssid_sap_dyn_ini_config_t, acsAllowedChnls,
+                        VAR_FLAGS_OPTIONAL | VAR_FLAGS_DYNAMIC_CFG,
+                        (void *)CFG_ONLY_ALLOWED_CHANNELS_DEFAULT),
+
+   REG_VARIABLE( CFG_SAP_SCAN_BAND_PREFERENCE, WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, acsScanBandPreference,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_SAP_SCAN_BAND_PREFERENCE_DEFAULT,
+                 CFG_SAP_SCAN_BAND_PREFERENCE_MIN,
+                 CFG_SAP_SCAN_BAND_PREFERENCE_MAX ),
+
+   REG_VARIABLE( CFG_ACS_BAND_SWITCH_THRESHOLD, WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, acsBandSwitchThreshold,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT,
+                 CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
+                 CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
+
+   REG_VARIABLE( CFG_SAP_DOT11_MODE_NAME, WLAN_PARAM_Integer,
+                 mbssid_sap_dyn_ini_config_t, sapDot11Mode,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK
+                 | VAR_FLAGS_DYNAMIC_CFG,
+                 CFG_SAP_DOT11_MODE_DEFAULT,
+                 CFG_SAP_DOT11_MODE_MIN,
+                 CFG_SAP_DOT11_MODE_MAX ),
+
+};
+#endif
 
 /*
  * This function returns a pointer to the character after the occurence
@@ -3889,11 +3975,13 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
 
 #define CFG_VALUE_MAX_LEN 256
 #define CFG_ENTRY_MAX_LEN (32+CFG_VALUE_MAX_LEN)
-VOS_STATUS hdd_cfg_get_config(hdd_context_t *pHddCtx, char *pBuf, int buflen)
+static VOS_STATUS hdd_cfg_get_config(REG_TABLE_ENTRY *reg_table,
+                              unsigned long cRegTableEntries,
+                              v_U8_t *ini_struct,
+                              hdd_context_t *pHddCtx, char *pBuf, int buflen)
 {
    unsigned int idx;
-   REG_TABLE_ENTRY *pRegEntry = g_registry_table;
-   unsigned long cRegTableEntries  = sizeof(g_registry_table) / sizeof( g_registry_table[ 0 ]);
+   REG_TABLE_ENTRY *pRegEntry = reg_table;
    v_U32_t value;
    char valueStr[CFG_VALUE_MAX_LEN];
    char configStr[CFG_ENTRY_MAX_LEN];
@@ -3908,7 +3996,7 @@ VOS_STATUS hdd_cfg_get_config(hdd_context_t *pHddCtx, char *pBuf, int buflen)
 
    for ( idx = 0; idx < cRegTableEntries; idx++, pRegEntry++ )
    {
-      pField = ( (v_U8_t *)pHddCtx->cfg_ini) + pRegEntry->VarOffset;
+      pField = ini_struct + pRegEntry->VarOffset;
 
       if ( ( WLAN_PARAM_Integer       == pRegEntry->RegType ) ||
            ( WLAN_PARAM_SignedInteger == pRegEntry->RegType ) ||
@@ -3975,7 +4063,7 @@ VOS_STATUS hdd_cfg_get_config(hdd_context_t *pHddCtx, char *pBuf, int buflen)
          return VOS_STATUS_E_RESOURCES;
       }
 #else
-      printk(KERN_CRIT "%s", configStr);
+      printk(KERN_INFO "%s", configStr);
 #endif // RETURN_IN_BUFFER
 
 }
@@ -3987,6 +4075,26 @@ VOS_STATUS hdd_cfg_get_config(hdd_context_t *pHddCtx, char *pBuf, int buflen)
 
    return VOS_STATUS_SUCCESS;
 }
+
+VOS_STATUS hdd_cfg_get_global_config(hdd_context_t *pHddCtx, char *pBuf,
+                                                                    int buflen)
+{
+    return hdd_cfg_get_config(g_registry_table, ARRAY_SIZE(g_registry_table),
+                              (v_U8_t *) pHddCtx->cfg_ini,
+                              pHddCtx, pBuf, buflen);
+}
+
+#ifdef WLAN_FEATURE_MBSSID
+VOS_STATUS hdd_cfg_get_sap_dyn_config(hdd_adapter_t *pAdapter, char *pBuf,
+                                                                    int buflen)
+{
+    return hdd_cfg_get_config(mbssid_sap_dyn_ini_reg_table,
+                              ARRAY_SIZE(mbssid_sap_dyn_ini_reg_table),
+                              (v_U8_t *) &pAdapter->sap_dyn_ini_cfg,
+                              WLAN_HDD_GET_CTX(pAdapter),
+                              pBuf, buflen);
+}
+#endif
 
 static VOS_STATUS find_cfg_item (tCfgIniEntry* iniTable, unsigned long entries,
     char *name, char** value)
@@ -4376,6 +4484,27 @@ static VOS_STATUS hdd_apply_cfg_ini( hdd_context_t *pHddCtx, tCfgIniEntry* iniTa
 
   return( ret_status );
 }
+
+#ifdef WLAN_FEATURE_MBSSID
+v_VOID_t hdd_mbssid_apply_def_cfg_ini(hdd_adapter_t *pAdapter)
+{
+   hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+   hdd_config_t *iniConfig = pHddCtx->cfg_ini;
+   mbssid_sap_dyn_ini_config_t *sap_ini_cfg = &pAdapter->sap_dyn_ini_cfg;
+
+   sap_ini_cfg->apStartChannelNum = iniConfig->apStartChannelNum;
+   sap_ini_cfg->apEndChannelNum = iniConfig->apEndChannelNum;
+   sap_ini_cfg->apOperatingBand = iniConfig->apOperatingBand;
+   sap_ini_cfg->apAutoChannelSelection = iniConfig->apAutoChannelSelection;
+   sap_ini_cfg->acsScanBandPreference = iniConfig->acsScanBandPreference;
+   sap_ini_cfg->acsBandSwitchThreshold = iniConfig->acsBandSwitchThreshold;
+   vos_mem_copy(sap_ini_cfg->acsAllowedChnls, iniConfig->acsAllowedChnls,
+                                                              CFG_MAX_STR_LEN);
+
+   sap_ini_cfg->sapDot11Mode = iniConfig->sapDot11Mode;
+
+}
+#endif
 
 eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode( eHddDot11Mode dot11Mode )
 {
@@ -5636,9 +5765,10 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
 
   --------------------------------------------------------------------------*/
 
-VOS_STATUS hdd_execute_config_command(hdd_context_t *pHddCtx, char *command)
+static VOS_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
+                                   unsigned long tableSize, v_U8_t *ini_struct,
+                                   hdd_context_t *pHddCtx, char *command)
 {
-   size_t tableSize = sizeof(g_registry_table)/sizeof(g_registry_table[0]);
    REG_TABLE_ENTRY *pRegEntry;
    char *clone;
    char *pCmd;
@@ -5716,7 +5846,7 @@ VOS_STATUS hdd_execute_config_command(hdd_context_t *pHddCtx, char *command)
    // lookup the configuration item
    for (idx = 0; idx < tableSize; idx++)
    {
-      if (0 == strcmp(name, g_registry_table[idx].RegName))
+      if (0 == strcmp(name, reg_table[idx].RegName))
       {
          // found a match
          break;
@@ -5730,16 +5860,17 @@ VOS_STATUS hdd_execute_config_command(hdd_context_t *pHddCtx, char *command)
       goto done;
    }
 
-   pRegEntry = &g_registry_table[idx];
+   pRegEntry = &reg_table[idx];
    if (!(pRegEntry->Flags & VAR_FLAGS_DYNAMIC_CFG))
    {
       // does not support dynamic configuration
-      hddLog(LOGE, "%s: invalid command, %s does not support "
+      hddLog(LOGE, "%s: Global_Registry_Table.%s does not support "
              "dynamic configuration", __func__, name);
+      vstatus = VOS_STATUS_E_PERM;
       goto done;
    }
 
-   pField = ((v_U8_t *)pHddCtx->cfg_ini) + pRegEntry->VarOffset;
+   pField = ini_struct + pRegEntry->VarOffset;
 
    switch (pRegEntry->RegType)
    {
@@ -5866,6 +5997,25 @@ VOS_STATUS hdd_execute_config_command(hdd_context_t *pHddCtx, char *command)
    return vstatus;
 }
 
+VOS_STATUS hdd_execute_global_config_command(hdd_context_t *pHddCtx,
+                                                                 char *command)
+{
+    return hdd_execute_config_command(g_registry_table,
+                                      ARRAY_SIZE(g_registry_table),
+                                      (v_U8_t *) pHddCtx->cfg_ini,
+                                      pHddCtx, command);
+}
+
+#ifdef WLAN_FEATURE_MBSSID
+VOS_STATUS hdd_execute_sap_dyn_config_command(hdd_adapter_t *pAdapter,
+                                                                 char *command)
+{
+    return hdd_execute_config_command(mbssid_sap_dyn_ini_reg_table,
+                                      ARRAY_SIZE(mbssid_sap_dyn_ini_reg_table),
+                                      (v_U8_t *) &pAdapter->sap_dyn_ini_cfg,
+                                      WLAN_HDD_GET_CTX(pAdapter), command);
+}
+#endif
 /**---------------------------------------------------------------------------
 
   \brief hdd_is_okc_mode_enabled() -
