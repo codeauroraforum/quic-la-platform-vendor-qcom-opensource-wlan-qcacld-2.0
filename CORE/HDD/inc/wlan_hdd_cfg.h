@@ -2393,6 +2393,18 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ROAMING_DFS_CHANNEL_MAX                 (1)
 #define CFG_ROAMING_DFS_CHANNEL_DEFAULT             (0)
 
+#ifdef WLAN_FEATURE_11W
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_NAME                    "pmfSaQueryMaxRetries"
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_DEFAULT                 ( 5  )
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_MIN                     ( 0 )
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_MAX                     ( 20  )
+
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_NAME                 "pmfSaQueryRetryInterval"
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_DEFAULT              ( 200    )
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MIN                  ( 0 )
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX                  ( 2000  )
+#endif
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2890,6 +2902,10 @@ typedef struct
    v_U8_t      enableFwModuleLogLevel[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
 #endif
 
+#ifdef WLAN_FEATURE_11W
+   v_U32_t                     pmfSaQueryMaxRetries;
+   v_U32_t                     pmfSaQueryRetryInterval;
+#endif
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
