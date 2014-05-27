@@ -54,6 +54,7 @@
 #include "btcApi.h"
 #include "vos_nvitem.h"
 #include "p2p_Api.h"
+#include "smeInternal.h"
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
 #include "oemDataApi.h"
@@ -3514,4 +3515,21 @@ eHalStatus sme_TxpowerLimit( tHalHandle hHal, tSirTxPowerLimit *psmetx);
 eHalStatus sme_UpdateConnectDebug(tHalHandle hHal, tANI_U32 set_value);
 eHalStatus sme_ApDisableIntraBssFwd(tHalHandle hHal, tANI_U8 sessionId,
                                     tANI_BOOLEAN disablefwd);
+
+#ifdef WLAN_FEATURE_STATS_EXT
+
+typedef struct sStatsExtRequestReq {
+  tANI_U32 request_data_len;
+  tANI_U8* request_data;
+} tStatsExtRequestReq, *tpStatsExtRequestReq;
+
+typedef void (* StatsExtCallback)(void *, tStatsExtEvent *);
+
+void sme_StatsExtRegisterCallback(tHalHandle hHal, StatsExtCallback callback);
+
+eHalStatus sme_StatsExtRequest(tANI_U8 session_id, tpStatsExtRequestReq input);
+
+eHalStatus sme_StatsExtEvent (tHalHandle hHal, void* pMsg);
+
+#endif
 #endif //#if !defined( __SME_API_H )

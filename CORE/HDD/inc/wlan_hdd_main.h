@@ -1505,4 +1505,8 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter);
 
 void wlan_hdd_send_svc_nlink_msg(int type);
 
+#ifdef WLAN_FEATURE_STATS_EXT
+void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
+#endif
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
