@@ -263,6 +263,7 @@ struct completion wlan_start_comp;
 extern void hif_init_adf_ctx(adf_os_device_t adf_ctx, v_VOID_t *hif_sc);
 extern int hif_register_driver(void);
 extern void hif_unregister_driver(void);
+extern void hif_get_hw_info(void *ol_sc, u32 *version, u32 *revision);
 #ifdef QCA_WIFI_FTM
 extern int hdd_ftm_start(hdd_context_t *pHddCtx);
 extern int hdd_ftm_stop(hdd_context_t *pHddCtx);
@@ -10199,7 +10200,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    ((VosContextType*)(pVosContext))->adf_ctx = adf_ctx;
 #endif /* QCA_WIFI_2_0 */
 
-   pHddCtx->nEnableStrictRegulatoryForFCC = TRUE;
+   pHddCtx->nEnableStrictRegulatoryForFCC = FALSE;
    // Load all config first as TL config is needed during vos_open
    pHddCtx->cfg_ini = (hdd_config_t*) kmalloc(sizeof(hdd_config_t), GFP_KERNEL);
    if(pHddCtx->cfg_ini == NULL)
@@ -10649,9 +10650,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 
 #ifdef QCA_WIFI_2_0
 
-   /* target hw version would only be retrieved after firmware donwload */
-   pHddCtx->target_hw_version =
-       ((struct ol_softc *)hif_sc)->target_version;
+   /* target hw version/revision would only be retrieved after firmware donwload */
+   hif_get_hw_info(hif_sc, &pHddCtx->target_hw_version,
+                   &pHddCtx->target_hw_revision);
 
    /* Get the wlan hw/fw version */
    hdd_wlan_get_version(pAdapter, NULL, NULL);
