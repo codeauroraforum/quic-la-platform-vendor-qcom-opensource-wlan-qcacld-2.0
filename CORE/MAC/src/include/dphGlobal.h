@@ -178,6 +178,17 @@
 #define DPH_STA_HASH_INDEX_PEER   1
 
 
+#ifdef WLAN_FEATURE_11W
+//DPH PMF SA Query state for station
+
+#define DPH_SA_QUERY_NOT_IN_PROGRESS      1
+
+#define DPH_SA_QUERY_IN_PROGRESS          2
+
+#define DPH_SA_QUERY_TIMED_OUT            3
+#endif
+
+
 typedef struct sDphRateBasedCtr
 
 {
@@ -602,6 +613,14 @@ typedef struct sDphHashNode
     tANI_U8  vhtSupportedChannelWidthSet;
     tANI_U8  vhtSupportedRxNss;
     tANI_U8  vhtBeamFormerCapable;
+#endif
+
+#ifdef WLAN_FEATURE_11W
+    tANI_U8  pmfSaQueryState;
+    tANI_U8  pmfSaQueryRetryCount;
+    tANI_U16 pmfSaQueryCurrentTransId;
+    tANI_U16 pmfSaQueryStartTransId;
+    TX_TIMER pmfSaQueryTimer;
 #endif
 
     tANI_U8 htLdpcCapable;

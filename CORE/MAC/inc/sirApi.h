@@ -662,6 +662,12 @@ typedef struct sSirSmeStartBssReq
     tSirMacRateSet          operationalRateSet;// Has 11a or 11b rates
     tSirMacRateSet          extendedRateSet;    // Has 11g rates
     tSirHTConfig            htConfig;
+
+#ifdef WLAN_FEATURE_11W
+    tANI_BOOLEAN            pmfCapable;
+    tANI_BOOLEAN            pmfRequired;
+#endif
+
 } tSirSmeStartBssReq, *tpSirSmeStartBssReq;
 
 #define GET_IE_LEN_IN_BSS(lenInBss) ( lenInBss + sizeof(lenInBss) - \
@@ -4876,5 +4882,14 @@ typedef struct
 {
     tANI_U32 param;
 } tSirModemPowerStateInd, *tpSirModemPowerStateInd;
+
+#ifdef WLAN_FEATURE_STATS_EXT
+typedef struct
+{
+    tANI_U32 event_data_len;
+    u_int8_t event_data[];
+} tSirStatsExtEvent, *tpSirStatsExtEvent;
+
+#endif
 
 #endif /* __SIR_API_H */
