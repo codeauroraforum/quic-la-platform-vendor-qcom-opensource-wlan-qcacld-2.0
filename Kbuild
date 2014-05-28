@@ -251,6 +251,9 @@ BAP_OBJS := 	$(BAP_SRC_DIR)/bapApiData.o \
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 ############ HIF ############
+HIF_DIR := CORE/SERVICES/HIF
+HIF_DIR_OBJS :=  $(HIF_DIR)/ath_procfs.o
+
 HIF_COMMON_DIR := CORE/SERVICES/HIF/common
 HIF_COMMON_OBJS := $(HIF_COMMON_DIR)/hif_bmi_reg_access.o \
                    $(HIF_COMMON_DIR)/hif_diag_reg_access.o
@@ -279,7 +282,8 @@ HIF_INC := -I$(WLAN_ROOT)/$(HIF_COMMON_DIR) \
            -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_INC_DIR) \
            -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)
 
-HIF_OBJS := $(HIF_COMMON_OBJS)\
+HIF_OBJS := $(HIF_DIR_OBJS)\
+			$(HIF_COMMON_OBJS)\
             $(HIF_SDIO_OBJS)\
             $(HIF_SDIO_LINUX_OBJS)\
             $(HIF_SDIO_NATIVE_OBJS)
@@ -978,13 +982,13 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DQCA_SUPPORT_TX_THROTTLE_LL \
 		-DWMI_INTERFACE_EVENT_LOGGING\
 		-DATH_SUPPORT_WAPI\
-		-DDISABLE_L1SS_STATES \
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DCONFIG_AR6320_SUPPORT \
                 -DSDIO_3_0 \
-                -DHIF_SDIO
+                -DHIF_SDIO \
+                -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 endif
 
 ifeq ($(CONFIG_ARCH_MSM), y)
