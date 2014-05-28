@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,6 +43,9 @@
 #include <ol_htt_api.h>
 
 #include <htt_internal.h>
+#if defined(HIF_PCI)
+#include "if_pci.h"
+#endif
 
 #define HTT_HTC_PKT_POOL_INIT_SIZE 100 /* enough for a large A-MPDU */
 
@@ -392,6 +395,42 @@ htt_htc_attach(struct htt_pdev_t *pdev)
         return 1; /* failure */
     }
     pdev->htc_endpoint = response.Endpoint;
+#if defined(HIF_PCI)
+    hif_pci_save_htc_htt_config_endpoint(pdev->htc_endpoint);
+#endif
+
+#ifdef QCA_TX_HTT2_SUPPORT
+    /* Start TX HTT2 service if the target support it. */
+    if (pdev->cfg.is_high_latency) {
+        adf_os_mem_set(&connect, 0, sizeof(connect));
+        adf_os_mem_set(&response, 0, sizeof(response));
+
+        /* The same as HTT service but no RX. */
+        connect.EpCallbacks.pContext = pdev;
+        connect.EpCallbacks.EpTxComplete = htt_h2t_send_complete;
+        connect.EpCallbacks.EpSendFull = htt_h2t_full;
+        connect.MaxSendQueueDepth = HTT_MAX_SEND_QUEUE_DEPTH;
+
+        /* Should NOT support credit flow control. */
+        connect.ConnectionFlags |= HTC_CONNECT_FLAGS_DISABLE_CREDIT_FLOW_CTRL;
+
+        connect.ServiceID = HTT_DATA2_MSG_SVC;
+
+        status = HTCConnectService(pdev->htc_pdev, &connect, &response);
+        if (status != A_OK) {
+            pdev->htc_tx_htt2_endpoint = ENDPOINT_UNUSED;
+            pdev->htc_tx_htt2_max_size = 0;
+        } else {
+            pdev->htc_tx_htt2_endpoint = response.Endpoint;
+            pdev->htc_tx_htt2_max_size = HTC_TX_HTT2_MAX_SIZE;
+        }
+
+        adf_os_print("TX HTT %s, ep %d size %d\n",
+                     (status == A_OK ? "ON" : "OFF"),
+                     pdev->htc_tx_htt2_endpoint,
+                     pdev->htc_tx_htt2_max_size);
+    }
+#endif /* QCA_TX_HTT2_SUPPORT */
 
     return 0; /* success */
 }
@@ -429,3 +468,9 @@ htt_display(htt_pdev_handle pdev, int indent)
         pdev->rx_ring.sw_rd_idx.msdu_payld);
 }
 #endif
+
+/* Disable ASPM : Disable PCIe low power */
+void htt_htc_disable_aspm(void)
+{
+    htc_disable_aspm();
+}

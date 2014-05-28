@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -149,7 +149,7 @@ htt_print_rx_desc(struct htt_host_rx_desc_base *rx_desc)
                   (unsigned int)(((u_int32_t *) &rx_desc->mpdu_start)[0]),
                   (unsigned int)(((u_int32_t *) &rx_desc->mpdu_start)[1]),
                   (unsigned int)(((u_int32_t *) &rx_desc->mpdu_start)[2]));
-    adf_os_print("mpdu_start: %#010x %#010x %#010x\n",
+    adf_os_print("msdu_start: %#010x %#010x %#010x\n",
                   (unsigned int)(((u_int32_t *) &rx_desc->msdu_start)[0]),
                   (unsigned int)(((u_int32_t *) &rx_desc->msdu_start)[1]),
                   (unsigned int)(((u_int32_t *) &rx_desc->msdu_start)[2]));
@@ -391,5 +391,7 @@ htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
 void
 htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev);
 #endif
+
+void htt_htc_disable_aspm(void);
 
 #endif /* _HTT_INTERNAL__H_ */

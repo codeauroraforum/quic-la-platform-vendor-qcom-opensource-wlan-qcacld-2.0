@@ -232,6 +232,7 @@ enum eWniMsgTypes
     eWNI_SME_ABORT_REMAIN_ON_CHAN_IND,
     eWNI_SME_UPDATE_NOA,
     eWNI_SME_CLEAR_DFS_CHANNEL_LIST,
+    eWNI_SME_CLEAR_LIM_SCAN_CACHE,
     eWNI_SME_PRE_CHANNEL_SWITCH_FULL_POWER,
     eWNI_SME_GET_SNR_REQ,
     //General Power Save Messages
@@ -391,6 +392,8 @@ enum eWniMsgTypes
     eWNI_SME_DFS_BEACON_CHAN_SW_IE_REQ, //Transmit CSA IE in beacons
     eWNI_SME_DFS_CSAIE_TX_COMPLETE_IND, //To indicate completion of CSA IE
                                         //update in beacons/probe rsp
+
+    eWNI_SME_STATS_EXT_EVENT,
     eWNI_SME_MSG_TYPES_END
 };
 

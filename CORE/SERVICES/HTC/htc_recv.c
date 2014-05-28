@@ -99,7 +99,12 @@ static void DoRecvCompletion(HTC_ENDPOINT     *pEndpoint,
             /* using legacy EpRecv */
             while (!HTC_QUEUE_EMPTY(pQueueToIndicate)) {
                 pPacket = HTC_PACKET_DEQUEUE(pQueueToIndicate);
-                AR_DEBUG_PRINTF(ATH_DEBUG_RECV, (" HTC calling ep %d recv callback on packet %p \n",
+                if (pEndpoint->EpCallBacks.EpRecv == NULL) {
+                    AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("HTC ep %d has NULL recv callback on packet %p\n",
+                            pEndpoint->Id, pPacket));
+                    continue;
+                }
+                AR_DEBUG_PRINTF(ATH_DEBUG_RECV, ("HTC calling ep %d recv callback on packet %p\n",
                         pEndpoint->Id, pPacket));
                 pEndpoint->EpCallBacks.EpRecv(pEndpoint->EpCallBacks.pContext, pPacket);
             }
@@ -237,6 +242,12 @@ _failed:
     return NULL;
 }
 #endif
+
+static void HTCsuspendwow(HTC_TARGET *target)
+{
+    HIFsuspendwow(target->hif_dev);
+    return;
+}
 
 A_STATUS HTCRxCompletionHandler(
     void *Context, adf_nbuf_t netbuf, a_uint8_t pipeID)
@@ -399,6 +410,7 @@ A_STATUS HTCRxCompletionHandler(
             case HTC_MSG_SEND_SUSPEND_COMPLETE:
                 wow_nack = 0;
                 target->HTCInitInfo.TargetSendSuspendComplete((void *)&wow_nack);
+                HTCsuspendwow(target);
                 break;
             case HTC_MSG_NACK_SUSPEND:
                 wow_nack = 1;

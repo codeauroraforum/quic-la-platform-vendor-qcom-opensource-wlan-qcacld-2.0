@@ -972,8 +972,6 @@ void usb_hif_io_comp_work(struct work_struct *work)
 	HIF_USB_PIPE *pipe = container_of(work, HIF_USB_PIPE, io_complete_work);
 	adf_nbuf_t buf;
 	HIF_DEVICE_USB *device;
-	A_UINT8 *data;
-	A_UINT32 len;
 	HTC_FRAME_HDR *HtcHdr;
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("+%s\n", __func__));
@@ -985,9 +983,8 @@ void usb_hif_io_comp_work(struct work_struct *work)
 			AR_DEBUG_PRINTF(USB_HIF_DEBUG_BULK_OUT,
 					("+athusb xmit callback " "buf:0x%p\n",
 					 buf));
+			HtcHdr = (HTC_FRAME_HDR *) adf_nbuf_get_frag_vaddr(buf, 0);
 
-			adf_nbuf_peek_header(buf, &data, &len);
-			HtcHdr = (HTC_FRAME_HDR *) data;
 #ifdef ATH_11AC_TXCOMPACT
 #error ATH_11AC_TXCOMPACT only support for High Latency mode
 #else

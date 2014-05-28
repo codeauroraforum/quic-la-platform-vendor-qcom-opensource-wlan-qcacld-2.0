@@ -161,7 +161,8 @@ limCollectBssDescription(tpAniSirGlobal pMac,
      */
     if ((NULL != pMac->lim.gpLimMlmScanReq && pMac->lim.gpLimMlmScanReq->p2pSearch) ||
             (pMac->fScanOffload && pMac->lim.fOffloadScanPending &&
-             pMac->lim.fOffloadScanP2PSearch))
+             (pMac->lim.fOffloadScanP2PSearch ||
+              pMac->lim.fOffloadScanP2PListen)))
     {
         if (NULL == limGetP2pIEPtr(pMac, (pBody + SIR_MAC_B_PR_SSID_OFFSET), ieLen))
         {
@@ -732,8 +733,8 @@ limLookupNaddHashEntry(tpAniSirGlobal pMac,
                       (tANI_U8 *) ptemp->bssDescription.bssId,
                       sizeof(tSirMacAddr))) &&   //matching BSSID
              // matching band to update new channel info
-            (vos_freq_to_band(pBssDescr->bssDescription.channelId) ==
-                      vos_freq_to_band(ptemp->bssDescription.channelId)) &&
+            (vos_chan_to_band(pBssDescr->bssDescription.channelId) ==
+                      vos_chan_to_band(ptemp->bssDescription.channelId)) &&
             vos_mem_compare( ((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1),
                            ((tANI_U8 *) &ptemp->bssDescription.ieFields + 1),
                            (tANI_U8) (ssidLen + 1)) &&

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2012, 2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -65,7 +65,6 @@
 #define VOS_CHAN_SPACING_20MHZ 20
 #define VOS_CHAN_14_FREQ       2484
 #define VOS_CHAN_15_FREQ       2512
-
 /*--------------------------------------------------------------------------
   Type declarations
   ------------------------------------------------------------------------*/
@@ -170,10 +169,12 @@ VOS_STATUS vos_decrypt_AES(v_U32_t cryptHandle, /* Handle */
 
 v_U32_t vos_chan_to_freq(v_U8_t chan);
 v_U8_t vos_freq_to_chan(v_U32_t freq);
-v_U8_t vos_freq_to_band(v_U32_t freq);
+v_U8_t vos_chan_to_band(v_U32_t chan);
 #ifdef WLAN_FEATURE_11W
 v_BOOL_t vos_is_mmie_valid(v_U8_t *key, v_U8_t *ipn,
 				v_U8_t* frm, v_U8_t* efrm);
+v_BOOL_t vos_attach_mmie(v_U8_t *igtk, v_U8_t *ipn, u_int16_t key_id,
+				v_U8_t* frm, v_U8_t* efrm, u_int16_t frmLen);
 v_U8_t vos_get_mmie_size(void);
 #endif /* WLAN_FEATURE_11W */
 #endif // #if !defined __VOSS_UTILS_H

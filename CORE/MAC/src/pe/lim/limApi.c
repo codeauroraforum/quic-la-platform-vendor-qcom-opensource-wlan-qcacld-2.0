@@ -615,18 +615,27 @@ static tSirRetStatus __limInitConfig( tpAniSirGlobal pMac )
    /* This was initially done after resume notification from HAL. Now, DAL is
       started before PE so this can be done here */
    handleHTCapabilityandHTInfo(pMac, NULL);
-   if(wlan_cfgGetInt(pMac, WNI_CFG_DISABLE_LDPC_WITH_TXBF_AP,(tANI_U32 *) &pMac->lim.disableLDPCWithTxbfAP) != eSIR_SUCCESS)
+   if (eSIR_SUCCESS != wlan_cfgGetInt(pMac, WNI_CFG_DISABLE_LDPC_WITH_TXBF_AP,
+                       (tANI_U32 *) &pMac->lim.disableLDPCWithTxbfAP))
    {
       limLog(pMac, LOGP, FL("cfg get disableLDPCWithTxbfAP failed"));
       return eSIR_FAILURE;
    }
 #ifdef FEATURE_WLAN_TDLS
-   if(wlan_cfgGetInt(pMac, WNI_CFG_TDLS_BUF_STA_ENABLED,(tANI_U32 *) &pMac->lim.gLimTDLSBufStaEnabled) != eSIR_SUCCESS)
+   if (eSIR_SUCCESS != wlan_cfgGetInt(pMac, WNI_CFG_TDLS_BUF_STA_ENABLED,
+                       (tANI_U32 *) &pMac->lim.gLimTDLSBufStaEnabled))
    {
        limLog(pMac, LOGP, FL("cfg get LimTDLSBufStaEnabled failed"));
        return eSIR_FAILURE;
    }
-   if(wlan_cfgGetInt(pMac, WNI_CFG_TDLS_QOS_WMM_UAPSD_MASK,(tANI_U32 *) &pMac->lim.gLimTDLSUapsdMask) != eSIR_SUCCESS)
+   if (eSIR_SUCCESS != wlan_cfgGetInt(pMac, WNI_CFG_TDLS_QOS_WMM_UAPSD_MASK,
+                       (tANI_U32 *) &pMac->lim.gLimTDLSUapsdMask))
+   {
+       limLog(pMac, LOGP, FL("cfg get LimTDLSUapsdMask failed"));
+       return eSIR_FAILURE;
+   }
+   if (eSIR_SUCCESS != wlan_cfgGetInt(pMac, WNI_CFG_TDLS_OFF_CHANNEL_ENABLED,
+                       (tANI_U32 *) &pMac->lim.gLimTDLSOffChannelEnabled))
    {
        limLog(pMac, LOGP, FL("cfg get LimTDLSUapsdMask failed"));
        return eSIR_FAILURE;
@@ -719,13 +728,6 @@ limInitialize(tpAniSirGlobal pMac)
         return status;
     }
 
-    /*
-     * MLM will be intitalized when 'START' request comes from SME.
-     * limInitMlm calls limCreateTimers, which actually relies on
-     * CFG to be downloaded. So it should not be called as part of
-     * peStart, as CFG download is happening after peStart.
-     */
-    //limInitMlm(pMac);
     // Initializations for maintaining peers in IBSS
     limIbssInit(pMac);
 
@@ -741,34 +743,6 @@ limInitialize(tpAniSirGlobal pMac)
 #endif
 
     vos_list_init(&pMac->lim.gLimMgmtFrameRegistratinQueue);
-
-#if 0
-
-    vos_trace_setLevel(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR);
-    vos_trace_setLevel(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_WARN);
-    vos_trace_setLevel(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_FATAL);
-
-    vos_trace_setLevel(VOS_MODULE_ID_HAL, VOS_TRACE_LEVEL_WARN);
-    vos_trace_setLevel(VOS_MODULE_ID_HAL, VOS_TRACE_LEVEL_ERROR);
-
-    vos_trace_setLevel(VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_WARN);
-    vos_trace_setLevel(VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR);
-    vos_trace_setLevel(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR);
-
-    vos_trace_setLevel(VOS_MODULE_ID_SAL, VOS_TRACE_LEVEL_ERROR);
-
-    vos_trace_setLevel(VOS_MODULE_ID_SSC, VOS_TRACE_LEVEL_ERROR);
-
-    vos_trace_setLevel(VOS_MODULE_ID_SAL, VOS_TRACE_LEVEL_ERROR);
-    vos_trace_setLevel(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR);
-
-    vos_trace_setLevel(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR);
-
-
-    vos_trace_setLevel(VOS_MODULE_ID_BAL, VOS_TRACE_LEVEL_ERROR);
-
-    vos_trace_setLevel(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR);
-#endif
 
     //Initialize the configurations needed by PE
     if( eSIR_FAILURE == __limInitConfig(pMac))

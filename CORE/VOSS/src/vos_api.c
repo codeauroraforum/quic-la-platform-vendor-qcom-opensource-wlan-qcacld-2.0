@@ -431,9 +431,14 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
    */
   macOpenParms.dfsPhyerrFilterOffload =
                         pHddCtx->cfg_ini->fDfsPhyerrFilterOffload;
+  if (pHddCtx->cfg_ini->ssdp)
+      macOpenParms.ssdp = pHddCtx->cfg_ini->ssdp;
 #endif
 
    macOpenParms.apMaxOffloadPeers = pHddCtx->cfg_ini->apMaxOffloadPeers;
+
+   macOpenParms.apMaxOffloadReorderBuffs =
+                        pHddCtx->cfg_ini->apMaxOffloadReorderBuffs;
 
    macOpenParms.apDisableIntraBssFwd = pHddCtx->cfg_ini->apDisableIntraBssFwd;
 
@@ -601,6 +606,8 @@ err_wda_close:
    WDA_close(gpVosContext);
 
 #ifdef QCA_WIFI_2_0
+   wma_wmi_service_close(gpVosContext);
+
 err_htc_close:
    if (gpVosContext->htc_ctx) {
       HTCDestroy(gpVosContext->htc_ctx);
@@ -1160,7 +1167,6 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
       HTCDestroy(gpVosContext->htc_ctx);
       gpVosContext->htc_ctx = NULL;
   }
-#endif
 
   vosStatus = wma_wmi_service_close( vosContext );
   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
@@ -1169,7 +1175,7 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
          "%s: Failed to close wma_wmi_service", __func__);
      VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
   }
-
+#endif
 
 #ifndef QCA_WIFI_2_0
   /* Let DXE return packets in WDA_close and then free them here */
@@ -2567,4 +2573,20 @@ v_VOID_t vos_flush_delayed_work(v_VOID_t *dwork)
 #elif defined (WLAN_OPEN_SOURCE)
    cancel_delayed_work_sync(dwork);
 #endif
+}
+
+v_BOOL_t vos_is_packet_log_enabled(void)
+{
+   hdd_context_t *pHddCtx;
+
+   pHddCtx = (hdd_context_t*)(gpVosContext->pHDDContext);
+   if((NULL == pHddCtx) ||
+      (NULL == pHddCtx->cfg_ini))
+   {
+     VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+               "%s: Hdd Context is Null", __func__);
+     return FALSE;
+   }
+
+   return pHddCtx->cfg_ini->enablePacketLog;
 }

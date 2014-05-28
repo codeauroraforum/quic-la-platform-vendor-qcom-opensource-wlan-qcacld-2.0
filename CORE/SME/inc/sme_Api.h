@@ -54,6 +54,7 @@
 #include "btcApi.h"
 #include "vos_nvitem.h"
 #include "p2p_Api.h"
+#include "smeInternal.h" 
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
 #include "oemDataApi.h"
@@ -167,6 +168,24 @@ typedef PACKED_PRE struct PACKED_POST
     tANI_U32 reg_info_2;
 } tSmeChannelInfo;
 #ifdef FEATURE_WLAN_TDLS
+
+#define SME_TDLS_MAX_SUPP_CHANNELS       128
+#define SME_TDLS_MAX_SUPP_OPER_CLASSES   32
+
+typedef struct _smeTdlsPeerCapParams {
+   tANI_U8 isPeerResponder;
+   tANI_U8 peerUapsdQueue;
+   tANI_U8 peerMaxSp;
+   tANI_U8 peerBuffStaSupport;
+   tANI_U8 peerOffChanSupport;
+   tANI_U8 peerCurrOperClass;
+   tANI_U8 selfCurrOperClass;
+   tANI_U8 peerChanLen;
+   tANI_U8 peerChan[SME_TDLS_MAX_SUPP_CHANNELS];
+   tANI_U8 peerOperClassLen;
+   tANI_U8 peerOperClass[SME_TDLS_MAX_SUPP_OPER_CLASSES];
+} tSmeTdlsPeerCapParams;
+
 typedef enum
 {
     eSME_TDLS_PEER_STATE_PEERING,
@@ -179,6 +198,7 @@ typedef struct _smeTdlsPeerStateParams
     tANI_U32 vdevId;
     tSirMacAddr peerMacAddr;
     tANI_U32 peerState;
+    tSmeTdlsPeerCapParams peerCap;
 } tSmeTdlsPeerStateParams;
 #endif /* FEATURE_WLAN_TDLS */
 #endif /* QCA_WIFI_2_0 */
@@ -568,6 +588,19 @@ eHalStatus sme_ScanGetResult(tHalHandle hHal, tANI_U8 sessionId, tCsrScanResultF
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_ScanFlushResult(tHalHandle hHal, tANI_U8 sessionId);
+
+/*
+ * ---------------------------------------------------------------------------
+ *  \fn sme_FilterScanResults
+ *  \brief a wrapper function to request CSR to filter the scan results based
+ *   on valid chennel list.
+ *  \param hHal - The handle returned by macOpen.
+ *  \param sessionId - the sessionId returned by sme_OpenSession.
+ *  \return eHalStatus
+ *---------------------------------------------------------------------------
+ */
+eHalStatus sme_FilterScanResults(tHalHandle hHal, tANI_U8 sessionId);
+
 eHalStatus sme_ScanFlushP2PResult(tHalHandle hHal, tANI_U8 sessionId);
 
 /* ---------------------------------------------------------------------------
@@ -910,9 +943,25 @@ eHalStatus sme_GetStatistics(tHalHandle hHal, eCsrStatsRequesterType requesterId
   ---------------------------------------------------------------------------*/
 tANI_U16 smeGetTLSTAState(tHalHandle hHal, tANI_U8 staId);
 
+/* ---------------------------------------------------------------------------
+    \fn sme_GetRssi
+    \brief a wrapper function that client calls to register a callback to get
+           RSSI
+
+    \param hHal - HAL handle for device
+    \param callback - SME sends back the requested stats using the callback
+    \param staId -    The station ID for which the stats is requested for
+    \param bssid - The bssid of the connected session
+    \param lastRSSI - RSSI value at time of request. In case fw cannot provide
+                      RSSI, do not hold up but return this value.
+    \param pContext - user context to be passed back along with the callback
+    \param pVosContext - vos context
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
 eHalStatus sme_GetRssi(tHalHandle hHal,
-                             tCsrRssiCallback callback,
-                             tANI_U8 staId, tCsrBssid bssId, void *pContext, void* pVosContext);
+                       tCsrRssiCallback callback,
+                       tANI_U8 staId, tCsrBssid bssId, tANI_S8 lastRSSI,
+                       void *pContext, void* pVosContext);
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetSnr
@@ -3518,4 +3567,21 @@ eHalStatus sme_ApDisableIntraBssFwd(tHalHandle hHal, tANI_U8 sessionId,
                                     tANI_BOOLEAN disablefwd);
 tANI_U32 sme_GetChannelBondingMode5G(tHalHandle hHal);
 tANI_U32 sme_GetChannelBondingMode24G(tHalHandle hHal);
+
+#ifdef WLAN_FEATURE_STATS_EXT
+
+typedef struct sStatsExtRequestReq {
+  tANI_U32 request_data_len;
+  tANI_U8* request_data;
+} tStatsExtRequestReq, *tpStatsExtRequestReq;
+
+typedef void (* StatsExtCallback)(void *, tStatsExtEvent *);
+
+void sme_StatsExtRegisterCallback(tHalHandle hHal, StatsExtCallback callback);
+
+eHalStatus sme_StatsExtRequest(tANI_U8 session_id, tpStatsExtRequestReq input);
+
+eHalStatus sme_StatsExtEvent (tHalHandle hHal, void* pMsg);
+
+#endif
 #endif //#if !defined( __SME_API_H )

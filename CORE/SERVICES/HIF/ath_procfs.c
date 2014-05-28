@@ -35,6 +35,8 @@
 #include "if_pci.h"
 #elif defined(HIF_USB)
 #include "if_usb.h"
+#elif defined(HIF_SDIO)
+#include "if_ath_sdio.h"
 #endif
 #include "vos_api.h"
 
@@ -53,18 +55,24 @@ static void *get_hif_hdl_from_file(struct file *file)
 	struct hif_pci_softc *scn;
 #elif defined(HIF_USB)
 	struct hif_usb_softc *scn;
+#elif defined(HIF_SDIO)
+	struct ath_hif_sdio_softc *scn;
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
 #if defined(HIF_PCI)
 	scn = (struct hif_pci_softc *)PDE_DATA(file_inode(file));
 #elif defined(HIF_USB)
 	scn = (struct hif_usb_softc *)PDE_DATA(file_inode(file));
+#elif defined(HIF_SDIO)
+	scn = (struct ath_hif_sdio_softc *)PDE_DATA(file_inode(file));
 #endif
 #else
 #if defined(HIF_PCI)
 	scn = (struct hif_pci_softc *)(PDE(file->f_path.dentry->d_inode)->data);
 #elif defined(HIF_USB)
 	scn = (struct hif_usb_softc *)(PDE(file->f_path.dentry->d_inode)->data);
+#elif defined(HIF_SDIO)
+	scn = (struct ath_hif_sdio_softc *)(PDE(file->f_path.dentry->d_inode)->data);
 #endif
 #endif
 	return (void*)scn->ol_sc->hif_hdl;
@@ -84,7 +92,7 @@ static ssize_t ath_procfs_diag_read(struct file *file, char __user *buf,
 	}
 
 	hif_hdl = get_hif_hdl_from_file(file);
-	pr_debug("rd buff 0x%p cnt %d offset 0x%x buf 0x%p\n",
+	pr_debug("rd buff 0x%p cnt %zu offset 0x%x buf 0x%p\n",
 			read_buffer,count,
 			(int)*pos, buf);
 
@@ -123,13 +131,13 @@ static ssize_t ath_procfs_diag_write(struct file *file, const char __user *buf,
 		return -EINVAL;
 	}
 	if(copy_from_user(write_buffer, buf, count)) {
-        vos_mem_free(write_buffer);
+		vos_mem_free(write_buffer);
 		return -EFAULT;
-    }
+	}
 
 	hif_hdl = get_hif_hdl_from_file(file);
-	pr_debug("wr buff 0x%p buf 0x%p cnt %d offset 0x%x value 0x%x\n",
-			write_buffer, buf, (int)count,
+	pr_debug("wr buff 0x%p buf 0x%p cnt %zu offset 0x%x value 0x%x\n",
+			write_buffer, buf, count,
 			(int)*pos, *((A_UINT32 *)write_buffer));
 
 	if ((count == 4) && ((((A_UINT32)(*pos)) & 3) == 0)) {
@@ -187,7 +195,7 @@ int athdiag_procfs_init(void *scn)
  *This function is called when the module is unloaded
  *
  */
-void athdiag_procfs_remove()
+void athdiag_procfs_remove(void)
 {
 	remove_proc_entry(PROCFS_NAME, proc_dir);
 	pr_debug("/proc/%s/%s removed\n", PROCFS_DIR, PROCFS_NAME);

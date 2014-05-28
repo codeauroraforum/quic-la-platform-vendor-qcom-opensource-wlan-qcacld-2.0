@@ -659,6 +659,11 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
     eHalStatus halStatus = eHAL_STATUS_FAILURE;
 #endif
 
+    if (NULL == pHddCtx)
+        return -1;
+
+    mutex_lock(&pHddCtx->tdls_lock);
+
     /* QCA 2.0 Discrete ANDs feature capability in cfg_ini with that
      * received from target, so cfg_ini gives combined intersected result
      */
@@ -680,6 +685,7 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
                "%s TDLS not enabled (%d) or FW doesn't support",
                __func__, pHddCtx->cfg_ini->fEnableTDLSSupport);
 #endif
+        mutex_unlock(&pHddCtx->tdls_lock);
         return 0;
     }
     /* TDLS is supported only in STA / P2P Client modes,
@@ -694,6 +700,7 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
      */
     if (0 == WLAN_HDD_IS_TDLS_SUPPORTED_ADAPTER(pAdapter))
     {
+        mutex_unlock(&pHddCtx->tdls_lock);
         return 0;
     }
     /* Check for the valid pHddTdlsCtx. If valid do not further
@@ -709,6 +716,7 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
         if (NULL == pHddTdlsCtx) {
             hddLog(VOS_TRACE_LEVEL_ERROR, "%s malloc failed!", __func__);
             pAdapter->sessionCtx.station.pHddTdlsCtx = NULL;
+            mutex_unlock(&pHddCtx->tdls_lock);
             return -1;
         }
         /* initialize TDLS pAdater context */
@@ -792,12 +800,25 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
 #endif
     INIT_DELAYED_WORK(&pHddCtx->tdls_scan_ctxt.tdls_scan_work, wlan_hdd_tdls_schedule_scan);
 
+    /*
+     * Release tdls lock before calling in SME api
+     * which would try to acquire sme lock.
+     */
+    mutex_unlock(&pHddCtx->tdls_lock);
 #ifdef QCA_WIFI_2_0
     tInfo = vos_mem_malloc(sizeof(tdlsInfo_t));
     if (NULL == tInfo)
     {
         hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s: vos_mem_alloc failed for tInfo", __func__);
+        vos_timer_destroy(&pHddTdlsCtx->peerDiscoveryTimeoutTimer);
+#ifndef QCA_WIFI_2_0
+        vos_timer_destroy(&pHddTdlsCtx->peerUpdateTimer);
+#endif
+#ifdef TDLS_USE_SEPARATE_DISCOVERY_TIMER
+        vos_timer_destroy(&pHddTdlsCtx->peerDiscoverTimer);
+#endif
+        vos_mem_free(pHddTdlsCtx);
         return -1;
     }
 
@@ -809,7 +830,13 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
     tInfo->rssi_teardown_threshold =
         pHddTdlsCtx->threshold_config.rssi_teardown_threshold;
     tInfo->rssi_delta = pHddTdlsCtx->threshold_config.rssi_delta;
-    tInfo->tdls_options = 0; /* TBD */
+    tInfo->tdls_options = 0;
+    if (pHddCtx->cfg_ini->fEnableTDLSOffChannel)
+        tInfo->tdls_options |= ENA_TDLS_OFFCHAN;
+    if (pHddCtx->cfg_ini->fEnableTDLSBufferSta)
+        tInfo->tdls_options |= ENA_TDLS_BUFFER_STA;
+    if (pHddCtx->cfg_ini->fEnableTDLSSleepSta)
+        tInfo->tdls_options |= ENA_TDLS_SLEEP_STA;
 
     VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
               "%s: Setting tdls state and param in fw: "
@@ -835,6 +862,14 @@ int wlan_hdd_tdls_init(hdd_adapter_t *pAdapter)
     if (eHAL_STATUS_SUCCESS != halStatus)
     {
         vos_mem_free(tInfo);
+        vos_timer_destroy(&pHddTdlsCtx->peerDiscoveryTimeoutTimer);
+#ifndef QCA_WIFI_2_0
+        vos_timer_destroy(&pHddTdlsCtx->peerUpdateTimer);
+#endif
+#ifdef TDLS_USE_SEPARATE_DISCOVERY_TIMER
+        vos_timer_destroy(&pHddTdlsCtx->peerDiscoverTimer);
+#endif
+        vos_mem_free(pHddTdlsCtx);
         return -1;
     }
 #endif
@@ -851,34 +886,37 @@ void wlan_hdd_tdls_exit(hdd_adapter_t *pAdapter)
     eHalStatus halStatus = eHAL_STATUS_FAILURE;
 #endif
 
-    /*
-     * NOTE: The Callers of this function should ensure to acquire the
-     * tdls_lock to avoid any concurrent access to the Adapter.
-     */
-
     pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
-    if (0 != (wlan_hdd_validate_context(pHddCtx)))
+    if (!pHddCtx)
     {
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 FL("pHddCtx is not valid"));
+                 FL("pHddCtx is NULL"));
        return;
     }
 
     pHddTdlsCtx = WLAN_HDD_GET_TDLS_CTX_PTR(pAdapter);
     if (NULL == pHddTdlsCtx)
     {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 FL("pHddTdlsCtx is NULL"));
-        return;
+       /* TDLS context can be null and might have been freed up during
+        * cleanup for STA adapter
+        */
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+                 FL("pHddTdlsCtx is NULL, adapter device mode: %d"),
+                 pAdapter->device_mode);
+       return;
     }
 
     vos_flush_work(&pHddTdlsCtx->implicit_setup);
     vos_flush_delayed_work(&pHddCtx->tdls_scan_ctxt.tdls_scan_work);
 
+    mutex_lock(&pHddCtx->tdls_lock);
+
     /* must stop timer here before freeing peer list, because peerIdleTimer is
     part of peer list structure. */
     wlan_hdd_tdls_timers_destroy(pHddTdlsCtx);
     wlan_hdd_tdls_free_list(pHddTdlsCtx);
+
+    mutex_unlock(&pHddCtx->tdls_lock);
 
     wlan_hdd_tdls_free_scan_request(&pHddCtx->tdls_scan_ctxt);
 
@@ -896,7 +934,13 @@ void wlan_hdd_tdls_exit(hdd_adapter_t *pAdapter)
         tInfo->rssi_teardown_threshold =
             pHddTdlsCtx->threshold_config.rssi_teardown_threshold;
         tInfo->rssi_delta = pHddTdlsCtx->threshold_config.rssi_delta;
-        tInfo->tdls_options = 0; /* TBD */
+        tInfo->tdls_options = 0;
+        if (pHddCtx->cfg_ini->fEnableTDLSOffChannel)
+            tInfo->tdls_options |= ENA_TDLS_OFFCHAN;
+        if (pHddCtx->cfg_ini->fEnableTDLSBufferSta)
+            tInfo->tdls_options |= ENA_TDLS_BUFFER_STA;
+        if (pHddCtx->cfg_ini->fEnableTDLSSleepSta)
+            tInfo->tdls_options |= ENA_TDLS_SLEEP_STA;
 
         VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
                   "%s: Setting tdls state and param in fw: "
@@ -1067,8 +1111,8 @@ hddTdlsPeer_t *wlan_hdd_tdls_get_peer(hdd_adapter_t *pAdapter, u8 *mac)
 
     if (NULL == pHddTdlsCtx)
     {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 FL("pHddTdlsCtx is NULL"));
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("pHddTdlsCtx is NULL"));
         vos_mem_free(peer);
         mutex_unlock(&pHddCtx->tdls_lock);
         return NULL;
@@ -1189,7 +1233,6 @@ int wlan_hdd_tdls_recv_discovery_resp(hdd_adapter_t *pAdapter, u8 *mac)
 
     pHddCtx = WLAN_HDD_GET_CTX(pHddTdlsCtx->pAdapter);
 
-    if (NULL == pHddCtx)
     if (0 != (wlan_hdd_validate_context(pHddCtx)))
     {
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -1256,9 +1299,9 @@ int wlan_hdd_tdls_recv_discovery_resp(hdd_adapter_t *pAdapter, u8 *mac)
 
 int wlan_hdd_tdls_set_peer_caps(hdd_adapter_t *pAdapter,
                                 u8 *mac,
-                                tANI_U8 uapsdQueues,
-                                tANI_U8 maxSp,
-                                tANI_BOOLEAN isBufSta)
+                                tCsrStaParams *StaParams,
+                                tANI_BOOLEAN isBufSta,
+                                tANI_BOOLEAN isOffChannelSupported)
 {
     hddTdlsPeer_t *curr_peer;
 
@@ -1270,9 +1313,24 @@ int wlan_hdd_tdls_set_peer_caps(hdd_adapter_t *pAdapter,
        return -1;
     }
 
-    curr_peer->uapsdQueues = uapsdQueues;
-    curr_peer->maxSp = maxSp;
+    curr_peer->uapsdQueues = StaParams->uapsd_queues;
+    curr_peer->maxSp = StaParams->max_sp;
     curr_peer->isBufSta = isBufSta;
+    curr_peer->isOffChannelSupported = isOffChannelSupported;
+
+    vos_mem_copy(curr_peer->supported_channels,
+                 StaParams->supported_channels,
+                 StaParams->supported_channels_len);
+
+    curr_peer->supported_channels_len =
+               StaParams->supported_channels_len;
+
+    vos_mem_copy(curr_peer->supported_oper_classes,
+                 StaParams->supported_oper_classes,
+                 StaParams->supported_oper_classes_len);
+
+    curr_peer->supported_oper_classes_len =
+               StaParams->supported_oper_classes_len;
     return 0;
 }
 
@@ -1293,6 +1351,22 @@ int wlan_hdd_tdls_get_link_establish_params(hdd_adapter_t *pAdapter, u8 *mac,
     tdlsLinkEstablishParams->uapsdQueues = curr_peer->uapsdQueues;
     tdlsLinkEstablishParams->maxSp = curr_peer->maxSp;
     tdlsLinkEstablishParams->isBufSta = curr_peer->isBufSta;
+    tdlsLinkEstablishParams->isOffChannelSupported =
+                                 curr_peer->isOffChannelSupported;
+
+    vos_mem_copy(tdlsLinkEstablishParams->supportedChannels,
+                 curr_peer->supported_channels,
+                 curr_peer->supported_channels_len);
+
+    tdlsLinkEstablishParams->supportedChannelsLen =
+                 curr_peer->supported_channels_len;
+
+    vos_mem_copy(tdlsLinkEstablishParams->supportedOperClasses,
+                 curr_peer->supported_oper_classes,
+                 curr_peer->supported_oper_classes_len);
+
+    tdlsLinkEstablishParams->supportedOperClassesLen =
+                 curr_peer->supported_oper_classes_len;
     return 0;
 }
 
@@ -1546,7 +1620,13 @@ int wlan_hdd_tdls_set_params(struct net_device *dev, tdls_config_params_t *confi
     tdlsParams->tx_teardown_threshold = config->idle_packet_n;
     tdlsParams->rssi_teardown_threshold = config->rssi_teardown_threshold;
     tdlsParams->rssi_delta = config->rssi_delta;
-    tdlsParams->tdls_options = 0; /* TBD */
+    tdlsParams->tdls_options = 0;
+    if (pHddCtx->cfg_ini->fEnableTDLSOffChannel)
+        tdlsParams->tdls_options |= ENA_TDLS_OFFCHAN;
+    if (pHddCtx->cfg_ini->fEnableTDLSBufferSta)
+        tdlsParams->tdls_options |= ENA_TDLS_BUFFER_STA;
+    if (pHddCtx->cfg_ini->fEnableTDLSSleepSta)
+        tdlsParams->tdls_options |= ENA_TDLS_SLEEP_STA;
 
     VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
               "%s: Setting tdls state and param in fw: "
@@ -2318,9 +2398,9 @@ static void wlan_hdd_tdls_pre_setup(struct work_struct *work)
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: discovery attempt (%d) reached max (%d) for peer "
                   MAC_ADDRESS_STR ", ignore discovery trigger from fw",
-                  __func__, MAC_ADDR_ARRAY(curr_peer->peerMac),
-                  curr_peer->discovery_attempt,
-                  pHddTdlsCtx->threshold_config.discovery_tries_n);
+                  __func__, curr_peer->discovery_attempt,
+                  pHddTdlsCtx->threshold_config.discovery_tries_n,
+                  MAC_ADDR_ARRAY(curr_peer->peerMac));
         curr_peer->tdls_support = eTDLS_CAP_NOT_SUPPORTED;
         goto done;
     }

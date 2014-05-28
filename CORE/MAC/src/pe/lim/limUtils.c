@@ -70,6 +70,8 @@ static tAniBool glimTriggerBackgroundScanDuringQuietBss_Status = eSIR_TRUE;
 //#define LIM_MAX_ACTIVE_SESSIONS 3  //defined temporarily for BT-AMP SUPPORT
 #define SUCCESS 1                   //defined temporarily for BT-AMP
 
+#define MAX_BA_WINDOW_SIZE_FOR_CISCO 25
+
 /** -------------------------------------------------------------
 \fn limAssignDialogueToken
 \brief Assigns dialogue token.
@@ -912,11 +914,6 @@ limInitMlm(tpAniSirGlobal pMac)
 
     /// Initialize MAC based Authentication STA list
     limInitPreAuthList(pMac);
-
-    //pMac->lim.gpLimMlmJoinReq = NULL;
-
-    if (pMac->lim.gLimTimersCreated)
-        return;
 
     // Create timers used by LIM
     retVal = limCreateTimers(pMac);
@@ -5384,14 +5381,6 @@ limValidateDeltsReq(tpAniSirGlobal pMac, tpSirDeltsReq pDeltsReq, tSirMacAddr pe
         pSta = dphGetHashEntry(pMac, DPH_STA_HASH_INDEX_PEER, &psessionEntry->dph.dphHashTable);
 
         val = sizeof(tSirMacAddr);
-        #if 0
-        if (wlan_cfgGetStr(pMac, WNI_CFG_BSSID, peerMacAddr, &val) != eSIR_SUCCESS)
-        {
-            /// Could not get BSSID from CFG. Log error.
-            limLog(pMac, LOGP, FL("could not retrieve BSSID"));
-            return eSIR_FAILURE;
-        }
-       #endif// TO SUPPORT BT-AMP
        sirCopyMacAddr(peerMacAddr,psessionEntry->bssId);
 
     }
@@ -5908,7 +5897,17 @@ tSirRetStatus limPostMlmAddBAReq( tpAniSirGlobal pMac,
   // Requesting the ADDBA recipient to populate the size.
   // If ADDBA is accepted, a non-zero buffer size should
   // be returned in the ADDBA Rsp
-  pMlmAddBAReq->baBufferSize = 0;
+  if ((TRUE == psessionEntry->isCiscoVendorAP) &&
+        (eHT_CHANNEL_WIDTH_80MHZ != pStaDs->htSupportedChannelWidthSet))
+  {
+     /* Cisco AP has issues in receiving more than 25 "mpdu in ampdu"
+        causing very low throughput in HT40 case */
+     limLog( pMac, LOGW,
+         FL( "Requesting ADDBA with Cisco 1225 AP, window size 25"));
+     pMlmAddBAReq->baBufferSize = MAX_BA_WINDOW_SIZE_FOR_CISCO;
+  }
+  else
+     pMlmAddBAReq->baBufferSize = 0;
 
   limLog( pMac, LOGW,
       FL( "Requesting an ADDBA to setup a %s BA session with STA %d for TID %d" ),
@@ -7265,9 +7264,8 @@ void limHandleHeartBeatFailureTimeout(tpAniSirGlobal pMac)
 #endif
                 if (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE)
                 {
-                    if ((!LIM_IS_CONNECTION_ACTIVE(psessionEntry)) &&
-                        (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
-                        (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE))
+                    if ((psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
+                       (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE))
                     {
                         limLog(pMac, LOGE, FL("Probe_hb_failure: for session:%d " ),psessionEntry->peSessionId);
                         /* AP did not respond to Probe Request. Tear down link with it.*/
@@ -7758,7 +7756,6 @@ void limPmfSaQueryTimerHandler(void *pMacGlobal, tANI_U32 param)
     {
         limLog(pMac, LOGE, FL("Session does not exist for given session ID %d"),
                timerId.fields.sessionId);
-        pSta->pmfSaQueryState = DPH_SA_QUERY_NOT_IN_PROGRESS;
         return;
     }
     if ((pSta = dphGetHashEntry(pMac, timerId.fields.peerIdx,
@@ -7802,18 +7799,34 @@ void limPmfSaQueryTimerHandler(void *pMacGlobal, tANI_U32 param)
 
 
 #ifdef WLAN_FEATURE_11AC
-tANI_BOOLEAN limCheckVHTOpModeChange( tpAniSirGlobal pMac, tpPESession psessionEntry, tANI_U8 chanWidth, tANI_U8 staId)
+tANI_BOOLEAN limCheckVHTOpModeChange( tpAniSirGlobal pMac, tpPESession psessionEntry,
+                                      tANI_U8 chanWidth, tANI_U8 staId, tANI_U8 *peerMac)
 {
     tUpdateVHTOpMode tempParam;
 
     tempParam.opMode = chanWidth;
     tempParam.staId  = staId;
     tempParam.smesessionId = psessionEntry->smeSessionId;
-    vos_mem_copy(tempParam.peer_mac, psessionEntry->bssId,
+    vos_mem_copy(tempParam.peer_mac, peerMac,
                  sizeof(tSirMacAddr));
 
-
     limSendModeUpdate( pMac, &tempParam, psessionEntry );
+
+    return eANI_BOOLEAN_TRUE;
+}
+
+tANI_BOOLEAN limSetNssChange( tpAniSirGlobal pMac, tpPESession psessionEntry, tANI_U8 rxNss,
+                              tANI_U8 staId, tANI_U8 *peerMac)
+{
+    tUpdateRxNss tempParam;
+
+    tempParam.rxNss = rxNss;
+    tempParam.staId  = staId;
+    tempParam.smesessionId = psessionEntry->smeSessionId;
+    vos_mem_copy(tempParam.peer_mac, peerMac,
+                 sizeof(tSirMacAddr));
+
+    limSendRxNssUpdate( pMac, &tempParam, psessionEntry );
 
     return eANI_BOOLEAN_TRUE;
 }

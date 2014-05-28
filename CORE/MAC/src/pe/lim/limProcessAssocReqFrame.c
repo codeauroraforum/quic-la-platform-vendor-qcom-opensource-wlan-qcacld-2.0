@@ -643,6 +643,12 @@ limProcessAssocReqFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
     /* if additional IE is present, check if it has WscIE */
     if( pAssocReq->addIEPresent && pAssocReq->addIE.length )
         wpsIe = limGetWscIEPtr(pMac, pAssocReq->addIE.addIEdata, pAssocReq->addIE.length);
+    else
+    {
+          limLog(pMac, LOG1, FL("Assoc req addIEPresent = %d "
+                                "addIE length = %d"), pAssocReq->addIEPresent,
+                                pAssocReq->addIE.length);
+    }
     /* when wpsIe is present, RSN/WPA IE is ignored */
     if( wpsIe == NULL )
     {
@@ -765,6 +771,10 @@ limProcessAssocReqFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
             && psessionEntry->pLimStartBssReq->rsnIE->length) */
 
     } /* end of     if( ! pAssocReq->wscInfo.present ) */
+    else
+    {
+          limLog(pMac, LOG1, FL("Assoc req WSE IE is present"));
+    }
 
     /**
      * Extract 'associated' context for STA, if any.
@@ -1196,6 +1206,18 @@ if (limPopulateMatchingRateSet(pMac,
         pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
         goto error;
     }
+
+#ifdef WLAN_FEATURE_11AC
+    if(pAssocReq->operMode.present)
+    {
+        pStaDs->vhtSupportedRxNss = pAssocReq->operMode.rxNSS + 1;
+    }
+    else
+    {
+        pStaDs->vhtSupportedRxNss = ((pStaDs->supportedRates.vhtRxMCSMap & MCSMAPMASK2x2)
+                                                                == MCSMAPMASK2x2) ? 1 : 2;
+    }
+#endif
 
     vos_mem_copy((tANI_U8 *) &pStaDs->mlmStaContext.propRateSet,
                  (tANI_U8 *) &(pAssocReq->propIEinfo.propRates),

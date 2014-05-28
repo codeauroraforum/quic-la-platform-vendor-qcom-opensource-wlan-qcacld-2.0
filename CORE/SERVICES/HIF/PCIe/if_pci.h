@@ -31,11 +31,7 @@
 #define __ATH_PCI_H__
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
-#include <asm/semaphore.h>
-#else
 #include <linux/semaphore.h>
-#endif
 #include <linux/interrupt.h>
 
 #define CONFIG_COPY_ENGINE_SUPPORT /* TBDXXX: here for now */
@@ -88,8 +84,12 @@ struct hif_pci_softc {
     struct targetdef_s *targetdef;
     struct hostdef_s *hostdef;
     atomic_t tasklet_from_intr;
+    atomic_t wow_done;
+    atomic_t ce_suspend;
+    atomic_t pci_link_suspended;
     bool hif_init_done;
     bool recovery;
+    int htc_endpoint;
 };
 #define TARGID(sc) ((A_target_id_t)(&(sc)->mem))
 #define TARGID_TO_HIF(targid) (((struct hif_pci_softc *)((char *)(targid) - (char *)&(((struct hif_pci_softc *)0)->mem)))->hif_device)
@@ -115,10 +115,15 @@ adf_os_size_t initBufferCount(adf_os_size_t maxSize);
 void hif_init_pdev_txrx_handle(void *ol_sc, void *txrx_handle);
 void hif_disable_isr(void *ol_sc);
 
-/* Function to reset SoC*/
+/* Function to reset SoC */
 void hif_reset_soc(void *ol_sc);
 
+/* Function to disable ASPM */
+void hif_disable_aspm(void);
+
 void hif_init_adf_ctx(adf_os_device_t adf_dev, void *ol_sc);
+
+void hif_pci_save_htc_htt_config_endpoint(int htc_endpoint);
 
 #ifndef REMOVE_PKT_LOG
 extern int pktlogmod_init(void *context);
@@ -127,6 +132,8 @@ extern void pktlogmod_exit(void *context);
 
 int hif_pci_check_soc_status(struct hif_pci_softc *sc);
 void dump_CE_debug_register(struct hif_pci_softc *sc);
+
+void hif_get_hw_info(void *ol_sc, u32 *version, u32 *revision);
 
 /*
  * A firmware interrupt to the Host is indicated by the
@@ -151,10 +158,13 @@ void dump_CE_debug_register(struct hif_pci_softc *sc);
  */
 #define OL_ATH_TX_DRAIN_WAIT_DELAY     50 /* ms */
 
+#define HIF_CE_DRAIN_WAIT_DELAY        10 /* ms */
 /*
  * Wait time (in unit of OL_ATH_TX_DRAIN_WAIT_DELAY) for pending
  * tx frame completion before suspend. Refer: hif_pci_suspend()
  */
 #define OL_ATH_TX_DRAIN_WAIT_CNT       10
+
+#define HIF_CE_DRAIN_WAIT_CNT          20
 
 #endif /* __ATH_PCI_H__ */

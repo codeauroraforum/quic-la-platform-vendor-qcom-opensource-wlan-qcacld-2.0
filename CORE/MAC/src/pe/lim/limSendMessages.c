@@ -257,6 +257,7 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
 #endif
     vos_mem_copy(  pChnlParams->bssId, pSessionEntry->bssId, sizeof(tSirMacAddr) );
     pChnlParams->peSessionId = peSessionId;
+    pChnlParams->vhtCapable = pSessionEntry->vhtCapability;
 
     /*Set DFS flag for DFS channel*/
     if (vos_nv_getChannelEnabledState(chnlNumber) == NV_CHANNEL_DFS)
@@ -777,6 +778,47 @@ tSirRetStatus limSendModeUpdate(tpAniSirGlobal pMac,
         vos_mem_free(pVhtOpMode);
         limLog( pMac, LOGP,
                     FL("Posting  WDA_UPDATE_OP_MODE to WDA failed, reason=%X"),
+                    retCode );
+    }
+
+    return retCode;
+}
+
+tSirRetStatus limSendRxNssUpdate(tpAniSirGlobal pMac,
+                                tUpdateRxNss *pTempParam,
+                                tpPESession  psessionEntry )
+{
+    tUpdateRxNss *pRxNss = NULL;
+    tSirRetStatus   retCode = eSIR_SUCCESS;
+    tSirMsgQ msgQ;
+
+    pRxNss = vos_mem_malloc(sizeof(tUpdateRxNss));
+    if ( NULL == pRxNss )
+    {
+        limLog( pMac, LOGP,
+            FL( "Unable to allocate memory during Update Rx Nss" ));
+        return eSIR_MEM_ALLOC_FAILED;
+    }
+    vos_mem_copy((tANI_U8 *)pRxNss, pTempParam, sizeof(tUpdateRxNss));
+    msgQ.type =  WDA_UPDATE_RX_NSS;
+    msgQ.reserved = 0;
+    msgQ.bodyptr = pRxNss;
+    msgQ.bodyval = 0;
+    PELOG3(limLog( pMac, LOG3,
+                FL( "Sending WDA_UPDATE_RX_NSS" ));)
+    if(NULL == psessionEntry)
+    {
+        MTRACE(macTraceMsgTx(pMac, NO_SESSION, msgQ.type));
+    }
+    else
+    {
+        MTRACE(macTraceMsgTx(pMac, psessionEntry->peSessionId, msgQ.type));
+    }
+    if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
+    {
+        vos_mem_free(pRxNss);
+        limLog( pMac, LOGP,
+                    FL("Posting WDA_UPDATE_RX_NSS to WDA failed, reason=%X"),
                     retCode );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -97,6 +97,8 @@
 #endif
 #endif
 
+#define MAX_CHANNEL (MAX_2_4GHZ_CHANNEL + NUM_5GHZ_CHANNELS)
+
 typedef struct {
    u8 element_id;
    u8 len;
@@ -118,17 +120,27 @@ typedef struct {
 #define QCA_NL80211_VENDOR_ID                          0x001374
 #define QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY      10
 #define QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY       11
+#define QCA_NL80211_VENDOR_SUBCMD_NAN                  12
+#define QCA_NL80211_VENDOR_SUBCMD_STATS_EXT            13
 
 enum qca_wlan_vendor_attr
 {
     QCA_WLAN_VENDOR_ATTR_INVALID = 0,
     /* used by QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY */
     QCA_WLAN_VENDOR_ATTR_DFS     = 1,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_NAN */
+    QCA_WLAN_VENDOR_ATTR_NAN     = 2,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_STATS_EXT */
+    QCA_WLAN_VENDOR_ATTR_STATS_EXT     = 3,
     /* keep last */
     QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
     QCA_WLAN_VENDOR_ATTR_MAX       = QCA_WLAN_VENDOR_ATTR_AFTER_LAST - 1,
 };
 
+/* Vendor specific sub-command index, may change later due to NAN */
+#ifdef WLAN_FEATURE_STATS_EXT
+#define QCA_NL80211_VENDOR_SUBCMD_STATS_EXT_INDEX   1
+#endif /* WLAN_FEATURE_STATS_EXT */
 
 /* Vendor specific sub-command id and their index */
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -188,10 +200,13 @@ int wlan_hdd_cfg80211_init(struct device *dev,
                                hdd_config_t *pCfg
                                          );
 
-int wlan_hdd_cfg80211_register( struct wiphy *wiphy);
-void wlan_hdd_cfg80211_post_voss_start(hdd_adapter_t* pAdapter);
+void wlan_hdd_update_wiphy(struct wiphy *wiphy,
+                           hdd_config_t *pCfg);
 
-void wlan_hdd_cfg80211_pre_voss_stop(hdd_adapter_t* pAdapter);
+int wlan_hdd_cfg80211_register( struct wiphy *wiphy);
+void wlan_hdd_cfg80211_register_frames(hdd_adapter_t* pAdapter);
+
+void wlan_hdd_cfg80211_deregister_frames(hdd_adapter_t* pAdapter);
 
 #ifdef CONFIG_ENABLE_LINUX_REG
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
@@ -232,7 +247,7 @@ void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len);
 #endif
 
 #ifdef QCA_WIFI_2_0
-void hdd_suspend_wlan(void (*callback)(void *callbackContext),
+void hdd_suspend_wlan(void (*callback)(void *callbackContext, boolean suspended),
                       void *callbackContext);
 void hdd_resume_wlan(void);
 #endif

@@ -155,9 +155,6 @@ int HIF_USBDeviceInserted(struct usb_interface *interface, hif_handle_t hif_hdl)
 	return retval;
 }
 
-A_STATUS HIFDiagWriteWARMRESET(struct usb_interface *interface,
-			       A_UINT32 address, A_UINT32 data);
-
 void HIF_USBDeviceDetached(struct usb_interface *interface,
 			   a_uint8_t surprise_removed)
 {
@@ -172,8 +169,6 @@ void HIF_USBDeviceDetached(struct usb_interface *interface,
 			AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("device is NULL\n"));
 			break;
 		}
-
-		HIFDiagWriteWARMRESET(interface, 0, 0);
 
 		device->surpriseRemoved = surprise_removed;
 		/* inform upper layer if it is still interested */
@@ -218,9 +213,12 @@ static void usb_hif_usb_transmit_complete(struct urb *urb)
 	a_mem_trace(urb_context->buf);
 	buf = urb_context->buf;
 	pSendContext = urb_context->pSendContext;
-	if (pSendContext->bNewAlloc)
+
+	if (pSendContext->bNewAlloc) {
 		adf_os_mem_free((void *)pSendContext);
-	adf_nbuf_pull_head(buf, sizeof(struct HIFSendContext));
+	} else {
+		adf_nbuf_pull_head(buf, pSendContext->head_data_len);
+	}
 
 	urb_context->buf = NULL;
 	usb_hif_cleanup_transmit_urb(urb_context);
@@ -644,7 +642,7 @@ static HIF_DEVICE_USB *usb_hif_create(struct usb_interface *interface)
 	return device;
 }
 
-void HIFStart(HIF_DEVICE *hifDevice)
+A_STATUS HIFStart(HIF_DEVICE *hifDevice)
 {
 	HIF_DEVICE_USB *device = (HIF_DEVICE_USB *) hifDevice;
 	int i;
@@ -660,6 +658,7 @@ void HIFStart(HIF_DEVICE *hifDevice)
 	}
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n", __func__));
+	return A_OK;
 }
 
 void HIFStop(HIF_DEVICE *hifDevice)
@@ -776,6 +775,15 @@ HIFMapServiceToPipe(HIF_DEVICE *hif_device, a_uint16_t ServiceId,
 		else
 			*DLPipe = HIF_RX_DATA2_PIPE;
 		break;
+#ifdef QCA_TX_HTT2_SUPPORT
+	case HTT_DATA2_MSG_SVC:
+		*ULPipe = HIF_TX_DATA_HP_PIPE;
+		if (hif_usb_disable_rxdata2)
+			*DLPipe = HIF_RX_DATA_PIPE;
+		else
+			*DLPipe = HIF_RX_DATA2_PIPE;
+		break;
+#endif /* QCA_TX_HTT2_SUPPORT */
 	default:
 		status = A_ENOTSUP;
 		break;
@@ -1144,4 +1152,8 @@ A_STATUS HIFDiagWriteWARMRESET(struct usb_interface *interface,
 	}
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n", __func__));
 	return status;
+}
+void HIFsuspendwow(HIF_DEVICE *hif_device)
+{
+	printk(KERN_INFO "HIFsuspendwow TODO\n");
 }

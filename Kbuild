@@ -137,19 +137,6 @@ ifeq ($(CONFIG_ROME_IF),usb)
 #CONFIG_ATH_PCI := 1
 endif
 
-ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
-CONFIG_HIF_PCI := 0
-else
-CONFIG_HIF_PCI := 1
-endif
-
-#Enable pci read/write config functions
-ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
-CONFIG_ATH_PCI := 0
-else
-CONFIG_ATH_PCI := 1
-endif
-
 #Enable IBSS support on CLD
 CONFIG_QCA_IBSS_SUPPORT := 1
 
@@ -200,6 +187,10 @@ CONFIG_QCA_SINGLE_BINARY_SUPPORT := 0
 
 #Enable collecting target RAM dump after kernel panic
 CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC := 1
+
+#Flag to enable Stats Ext implementation
+CONFIG_FEATURE_STATS_EXT := 1
+
 
 ifeq ($(CONFIG_CFG80211),y)
 HAVE_CFG80211 := 1
@@ -260,6 +251,9 @@ BAP_OBJS := 	$(BAP_SRC_DIR)/bapApiData.o \
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 ############ HIF ############
+HIF_DIR := CORE/SERVICES/HIF
+HIF_DIR_OBJS :=  $(HIF_DIR)/ath_procfs.o
+
 HIF_COMMON_DIR := CORE/SERVICES/HIF/common
 HIF_COMMON_OBJS := $(HIF_COMMON_DIR)/hif_bmi_reg_access.o \
                    $(HIF_COMMON_DIR)/hif_diag_reg_access.o
@@ -288,7 +282,8 @@ HIF_INC := -I$(WLAN_ROOT)/$(HIF_COMMON_DIR) \
            -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_INC_DIR) \
            -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_SRC_DIR)
 
-HIF_OBJS := $(HIF_COMMON_OBJS)\
+HIF_OBJS := $(HIF_DIR_OBJS)\
+			$(HIF_COMMON_OBJS)\
             $(HIF_SDIO_OBJS)\
             $(HIF_SDIO_LINUX_OBJS)\
             $(HIF_SDIO_NATIVE_OBJS)
@@ -624,7 +619,6 @@ VOSS_OBJS :=    $(VOSS_SRC_DIR)/vos_api.o \
 		$(VOSS_SRC_DIR)/vos_mq.o \
 		$(VOSS_SRC_DIR)/vos_nvitem.o \
 		$(VOSS_SRC_DIR)/vos_packet.o \
-		$(VOSS_SRC_DIR)/vos_power.o \
 		$(VOSS_SRC_DIR)/vos_sched.o \
 		$(VOSS_SRC_DIR)/vos_threads.o \
 		$(VOSS_SRC_DIR)/vos_timer.o \
@@ -987,12 +981,14 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
                 -DQCA_SUPPORT_TXRX_VDEV_PAUSE_LL \
 		-DQCA_SUPPORT_TX_THROTTLE_LL \
 		-DWMI_INTERFACE_EVENT_LOGGING\
+		-DATH_SUPPORT_WAPI\
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DCONFIG_AR6320_SUPPORT \
                 -DSDIO_3_0 \
-                -DHIF_SDIO
+                -DHIF_SDIO \
+                -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 endif
 
 ifeq ($(CONFIG_ARCH_MSM), y)
@@ -1004,7 +1000,9 @@ CDEFINES +=	-DWLANTL_DEBUG
 else
 CDEFINES +=	-DOSIF_NEED_RX_PEER_ID \
 		-DQCA_SUPPORT_TXRX_LOCAL_PEER_ID
+ifeq ($(CONFIG_ROME_IF),pci)
 CDEFINES +=	-DQCA_LL_TX_FLOW_CT
+endif
 endif
 
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
@@ -1094,6 +1092,7 @@ ifeq ($(CONFIG_HIF_USB), 1)
 CDEFINES += -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 CDEFINES += -DQCA_SUPPORT_OL_RX_REORDER_TIMEOUT
 CDEFINES += -DCONFIG_ATH_PCIE_MAX_PERF=0 -DCONFIG_ATH_PCIE_AWAKE_WHILE_DRIVER_LOAD=0 -DCONFIG_DISABLE_CDC_MAX_PERF_WAR=0
+CDEFINES += -DQCA_TX_HTT2_SUPPORT
 endif
 
 # enable the MAC Address auto-generation feature
@@ -1123,6 +1122,10 @@ ifeq ($(CONFIG_ENABLE_LINUX_REG), y)
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
 CDEFINES += -DCONFIG_ENABLE_LINUX_REG
 endif
+endif
+
+ifeq ($(CONFIG_FEATURE_STATS_EXT), 1)
+CDEFINES += -DWLAN_FEATURE_STATS_EXT
 endif
 
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
@@ -1267,6 +1270,9 @@ CDEFINES += -DWLAN_FEATURE_MBSSID
 #Green AP feature
 CDEFINES += -DFEATURE_GREEN_AP
 
+#Enable 4address scheme for mdm9630
+CDEFINES += -DFEATURE_WLAN_STA_4ADDR_SCHEME
+
 else
 
 #Open P2P device interface only for non-MDM9630 platform
@@ -1301,6 +1307,14 @@ CDEFINES += -DEXISTS_MSM_SMSM
 endif
 
 KBUILD_CPPFLAGS += $(CDEFINES)
+
+# Currently, for versions of gcc which support it, the kernel Makefile
+# is disabling the maybe-uninitialized warning.  Re-enable it for the
+# WLAN driver.  Note that we must use EXTRA_CFLAGS here so that it
+# will override the kernel settings.
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
 
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o

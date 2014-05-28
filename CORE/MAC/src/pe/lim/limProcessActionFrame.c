@@ -474,8 +474,16 @@ __limProcessOperatingModeActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo
             pSta->htSupportedChannelWidthSet = eHT_CHANNEL_WIDTH_20MHZ;
         }
         limCheckVHTOpModeChange( pMac, psessionEntry,
-                                 (pOperatingModeframe->OperatingMode.chanWidth), pSta->staIndex);
+                                 (pOperatingModeframe->OperatingMode.chanWidth),
+                                 pSta->staIndex, pHdr->sa);
     }
+
+    if (pSta->vhtSupportedRxNss != (pOperatingModeframe->OperatingMode.rxNSS + 1)) {
+        pSta->vhtSupportedRxNss = pOperatingModeframe->OperatingMode.rxNSS + 1;
+        limSetNssChange( pMac, psessionEntry, pSta->vhtSupportedRxNss,
+                         pSta->staIndex, pHdr->sa);
+    }
+
     vos_mem_free(pOperatingModeframe);
     return;
 }
@@ -1095,13 +1103,13 @@ __limProcessDelTsReq(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession pse
 static void
 __limProcessBasicMeasReq(tpAniSirGlobal pMac,
                        tpSirMacMeasReqActionFrame pMeasReqFrame,
-                       tSirMacAddr peerMacAddr)
+                       tSirMacAddr peerMacAddr, tpPESession psessionEntry)
 {
     // TBD - Station shall perform basic measurements
 
     if (limSendMeasReportFrame(pMac,
                                pMeasReqFrame,
-                               peerMacAddr) != eSIR_SUCCESS)
+                               peerMacAddr, psessionEntry) != eSIR_SUCCESS)
     {
         PELOGE(limLog(pMac, LOGE, FL("fail to send Basic Meas report "));)
         return;
@@ -1132,13 +1140,13 @@ __limProcessBasicMeasReq(tpAniSirGlobal pMac,
 static void
 __limProcessCcaMeasReq(tpAniSirGlobal pMac,
                      tpSirMacMeasReqActionFrame pMeasReqFrame,
-                     tSirMacAddr peerMacAddr)
+                     tSirMacAddr peerMacAddr, tpPESession psessionEntry)
 {
     // TBD - Station shall perform cca measurements
 
     if (limSendMeasReportFrame(pMac,
                                pMeasReqFrame,
-                               peerMacAddr) != eSIR_SUCCESS)
+                               peerMacAddr, psessionEntry) != eSIR_SUCCESS)
     {
         PELOGE(limLog(pMac, LOGE, FL("fail to send CCA Meas report "));)
         return;
@@ -1168,11 +1176,11 @@ __limProcessCcaMeasReq(tpAniSirGlobal pMac,
 static void
 __limProcessRpiMeasReq(tpAniSirGlobal pMac,
                      tpSirMacMeasReqActionFrame pMeasReqFrame,
-                     tSirMacAddr peerMacAddr)
+                     tSirMacAddr peerMacAddr, tpPESession psessionEntry)
 {
     if (limSendMeasReportFrame(pMac,
                                pMeasReqFrame,
-                               peerMacAddr) != eSIR_SUCCESS)
+                               peerMacAddr, psessionEntry) != eSIR_SUCCESS)
     {
         PELOGE(limLog(pMac, LOGE, FL("fail to send RPI Meas report "));)
         return;
@@ -1197,7 +1205,8 @@ __limProcessRpiMeasReq(tpAniSirGlobal pMac,
  */
 
 static void
-__limProcessMeasurementRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo)
+__limProcessMeasurementRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
+                                                  tpPESession psessionEntry)
 {
     tpSirMacMgmtHdr                       pHdr;
     tANI_U8                                    *pBody;
@@ -1227,15 +1236,15 @@ __limProcessMeasurementRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo)
     switch(pMeasReqFrame->measReqIE.measType)
     {
         case SIR_MAC_BASIC_MEASUREMENT_TYPE:
-            __limProcessBasicMeasReq(pMac, pMeasReqFrame, pHdr->sa);
+            __limProcessBasicMeasReq(pMac, pMeasReqFrame, pHdr->sa, psessionEntry);
             break;
 
         case SIR_MAC_CCA_MEASUREMENT_TYPE:
-            __limProcessCcaMeasReq(pMac, pMeasReqFrame, pHdr->sa);
+            __limProcessCcaMeasReq(pMac, pMeasReqFrame, pHdr->sa, psessionEntry);
             break;
 
         case SIR_MAC_RPI_MEASUREMENT_TYPE:
-            __limProcessRpiMeasReq(pMac, pMeasReqFrame, pHdr->sa);
+            __limProcessRpiMeasReq(pMac, pMeasReqFrame, pHdr->sa, psessionEntry);
             break;
 
         default:
@@ -1261,7 +1270,7 @@ __limProcessMeasurementRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo)
  */
 
 static void
-__limProcessTpcRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo)
+__limProcessTpcRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession psessionEntry)
 {
     tpSirMacMgmtHdr                       pHdr;
     tANI_U8                                    *pBody;
@@ -1290,7 +1299,7 @@ __limProcessTpcRequestFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo)
 
     if (limSendTpcReportFrame(pMac,
                               pTpcReqFrame,
-                              pHdr->sa) != eSIR_SUCCESS)
+                              pHdr->sa, psessionEntry) != eSIR_SUCCESS)
     {
         PELOGE(limLog(pMac, LOGE, FL("fail to send TPC Report Frame. "));)
         return;
@@ -2095,6 +2104,18 @@ static void __limProcessSAQueryResponseActionFrame(tpAniSirGlobal pMac, tANI_U8 
     VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
                          ("SA Query Response received...")) ;
 
+    /* When a station, supplicant handles SA Query Response.
+     * Forward to SME to HDD to wpa_supplicant.
+     */
+    if (eLIM_STA_ROLE == psessionEntry->limSystemRole)
+    {
+        limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType, (tANI_U8*)pHdr,
+                               frameLen + sizeof(tSirMacMgmtHdr), 0,
+                               WDA_GET_RX_CH( pRxPacketInfo ),
+                               psessionEntry, 0);
+        return;
+    }
+
     /* If this is an unprotected SA Query Response, then ignore it. */
     if (pHdr->fc.wep == 0)
         return;
@@ -2213,7 +2234,7 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                 case SIR_MAC_ACTION_MEASURE_REQUEST_ID:
                     if(psessionEntry->lim11hEnable)
                     {
-                        __limProcessMeasurementRequestFrame(pMac, pRxPacketInfo);
+                        __limProcessMeasurementRequestFrame(pMac, pRxPacketInfo, psessionEntry);
                     }
                     break;
 
@@ -2223,7 +2244,7 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                     {
                         if(psessionEntry->lim11hEnable)
                         {
-                            __limProcessTpcRequestFrame(pMac, pRxPacketInfo);
+                            __limProcessTpcRequestFrame(pMac, pRxPacketInfo, psessionEntry);
                         }
                     }
                     break;

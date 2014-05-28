@@ -253,6 +253,60 @@ static inline tANI_U8
     return FALSE;
 }
 
+static inline int limSelectCBMode(tDphHashNode *pStaDs, tpPESession psessionEntry,
+                                  tANI_U8 channel, tANI_U8 chan_bw)
+{
+    if ( pStaDs->mlmStaContext.vhtCapability && chan_bw)
+    {
+        if ( channel== 36 || channel == 52 || channel == 100 ||
+             channel == 116 || channel == 149 )
+        {
+           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW - 1;
+        }
+        else if ( channel == 40 || channel == 56 || channel == 104 ||
+             channel == 120 || channel == 153 )
+        {
+           return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW - 1;
+        }
+        else if ( channel == 44 || channel == 60 || channel == 108 ||
+                  channel == 124 || channel == 157 )
+        {
+           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH -1;
+        }
+        else if ( channel == 48 || channel == 64 || channel == 112 ||
+             channel == 128 || channel == 161 )
+        {
+            return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH - 1;
+        }
+        else if ( channel == 165 )
+        {
+            return PHY_SINGLE_CHANNEL_CENTERED;
+        }
+    }
+    else if ( pStaDs->mlmStaContext.htCapability )
+    {
+        if ( channel== 40 || channel == 48 || channel == 56 ||
+             channel == 64 || channel == 104 || channel == 112 ||
+             channel == 120 || channel == 128 || channel == 136 ||
+             channel == 144 || channel == 153 || channel == 161 )
+        {
+           return PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
+        }
+        else if ( channel== 36 || channel == 44 || channel == 52 ||
+             channel == 60 || channel == 100 || channel == 108 ||
+             channel == 116 || channel == 124 || channel == 132 ||
+             channel == 140 || channel == 149 || channel == 157 )
+        {
+           return PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
+        }
+        else if ( channel == 165 )
+        {
+           return PHY_SINGLE_CHANNEL_CENTERED;
+        }
+    }
+    return PHY_SINGLE_CHANNEL_CENTERED;
+}
+
 /// ANI peer station count management and associated actions
 void limUtilCountStaAdd(tpAniSirGlobal pMac, tpDphHashNode pSta, tpPESession psessionEntry);
 void limUtilCountStaDel(tpAniSirGlobal pMac, tpDphHashNode pSta, tpPESession psessionEntry);
@@ -403,8 +457,10 @@ tANI_BOOLEAN limIsconnectedOnDFSChannel(tANI_U8 currentChannel);
 tANI_U8 limGetCurrentOperatingChannel(tpAniSirGlobal pMac);
 
 #ifdef WLAN_FEATURE_11AC
-tANI_BOOLEAN limCheckVHTOpModeChange( tpAniSirGlobal pMac,
-                                      tpPESession psessionEntry, tANI_U8 chanWidth, tANI_U8 staId);
+tANI_BOOLEAN limCheckVHTOpModeChange( tpAniSirGlobal pMac, tpPESession psessionEntry,
+                                      tANI_U8 chanWidth, tANI_U8 staId, tANI_U8 *peerMac);
+tANI_BOOLEAN limSetNssChange( tpAniSirGlobal pMac, tpPESession psessionEntry,
+                              tANI_U8 rxNss, tANI_U8 staId, tANI_U8 *peerMac);
 tANI_BOOLEAN limCheckMembershipUserPosition( tpAniSirGlobal pMac, tpPESession psessionEntry,
                                              tANI_U32 membership, tANI_U32 userPosition,
                                              tANI_U8 staId);

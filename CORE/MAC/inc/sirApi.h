@@ -77,6 +77,10 @@
 
 #define SIR_MDIE_SIZE               3
 
+// Increase dwell time for P2P search in ms
+#define P2P_SEARCH_DWELL_TIME_INCREASE   20
+#define P2P_SOCIAL_CHANNELS              3
+
 /* Max number of channels are 165, but to access 165th element of array,
  *array of 166 is required.
  */
@@ -863,6 +867,7 @@ typedef struct sSirSmeScanReq
      */
     tANI_U32 minChannelTimeBtc;    //in units of milliseconds
     tANI_U32 maxChannelTimeBtc;    //in units of milliseconds
+    tANI_U32 restTime;              //in units of milliseconds, ignored when not connected
     tANI_U8              returnAfterFirstMatch;
 
     /**
@@ -2176,9 +2181,10 @@ typedef struct sAniGetRssiReq
 {
     // Common for all types are requests
     tANI_U16                msgType;    // message type is same as the request type
-    tANI_U16                msgLen;  // length of the entire request
+    tANI_U16                msgLen;     // length of the entire request
     tANI_U8                 sessionId;
     tANI_U8                 staId;
+    tANI_S8                 lastRSSI;   // in case of error, return last RSSI
     void                    *rssiCallback;
     void                    *pDevContext; //device context
     void                    *pVosContext; //voss context
@@ -3832,7 +3838,7 @@ typedef struct
 typedef struct
 {
   tSirMacSSid ssId;
-  tANI_U8     currAPbssid[WNI_CFG_BSSID_LEN];
+  tANI_U8     currAPbssid[VOS_MAC_ADDR_SIZE];
   tANI_U32    authentication;
   tANI_U8     encryption;
   tANI_U8     mcencryption;
@@ -4202,9 +4208,14 @@ typedef struct
     tANI_U8             uapsdQueues;   // Peer's uapsd Queues Information
     tANI_U8             maxSp;         // Peer's Supported Maximum Service Period
     tANI_U8             isBufSta;      // Does Peer Support as Buffer Station.
+    tANI_U8             isOffChannelSupported;    // Does Peer Support as TDLS Off Channel.
     tANI_U8             isResponder;   // Is Peer a responder.
     tSirMacAddr         bssid;         // For multi-session, for PE to locate peSession ID
     tSirMacAddr         peerMac;
+    tANI_U8             supportedChannelsLen;
+    tANI_U8             supportedChannels[SIR_MAC_MAX_SUPP_CHANNELS];
+    tANI_U8             supportedOperClassesLen;
+    tANI_U8             supportedOperClasses[SIR_MAC_MAX_SUPP_OPER_CLASSES];
 }tSirTdlsLinkEstablishReq, *tpSirTdlsLinkEstablishReq;
 
 /* TDLS Request struct SME-->PE */
@@ -4485,7 +4496,7 @@ typedef struct sAniHandoffReq
     tANI_U16  msgType; // message type is same as the request type
     tANI_U16  msgLen;  // length of the entire request
     tANI_U8   sessionId;
-    tANI_U8   bssid[WNI_CFG_BSSID_LEN];
+    tANI_U8   bssid[VOS_MAC_ADDR_SIZE];
     tANI_U8   channel;
 #ifndef QCA_WIFI_ISOC
     tANI_U8   handoff_src;
@@ -4504,6 +4515,7 @@ typedef struct sSirScanOffloadReq {
     tSirScanType scanType;
     tANI_U32 minChannelTime;
     tANI_U32 maxChannelTime;
+    tANI_U32 restTime;              //in units of milliseconds, ignored when not connected
     tSirP2pScanType p2pScanType;
     tANI_U16 uIEFieldLen;
     tANI_U16 uIEFieldOffset;
@@ -4756,6 +4768,7 @@ typedef struct
 {
     tANI_U16      mesgType;
     tANI_U16      mesgLen;
+    tANI_BOOLEAN  suspended;
 }  tSirReadyToSuspendInd, *tpSirReadyToSuspendInd;
 typedef struct sSirRateUpdateInd
 {
@@ -4831,7 +4844,7 @@ typedef struct sSirChanChangeRequest
     tANI_U16     messageLen;
     tANI_U8      targetChannel;
     tANI_U8      cbMode;
-    tANI_U8      bssid[WNI_CFG_BSSID_LEN];
+    tANI_U8      bssid[VOS_MAC_ADDR_SIZE];
 }tSirChanChangeRequest, *tpSirChanChangeRequest;
 
 typedef struct sSirChanChangeResponse
@@ -4847,7 +4860,7 @@ typedef struct sSirStartBeaconIndication
     tANI_U16     messageType;
     tANI_U16     messageLen;
     tANI_U8      beaconStartStatus;
-    tANI_U8      bssid[WNI_CFG_BSSID_LEN];
+    tANI_U8      bssid[VOS_MAC_ADDR_SIZE];
 }tSirStartBeaconIndication, *tpSirStartBeaconIndication;
 
 /* Message format for requesting channel switch announcement to lower layers */
@@ -4857,7 +4870,7 @@ typedef struct sSirDfsCsaIeRequest
     tANI_U16 msgLen;
     tANI_U8  targetChannel;
     tANI_U8  csaIeRequired;
-    tANI_U8  bssid[WNI_CFG_BSSID_LEN];
+    tANI_U8  bssid[VOS_MAC_ADDR_SIZE];
 }tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -4912,5 +4925,14 @@ typedef struct
 {
     tANI_U32 param;
 } tSirModemPowerStateInd, *tpSirModemPowerStateInd;
+
+#ifdef WLAN_FEATURE_STATS_EXT
+typedef struct
+{
+    tANI_U32 event_data_len;
+    u_int8_t event_data[];
+} tSirStatsExtEvent, *tpSirStatsExtEvent;
+
+#endif
 
 #endif /* __SIR_API_H */
