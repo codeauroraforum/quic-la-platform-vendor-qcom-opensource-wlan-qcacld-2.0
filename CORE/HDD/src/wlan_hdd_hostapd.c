@@ -1689,10 +1689,10 @@ static iw_softap_setparam(struct net_device *dev,
 #ifdef DEBUG
          case QCSAP_FW_CRASH_INJECT:
              {
-                  hddLog(LOGE, "WE_FW_CRASH_INJECT");
+                  hddLog(LOGE, "WE_FW_CRASH_INJECT %d", set_value);
                   ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
                                                 (int)GEN_PARAM_CRASH_INJECT,
-                                                0, GEN_CMD);
+                                                set_value, GEN_CMD);
                   break;
              }
 #endif
@@ -2098,6 +2098,25 @@ static iw_softap_setparam(struct net_device *dev,
 #else
                   (void)sme_SetThermalLevel(hHal, set_value);
 #endif
+                  break;
+             }
+
+
+        case QCASAP_SET_DFS_IGNORE_CAC:
+             {
+                  hddLog(VOS_TRACE_LEVEL_INFO, "Set Dfs ignore CAC  %d",
+                            set_value);
+
+                  if (pHostapdAdapter->device_mode != WLAN_HDD_SOFTAP)
+                       return -EINVAL;
+
+                  ret = WLANSAP_Set_Dfs_Ignore_CAC(
+#ifdef WLAN_FEATURE_MBSSID
+                                WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
+#else
+                                pVosContext,
+#endif
+                                set_value);
                   break;
              }
 
@@ -4360,6 +4379,11 @@ static const struct iw_priv_args hostapd_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0,
         "setTmLevel" },
+
+    {   QCASAP_SET_DFS_IGNORE_CAC,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "setDfsIgnoreCAC" },
 
 #endif /* QCA_WIFI_2_0 */
 

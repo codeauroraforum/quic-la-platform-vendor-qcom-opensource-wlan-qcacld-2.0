@@ -106,7 +106,11 @@ when           who                what, where, why
 #define       MAX_TEXT_SIZE                32
 
 #define       MAX_CHANNEL_LIST_LEN         256
+#ifdef WLAN_FEATURE_MBSSID
 #define       VOS_MAX_NO_OF_SAP_MODE       2 // max # of SAP
+#else
+#define       VOS_MAX_NO_OF_SAP_MODE       1 // max # of SAP
+#endif
 
 /*--------------------------------------------------------------------------
   reasonCode take form 802.11 standard Table 7-22 to be passed to WLANSAP_DisassocSta api.
@@ -1734,6 +1738,34 @@ VOS_STATUS WLANSAP_StartBeaconReq(v_PVOID_t pSapCtx);
 VOS_STATUS
 WLANSAP_DfsSendCSAIeRequest(v_PVOID_t pSapCtx);
 
+/*==========================================================================
+  FUNCTION    WLANSAP_Set_Dfs_Ignore_CAC
+
+  DESCRIPTION
+   This API is used to set ignore_cac flag, used for ignoring the CAC operation for DFS channel.
+   If the flag set to 1 or TRUE then it will avoid CAC.
+
+  DEPENDENCIES
+   NA.
+
+  PARAMETERS
+  IN
+  pvosGCtx: Pointer to vos global context structure
+
+  PARAMETERS
+  IN
+  ignore_cac: value to be set
+
+  RETURN VALUE
+  The VOS_STATUS code associated with performing the operation
+
+  VOS_STATUS_SUCCESS:  Success
+
+  SIDE EFFECTS
+============================================================================*/
+
+VOS_STATUS
+WLANSAP_Set_Dfs_Ignore_CAC(v_PVOID_t pvosGCtx, v_U8_t ignore_cac);
 
 #ifdef __cplusplus
  }

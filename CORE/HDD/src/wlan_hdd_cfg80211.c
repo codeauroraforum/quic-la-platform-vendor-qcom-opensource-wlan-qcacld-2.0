@@ -440,16 +440,6 @@ wlan_hdd_iface_limit[] = {
     },
 };
 
-/* By default, only single channel concurrency is allowed */
-static struct ieee80211_iface_combination
-wlan_hdd_iface_combination = {
-        .limits = wlan_hdd_iface_limit,
-        .num_different_channels = 1,
-        .max_interfaces = WLAN_MAX_INTERFACES,
-        .n_limits = ARRAY_SIZE(wlan_hdd_iface_limit),
-        .beacon_int_infra_match = false,
-};
-
 #else
 
 static const struct ieee80211_iface_limit
@@ -496,6 +486,8 @@ wlan_hdd_iface_limit[] = {
     },
 };
 
+#endif /* WLAN_FEATURE_MBSSID */
+
 /* By default, only single channel concurrency is allowed */
 static struct ieee80211_iface_combination
 wlan_hdd_iface_combination = {
@@ -515,8 +507,6 @@ wlan_hdd_iface_combination = {
         .n_limits = ARRAY_SIZE(wlan_hdd_iface_limit),
         .beacon_int_infra_match = false,
 };
-
-#endif /* WLAN_FEATURE_MBSSID */
 
 #endif
 
@@ -2227,8 +2217,8 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     hdd_config_t *iniConfig;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
     tSmeConfigParams *psmeConfig;
-    v_BOOL_t MFPCapable;
-    v_BOOL_t MFPRequired;
+    v_BOOL_t MFPCapable =  VOS_FALSE;
+    v_BOOL_t MFPRequired =  VOS_FALSE;
     eHddDot11Mode sapDot11Mode =
              (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->sapDot11Mode;
 
@@ -8404,6 +8394,21 @@ static int wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
     else
         vos_status =  wlan_hdd_set_powersave(pAdapter, !mode);
 
+    if (!mode)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_DEBUG,
+                  "%s: DHCP start indicated through power save", __func__);
+        sme_DHCPStartInd(pHddCtx->hHal, pAdapter->device_mode,
+                         pAdapter->macAddressCurrent.bytes, pAdapter->sessionId);
+    }
+    else
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_DEBUG,
+                  "%s: DHCP stop indicated through power save", __func__);
+        sme_DHCPStopInd(pHddCtx->hHal, pAdapter->device_mode,
+                        pAdapter->macAddressCurrent.bytes, pAdapter->sessionId);
+    }
+
     EXIT();
     if (VOS_STATUS_E_FAILURE == vos_status)
     {
@@ -10249,7 +10254,7 @@ static int wlan_hdd_cfg80211_set_mac_acl(struct wiphy *wiphy,
         }
 
 #ifdef WLAN_FEATURE_MBSSID
-        vos_status = WLANSAP_SetMacACL(WLAN_HDD_GET_SAP_CTX_PTR(pAdapter),pConfig);
+        vos_status = WLANSAP_SetMacACL(WLAN_HDD_GET_SAP_CTX_PTR(pAdapter), pConfig);
 #else
         vos_status = WLANSAP_SetMacACL(pVosContext, pConfig);
 #endif
@@ -10709,10 +10714,10 @@ int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 }
 
 #ifdef QCA_WIFI_2_0
-void wlan_hdd_cfg80211_ready_to_suspend(void *callbackContext)
+void wlan_hdd_cfg80211_ready_to_suspend(void *callbackContext, boolean suspended)
 {
     hdd_context_t *pHddCtx = (hdd_context_t *)callbackContext;
-
+    pHddCtx->suspended = suspended;
     complete(&pHddCtx->ready_to_suspend);
 }
 #endif
@@ -10793,6 +10798,13 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: Failed to get ready to suspend", __func__);
         goto resume_tx;
+    }
+
+    if (!pHddCtx->suspended) {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: Faied as suspend_status is wrong:%d",
+                           __func__, pHddCtx->suspended);
+       goto resume_tx;
     }
 
     /* Suspend MC thread */
