@@ -2871,6 +2871,60 @@ static int wma_vdev_install_key_complete_event_handler(void *handle, u_int8_t *e
     return 0;
 }
 
+#ifdef WLAN_FEATURE_STATS_EXT
+static int wma_stats_ext_event_handler(void *handle, u_int8_t *event_buf,
+				       u_int32_t len)
+{
+	WMI_STATS_EXT_EVENTID_param_tlvs *param_buf;
+	tSirStatsExtEvent *stats_ext_event;
+	wmi_stats_ext_event_fixed_param *stats_ext_info;
+	VOS_STATUS status;
+	vos_msg_t vos_msg;
+	u_int8_t *buf_ptr;
+	u_int8_t alloc_len;
+
+	WMA_LOGD("%s: Posting stats ext event to SME", __func__);
+
+	param_buf = (WMI_STATS_EXT_EVENTID_param_tlvs *)event_buf;
+	if (!param_buf) {
+		WMA_LOGE("%s: Invalid stats ext event buf", __func__);
+		return -EINVAL;
+	}
+
+	stats_ext_info =  param_buf->fixed_param;
+	buf_ptr = (u_int8_t *)stats_ext_info;
+
+	alloc_len = sizeof(tSirStatsExtEvent);
+	alloc_len += stats_ext_info->data_len;
+
+	stats_ext_event = (tSirStatsExtEvent *) vos_mem_malloc(alloc_len);
+	if (NULL == stats_ext_event) {
+		WMA_LOGE("%s: Memory allocation failure", __func__);
+		return -ENOMEM;
+	}
+
+	buf_ptr +=  sizeof(wmi_stats_ext_event_fixed_param) + WMI_TLV_HDR_SIZE ;
+	stats_ext_event->event_data_len = stats_ext_info->data_len;
+	vos_mem_copy(stats_ext_event->event_data,
+		     buf_ptr,
+		     stats_ext_event->event_data_len);
+
+	vos_msg.type = eWNI_SME_STATS_EXT_EVENT;
+	vos_msg.bodyptr = (void *)stats_ext_event;
+	vos_msg.bodyval = 0;
+
+	status = vos_mq_post_message(VOS_MQ_ID_SME, &vos_msg);
+	if (status != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("%s: Failed to post stats ext event to SME", __func__);
+		vos_mem_free(stats_ext_event);
+		return -1;
+	}
+
+	WMA_LOGD("%s: stats ext event Posted to SME", __func__);
+	return 0;
+}
+#endif
+
 /*
  * Allocate and init wmi adaptation layer.
  */
@@ -3150,6 +3204,13 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
     wmi_unified_register_event_handler(wma_handle->wmi_handle,
                                       WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID,
                                       wma_vdev_install_key_complete_event_handler);
+
+#ifdef WLAN_FEATURE_STATS_EXT
+        /* register for extended stats event */
+        wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   WMI_STATS_EXT_EVENTID,
+					   wma_stats_ext_event_handler);
+#endif
 
 	WMA_LOGD("%s: Exit", __func__);
 
@@ -8542,6 +8603,9 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	u_int8_t vdev_id, peer_id;
 	VOS_STATUS status;
 	tPowerdBm maxTxPower;
+#ifdef WLAN_FEATURE_11W
+	int ret = 0;
+#endif /* WLAN_FEATURE_11W */
 
 	pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
 
@@ -8591,6 +8655,24 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	req.max_txpow = 0;
 	maxTxPower = 0;
 #endif
+#ifdef WLAN_FEATURE_11W
+	if (add_bss->rmfEnabled) {
+		/*
+		 * when 802.11w PMF is enabled for hw encr/decr
+		 * use hw MFP Qos bits 0x10
+		 */
+		ret = wmi_unified_pdev_set_param(wma->wmi_handle,
+				WMI_PDEV_PARAM_PMF_QOS, TRUE);
+		if(ret) {
+			WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
+				__func__, ret);
+		} else {
+			WMA_LOGI("%s: QOS MFP/PMF set to %d",
+				__func__, TRUE);
+		}
+	}
+#endif /* WLAN_FEATURE_11W */
+
 	req.beacon_intval = add_bss->beaconInterval;
 	req.dtim_period = add_bss->dtimPeriod;
 	req.hidden_ssid = add_bss->bHiddenSSIDEn;
@@ -9179,6 +9261,9 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	u_int8_t peer_id;
 	VOS_STATUS status;
 	int32_t ret;
+#ifdef WLAN_FEATURE_11W
+	struct wma_txrx_node *iface = NULL;
+#endif /* WLAN_FEATURE_11W */
 
 	pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
 
@@ -9254,6 +9339,31 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		}
 		state = ol_txrx_peer_state_auth;
 	}
+#ifdef WLAN_FEATURE_11W
+	if (add_sta->rmfEnabled) {
+		/*
+		 * We have to store the state of PMF connection
+		 * per STA for SAP case
+		 * We will isolate the ifaces based on vdevid
+		 */
+		iface = &wma->interfaces[vdev->vdev_id];
+		iface->rmfEnabled = add_sta->rmfEnabled;
+		/*
+		 * when 802.11w PMF is enabled for hw encr/decr
+		 * use hw MFP Qos bits 0x10
+		 */
+		ret = wmi_unified_pdev_set_param(wma->wmi_handle,
+				WMI_PDEV_PARAM_PMF_QOS, TRUE);
+		if(ret) {
+			WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
+				__func__, ret);
+		}
+		else {
+			WMA_LOGI("%s: QOS MFP/PMF set to %d",
+				__func__, TRUE);
+		}
+	}
+#endif /* WLAN_FEATURE_11W */
 
 	if (add_sta->uAPSD) {
 		ret = wma_set_ap_peer_uapsd(wma, add_sta->smesessionId,
@@ -15904,6 +16014,56 @@ VOS_STATUS wma_notify_modem_power_state(void *wda_handle,
 	return VOS_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_STATS_EXT
+VOS_STATUS wma_stats_ext_req(void *wda_handle,
+			     tpStatsExtRequest preq)
+{
+	int32_t ret;
+	tp_wma_handle wma = (tp_wma_handle)wda_handle;
+	wmi_req_stats_ext_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	u_int16_t len;
+	u_int8_t *buf_ptr;
+
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE +
+		preq->request_data_len;
+
+	buf = wmi_buf_alloc(wma->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGE("%s:wmi_buf_alloc failed", __func__);
+		return -ENOMEM;
+	}
+
+	buf_ptr = (u_int8_t *) wmi_buf_data(buf);
+	cmd = (wmi_req_stats_ext_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_req_stats_ext_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_req_stats_ext_cmd_fixed_param));
+	cmd->vdev_id = preq->vdev_id;
+	cmd->data_len = preq->request_data_len;
+
+	WMA_LOGD("%s: The data len value is %u and vdev id set is %u ",
+		 __func__, preq->request_data_len, preq->vdev_id);
+
+	buf_ptr += sizeof(wmi_req_stats_ext_cmd_fixed_param);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, cmd->data_len);
+
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	vos_mem_copy(buf_ptr, preq->request_data,
+		     cmd->data_len);
+
+	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
+				   WMI_REQUEST_STATS_EXT_CMDID);
+	if (ret != EOK) {
+		WMA_LOGE("%s: Failed to send notify cmd ret = %d", __func__, ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
+#endif
 
 /*
  * function   : wma_mc_process_msg
@@ -16310,6 +16470,15 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			wma_vdev_stop_ind(wma_handle, msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
+
+#ifdef WLAN_FEATURE_STATS_EXT
+		case WDA_STATS_EXT_REQUEST:
+			wma_stats_ext_req(wma_handle,
+					  (tpStatsExtRequest)(msg->bodyptr));
+			vos_mem_free(msg->bodyptr);
+			break;
+#endif
+
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
 			/* Do Nothing? MSG Body should be freed at here */
@@ -18572,40 +18741,92 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 		return VOS_STATUS_E_FAILURE;
 	}
 #ifdef WLAN_FEATURE_11W
-	if ((iface && iface->rmfEnabled && pFc->wep) &&
+	if ((iface && iface->rmfEnabled) &&
 		(frmType == HAL_TXRX_FRM_802_11_MGMT) &&
 		(pFc->subType == SIR_MAC_MGMT_DISASSOC ||
 			pFc->subType == SIR_MAC_MGMT_DEAUTH ||
 			pFc->subType == SIR_MAC_MGMT_ACTION)) {
 		struct ieee80211_frame *wh =
-			(struct ieee80211_frame *)adf_nbuf_data(tx_frame);
-		/* Allocate extra bytes for privacy header and trailer */
-		newFrmLen = frmLen + IEEE80211_CCMP_HEADERLEN + IEEE80211_CCMP_MICLEN;
-		vos_status = palPktAlloc( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
-				( tANI_U16 )newFrmLen, ( void** ) &pFrame,
-				( void** ) &pPacket );
+				(struct ieee80211_frame *)adf_nbuf_data(tx_frame);
+		if(!IEEE80211_IS_BROADCAST(wh->i_addr1) &&
+		   !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+			if (pFc->wep) {
+				/* Allocate extra bytes for privacy header and trailer */
+				newFrmLen = frmLen + IEEE80211_CCMP_HEADERLEN +
+							IEEE80211_CCMP_MICLEN;
+				vos_status = palPktAlloc( pMac->hHdd,
+							  HAL_TXRX_FRM_802_11_MGMT,
+							  ( tANI_U16 )newFrmLen,
+							  ( void** ) &pFrame,
+							  ( void** ) &pPacket );
 
-		if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
-			WMA_LOGP("%s: Failed to allocate %d bytes for RMF status "
-				"code (%x)", __func__, newFrmLen, vos_status);
-			/* Free the original packet memory */
+				if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+					WMA_LOGP("%s: Failed to allocate %d bytes for RMF status "
+							 "code (%x)", __func__, newFrmLen, vos_status);
+					/* Free the original packet memory */
+					palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
+								( void* ) pData, ( void* ) tx_frame );
+					goto error;
+				}
+
+				/*
+				 * Initialize the frame with 0's and only fill
+				 * MAC header and data, Keep the CCMP header and
+				 * trailer as 0's, firmware shall fill this
+				 */
+				vos_mem_set(  pFrame, newFrmLen , 0 );
+				vos_mem_copy( pFrame, wh, sizeof(*wh));
+				vos_mem_copy( pFrame + sizeof(*wh) + IEEE80211_CCMP_HEADERLEN,
+							  pData + sizeof(*wh), frmLen - sizeof(*wh));
+
+				palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
+							( void* ) pData, ( void* ) tx_frame );
+				tx_frame = pPacket;
+				frmLen = newFrmLen;
+			}
+		} else {
+			/* Allocate extra bytes for MMIE */
+			newFrmLen = frmLen + IEEE80211_MMIE_LEN;
+			vos_status = palPktAlloc( pMac->hHdd,
+						  HAL_TXRX_FRM_802_11_MGMT,
+						  ( tANI_U16 )newFrmLen,
+						  ( void** ) &pFrame,
+						  ( void** ) &pPacket );
+
+			if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+				WMA_LOGP("%s: Failed to allocate %d bytes for RMF status "
+						 "code (%x)", __func__, newFrmLen, vos_status);
+				/* Free the original packet memory */
+				palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
+							( void* ) pData, ( void* ) tx_frame );
+				goto error;
+			}
+			/*
+			 * Initialize the frame with 0's and only fill
+			 * MAC header and data. MMIE field will be
+			 * filled by vos_attach_mmie API
+			 */
+			vos_mem_set(  pFrame, newFrmLen , 0 );
+			vos_mem_copy( pFrame, wh, sizeof(*wh));
+			vos_mem_copy( pFrame + sizeof(*wh),
+						  pData + sizeof(*wh), frmLen - sizeof(*wh));
+			if (!vos_attach_mmie(iface->key.key,
+					iface->key.key_id[0].ipn,
+					WMA_IGTK_KEY_INDEX_4,
+					pFrame,
+					pFrame+newFrmLen, newFrmLen)) {
+				WMA_LOGP("%s: Failed to attach MMIE at the end of "
+						 "frame", __func__);
+				/* Free the original packet memory */
+				palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
+					( void* ) pData, ( void* ) tx_frame );
+					goto error;
+			}
 			palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
-	                    ( void* ) pData, ( void* ) tx_frame );
-			goto error;
+						( void* ) pData, ( void* ) tx_frame );
+			tx_frame = pPacket;
+			frmLen = newFrmLen;
 		}
-
-		/* Initialize the frame with 0's and only fill
-		   MAC header and data, Keep the CCMP header and
-		   trailer as 0's, firmware shall fill this */
-		vos_mem_set(  pFrame, newFrmLen , 0 );
-		vos_mem_copy( pFrame, wh, sizeof(*wh));
-		vos_mem_copy( pFrame + sizeof(*wh) + IEEE80211_CCMP_HEADERLEN,
-				pData + sizeof(*wh), frmLen - sizeof(*wh));
-
-		palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
-			( void* ) pData, ( void* ) tx_frame );
-		tx_frame = pPacket;
-		frmLen = newFrmLen;
 	}
 #endif /* WLAN_FEATURE_11W */
 
