@@ -139,7 +139,10 @@
 #define WMA_HW_DEF_SCAN_MAX_DURATION	  30000 /* 30 secs */
 
 /* Max offchannel duration */
-#define WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS 5
+#define WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS  (5)
+#define WMA_SCAN_NPROBES_DEFAULT            (2)
+#define WMA_SCAN_IDLE_TIME_DEFAULT          (25)
+#define WMA_P2P_SCAN_MAX_BURST_DURATION     (120)
 
 /* Roaming default values
  * All time and period values are in milliseconds.
@@ -579,6 +582,7 @@ typedef struct {
 	u_int8_t is_fw_assert;
 	struct wma_wow wow;
 	u_int8_t no_of_suspend_ind;
+	u_int8_t no_of_resume_ind;
 
 	/* Have a back up of arp info to send along
 	 * with ns info suppose if ns also enabled

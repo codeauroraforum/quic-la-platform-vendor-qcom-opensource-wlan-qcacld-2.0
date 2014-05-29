@@ -1146,6 +1146,7 @@ static eHalStatus limSendHalStartScanOffloadReq(tpAniSirGlobal pMac,
     pScanOffloadReq->scanType = pScanReq->scanType;
     pScanOffloadReq->minChannelTime = pScanReq->minChannelTime;
     pScanOffloadReq->maxChannelTime = pScanReq->maxChannelTime;
+    pScanOffloadReq->restTime= pScanReq->restTime;
 
     /* for normal scan, the value for p2pScanType should be 0
        always */
@@ -1774,13 +1775,26 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         psessionEntry->enableAmpduPs = pSmeJoinReq->enableAmpduPs;
         psessionEntry->enableHtSmps = pSmeJoinReq->enableHtSmps;
         psessionEntry->htSmpsvalue = pSmeJoinReq->htSmps;
+
+        /*Store Persona */
+        psessionEntry->pePersona = pSmeJoinReq->staPersona;
+        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
+                  FL("PE PERSONA=%d cbMode %u"), psessionEntry->pePersona,
+                      pSmeJoinReq->cbMode);
 #ifdef WLAN_FEATURE_11AC
         psessionEntry->vhtCapability = IS_DOT11_MODE_VHT(psessionEntry->dot11mode);
         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO_MED,
             "***__limProcessSmeJoinReq: vhtCapability=%d****",psessionEntry->vhtCapability);
         if (psessionEntry->vhtCapability )
         {
-            psessionEntry->txBFIniFeatureEnabled = pSmeJoinReq->txBFIniFeatureEnabled;
+            if (psessionEntry->pePersona == VOS_STA_MODE)
+            {
+                    psessionEntry->txBFIniFeatureEnabled = pSmeJoinReq->txBFIniFeatureEnabled;
+            }
+            else
+            {
+                    psessionEntry->txBFIniFeatureEnabled = 0;
+            }
             psessionEntry->txMuBformee = pSmeJoinReq->txMuBformee;
             psessionEntry->enableVhtpAid = pSmeJoinReq->enableVhtpAid;
             psessionEntry->enableVhtGid = pSmeJoinReq->enableVhtGid;
@@ -1841,11 +1855,6 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         psessionEntry->rssi =  pSmeJoinReq->bssDescription.rssi;
 #endif
 
-        /*Store Persona */
-        psessionEntry->pePersona = pSmeJoinReq->staPersona;
-        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-                  FL("PE PERSONA=%d cbMode %u"), psessionEntry->pePersona,
-                      pSmeJoinReq->cbMode);
 
         /* Copy the SSID from smejoinreq to session entry  */
         psessionEntry->ssId.length = pSmeJoinReq->ssId.length;
@@ -5608,6 +5617,9 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
             break;
         case eWNI_SME_CLEAR_DFS_CHANNEL_LIST:
             __limProcessClearDfsChannelList(pMac, pMsg);
+            break;
+        case eWNI_SME_CLEAR_LIM_SCAN_CACHE:
+            limReInitScanResults(pMac);
             break;
         case eWNI_SME_JOIN_REQ:
             __limProcessSmeJoinReq(pMac, pMsgBuf);

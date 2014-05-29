@@ -886,7 +886,8 @@ void hdd_conf_mcastbcast_filter(hdd_context_t* pHddCtx, v_BOOL_t setfilter)
 
 static void hdd_conf_suspend_ind(hdd_context_t* pHddCtx,
                                  hdd_adapter_t *pAdapter,
-                                 void (*callback)(void *callbackContext),
+                                 void (*callback)(void *callbackContext,
+                                                  boolean suspended),
                                  void *callbackContext)
 {
     eHalStatus halStatus = eHAL_STATUS_FAILURE;
@@ -951,14 +952,11 @@ static void hdd_conf_suspend_ind(hdd_context_t* pHddCtx,
 static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
 {
     hdd_context_t* pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    eHalStatus halStatus = eHAL_STATUS_FAILURE;
 
 #ifndef QCA_WIFI_2_0
 
-    eHalStatus halStatus = eHAL_STATUS_FAILURE;
     tpSirWlanResumeParam wlanResumeParam;
-
-    hddLog(VOS_TRACE_LEVEL_INFO,
-      "%s: send wlan resume indication", __func__);
 
     wlanResumeParam = vos_mem_malloc(sizeof(tSirWlanResumeParam));
 
@@ -971,14 +969,27 @@ static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
 
     wlanResumeParam->configuredMcstBcstFilterSetting =
                                pHddCtx->configuredMcastBcastFilter;
-    halStatus = sme_ConfigureResumeReq(pHddCtx->hHal, wlanResumeParam);
-    if (eHAL_STATUS_SUCCESS != halStatus)
-    {
-        vos_mem_free(wlanResumeParam);
-    }
 
 #endif
 
+    halStatus = sme_ConfigureResumeReq(pHddCtx->hHal,
+#ifndef QCA_WIFI_2_0
+                                       wlanResumeParam
+#else
+                                       NULL
+#endif
+                                      );
+
+    if (eHAL_STATUS_SUCCESS != halStatus)
+    {
+#ifndef QCA_WIFI_2_0
+        vos_mem_free(wlanResumeParam);
+#endif
+
+    }
+
+    hddLog(VOS_TRACE_LEVEL_INFO,
+      "%s: send wlan resume indication", __func__);
     /* Disable supported OffLoads */
     hdd_conf_hostoffload(pAdapter, FALSE);
     pHddCtx->hdd_mcastbcast_filter_set = FALSE;
@@ -1004,7 +1015,7 @@ static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
 }
 
 //Suspend routine registered with Android OS
-void hdd_suspend_wlan(void (*callback)(void *callbackContext),
+void hdd_suspend_wlan(void (*callback)(void *callbackContext, boolean suspended),
                       void *callbackContext)
 {
    hdd_context_t *pHddCtx = NULL;
@@ -1511,7 +1522,8 @@ VOS_STATUS hdd_wlan_shutdown(void)
    }
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-    pHddCtx->isLogpInProgress = TRUE;
+   pHddCtx->isLogpInProgress = TRUE;
+   vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 #endif
 
    //Stop the traffic monitor timer

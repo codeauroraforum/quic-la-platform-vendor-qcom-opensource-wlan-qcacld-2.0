@@ -3074,13 +3074,6 @@ static int wlan_hdd_change_iface_to_sta_mode(struct net_device *ndev,
 
     wdev = ndev->ieee80211_ptr;
     hdd_stop_adapter(pHddCtx, pAdapter);
-#ifdef FEATURE_WLAN_TDLS
-    /* A Mutex Lock is introduced while changing the mode to
-     * protect the concurrent access for the Adapters by TDLS
-     * module.
-     */
-    mutex_lock(&pHddCtx->tdls_lock);
-#endif
     hdd_deinit_adapter(pHddCtx, pAdapter);
     wdev->iftype = type;
     /*Check for sub-string p2p to confirm its a p2p interface*/
@@ -3098,9 +3091,6 @@ static int wlan_hdd_change_iface_to_sta_mode(struct net_device *ndev,
     pHddCtx->change_iface = type;
     memset(&pAdapter->sessionCtx, 0, sizeof(pAdapter->sessionCtx));
     hdd_set_station_ops(pAdapter->dev);
-#ifdef FEATURE_WLAN_TDLS
-    mutex_unlock(&pHddCtx->tdls_lock);
-#endif
     status = hdd_init_station_mode(pAdapter);
     wext = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
     wext->roamProfile.pAddIEScan = pAdapter->scan_info.scanAddIE.addIEdata;
@@ -3318,22 +3308,12 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
                     }
                 }
                 hdd_stop_adapter( pHddCtx, pAdapter );
-#ifdef FEATURE_WLAN_TDLS
 
-                /* A Mutex Lock is introduced while changing the mode to
-                 * protect the concurrent access for the Adapters by TDLS
-                 * module.
-                 */
-                mutex_lock(&pHddCtx->tdls_lock);
-#endif
                 //De-init the adapter.
                 hdd_deinit_adapter( pHddCtx, pAdapter );
                 memset(&pAdapter->sessionCtx, 0, sizeof(pAdapter->sessionCtx));
                 pAdapter->device_mode = (type == NL80211_IFTYPE_AP) ?
                                    WLAN_HDD_SOFTAP : WLAN_HDD_P2P_GO;
-#ifdef FEATURE_WLAN_TDLS
-                mutex_unlock(&pHddCtx->tdls_lock);
-#endif
 
                 /*
                  * If Powersave Offload is enabled
@@ -7853,10 +7833,11 @@ static int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_device 
             maxRate = (currentRate > maxRate)?currentRate:maxRate;
         }
         /* Get MCS Rate Set --
-           Only if we are always reporting max speed  (or)
+           Only if we are connected in non legacy mode and always reporting max speed  (or)
            if we have good rssi */
-         if ((0 == rssidx) ||
-              (eHDD_LINK_SPEED_REPORT_MAX == pCfg->reportMaxLinkSpeed))
+         if (((0 == rssidx) ||
+              (eHDD_LINK_SPEED_REPORT_MAX == pCfg->reportMaxLinkSpeed)) &&
+              !(rate_flags & eHAL_TX_RATE_LEGACY))
         {
             if (0 != ccmCfgGetStr(WLAN_HDD_GET_HAL_CTX(pAdapter), WNI_CFG_CURRENT_MCS_SET,
                                  MCSRates, &MCSLeng))
@@ -10294,10 +10275,10 @@ int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 }
 
 #ifdef QCA_WIFI_2_0
-void wlan_hdd_cfg80211_ready_to_suspend(void *callbackContext)
+void wlan_hdd_cfg80211_ready_to_suspend(void *callbackContext, boolean suspended)
 {
     hdd_context_t *pHddCtx = (hdd_context_t *)callbackContext;
-
+    pHddCtx->suspended = suspended;
     complete(&pHddCtx->ready_to_suspend);
 }
 #endif
@@ -10377,6 +10358,13 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: Failed to get ready to suspend", __func__);
         goto resume_tx;
+    }
+
+    if (!pHddCtx->suspended) {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: Faied as suspend_status is wrong:%d",
+                           __func__, pHddCtx->suspended);
+       goto resume_tx;
     }
 
     /* Suspend MC thread */
