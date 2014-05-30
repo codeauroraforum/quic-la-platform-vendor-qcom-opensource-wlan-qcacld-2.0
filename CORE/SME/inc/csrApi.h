@@ -923,6 +923,8 @@ typedef struct tagCsrRoamProfile
     tVOS_CON_MODE csrPersona;
 
     tANI_U8 disableDFSChSwitch;
+    /* addIe params */
+    tSirAddIeParams        addIeParams;
 }tCsrRoamProfile;
 
 
