@@ -673,6 +673,8 @@ eHalStatus csrScanRequest(tpAniSirGlobal pMac, tANI_U16 sessionId,
                 vos_mem_set(&pScanCmd->u.scanCmd, sizeof(tScanCmd), 0);
                 pScanCmd->command = eSmeCommandScan;
                 pScanCmd->sessionId = sessionId;
+                if (pScanCmd->sessionId >= CSR_ROAM_SESSION_MAX)
+                    smsLog( pMac, LOGE, FL("Invalid Sme Session ID = %d"), sessionId);
                 pScanCmd->u.scanCmd.callback = callback;
                 pScanCmd->u.scanCmd.pContext = pContext;
                 if(eCSR_SCAN_REQUEST_11D_SCAN == pScanRequest->requestType)
@@ -5097,7 +5099,9 @@ static tANI_BOOLEAN csrScanProcessScanResults( tpAniSirGlobal pMac, tSmeCmd *pCo
     }while(0);
     if ( eSIR_SME_MORE_SCAN_RESULTS_FOLLOW != pScanRsp->statusCode )
     {
-        smsLog(pMac, LOG1, " Scan received %d unique BSS scan reason is %d", csrLLCount(&pMac->scan.tempScanResults), pCommand->u.scanCmd.reason);
+        smsLog(pMac, LOGE, "Found %d BSS",
+                           csrLLCount(&pMac->scan.tempScanResults));
+        smsLog(pMac, LOG1, "scan reason is %d", pCommand->u.scanCmd.reason);
         fRemoveCommand = csrScanComplete( pMac, pScanRsp );
         fRet = eANI_BOOLEAN_TRUE;
     }//if ( eSIR_SME_MORE_SCAN_RESULTS_FOLLOW != pScanRsp->statusCode )
@@ -5579,7 +5583,8 @@ eHalStatus csrSendMBScanReq( tpAniSirGlobal pMac, tANI_U16 sessionId,
                    request on first available session */
                 pMsg->sessionId = 0;
             }
-
+            if (pMsg->sessionId >= CSR_ROAM_SESSION_MAX)
+                smsLog( pMac, LOGE, FL(" Invalid Sme Session ID = %d"), pMsg->sessionId );
             pMsg->transactionId = 0;
             pMsg->dot11mode = (tANI_U8) csrTranslateToWNICfgDot11Mode(pMac, csrFindBestPhyMode( pMac, pMac->roam.configParam.phyMode ));
             pMsg->bssType = pal_cpu_to_be32(csrTranslateBsstypeToMacType(pScanReq->BSSType));

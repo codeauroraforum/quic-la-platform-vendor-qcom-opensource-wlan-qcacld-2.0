@@ -1163,6 +1163,10 @@ static eHalStatus limSendHalStartScanOffloadReq(tpAniSirGlobal pMac,
         pScanOffloadReq->p2pScanType = P2P_SCAN_TYPE_SEARCH;
 
     pScanOffloadReq->sessionId = pScanReq->sessionId;
+
+    if (pScanOffloadReq->sessionId >= pMac->lim.maxBssId)
+        limLog(pMac, LOGE,FL("Invalid pe sessionID : %d"), pScanOffloadReq->sessionId);
+
     pScanOffloadReq->channelList.numChannels =
         pScanReq->channelList.numChannels;
     p = &(pScanOffloadReq->channelList.channelNumber[0]);
@@ -4533,6 +4537,45 @@ end:
     return;
 } /*** end __limProcessSmeUpdateAPWPSIEs(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf) ***/
 
+#ifdef QCA_WIFI_2_0
+void
+limSendVdevRestart(tpAniSirGlobal pMac,
+                   tpPESession psessionEntry,
+                   tANI_U8 sessionId)
+{
+    tpHalHiddenSsidVdevRestart pHalHiddenSsidVdevRestart = NULL;
+    tSirMsgQ       msgQ;
+    tSirRetStatus  retCode = eSIR_SUCCESS;
+
+    if ( psessionEntry == NULL )
+    {
+        PELOGE(limLog(pMac, LOGE, "%s:%d: Invalid parameters", __func__, __LINE__ );)
+        return;
+    }
+
+    pHalHiddenSsidVdevRestart = vos_mem_malloc(sizeof(tHalHiddenSsidVdevRestart));
+    if (NULL == pHalHiddenSsidVdevRestart)
+    {
+        PELOGE(limLog(pMac, LOGE, "%s:%d: Unable to allocate memory", __func__, __LINE__ );)
+        return;
+    }
+
+    pHalHiddenSsidVdevRestart->ssidHidden = psessionEntry->ssidHidden;
+    pHalHiddenSsidVdevRestart->sessionId = sessionId;
+
+    msgQ.type = WDA_HIDDEN_SSID_VDEV_RESTART;
+    msgQ.bodyptr = pHalHiddenSsidVdevRestart;
+    msgQ.bodyval = 0;
+
+    retCode = wdaPostCtrlMsg(pMac, &msgQ);
+    if (eSIR_SUCCESS != retCode)
+    {
+        PELOGE(limLog(pMac, LOGE, "%s:%d: wdaPostCtrlMsg() failed", __func__, __LINE__ );)
+        vos_mem_free(pHalHiddenSsidVdevRestart);
+    }
+}
+#endif /* QCA_WIFI_2_0 */
+
 static void
 __limProcessSmeHideSSID(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 {
@@ -4559,6 +4602,11 @@ __limProcessSmeHideSSID(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     /* Update the session entry */
     psessionEntry->ssidHidden = pUpdateParams->ssidHidden;
+
+#ifdef QCA_WIFI_2_0
+    /* Send vdev restart */
+    limSendVdevRestart(pMac, psessionEntry, pUpdateParams->sessionId);
+#endif /* QCA_WIFI_2_0 */
 
     /* Update beacon */
     schSetFixedBeaconFields(pMac, psessionEntry);
