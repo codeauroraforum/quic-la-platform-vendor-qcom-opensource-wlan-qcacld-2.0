@@ -3063,7 +3063,7 @@ static int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 #endif //(LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0))
 
-static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
                                       struct net_device *dev,
                                       struct bss_parameters *params)
 {
@@ -3158,6 +3158,18 @@ static int wlan_hdd_change_iface_to_sta_mode(struct net_device *ndev,
     return status;
 }
 
+static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
+                                      struct net_device *dev,
+                                      struct bss_parameters *params)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __wlan_hdd_cfg80211_change_bss(wiphy, dev, params);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
 /* FUNCTION: wlan_hdd_change_country_code_cd
 *  to wait for contry code completion
 */
@@ -7423,11 +7435,11 @@ static int wlan_hdd_cfg80211_leave_ibss( struct wiphy *wiphy,
 }
 
 /*
- * FUNCTION: wlan_hdd_cfg80211_set_wiphy_params
+ * FUNCTION: __wlan_hdd_cfg80211_set_wiphy_params
  * This function is used to set the phy parameters
  * (RTS Threshold/FRAG Threshold/Retry Count etc ...)
  */
-static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
         u32 changed)
 {
     hdd_context_t *pHddCtx = wiphy_priv(wiphy);
@@ -7553,11 +7565,23 @@ static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
     return 0;
 }
 
+static int wlan_hdd_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+                                                                u32 changed)
+{
+     int ret;
+
+     vos_ssr_protect(__func__);
+     ret = __wlan_hdd_cfg80211_set_wiphy_params(wiphy, changed);
+     vos_ssr_unprotect(__func__);
+
+     return ret;
+}
+
 /*
- * FUNCTION: wlan_hdd_cfg80211_set_txpower
+ * FUNCTION: __wlan_hdd_cfg80211_set_txpower
  * This function is used to set the txpower
  */
-static int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
         struct wireless_dev *wdev,
 #endif
@@ -7621,6 +7645,34 @@ static int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
     }
 
     return 0;
+}
+
+static int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
+        struct wireless_dev *wdev,
+#endif
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,35)
+        enum tx_power_setting type,
+#else
+        enum nl80211_tx_power_setting type,
+#endif
+        int dbm)
+{
+    int ret;
+    vos_ssr_protect(__func__);
+    ret = __wlan_hdd_cfg80211_set_txpower(wiphy,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
+                                        wdev,
+#endif
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,35)
+                                        type,
+#else
+                                        type,
+#endif
+                                        dbm);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
 }
 
 /*
