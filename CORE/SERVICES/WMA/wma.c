@@ -13049,6 +13049,8 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 		goto error;
 	}
 
+	wmi_set_target_suspend(wma->wmi_handle, TRUE);
+
 	if (vos_wait_single_event(&wma->target_suspend,
 				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
 				  != VOS_STATUS_SUCCESS) {
@@ -13057,11 +13059,13 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 			wmi_get_host_credits(wma->wmi_handle),
 			wmi_get_pending_cmds(wma->wmi_handle));
 
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
 		return VOS_STATUS_E_FAILURE;
 	}
 
 	if (wma->wow_nack) {
 		WMA_LOGE("FW not ready to WOW");
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
 		return VOS_STATUS_E_AGAIN;
 	}
 
@@ -13086,6 +13090,7 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 
 	if (scn == NULL) {
 		WMA_LOGE("%s: Failed to get HIF context", __func__);
+		VOS_ASSERT(0);
 		return VOS_STATUS_E_FAULT;
 	}
 
@@ -13093,7 +13098,6 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 
 	wma->wow.wow_enable_cmd_sent = TRUE;
 
-	wmi_set_target_suspend(wma->wmi_handle, TRUE);
 	return VOS_STATUS_SUCCESS;
 
 error:
@@ -19376,10 +19380,15 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 		adf_nbuf_free(wmibuf);
 		return -1;
 	}
+
+
+	wmi_set_target_suspend(wma_handle->wmi_handle, TRUE);
+
 	if (vos_wait_single_event(&wma_handle->target_suspend,
 				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
 				  != VOS_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get ACK from firmware for pdev suspend");
+		wmi_set_target_suspend(wma_handle->wmi_handle, FALSE);
 		return -1;
 	}
 
@@ -19387,12 +19396,12 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 
 	if (scn == NULL) {
 		WMA_LOGE("%s: Failed to get HIF context", __func__);
+		VOS_ASSERT(0);
 		return -1;
 	}
 
 	HTCCancelDeferredTargetSleep(scn);
 
-	wmi_set_target_suspend(wma_handle->wmi_handle, TRUE);
 	return 0;
 }
 
