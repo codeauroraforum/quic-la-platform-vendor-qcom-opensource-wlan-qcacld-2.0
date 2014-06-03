@@ -116,8 +116,6 @@ int wlan_hdd_ftm_start(hdd_context_t *pAdapter);
 #endif
 #ifdef FEATURE_WLAN_CH_AVOID
 #include <net/cnss.h>
-/* Channle/Freqency table */
-extern const tRfChannelProps rfChannels[NUM_RF_CHANNELS];
 extern int hdd_hostapd_stop (struct net_device *dev);
 void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #endif /* FEATURE_WLAN_CH_AVOID */
@@ -3098,7 +3096,7 @@ eHalStatus hdd_parse_plm_cmd(tANI_U8 *pValue, tSirPlmReq *pPlmRequest)
         hddLog(VOS_TRACE_LEVEL_DEBUG,
                "desiredTxPwr %d", pPlmRequest->desiredTxPwr);
 
-        for (count = 0; count < WNI_CFG_BSSID_LEN; count++)
+        for (count = 0; count < VOS_MAC_ADDR_SIZE; count++)
         {
             cmdPtr = strpbrk(cmdPtr, " ");
 
@@ -5172,6 +5170,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 *value = command;
            tCsrEseBeaconReq eseBcnReq;
            eHalStatus status = eHAL_STATUS_SUCCESS;
+
            status = hdd_parse_ese_beacon_req(value, &eseBcnReq);
            if (eHAL_STATUS_SUCCESS != status)
            {
@@ -5181,19 +5180,28 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                goto exit;
            }
 
+           if (!hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))) {
+               hddLog(VOS_TRACE_LEVEL_INFO, FL("Not associated"));
+               hdd_indicateEseBcnReportNoResults (pAdapter,
+                                      eseBcnReq.bcnReq[0].measurementToken,
+                                      0x02,  //BIT(1) set for measurement done
+                                      0);    // no BSS
+               goto exit;
+           }
+
            status = sme_SetEseBeaconRequest((tHalHandle)(pHddCtx->hHal),
                                             pAdapter->sessionId,
                                             &eseBcnReq);
            if (eHAL_STATUS_SUCCESS != status)
-	   {
-	      VOS_TRACE( VOS_MODULE_ID_HDD,
-                         VOS_TRACE_LEVEL_ERROR,
-	                 "%s: sme_SetEseBeaconRequest failed (%d)",
+           {
+               VOS_TRACE( VOS_MODULE_ID_HDD,
+                          VOS_TRACE_LEVEL_ERROR,
+                          "%s: sme_SetEseBeaconRequest failed (%d)",
                          __func__,
                          status);
-	      ret = -EINVAL;
-	      goto exit;
-	   }
+               ret = -EINVAL;
+               goto exit;
+           }
        }
 #endif /* FEATURE_WLAN_ESE && FEATURE_WLAN_ESE_UPLOAD */
        else if (strncmp(command, "SETMCRATE", 9) == 0)
@@ -7768,7 +7776,10 @@ void hdd_deinit_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
          hdd_cleanup_actionframe(pHddCtx, pAdapter);
 
          hdd_unregister_hostapd(pAdapter);
-         hdd_set_conparam( 0 );
+
+         // set con_mode to STA only when no SAP concurrency mode
+         if (!(hdd_get_concurrency_mode() & (VOS_SAP | VOS_P2P_GO)))
+             hdd_set_conparam( 0 );
          wlan_hdd_set_monitor_tx_adapter( WLAN_HDD_GET_CTX(pAdapter), NULL );
          break;
       }
@@ -8981,6 +8992,12 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
                                        WLAN_STATUS_ASSOC_DENIED_UNSPEC,
                                        GFP_KERNEL);
             }
+
+#ifdef QCA_LL_TX_FLOW_CT
+            WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext, hdd_tx_resume_cb,
+                                         pAdapter->sessionId, (void *)pAdapter);
+#endif
+
             break;
 
          case WLAN_HDD_SOFTAP:
@@ -10639,6 +10656,10 @@ static void hdd_bus_bw_compute_cbk(void *priv)
 
     hdd_cnss_request_bus_bandwidth(pHddCtx, tx_packets, rx_packets);
 
+#ifdef IPA_OFFLOAD
+    hdd_ipa_set_perf_level(pHddCtx, tx_packets, rx_packets);
+#endif
+
     vos_timer_start(&pHddCtx->bus_bw_timer,
             pHddCtx->cfg_ini->busBandwidthComputeInterval);
 }
@@ -11996,6 +12017,8 @@ static void hdd_driver_exit(void)
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
    }
 
+   vos_wait_for_work_thread_completion(__func__);
+
 #ifdef QCA_WIFI_ISOC
    //Do all the cleanup before deregistering the driver
    hdd_wlan_exit(pHddCtx);
@@ -13010,6 +13033,7 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
 {
     hdd_adapter_t *ap_pAdapter = NULL, *sta_pAdapter = (hdd_adapter_t *)data;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(sta_pAdapter);
+    tHalHandle hHal;
     hdd_ap_ctx_t *pHddApCtx;
     v_U16_t intf_ch = 0;
 
@@ -13022,6 +13046,10 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     if (ap_pAdapter == NULL)
         return;
     pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_pAdapter);
+    hHal = WLAN_HDD_GET_HAL_CTX(ap_pAdapter);
+
+    if (hHal == NULL)
+        return;
 
 #ifdef WLAN_FEATURE_MBSSID
     intf_ch = WLANSAP_CheckCCIntf(pHddApCtx->sapContext);
@@ -13032,6 +13060,9 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
         return;
 
     pHddApCtx->sapConfig.channel = intf_ch;
+    sme_SelectCBMode(hHal,
+            sapConvertSapPhyModeToCsrPhyMode(pHddApCtx->sapConfig.SapHw_mode),
+                                             pHddApCtx->sapConfig.channel);
     wlan_hdd_restart_sap(ap_pAdapter);
 }
 

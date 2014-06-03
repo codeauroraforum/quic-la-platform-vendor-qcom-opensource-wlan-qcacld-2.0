@@ -3491,6 +3491,7 @@ static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile
     int i;
     eCsrCfgDot11Mode cfgDot11Mode;
     tANI_U8 *pDstRate;
+    tANI_U16 rateBitmap = 0;
     vos_mem_set(pOpRateSet, sizeof(tSirMacRateSet), 0);
     vos_mem_set(pExRateSet, sizeof(tSirMacRateSet), 0);
     VOS_ASSERT( pIes != NULL );
@@ -3514,6 +3515,7 @@ static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile
             {
                 if ( csrRatesIsDot11RateSupported( pMac, pIes->SuppRates.rates[ i ] ) )
                 {
+                    csrAddRateBitmap(pIes->SuppRates.rates[ i ], &rateBitmap);
                     *pDstRate++ = pIes->SuppRates.rates[ i ];
                     pOpRateSet->numRates++;
                 }
@@ -3534,8 +3536,11 @@ static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile
                 {
                     if ( csrRatesIsDot11RateSupported( pMac, pIes->ExtSuppRates.rates[ i ] ) )
                     {
-                        *pDstRate++ = pIes->ExtSuppRates.rates[ i ];
-                        pExRateSet->numRates++;
+                        if (!csrCheckRateBitmap(pIes->ExtSuppRates.rates[ i ], rateBitmap))
+                        {
+                            *pDstRate++ = pIes->ExtSuppRates.rates[ i ];
+                            pExRateSet->numRates++;
+                        }
                     }
                 }
             }
@@ -7589,10 +7594,23 @@ void csrRoamReissueRoamCommand(tpAniSirGlobal pMac)
                     csrRoamComplete( pMac, eCsrNothingToJoin, NULL );
                 }
             }
-            else if(eCsrStopRoaming == csrRoamJoinNextBss(pMac, pCommand, eANI_BOOLEAN_TRUE))
+            else
             {
-                smsLog(pMac, LOGW, " Failed to reissue join command after disassociated");
-                csrRoamComplete( pMac, eCsrNothingToJoin, NULL );
+                if (pSession->bRefAssocStartCnt > 0)
+                {
+                    /* bRefAssocStartCnt was incremented in csrRoamJoinNextBss
+                     * when the roam command issued previously. As part of reissuing
+                     * the roam command again csrRoamJoinNextBss is going increment
+                     * RefAssocStartCnt. So make sure to decrement the bRefAssocStartCnt
+                     */
+                    pSession->bRefAssocStartCnt--;
+                }
+
+                if(eCsrStopRoaming == csrRoamJoinNextBss(pMac, pCommand, eANI_BOOLEAN_TRUE))
+                {
+                    smsLog(pMac, LOGW, " Failed to reissue join command after disassociated");
+                    csrRoamComplete( pMac, eCsrNothingToJoin, NULL );
+                }
             }
         }
         else
