@@ -652,5 +652,8 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void);
 VOS_STATUS vos_watchdog_wlan_re_init(void);
 void vos_ssr_protect(const char *caller_func);
 void vos_ssr_unprotect(const char *caller_func);
+bool vos_is_ssr_ready(const char *caller_func);
+
+#define vos_wait_for_work_thread_completion(func) vos_is_ssr_ready(func)
 
 #endif // #if !defined __VOSS_SCHED_H
