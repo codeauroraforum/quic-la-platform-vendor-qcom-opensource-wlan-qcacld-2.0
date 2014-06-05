@@ -643,6 +643,9 @@ typedef struct {
 
 	u_int8_t dfs_phyerr_filter_offload;
 	v_BOOL_t suitable_ap_hb_failure;
+
+	int32_t dfs_pri_multiplier;
+
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
@@ -1219,6 +1222,7 @@ struct wma_vdev_start_req {
 	u_int8_t pmf_enabled;
 	u_int8_t vht_capable;
 	u_int8_t ht_capable;
+	int32_t dfs_pri_multiplier;
 };
 
 struct wma_set_key_params {
