@@ -5163,7 +5163,7 @@ VOS_STATUS wma_roam_scan_offload_chan_list(tp_wma_handle wma_handle,
     chan_list_fp->vdev_id = wma_handle->roam_offload_vdev_id;
     chan_list_fp->num_chan = chan_count;
     if (chan_count > 0 && list_type == CHANNEL_LIST_STATIC) {
-        /* NCHO or other app is in control */
+        /* external app is controlling channel list */
         chan_list_fp->chan_list_type = WMI_ROAM_SCAN_CHAN_LIST_TYPE_STATIC;
     } else {
         /* umac supplied occupied channel list in LFR */
@@ -5330,6 +5330,7 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
                                    wmi_start_scan_cmd_fixed_param *scan_params)
 {
     tANI_U8 channels_per_burst = 0;
+    tANI_U32 val = 0;
 
     if (NULL == pMac) {
         WMA_LOGE("%s: pMac is NULL", __func__);
@@ -5364,6 +5365,18 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
          *                                   to scan;
          */
 
+        if (wlan_cfgGetInt(pMac, WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME, &val) != eSIR_SUCCESS)
+        {
+            /*
+             * Could not get max channel value from CFG. Log error.
+             */
+            WMA_LOGE("could not retrieve passive max channel value");
+
+            /* use a default value of 110ms */
+            val = WMA_ROAM_DWELL_TIME_PASSIVE_DEFAULT;
+        }
+
+        scan_params->dwell_time_passive = val;
         /*
          * Here is the formula,
          * T(HomeAway) = N * T(dwell) + (N+1) * T(cs)
@@ -5371,8 +5384,10 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
          */
         scan_params->dwell_time_active  = roam_req->NeighborScanChannelMaxTime;
         if (roam_req->HomeAwayTime < 2*WMA_ROAM_SCAN_CHANNEL_SWITCH_TIME) {
-            // clearly we can't follow home away time
-            scan_params->burst_duration     = scan_params->dwell_time_active;
+            /* clearly we can't follow home away time.
+             * Make it a split scan.
+             */
+            scan_params->burst_duration     = 0;
         } else {
             channels_per_burst =
               (roam_req->HomeAwayTime - WMA_ROAM_SCAN_CHANNEL_SWITCH_TIME)
@@ -5389,8 +5404,16 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
                   channels_per_burst * scan_params->dwell_time_active;
             }
         }
-
-        scan_params->dwell_time_passive = scan_params->dwell_time_active;
+        if (pMac->roam.configParam.allowDFSChannelRoam &&
+            roam_req->HomeAwayTime > 0 &&
+            roam_req->ChannelCacheType != CHANNEL_LIST_STATIC) {
+            /* Roaming on DFS channels is supported and it is not app channel list.
+             * It is ok to override homeAwayTime to accomodate DFS dwell time in burst
+             * duration.
+             */
+            scan_params->burst_duration = MAX(scan_params->burst_duration,
+                                                scan_params->dwell_time_passive);
+        }
         scan_params->min_rest_time = roam_req->NeighborScanTimerPeriod;
         scan_params->max_rest_time = roam_req->NeighborScanTimerPeriod;
         scan_params->repeat_probe_time = (roam_req->nProbes > 0) ?
@@ -5411,7 +5434,7 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
         scan_params->probe_delay = 0;
         scan_params->max_scan_time = WMA_HW_DEF_SCAN_MAX_DURATION;
         scan_params->idle_time = scan_params->min_rest_time;
-        scan_params->burst_duration = WMA_ROAM_DWELL_TIME_PASSIVE_DEFAULT;
+        scan_params->burst_duration = 0;
         scan_params->n_probes = 0;
     }
 
@@ -5419,6 +5442,7 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
     if (!pMac->roam.configParam.allowDFSChannelRoam) {
         scan_params->scan_ctrl_flags |= WMI_SCAN_BYPASS_DFS_CHN;
     }
+
     WMA_LOGI("%s: Rome roam scan parameters:"
              " dwell_time_active = %d, dwell_time_passive = %d",
              __func__,
@@ -12927,6 +12951,8 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 		goto error;
 	}
 
+	wmi_set_target_suspend(wma->wmi_handle, TRUE);
+
 	if (vos_wait_single_event(&wma->target_suspend,
 				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
 				  != VOS_STATUS_SUCCESS) {
@@ -12935,11 +12961,13 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 			wmi_get_host_credits(wma->wmi_handle),
 			wmi_get_pending_cmds(wma->wmi_handle));
 
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
 		return VOS_STATUS_E_FAILURE;
 	}
 
 	if (wma->wow_nack) {
 		WMA_LOGE("FW not ready to WOW");
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
 		return VOS_STATUS_E_AGAIN;
 	}
 
@@ -12964,6 +12992,7 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 
 	if (scn == NULL) {
 		WMA_LOGE("%s: Failed to get HIF context", __func__);
+		VOS_ASSERT(0);
 		return VOS_STATUS_E_FAULT;
 	}
 
@@ -12971,7 +13000,6 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle)
 
 	wma->wow.wow_enable_cmd_sent = TRUE;
 
-	wmi_set_target_suspend(wma->wmi_handle, TRUE);
 	return VOS_STATUS_SUCCESS;
 
 error:
@@ -19216,10 +19244,15 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 		adf_nbuf_free(wmibuf);
 		return -1;
 	}
+
+
+	wmi_set_target_suspend(wma_handle->wmi_handle, TRUE);
+
 	if (vos_wait_single_event(&wma_handle->target_suspend,
 				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
 				  != VOS_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get ACK from firmware for pdev suspend");
+		wmi_set_target_suspend(wma_handle->wmi_handle, FALSE);
 		return -1;
 	}
 
@@ -19227,12 +19260,12 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 
 	if (scn == NULL) {
 		WMA_LOGE("%s: Failed to get HIF context", __func__);
+		VOS_ASSERT(0);
 		return -1;
 	}
 
 	HTCCancelDeferredTargetSleep(scn);
 
-	wmi_set_target_suspend(wma_handle->wmi_handle, TRUE);
 	return 0;
 }
 
