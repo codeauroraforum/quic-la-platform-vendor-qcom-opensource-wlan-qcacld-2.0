@@ -80,7 +80,6 @@
 #include "wlan_hdd_p2p.h"
 #include "wlan_hdd_cfg80211.h"
 #include "wlan_hdd_hostapd.h"
-#include "sapInternal.h"
 #include "wlan_hdd_softap_tx_rx.h"
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_assoc.h"
@@ -102,6 +101,7 @@
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
 #endif
+#include "wlan_hdd_misc.h"
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -3227,7 +3227,9 @@ static int wlan_hdd_change_iface_to_sta_mode(struct net_device *ndev,
                                   WLAN_HDD_INFRA_STATION : WLAN_HDD_P2P_CLIENT;
     }
 
-    hdd_set_conparam(0);
+    // set con_mode to STA only when no SAP concurrency mode
+    if (!(hdd_get_concurrency_mode() & (VOS_SAP | VOS_P2P_GO)))
+        hdd_set_conparam(0);
     pHddCtx->change_iface = type;
     memset(&pAdapter->sessionCtx, 0, sizeof(pAdapter->sessionCtx));
     hdd_set_station_ops(pAdapter->dev);
@@ -5569,6 +5571,7 @@ int wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     v_U8_t* pP2pIe = NULL;
 
     ENTER();
+    hddLog(VOS_TRACE_LEVEL_ERROR, "received scan request");
 
     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
                      TRACE_CODE_HDD_CFG80211_SCAN,
@@ -9571,7 +9574,6 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Mgmt Tx Completion failed status %ld TxCompletion %u",
                   __func__, rc, pAdapter->mgmtTxCompletionStatus);
-        pAdapter->mgmtTxCompletionStatus = FALSE;
 
         if (pHddCtx->isLogpInProgress)
         {
@@ -9580,6 +9582,14 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
             return -EAGAIN;
         }
 
+        if (pHddCtx->isUnloadInProgress)
+        {
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
+            return -EAGAIN;
+        }
+
+        pAdapter->mgmtTxCompletionStatus = FALSE;
         wlan_hdd_tdls_check_bmps(pAdapter);
         return -EINVAL;
     }
