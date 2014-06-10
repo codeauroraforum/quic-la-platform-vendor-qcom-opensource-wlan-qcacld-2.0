@@ -1006,9 +1006,7 @@ endif
 endif
 
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
-ifeq ($(CONFIG_DEBUG_LL),y)
 CDEFINES +=    	-DQCA_PKT_PROTO_TRACE
-endif
 endif
 
 ifneq ($(CONFIG_QCA_CLD_WLAN),)
