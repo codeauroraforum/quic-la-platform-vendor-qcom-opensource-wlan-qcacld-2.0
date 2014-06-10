@@ -2650,6 +2650,13 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
               }
               break;
 #endif
+          case eWNI_SME_CSA_OFFLOAD_EVENT:
+               if (pMsg->bodyptr)
+               {
+                   csrScanFlushBssEntry(pMac, pMsg->bodyptr);
+                   vos_mem_free(pMsg->bodyptr);
+               }
+               break;
           default:
 
              if ( ( pMsg->type >= eWNI_SME_MSG_TYPES_BEGIN )
