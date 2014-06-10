@@ -660,6 +660,7 @@ limCleanupRxPath(tpAniSirGlobal pMac, tpDphHashNode pStaDs,tpPESession psessionE
     limLog( pMac, LOG1, FL("**Initiate cleanup"));
 
     limAbortBackgroundScan( pMac );
+    psessionEntry->isCiscoVendorAP = FALSE;
 
     if (pMac->lim.gLimAddtsSent)
     {
@@ -785,16 +786,6 @@ limSendDelStaCnf(tpAniSirGlobal pMac, tSirMacAddr staDsAddr,
     {
         // Set BSSID at CFG to null
         tSirMacAddr nullAddr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        #if 0
-        if (cfgSetStr(pMac, WNI_CFG_BSSID, (tANI_U8 *) &nullAddr,
-                      sizeof(tSirMacAddr)) != eSIR_SUCCESS)
-        {
-            /// Could not update BSSID at CFG. Log error.
-            limLog(pMac, LOGP, FL("could not update BSSID at CFG"));
-
-            return;
-        }
-        #endif//TO SUPPORT BT-AMP
 
         sirCopyMacAddr(nullAddr,psessionEntry->bssId);
 
@@ -898,7 +889,8 @@ limSendDelStaCnf(tpAniSirGlobal pMac, tSirMacAddr staDsAddr,
 
         //if it is a reassoc failure to join new AP
         if((mlmStaContext.resultCode == eSIR_SME_FT_REASSOC_TIMEOUT_FAILURE) ||
-           (mlmStaContext.resultCode == eSIR_SME_FT_REASSOC_FAILURE))
+           (mlmStaContext.resultCode == eSIR_SME_FT_REASSOC_FAILURE) ||
+           (mlmStaContext.resultCode == eSIR_SME_REASSOC_TIMEOUT_RESULT_CODE))
         {
             if(mlmStaContext.resultCode != eSIR_SME_SUCCESS )
             {
@@ -1505,20 +1497,6 @@ limRestorePreReassocState(tpAniSirGlobal pMac,
 
     // 'Change' timer for future activations
     limDeactivateAndChangeTimer(pMac, eLIM_REASSOC_FAIL_TIMER);
-
-    // Update BSSID at CFG database
-    #if 0
-    if (cfgSetStr(pMac, WNI_CFG_BSSID,
-                  pMac->lim.gLimCurrentBssId,
-                  sizeof(tSirMacAddr)) != eSIR_SUCCESS)
-    {
-        /// Could not update BSSID at CFG. Log error.
-        limLog(pMac, LOGP, FL("could not update BSSID at CFG"));
-        return;
-    }
-    #endif
-
-   // chanNum = pMac->lim.gLimCurrentChannelId;
 
    /*  To support BT-AMP */
    chanNum = psessionEntry->currentOperChannel;
@@ -2505,6 +2483,7 @@ limAddSta(
     if(pAddStaParams->vhtCapable)
     {
         pAddStaParams->vhtTxChannelWidthSet = pStaDs->vhtSupportedChannelWidthSet;
+        pAddStaParams->vhtSupportedRxNss = pStaDs->vhtSupportedRxNss;
         pAddStaParams->vhtTxBFCapable =
 #ifdef FEATURE_WLAN_TDLS
         (( STA_ENTRY_PEER == pStaDs->staType ) || (STA_ENTRY_TDLS_PEER == pStaDs->staType)) ?
@@ -3931,6 +3910,7 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
             PELOGE(limLog(pMac, LOGE, FL("Couldn't get assoc id for "
                        "MAC ADDR: " MAC_ADDRESS_STR),
                        MAC_ADDR_ARRAY(pAddBssParams->staContext.staMac));)
+            return eSIR_FAILURE;
         }
 
         if(!pMac->psOffloadEnabled)
@@ -3966,6 +3946,7 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
             if (psessionEntry->vhtCapability && pBeaconStruct->VHTCaps.present)
             {
                 pAddBssParams->staContext.vhtCapable = 1;
+                pAddBssParams->staContext.vhtSupportedRxNss = pStaDs->vhtSupportedRxNss;
                 if ((pAssocRsp->VHTCaps.suBeamFormerCap ||
                      pAssocRsp->VHTCaps.muBeamformerCap) &&
                      psessionEntry->txBFIniFeatureEnabled)

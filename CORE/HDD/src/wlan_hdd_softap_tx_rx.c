@@ -549,6 +549,7 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
    v_U8_t proto_type = 0;
 #endif /* QCA_PKT_PROTO_TRACE */
 
+   ++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
    /* Prevent this funtion to be called during SSR since TL context may
       not be reinitialized at this time which will lead crash. */
    if (pHddCtx->isLogpInProgress)
@@ -558,9 +559,20 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       goto drop_pkt;
    }
 
-   pDestMacAddress = (v_MACADDR_t*)skb->data;
+   /*
+    * If the device is operating on a DFS Channel
+    * then check if SAP is in CAC WAIT state and
+    * drop the packets. In CAC WAIT state device
+    * is expected not to transmit any frames.
+    * SAP starts Tx only after the BSS START is
+    * done.
+    */
+   if (pHddApCtx->dfs_cac_block_tx)
+   {
+        goto drop_pkt;
+   }
 
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
+   pDestMacAddress = (v_MACADDR_t*)skb->data;
 
    VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_INFO,
               "%s: enter", __func__);
@@ -617,33 +629,14 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        {
           netif_tx_stop_all_queues(dev);
           vos_timer_start(&pAdapter->tx_flow_control_timer,
-                          WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
+                          WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
        }
    }
 #endif /* defined(QCA_LL_TX_FLOW_CT) && !defined(CONFIG_HL_SUPPORT) */
 
    //Get TL AC corresponding to Qdisc queue index/AC.
    ac = hdd_QdiscAcToTlAC[skb->queue_mapping];
-
-#if defined (IPA_OFFLOAD)
-   if(!(NBUF_OWNER_ID(skb) == IPA_NBUF_OWNER_ID)) {
-#endif
-   // Check if the buffer has enough header room
-   skb = skb_unshare(skb, GFP_ATOMIC);
-   if (!skb)
-       goto drop_pkt;
-
-   if (skb_headroom(skb) < dev->hard_header_len) {
-       struct sk_buff *tmp;
-       tmp = skb;
-       skb = skb_realloc_headroom(tmp, dev->hard_header_len);
-       dev_kfree_skb(tmp);
-       if (!skb)
-           goto drop_pkt;
-   }
-#if defined (IPA_OFFLOAD)
-   }
-#endif
+   ++pAdapter->hdd_stats.hddTxRxStats.txXmitClassifiedAC[ac];
 
 #ifdef QCA_PKT_PROTO_TRACE
    if ((hddCtxt->cfg_ini->gEnableDebugLog & VOS_PKT_TRAC_TYPE_EAPOL) ||
@@ -662,6 +655,9 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       }
    }
 #endif /* QCA_PKT_PROTO_TRACE */
+   pAdapter->stats.tx_bytes += skb->len;
+   ++pAdapter->stats.tx_packets;
+   ++pAdapter->hdd_stats.hddTxRxStats.pkt_tx_count;
 
    if (WLANTL_SendSTA_DataFrame((WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
                                  STAId, skb
@@ -672,12 +668,9 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
         VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_WARN,
                   "%s: Failed to send packet to txrx for staid:%d",
                   __func__, STAId);
+        ++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
         goto drop_pkt;
    }
-
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitClassifiedAC[ac];
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitQueued;
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitQueuedAC[ac];
 
    dev->trans_start = jiffies;
 
@@ -689,7 +682,6 @@ drop_pkt:
 
    ++pAdapter->stats.tx_dropped;
    ++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
    kfree_skb(skb);
 
    return NETDEV_TX_OK;
@@ -1830,6 +1822,7 @@ VOS_STATUS hdd_softap_rx_mul_packet_cbk(v_VOID_t *vosContext,
    while(buf)
    {
       next_buf = adf_nbuf_queue_next(buf);
+      adf_nbuf_set_next(buf, NULL); /* Add NULL terminator */
       status = hdd_softap_rx_packet_cbk(vosContext, buf, staId);
       if(!VOS_IS_STATUS_SUCCESS(status))
       {

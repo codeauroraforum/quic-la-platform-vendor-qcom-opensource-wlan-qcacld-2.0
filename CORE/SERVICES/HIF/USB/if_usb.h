@@ -34,6 +34,7 @@
 #include <linux/semaphore.h>
 #endif
 #include <linux/interrupt.h>
+#include <linux/reboot.h>
 
 /*
  * There may be some pending tx frames during platform suspend.
@@ -73,6 +74,8 @@ struct hif_usb_softc {
 	u16 devid;
 	struct targetdef_s *targetdef;
 	struct hostdef_s *hostdef;
+	struct usb_interface *interface;
+	struct notifier_block reboot_notifier;  /* default mode before reboot */
 };
 #if defined(CONFIG_ATH_PROCFS_DIAG_SUPPORT)
 int athdiag_procfs_init(void *scn);
@@ -92,5 +95,7 @@ void hif_init_adf_ctx(adf_os_device_t adf_dev, void *ol_sc);
 extern int pktlogmod_init(void *context);
 extern void pktlogmod_exit(void *context);
 #endif
+
+void hif_get_hw_info(void *ol_sc, u32 *version, u32 *revision);
 
 #endif /* __ATH_USB_H__ */

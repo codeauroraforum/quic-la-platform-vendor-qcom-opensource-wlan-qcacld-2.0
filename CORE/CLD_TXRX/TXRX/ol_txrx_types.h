@@ -675,7 +675,9 @@ struct ol_txrx_pdev_t {
 		u_int32_t tx_threshold;
 		/* stores time in ms of on and off phase for each throttle level*/
 		int throttle_time_ms[THROTTLE_LEVEL_MAX][THROTTLE_PHASE_MAX];
-	} tx_throttle_ll;
+		/* mark as true if traffic is paused due to thermal throttling */
+		a_bool_t is_paused;
+	} tx_throttle;
 };
 
 struct ol_txrx_vdev_t {
@@ -696,7 +698,7 @@ struct ol_txrx_vdev_t {
 	TAILQ_ENTRY(ol_txrx_vdev_t) vdev_list_elem;
 
 	/* ol_txrx_peer list */
-	TAILQ_HEAD(, ol_txrx_peer_t) peer_list;
+	TAILQ_HEAD(peer_list_t, ol_txrx_peer_t) peer_list;
 	/* last real peer created for this vdev (not "self" pseudo-peer) */
 	struct ol_txrx_peer_t *last_real_peer;
 

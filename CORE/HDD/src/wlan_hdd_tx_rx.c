@@ -986,40 +986,15 @@ int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
    //Get TL AC corresponding to Qdisc queue index/AC.
    ac = hdd_QdiscAcToTlAC[skb->queue_mapping];
 
-#ifdef IPA_OFFLOAD
-   if(!(NBUF_OWNER_ID(skb) == IPA_NBUF_OWNER_ID)) {
-#endif
-
-   /* Check if the buffer has enough header room */
-   skb = skb_unshare(skb, GFP_ATOMIC);
-   if (!skb)
-       goto drop_pkt;
-
-   if (skb_headroom(skb) < dev->hard_header_len) {
-       struct sk_buff *tmp;
-       tmp = skb;
-       skb = skb_realloc_headroom(tmp, dev->hard_header_len);
-       dev_kfree_skb(tmp);
-       if (!skb)
-           goto drop_pkt;
-   }
-#ifdef IPA_OFFLOAD
-   }
-#endif
    //user priority from IP header, which is already extracted and set from
    //select_queue call back function
    up = skb->priority;
 
    ++pAdapter->hdd_stats.hddTxRxStats.txXmitClassifiedAC[ac];
-
 #ifdef HDD_WMM_DEBUG
    VOS_TRACE( VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_FATAL,
               "%s: Classified as ac %d up %d", __func__, ac, up);
 #endif // HDD_WMM_DEBUG
-
-
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitQueued;
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitQueuedAC[ac];
 
    if (HDD_PSB_CHANGED == pAdapter->psbChanged)
    {
@@ -1091,6 +1066,10 @@ int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       }
    }
 #endif /* QCA_PKT_PROTO_TRACE */
+
+   pAdapter->stats.tx_bytes += skb->len;
+   ++pAdapter->stats.tx_packets;
+   ++pAdapter->hdd_stats.hddTxRxStats.pkt_tx_count;
 
    /*
     * TODO: Should we stop net queues when txrx returns non-NULL?.
@@ -2029,6 +2008,7 @@ void hdd_tx_rx_pkt_cnt_stat_timer_handler( void *phddctx)
     hdd_station_ctx_t *pHddStaCtx = NULL;
     hdd_context_t *pHddCtx = (hdd_context_t *)phddctx;
     hdd_config_t  *cfg_param = pHddCtx->cfg_ini;
+    tpAniSirGlobal pMac = PMAC_STRUCT(phddctx->hHal);
     VOS_STATUS status;
     v_U8_t staId = 0;
     v_U8_t fconnected = 0;
@@ -2101,7 +2081,7 @@ void hdd_tx_rx_pkt_cnt_stat_timer_handler( void *phddctx)
                                        cfg_param->txRxThresholdForSplitScan) ||
                     (pAdapter->hdd_stats.hddTxRxStats.pkt_rx_count >
                                        cfg_param->txRxThresholdForSplitScan) ||
-                    pHddCtx->drvr_miracast)
+                    pMac->fMiracastSessionPresent)
                 {
                     pAdapter->hdd_stats.hddTxRxStats.pkt_tx_count = 0;
                     pAdapter->hdd_stats.hddTxRxStats.pkt_rx_count = 0;
@@ -2315,6 +2295,7 @@ VOS_STATUS hdd_rx_mul_packet_cbk(v_VOID_t *vosContext,
    while(buf)
    {
       next_buf = adf_nbuf_queue_next(buf);
+      adf_nbuf_set_next(buf, NULL); /* Add NULL terminator */
       status = hdd_rx_packet_cbk(vosContext, buf, staId);
       if(!VOS_IS_STATUS_SUCCESS(status))
       {

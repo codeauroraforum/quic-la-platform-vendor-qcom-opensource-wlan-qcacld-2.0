@@ -50,6 +50,10 @@
 #include <wlan_hdd_tgt_cfg.h>
 #endif
 
+#ifdef QCA_WIFI_2_0
+#define FW_MODULE_LOG_LEVEL_STRING_LENGTH  (255)
+#endif
+
 //Number of items that can be configured
 #define MAX_CFG_INI_ITEMS   512
 
@@ -305,6 +309,16 @@ typedef enum
 #define CFG_DOT11_MODE_DEFAULT                 eHDD_DOT11_MODE_11n
 #endif
 
+#define CFG_SAP_DOT11_MODE_NAME                "gSapDot11Mode"
+#define CFG_SAP_DOT11_MODE_MIN                 eHDD_DOT11_MODE_AUTO
+#ifdef WLAN_FEATURE_11AC
+#define CFG_SAP_DOT11_MODE_MAX                 eHDD_DOT11_MODE_11ac
+#define CFG_SAP_DOT11_MODE_DEFAULT             eHDD_DOT11_MODE_11ac
+#else
+#define CFG_SAP_DOT11_MODE_MAX                 eHDD_DOT11_MODE_11b_ONLY
+#define CFG_SAP_DOT11_MODE_DEFAULT             eHDD_DOT11_MODE_11n
+#endif
+
 #define CFG_CHANNEL_BONDING_MODE_24GHZ_NAME    "gChannelBondingMode24GHz"
 #define CFG_CHANNEL_BONDING_MODE_MIN           WNI_CFG_CHANNEL_BONDING_MODE_STAMIN
 #define CFG_CHANNEL_BONDING_MODE_MAX           WNI_CFG_CHANNEL_BONDING_MODE_STAMAX
@@ -382,11 +396,6 @@ typedef enum
 #define CFG_SHORT_PREAMBLE_MIN                 WNI_CFG_SHORT_PREAMBLE_STAMIN
 #define CFG_SHORT_PREAMBLE_MAX                 WNI_CFG_SHORT_PREAMBLE_STAMAX
 #define CFG_SHORT_PREAMBLE_DEFAULT             WNI_CFG_SHORT_PREAMBLE_STADEF
-
-#define CFG_IBSS_AUTO_BSSID_NAME               "gAutoIbssBssid"
-#define CFG_IBSS_AUTO_BSSID_MIN                WNI_CFG_IBSS_AUTO_BSSID_STAMIN
-#define CFG_IBSS_AUTO_BSSID_MAX                WNI_CFG_IBSS_AUTO_BSSID_STAMAX
-#define CFG_IBSS_AUTO_BSSID_DEFAULT            WNI_CFG_IBSS_AUTO_BSSID_STADEF
 
 #define CFG_IBSS_BSSID_NAME                    "gIbssBssid"
 #define CFG_IBSS_BSSID_MIN                     "000000000000"
@@ -814,7 +823,7 @@ typedef enum
 #define CFG_FAST_TRANSITION_ENABLED_NAME                    "FastTransitionEnabled"
 #define CFG_FAST_TRANSITION_ENABLED_NAME_MIN                (0)
 #define CFG_FAST_TRANSITION_ENABLED_NAME_MAX                (1)
-#define CFG_FAST_TRANSITION_ENABLED_NAME_DEFAULT            (0) //disabled
+#define CFG_FAST_TRANSITION_ENABLED_NAME_DEFAULT            (1) //Enabled
 
 /* This parameter is used to decide whether to Roam or not.
  * AP1 is the currently associated AP and AP2 is chosen for roaming.
@@ -853,9 +862,11 @@ typedef enum
 #define CFG_ROAM_SCAN_N_PROBES_DEFAULT                      (2)
 
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME                        "gRoamScanHomeAwayTime"
-#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (3)
+#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (0)   // 0 for disable
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_MAX                    (300)
 #define CFG_ROAM_SCAN_HOME_AWAY_TIME_DEFAULT                (CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN)
+                                                                  // disabled by default
+
 #endif /* (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR) */
 
 #ifdef FEATURE_WLAN_OKC
@@ -1382,6 +1393,11 @@ typedef enum
 #define CFG_ENABLE_HOST_ARPOFFLOAD_MAX          ( 1 )
 #define CFG_ENABLE_HOST_ARPOFFLOAD_DEFAULT      ( 0 )
 
+#define CFG_ENABLE_HOST_SSDP_NAME              "ssdp"
+#define CFG_ENABLE_HOST_SSDP_MIN               ( 0 )
+#define CFG_ENABLE_HOST_SSDP_MAX               ( 1 )
+#define CFG_ENABLE_HOST_SSDP_DEFAULT           ( 1 )
+
 #define CFG_ENABLE_HOST_NSOFFLOAD_NAME         "hostNSOffload"
 #define CFG_ENABLE_HOST_NSOFFLOAD_MIN          ( 0 )
 #define CFG_ENABLE_HOST_NSOFFLOAD_MAX          ( 1 )
@@ -1572,6 +1588,30 @@ typedef enum
 #define CFG_DEFAULT_RATE_INDEX_24GH_MIN           ( 1 )
 #define CFG_DEFAULT_RATE_INDEX_24GH_MAX           ( 9 )
 #define CFG_DEFAULT_RATE_INDEX_24GH_DEFAULT       ( 1 )
+
+
+#define CFG_ENABLE_PACKET_LOG            "gEnablePacketLog"
+#define CFG_ENABLE_PACKET_LOG_MIN        ( 0 )
+#define CFG_ENABLE_PACKET_LOG_MAX        ( 1 )
+#define CFG_ENABLE_PACKET_LOG_DEFAULT    ( 0 )
+
+#ifdef QCA_WIFI_2_0
+#define CFG_ENABLE_FW_LOG_TYPE            "gFwDebugLogType"
+#define CFG_ENABLE_FW_LOG_TYPE_MIN        ( 0 )
+#define CFG_ENABLE_FW_LOG_TYPE_MAX        ( 255 )
+#define CFG_ENABLE_FW_LOG_TYPE_DEFAULT    ( 0 )
+
+
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL          "gFwDebugLogLevel"
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MIN      ( 0 )
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MAX      ( 255 )
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_DEFAULT  ( 0 )
+
+
+#define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
+#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  ""
+#endif
+
 
 /*
  * VOS Trace Enable Control
@@ -1987,6 +2027,11 @@ typedef enum
 #define CFG_TDLS_EXTERNAL_CONTROL_MIN               (0)
 #define CFG_TDLS_EXTERNAL_CONTROL_MAX               (1)
 #define CFG_TDLS_EXTERNAL_CONTROL_DEFAULT           (0)
+
+#define CFG_TDLS_OFF_CHANNEL_SUPPORT_ENABLE          "gEnableTDLSOffChannel"
+#define CFG_TDLS_OFF_CHANNEL_SUPPORT_ENABLE_MIN      (0)
+#define CFG_TDLS_OFF_CHANNEL_SUPPORT_ENABLE_MAX      (1)
+#define CFG_TDLS_OFF_CHANNEL_SUPPORT_ENABLE_DEFAULT  (0)
 #endif
 
 #ifdef WLAN_ACTIVEMODE_OFFLOAD_FEATURE
@@ -2386,14 +2431,20 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_NAME                "gEnableStrictRegulatoryForFCC"
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MIN                 ( 0 )
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MAX                 ( 1 )
-#define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_DEFAULT             ( 1 )
+#define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_DEFAULT             ( 0 )
 
 #ifdef QCA_WIFI_2_0
 #define CFG_SAP_MAX_OFFLOAD_PEERS                  "gMaxOffloadPeers"
 #define CFG_SAP_MAX_OFFLOAD_PEERS_MIN              (2)
 #define CFG_SAP_MAX_OFFLOAD_PEERS_MAX              (5)
 #define CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT          (2)
+
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS          "gMaxOffloadReorderBuffs"
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_MIN      (0)
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_MAX      (3)
+#define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_DEFAULT  (2)
 #endif
+
 //Enable Memory Debug
 #ifdef MEMORY_DEBUG
 #define CFG_ENABLE_MEMORY_DEBUG_NAME             "gEnableMemoryDebug"
@@ -2414,6 +2465,40 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ROAMING_DFS_CHANNEL_MIN                 (0)
 #define CFG_ROAMING_DFS_CHANNEL_MAX                 (1)
 #define CFG_ROAMING_DFS_CHANNEL_DEFAULT             (0)
+
+#ifdef MSM_PLATFORM
+#define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD           "gBusBandwidthHighThreshold"
+#define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_DEFAULT   ( 40000 )
+#define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_MIN       ( 10000 )
+#define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_MAX       ( 4294967295UL )
+
+#define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD         "gBusBandwidthMediumThreshold"
+#define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_DEFAULT ( 10000 )
+#define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_MIN     ( 3000 )
+#define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_MAX     ( 40000 )
+
+#define CFG_BUS_BANDWIDTH_LOW_THRESHOLD            "gBusBandwidthLowThreshold"
+#define CFG_BUS_BANDWIDTH_LOW_THRESHOLD_DEFAULT    ( 3000 )
+#define CFG_BUS_BANDWIDTH_LOW_THRESHOLD_MIN        ( 0 )
+#define CFG_BUS_BANDWIDTH_LOW_THRESHOLD_MAX        ( 10000 )
+
+#define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL         "gBusBandwidthComputeInterval"
+#define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_DEFAULT ( 3000 )
+#define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_MIN     ( 1000 )
+#define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_MAX     ( 10000 )
+#endif /* MSM_PLATFORM */
+
+#ifdef WLAN_FEATURE_11W
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_NAME                    "pmfSaQueryMaxRetries"
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_DEFAULT                 ( 5  )
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_MIN                     ( 0 )
+#define CFG_PMF_SA_QUERY_MAX_RETRIES_MAX                     ( 20  )
+
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_NAME                 "pmfSaQueryRetryInterval"
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_DEFAULT              ( 200    )
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MIN                  ( 0 )
+#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX                  ( 2000  )
+#endif
 
 /*---------------------------------------------------------------------------
   Type declarations
@@ -2502,7 +2587,6 @@ typedef struct
    v_U32_t       nScanAgeTimeCPS;
    v_U8_t        nRssiCatGap;
    v_BOOL_t      fIsShortPreamble;
-   v_BOOL_t      fIsAutoIbssBssid;
    v_MACADDR_t   IbssBssid;
    v_U32_t       AdHocChannel5G;
    v_U32_t       AdHocChannel24G;
@@ -2683,6 +2767,7 @@ typedef struct
    v_BOOL_t                    bSingleTidRc;
    v_U8_t                      mcastBcastFilterSetting;
    v_BOOL_t                    fhostArpOffload;
+   v_BOOL_t                    ssdp;
 #ifdef FEATURE_WLAN_SCAN_PNO
    v_BOOL_t                    PnoOffload;
 #endif
@@ -2802,9 +2887,11 @@ typedef struct
 #endif
    v_U32_t                     fTDLSUapsdMask;    // what ACs to setup U-APSD for TDLS
    v_U32_t                     fEnableTDLSBufferSta;
+   v_U32_t                     fEnableTDLSSleepSta;
    v_U32_t                     fTDLSPuapsdInactivityTimer;
    v_U32_t                     fTDLSRxFrameThreshold;
    v_BOOL_t                    fTDLSExternalControl;
+   v_U32_t                     fEnableTDLSOffChannel;
 #endif
 #ifdef WLAN_SOFTAP_VSTA_FEATURE
    v_BOOL_t                    fEnableVSTASupport;
@@ -2911,6 +2998,7 @@ typedef struct
    v_U16_t                     acsBandSwitchThreshold;
    v_BOOL_t                    gEnableStrictRegulatoryForFCC;
    v_U8_t                      apMaxOffloadPeers;
+   v_U8_t                      apMaxOffloadReorderBuffs;
    v_BOOL_t                    advertiseConcurrentOperation;
    v_BOOL_t                    enableHystereticMode;
 
@@ -2923,6 +3011,28 @@ typedef struct
    v_BOOL_t                    allowDFSChannelRoam;
 
    v_BOOL_t                    debugP2pRemainOnChannel;
+
+   eHddDot11Mode               sapDot11Mode;
+
+   v_BOOL_t                    enablePacketLog;
+#ifdef MSM_PLATFORM
+   v_U32_t                     busBandwidthHighThreshold;
+   v_U32_t                     busBandwidthMediumThreshold;
+   v_U32_t                     busBandwidthLowThreshold;
+   v_U32_t                     busBandwidthComputeInterval;
+#endif /* MSM_PLATFORM */
+
+#ifdef QCA_WIFI_2_0
+   /* FW debug log parameters */
+   v_U32_t     enableFwLogType;
+   v_U32_t     enableFwLogLevel;
+   v_U8_t      enableFwModuleLogLevel[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
+#endif
+
+#ifdef WLAN_FEATURE_11W
+   v_U32_t                     pmfSaQueryMaxRetries;
+   v_U32_t                     pmfSaQueryRetryInterval;
+#endif
 } hdd_config_t;
 /*---------------------------------------------------------------------------
   Function declarations and documenation
@@ -3040,5 +3150,8 @@ static __inline unsigned long utilMin( unsigned long a, unsigned long b )
 void hdd_update_tgt_cfg(void *context, void *param);
 void hdd_dfs_indicate_radar(void *context, void *param);
 #endif /* QCA_WIFI_2_0 && !QCA_WIFI_ISOC */
+
+VOS_STATUS hdd_string_to_u8_array( char *str, tANI_U8 *intArray, tANI_U8 *len,
+               tANI_U8 intArrayMaxLen );
 
 #endif

@@ -86,7 +86,6 @@
 #endif
 #include "wlan_hdd_power.h"
 #include "qwlan_version.h"
-#include <vos_power.h>
 #include "wlan_hdd_host_offload.h"
 #include "wlan_hdd_keep_alive.h"
 #ifdef WLAN_FEATURE_PACKET_FILTERING
@@ -106,6 +105,7 @@
 #include "sme_Api.h"
 #include "wlan_qct_wda.h"
 #include "vos_trace.h"
+#include "wlan_hdd_assoc.h"
 
 #ifdef QCA_PKT_PROTO_TRACE
 #include "vos_packet.h"
@@ -244,8 +244,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_EARLY_RX_DRIFT_SAMPLE          82
 /* Private ioctl for packet power save */
 #define WE_PPS_5G_EBT                         83
-
-#define WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD    84
+#define WE_SET_FW_CRASH_INJECT                84
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
@@ -369,9 +368,6 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_DUMP_CHANINFO_START     13
 #define WE_DUMP_CHANINFO           14
 #define WE_DUMP_WATCHDOG           15
-#ifdef DEBUG
-#define WE_SET_FW_CRASH_INJECT     16
-#endif
 #endif
 
 /* Private ioctls and their sub-ioctls */
@@ -388,6 +384,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #endif
 
 #define WE_MTRACE_DUMP_CMD    8
+#define WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD    9
 
 #ifdef FEATURE_WLAN_TDLS
 #undef  MAX_VAR_ARGS
@@ -526,19 +523,33 @@ enum {
 static const struct qwlan_hw qwlan_hw_list[] = {
     {
         .id = AR6320_REV1_VERSION,
+        .subid = 0,
         .name = "QCA6174_REV1",
     },
     {
         .id = AR6320_REV1_1_VERSION,
+        .subid = 0x1,
         .name = "QCA6174_REV1_1",
     },
     {
         .id = AR6320_REV1_3_VERSION,
+        .subid = 0x2,
         .name = "QCA6174_REV1_3",
     },
     {
         .id = AR6320_REV2_1_VERSION,
+        .subid = 0x4,
         .name = "QCA6174_REV2_1",
+    },
+    {
+        .id = AR6320_REV2_1_VERSION,
+        .subid = 0x5,
+        .name = "QCA6174_REV2_2",
+    },
+    {
+        .id = AR6320_REV3_VERSION,
+        .subid = 0x8,
+        .name = "QCA6174_REV3",
     }
 };
 
@@ -620,7 +631,7 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
     tSirVersionString wcnss_SW_version;
     const char *pSWversion;
     const char *pHWversion;
-    v_U32_t CRMId = 0;
+    v_U32_t MSPId = 0, mSPId = 0, SIId = 0, CRMId = 0;
 #ifndef QCA_WIFI_2_0
     VOS_STATUS status;
     tSirVersionString wcnss_HW_version;
@@ -642,10 +653,14 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
         pHddContext->target_fw_version);
 
     pSWversion = wcnss_SW_version;
+    MSPId = (pHddContext->target_fw_version & 0xf0000000) >> 28;
+    mSPId = (pHddContext->target_fw_version & 0xf000000) >> 24;
+    SIId = (pHddContext->target_fw_version & 0xf00000) >> 20;
     CRMId = pHddContext->target_fw_version & 0x7fff;
 
     for (i = 0; i < ARRAY_SIZE(qwlan_hw_list); i++) {
-        if (pHddContext->target_hw_version == qwlan_hw_list[i].id) {
+        if (pHddContext->target_hw_version == qwlan_hw_list[i].id &&
+            pHddContext->target_hw_revision == qwlan_hw_list[i].subid) {
             pHWversion = qwlan_hw_list[i].name;
             break;
         }
@@ -679,15 +694,19 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
 
     if (wrqu) {
         wrqu->data.length = scnprintf(extra, WE_MAX_STR_LEN,
-                                     "Host SW:%s, FW:%s BuildId:%d, HW:%s",
+                                     "Host SW:%s, FW:%d.%d.%d.%d, HW:%s",
                                      QWLAN_VERSIONSTR,
-                                     pSWversion,
+                                     MSPId,
+                                     mSPId,
+                                     SIId,
                                      CRMId,
                                      pHWversion);
     } else {
-        pr_info("Host SW:%s, FW:%s BuildId:%d, HW:%s\n",
+        pr_info("Host SW:%s, FW:%d.%d.%d.%d, HW:%s\n",
                 QWLAN_VERSIONSTR,
-                pSWversion,
+                MSPId,
+                mSPId,
+                SIId,
                 CRMId,
                 pHWversion);
     }
@@ -982,7 +1001,7 @@ VOS_STATUS wlan_hdd_get_rssi(hdd_adapter_t *pAdapter, v_S7_t *rssi_value)
 
    hstatus = sme_GetRssi(pHddCtx->hHal, hdd_GetRssiCB,
                          pHddStaCtx->conn_info.staId[ 0 ],
-                         pHddStaCtx->conn_info.bssId,
+                         pHddStaCtx->conn_info.bssId, pAdapter->rssi,
                          &context, pHddCtx->pvosContext);
    if (eHAL_STATUS_SUCCESS != hstatus)
    {
@@ -1395,7 +1414,7 @@ void hdd_clearRoamProfileIe( hdd_adapter_t *pAdapter)
    pAdapter->wapi_info.nWapiMode = 0;
 #endif
 
-   vos_mem_zero((void *)(pWextState->req_bssId), WNI_CFG_BSSID_LEN);
+   vos_mem_zero((void *)(pWextState->req_bssId), VOS_MAC_ADDR_SIZE);
 
 }
 
@@ -3890,7 +3909,7 @@ static int iw_set_encodeext(struct net_device *dev,
 
     struct iw_encode_ext *ext = (struct iw_encode_ext*)extra;
 
-    v_U8_t groupmacaddr[WNI_CFG_BSSID_LEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    v_U8_t groupmacaddr[VOS_MAC_ADDR_SIZE] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
     int key_index;
     struct iw_point *encoding = &wrqu->encoding;
@@ -3957,12 +3976,12 @@ static int iw_set_encodeext(struct net_device *dev,
     if(ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY) {
       /*Key direction for group is RX only*/
        setKey.keyDirection = eSIR_RX_ONLY;
-       vos_mem_copy(setKey.peerMac,groupmacaddr,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,groupmacaddr, VOS_MAC_ADDR_SIZE);
     }
     else {
 
        setKey.keyDirection =  eSIR_TX_RX;
-       vos_mem_copy(setKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
     }
 
     /*For supplicant pae role is zero*/
@@ -4691,7 +4710,6 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
                  break;
 #endif
               case  14://reset wlan (power down/power up)
-                 vos_chipReset(NULL, VOS_FALSE, NULL, NULL, VOS_CHIP_RESET_UNKNOWN_EXCEPTION);
                  break;
               default:
                  hddLog(LOGE, "Invalid arg  %d in WE_SET_POWER IOCTL", set_value);
@@ -4857,15 +4875,6 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
 #else
            (void)sme_SetThermalLevel(hHal, set_value);
 #endif
-           break;
-        }
-
-        case WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD:
-        {
-           hddLog(LOG1, "%s: SELECTIVE_MODULE_LOG %d arg1",
-                  __func__, set_value);
-           vosTraceEnable(set_value);
-
            break;
         }
 
@@ -5889,6 +5898,16 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
                             set_value, VDEV_CMD);
             break;
        }
+#ifdef DEBUG
+        case WE_SET_FW_CRASH_INJECT:
+        {
+           hddLog(LOGE, "WE_FW_CRASH_INJECT: %d", set_value);
+           ret = process_wma_set_command((int) pAdapter->sessionId,
+                                         (int) GEN_PARAM_CRASH_INJECT,
+                                         set_value, GEN_CMD);
+           break;
+        }
+#endif
 #endif
         default:
         {
@@ -7133,6 +7152,7 @@ static int iw_setnone_getnone(struct net_device *dev, struct iw_request_info *in
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                                   "%s:LOGP in Progress. Ignore!!!", __func__);
+        msleep(1000);
         return -EBUSY;
     }
 
@@ -7315,16 +7335,6 @@ static int iw_setnone_getnone(struct net_device *dev, struct iw_request_info *in
                                           0, GEN_CMD);
             break;
         }
-#ifdef DEBUG
-        case WE_SET_FW_CRASH_INJECT:
-        {
-           hddLog(LOGE, "WE_FW_CRASH_INJECT");
-           ret = process_wma_set_command((int) pAdapter->sessionId,
-                                         (int) GEN_PARAM_CRASH_INJECT,
-                                         0, GEN_CMD);
-           break;
-        }
-#endif
 #endif
         default:
         {
@@ -7462,6 +7472,14 @@ int iw_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info
 
                 hdd_setP2pPs(dev, &p2pNoA);
 
+            }
+            break;
+
+        case WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD:
+            {
+                hddLog(LOG1, "%s: SELECTIVE_MODULE_LOG %d arg1 %d arg2",
+                        __func__, apps_args[0], apps_args[1]);
+                vosTraceEnable(apps_args[0], apps_args[1]);
             }
             break;
 
@@ -7935,7 +7953,7 @@ static int iw_qcom_set_wapi_key(struct net_device *dev, struct iw_request_info *
         case PAIRWISE_KEY:
         {
             isConnected = hdd_connIsConnected(pHddStaCtx);
-            vos_mem_copy(setKey.peerMac,&pHddStaCtx->conn_info.bssId,WNI_CFG_BSSID_LEN);
+            vos_mem_copy(setKey.peerMac,&pHddStaCtx->conn_info.bssId, VOS_MAC_ADDR_SIZE);
             break;
         }
         case GROUP_KEY:
@@ -9333,9 +9351,17 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     eCsrBand band;
+
+    VOS_STATUS status;
+    hdd_context_t *pHddCtx;
+    hdd_adapter_list_node_t *pAdapterNode, *pNext;
     eCsrBand currBand = eCSR_BAND_MAX;
+    eCsrBand connectedBand;
+
+    pAdapterNode = NULL;
+    pNext = NULL;
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
     switch(ui_band)
     {
@@ -9391,51 +9417,69 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
                 "%s: Current band value = %u, new setting %u ",
                  __func__, currBand, band);
 
-        hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
-                           eCSR_SCAN_ABORT_DUE_TO_BAND_CHANGE);
-
-        if (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))
+        status =  hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+        while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
         {
-             hdd_station_ctx_t *pHddStaCtx = &(pAdapter)->sessionCtx.station;
-             eHalStatus status = eHAL_STATUS_SUCCESS;
-             long lrc;
+            pAdapter = pAdapterNode->pAdapter;
+            hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
+            hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
+                           eCSR_SCAN_ABORT_DUE_TO_BAND_CHANGE);
+            connectedBand =
+                hdd_connGetConnectedBand(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter));
 
-             /* STA already connected on current band, So issue disconnect first,
-                        * then change the band*/
+            /* Handling is done only for STA and P2P */
+            if ( band != eCSR_BAND_ALL &&
+                 ((pAdapter->device_mode == WLAN_HDD_INFRA_STATION) ||
+                 (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)) &&
+                 (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))) &&
+                 (connectedBand != band))
+            {
+                 hdd_station_ctx_t *pHddStaCtx = &(pAdapter)->sessionCtx.station;
+                 eHalStatus status = eHAL_STATUS_SUCCESS;
+                 long lrc;
 
-             hddLog(VOS_TRACE_LEVEL_INFO,
-                     "%s STA connected in band %u, Changing band to %u, Issuing Disconnect",
-                        __func__, csrGetCurrentBand(hHal), band);
+                 /* STA already connected on current band, So issue disconnect
+                  * first, then change the band*/
 
-             pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
-             INIT_COMPLETION(pAdapter->disconnect_comp_var);
+                 hddLog(VOS_TRACE_LEVEL_INFO,
+                         "%s STA (Device mode=%d) connected in band %u, Changing band to %u, Issuing Disconnect",
+                            __func__, pAdapter->device_mode,
+                            currBand, band);
 
-             status = sme_RoamDisconnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
-             pAdapter->sessionId, eCSR_DISCONNECT_REASON_UNSPECIFIED);
+                 pHddStaCtx->conn_info.connState = eConnectionState_Disconnecting;
+                 INIT_COMPLETION(pAdapter->disconnect_comp_var);
 
-             if ( eHAL_STATUS_SUCCESS != status)
-             {
-                 hddLog(VOS_TRACE_LEVEL_ERROR,
-                         "%s csrRoamDisconnect failure, returned %d",
-                           __func__, (int)status );
-                 return -EINVAL;
-             }
+                 status = sme_RoamDisconnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
+                 pAdapter->sessionId, eCSR_DISCONNECT_REASON_UNSPECIFIED);
 
-             lrc = wait_for_completion_interruptible_timeout(
-                     &pAdapter->disconnect_comp_var,
-                     msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+                 if ( eHAL_STATUS_SUCCESS != status)
+                 {
+                     hddLog(VOS_TRACE_LEVEL_ERROR,
+                             "%s csrRoamDisconnect failure, returned %d",
+                               __func__, (int)status );
+                     return -EINVAL;
+                 }
 
-             if (lrc <= 0) {
+                 lrc = wait_for_completion_timeout(
+                         &pAdapter->disconnect_comp_var,
+                         msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
 
-                hddLog(VOS_TRACE_LEVEL_ERROR,"%s: %s while waiting for csrRoamDisconnect ",
-                 __func__, (0 == lrc) ? "Timeout" : "Interrupt");
+                 if (lrc == 0) {
+                    hddLog(VOS_TRACE_LEVEL_ERROR,"%s:Timeout while waiting for csrRoamDisconnect",
+                                __func__);
+                    return -ETIMEDOUT ;
+                 }
 
-                return (0 == lrc) ? -ETIMEDOUT : -EINTR;
-             }
+                 pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
+            }
+
+            sme_ScanFlushResult(hHal, pAdapter->sessionId);
+
+            status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+            pAdapterNode = pNext;
         }
 
-        sme_ScanFlushResult(hHal, pAdapter->sessionId);
-        if (eHAL_STATUS_SUCCESS != sme_SetFreqBand(hHal, (eCsrBand)band))
+        if (eHAL_STATUS_SUCCESS != sme_SetFreqBand(hHal, band))
         {
              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                      "%s: failed to set the band value to %u ",
@@ -9795,11 +9839,6 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0,
         "setStrictFCCreg" },
-
-    {   WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD,
-        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-        0,
-        "setdumplog" },
 
     /* handlers for main ioctl */
     {   WLAN_PRIV_SET_INT_GET_NONE,
@@ -10213,6 +10252,11 @@ static const struct iw_priv_args we_private_args[] = {
     {   WE_SET_EARLY_RX_DRIFT_SAMPLE,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0, "erx_dri_sample" },
+#ifdef DEBUG
+    {   WE_SET_FW_CRASH_INJECT,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "crash_inject" },
+#endif
 #endif
 
     {   WLAN_PRIV_SET_NONE_GET_INT,
@@ -10697,12 +10741,6 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         0,
         "dump_watchdog" },
-#ifdef DEBUG
-    {   WE_SET_FW_CRASH_INJECT,
-        0,
-        0,
-        "crash_inject" },
-#endif
 #endif
     /* handlers for main ioctl */
     {   WLAN_PRIV_SET_VAR_INT_GET_NONE,
@@ -10717,6 +10755,11 @@ static const struct iw_priv_args we_private_args[] = {
         "dump" },
 
     /* handlers for sub-ioctl */
+    {   WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD,
+        IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+        0,
+        "setdumplog" },
+
     {   WE_MTRACE_DUMP_CMD,
         IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
         0,

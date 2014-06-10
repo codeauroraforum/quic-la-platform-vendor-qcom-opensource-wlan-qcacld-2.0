@@ -63,6 +63,12 @@ should not be more than 2000 */
 #define TDLS_IS_CONNECTED(peer)  \
         ((eTDLS_LINK_CONNECTED == (peer)->link_status) || \
          (eTDLS_LINK_TEARING == (peer)->link_status))
+
+/* bit mask flag for tdls_option to FW */
+#define ENA_TDLS_OFFCHAN      (1 << 0)  /* TDLS Off Channel support */
+#define ENA_TDLS_BUFFER_STA   (1 << 1)  /* TDLS Buffer STA support */
+#define ENA_TDLS_SLEEP_STA    (1 << 2)  /* TDLS Sleep STA support */
+
 typedef struct
 {
     tANI_U32    tdls;
@@ -171,6 +177,11 @@ typedef struct _hddTdlsPeer_t {
     tANI_U8     uapsdQueues;
     tANI_U8     maxSp;
     tANI_U8     isBufSta;
+    tANI_U8     isOffChannelSupported;
+    tANI_U8     supported_channels_len;
+    tANI_U8     supported_channels[SIR_MAC_MAX_SUPP_CHANNELS];
+    tANI_U8     supported_oper_classes_len;
+    tANI_U8     supported_oper_classes[SIR_MAC_MAX_SUPP_OPER_CLASSES];
 #ifndef QCA_WIFI_2_0
     vos_timer_t     peerIdleTimer;
 #endif
@@ -230,9 +241,9 @@ int wlan_hdd_tdls_recv_discovery_resp(hdd_adapter_t *pAdapter, u8 *mac);
 
 int wlan_hdd_tdls_set_peer_caps(hdd_adapter_t *pAdapter,
                                 u8 *mac,
-                                tANI_U8 uapsdQueues,
-                                tANI_U8 maxSp,
-                                tANI_BOOLEAN isBufSta);
+                                tCsrStaParams *StaParams,
+                                tANI_BOOLEAN isBufSta,
+                                tANI_BOOLEAN isOffChannelSupported);
 
 int wlan_hdd_tdls_set_rssi(hdd_adapter_t *pAdapter, u8 *mac, tANI_S8 rxRssi);
 

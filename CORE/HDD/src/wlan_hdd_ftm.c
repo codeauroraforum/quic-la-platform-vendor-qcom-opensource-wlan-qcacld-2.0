@@ -67,7 +67,6 @@
 #include "i_vos_packet.h"
 #include "vos_nvitem.h"
 #include "wlan_hdd_main.h"
-#include "vos_power.h"
 #include "qwlan_version.h"
 
 #include "wlan_nv.h"
@@ -85,6 +84,7 @@
 #include "if_pci.h"
 #elif defined(HIF_USB)
 #include "if_usb.h"
+#include <linux/compat.h>
 #elif defined(HIF_SDIO)
 #include "if_ath_sdio.h"
 #endif
@@ -519,6 +519,26 @@ static FTM_STATUS ftm_status;
 
 //tpAniSirGlobal pMac;
 static tPttMsgbuffer *pMsgBuf;
+
+#if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(QCA_WIFI_FTM)
+#if defined(HIF_USB)
+#define ATH_XIOCTL_UNIFIED_UTF_CMD  0x1000
+#define ATH_XIOCTL_UNIFIED_UTF_RSP  0x1001
+#define MAX_UTF_LENGTH              1024
+typedef struct qcmbr_data_s {
+    unsigned int cmd;
+    unsigned int length;
+    unsigned char buf[MAX_UTF_LENGTH + 4];
+    unsigned int copy_to_user;
+} qcmbr_data_t;
+typedef struct qcmbr_queue_s {
+    unsigned char utf_buf[MAX_UTF_LENGTH + 4];
+    struct list_head list;
+} qcmbr_queue_t;
+LIST_HEAD(qcmbr_queue_head);
+DEFINE_SPINLOCK(qcmbr_queue_lock);
+#endif
+#endif
 
 static void _ftm_status_init(void)
 {
@@ -981,6 +1001,14 @@ static VOS_STATUS wlan_ftm_vos_close( v_CONTEXT_t vosContext )
       HTCDestroy(gpVosContext->htc_ctx);
       gpVosContext->htc_ctx = NULL;
   }
+  vosStatus = wma_wmi_service_close( vosContext );
+  if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+  {
+     VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+         "%s: Failed to close wma_wmi_service", __func__);
+     VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
+  }
+
   hif_disable_isr(gpVosContext->pHIFContext);
 #endif
 
@@ -1508,19 +1536,6 @@ int wlan_hdd_ftm_open(hdd_context_t *pHddCtx)
        goto err_nl_srv_init;
     }
 #endif
-    if (!VOS_IS_STATUS_SUCCESS(vos_chipVoteOnXOBuffer(NULL, NULL, NULL)))
-    {
-        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Failed to configure 19.2 MHz Clock", __func__);
-        goto err_nl_srv_init;
-    }
-#endif
-
-#ifdef HDD_SESSIONIZE
-    //Turn off carrier state
-    netif_carrier_off(pAdapter->dev);
-
-    //Stop the Interface TX queue. Just being safe
-    netif_tx_disable(pAdapter->dev);
 #endif
 
    pHddCtx->ftm.processingNVTable    = NV_MAX_TABLE;
@@ -1608,26 +1623,6 @@ int wlan_hdd_ftm_close(hdd_context_t *pHddCtx)
         wlan_ftm_stop(pHddCtx);
     }
 
-    //Assert Deep sleep signal now to put Libra HW in lowest power state
-    vosStatus = vos_chipAssertDeepSleep( NULL, NULL, NULL );
-    if (!VOS_IS_STATUS_SUCCESS(vosStatus))
-    {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                   "%s: Failed to assert deep sleep signal", __func__);
-        VOS_ASSERT( 0 );
-    }
-
-    //Vote off any PMIC voltage supplies
-    vosStatus = vos_chipPowerDown(NULL, NULL, NULL);
-    if (!VOS_IS_STATUS_SUCCESS(vosStatus))
-    {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                   "%s: Failed to put HW into low power", __func__);
-        VOS_ASSERT( 0 );
-     }
-
-    vos_chipVoteOffXOBuffer(NULL, NULL, NULL);
-
 #ifdef WLAN_KD_READY_NOTIFIER
     nl_srv_exit(pHddCtx->ptt_pid);
 #else
@@ -1670,6 +1665,18 @@ int wlan_hdd_ftm_close(hdd_context_t *pHddCtx)
     //Free up dynamically allocated members inside HDD Adapter
     kfree(pHddCtx->cfg_ini);
     pHddCtx->cfg_ini= NULL;
+
+#if defined(QCA_WIFI_FTM) && defined(HIF_USB)
+    spin_lock_bh(&qcmbr_queue_lock);
+    if (!list_empty(&qcmbr_queue_head)) {
+        qcmbr_queue_t *msg_buf, *tmp_buf;
+        list_for_each_entry_safe(msg_buf, tmp_buf, &qcmbr_queue_head, list) {
+            list_del(&msg_buf->list);
+            kfree(msg_buf);
+        }
+    }
+    spin_unlock_bh(&qcmbr_queue_lock);
+#endif
 
     return 0;
 
@@ -4335,6 +4342,12 @@ VOS_STATUS wlan_ftm_priv_get_ftm_version(hdd_adapter_t *pAdapter,char *pftmVer)
         return VOS_STATUS_E_FAILURE;
     }
 
+    if (!pMsgBuf) {
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+                 "%s: pMsgBuf is NULL", __func__);
+       return VOS_STATUS_E_FAILURE;
+    }
+
     vos_mem_set(pMsgBuf, sizeof(tPttMsgbuffer), 0);
     init_completion(&pHddCtx->ftm.ftm_comp_var);
     pMsgBuf->msgId = PTT_MSG_DBG_READ_REGISTER;
@@ -4460,6 +4473,12 @@ static VOS_STATUS wlan_ftm_priv_get_txrate(hdd_adapter_t *pAdapter,char *pTxRate
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                    "%s:Ftm has not started. Please start the ftm. ", __func__);
+        return VOS_STATUS_E_FAILURE;
+    }
+
+    if (!pMsgBuf) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+                   "%s: pMsgBuf is NULL", __func__);
         return VOS_STATUS_E_FAILURE;
     }
 
@@ -5507,6 +5526,141 @@ static int wlan_ftm_register_wext(hdd_adapter_t *pAdapter)
 }
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(QCA_WIFI_FTM)
+#if defined(HIF_USB)
+int wlan_hdd_qcmbr_command(hdd_adapter_t *pAdapter, qcmbr_data_t *pqcmbr_data)
+{
+    int ret = 0;
+    qcmbr_queue_t *qcmbr_buf = NULL;
+
+    switch (pqcmbr_data->cmd) {
+        case ATH_XIOCTL_UNIFIED_UTF_CMD: {
+            pqcmbr_data->copy_to_user = 0;
+            if (pqcmbr_data->length) {
+                if (wlan_hdd_ftm_testmode_cmd(pqcmbr_data->buf,
+                                              pqcmbr_data->length)
+                        != VOS_STATUS_SUCCESS) {
+                    ret = -EBUSY;
+                } else {
+                    ret = 0;
+                }
+            }
+        }
+        break;
+        case ATH_XIOCTL_UNIFIED_UTF_RSP: {
+            pqcmbr_data->copy_to_user = 1;
+            if (!list_empty(&qcmbr_queue_head)) {
+                spin_lock_bh(&qcmbr_queue_lock);
+                qcmbr_buf = list_first_entry(&qcmbr_queue_head,
+                                             qcmbr_queue_t, list);
+                list_del(&qcmbr_buf->list);
+                spin_unlock_bh(&qcmbr_queue_lock);
+                ret = 0;
+            } else {
+                ret = -1;
+            }
+
+            if (!ret) {
+                memcpy(pqcmbr_data->buf, qcmbr_buf->utf_buf,
+                       (MAX_UTF_LENGTH + 4));
+                kfree(qcmbr_buf);
+            } else {
+                ret = -EAGAIN;
+            }
+        }
+        break;
+    }
+
+    return ret;
+}
+
+#ifdef CONFIG_COMPAT
+static int wlan_hdd_qcmbr_compat_ioctl(hdd_adapter_t *pAdapter,
+                                       struct ifreq *ifr)
+{
+    qcmbr_data_t *qcmbr_data;
+    int ret = 0;
+
+    qcmbr_data = kzalloc(sizeof(qcmbr_data_t), GFP_KERNEL);
+    if (qcmbr_data == NULL)
+        return -ENOMEM;
+
+    if (copy_from_user(qcmbr_data, ifr->ifr_data, sizeof(*qcmbr_data))) {
+        ret = -EFAULT;
+        goto exit;
+    }
+
+    ret = wlan_hdd_qcmbr_command(pAdapter, qcmbr_data);
+    if (qcmbr_data->copy_to_user) {
+        ret = copy_to_user(ifr->ifr_data, qcmbr_data->buf,
+                           (MAX_UTF_LENGTH + 4));
+    }
+
+exit:
+    kfree(qcmbr_data);
+    return ret;
+}
+#else /* CONFIG_COMPAT */
+static int wlan_hdd_qcmbr_compat_ioctl(hdd_adapter_t *pAdapter,
+                                       struct ifreq *ifr)
+{
+   return 0;
+}
+#endif /* CONFIG_COMPAT */
+
+static int wlan_hdd_qcmbr_ioctl(hdd_adapter_t *pAdapter, struct ifreq *ifr)
+{
+    qcmbr_data_t *qcmbr_data;
+    int ret = 0;
+
+    qcmbr_data = kzalloc(sizeof(qcmbr_data_t), GFP_KERNEL);
+    if (qcmbr_data == NULL)
+        return -ENOMEM;
+
+    if (copy_from_user(qcmbr_data, ifr->ifr_data, sizeof(*qcmbr_data))) {
+        ret = -EFAULT;
+        goto exit;
+    }
+
+    ret = wlan_hdd_qcmbr_command(pAdapter, qcmbr_data);
+    if (qcmbr_data->copy_to_user) {
+        ret = copy_to_user(ifr->ifr_data, qcmbr_data->buf,
+                           (MAX_UTF_LENGTH + 4));
+    }
+
+exit:
+    kfree(qcmbr_data);
+    return ret;
+}
+
+int wlan_hdd_qcmbr_unified_ioctl(hdd_adapter_t *pAdapter, struct ifreq *ifr)
+{
+    int ret = 0;
+
+    if (is_compat_task()) {
+        ret = wlan_hdd_qcmbr_compat_ioctl(pAdapter, ifr);
+    } else {
+        ret = wlan_hdd_qcmbr_ioctl(pAdapter, ifr);
+    }
+
+    return ret;
+}
+
+void WLANQCMBR_McProcessMsg(v_VOID_t *message)
+{
+    qcmbr_queue_t *qcmbr_buf = NULL;
+    u_int32_t data_len;
+
+    data_len = *((u_int32_t *)message) + sizeof(u_int32_t);
+    qcmbr_buf = kzalloc(sizeof(qcmbr_queue_t), GFP_KERNEL);
+    if (qcmbr_buf != NULL) {
+        memcpy(qcmbr_buf->utf_buf, message, data_len);
+        spin_lock_bh(&qcmbr_queue_lock);
+        list_add_tail(&(qcmbr_buf->list), &qcmbr_queue_head);
+        spin_unlock_bh(&qcmbr_queue_lock);
+    }
+}
+#endif
+
 VOS_STATUS WLANFTM_McProcessMsg (v_VOID_t *message)
 {
     void *data;
@@ -5518,8 +5672,12 @@ VOS_STATUS WLANFTM_McProcessMsg (v_VOID_t *message)
     data_len = *((u_int32_t *)message);
     data = (u_int32_t *)message + 1;
 
+#if defined(HIF_USB)
+    WLANQCMBR_McProcessMsg(message);
+#else
 #ifdef CONFIG_NL80211_TESTMODE
     wlan_hdd_testmode_rx_event(data, (size_t)data_len);
+#endif
 #endif
 
     vos_mem_free(message);

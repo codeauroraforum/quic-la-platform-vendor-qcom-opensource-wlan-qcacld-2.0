@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -38,33 +38,17 @@
 #ifdef __KERNEL__
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
-#include <linux/config.h>
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
-#include <linux/autoconf.h>
-#else
 #include <generated/autoconf.h>
-#endif
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/jiffies.h>
-#endif
 #include <linux/timer.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
-#include <asm/semaphore.h>
-#else
 #include <linux/semaphore.h>
-#endif
-#ifdef KERNEL_2_4
-#include <asm/arch/irq.h>
-#include <asm/irq.h>
-#endif
 
 #include <linux/cache.h>
 //#include <linux/kthread.h>
@@ -119,10 +103,10 @@ void a_meminfo_report(int clear);
 #define A_NETIF_RX_NI(skb)              do { a_meminfo_del(skb);  netif_rx_ni(skb); } while (0)
 #else
 #define a_meminfo_report(_c)
-#define A_MALLOC(size)                  kmalloc((size), GFP_KERNEL)
+#define A_MALLOC(size)                  adf_os_mem_alloc(NULL, size)
 #define A_MALLOC_NOWAIT(size)           kmalloc((size), GFP_ATOMIC)
 #define a_mem_trace(ptr)
-#define A_FREE(addr)                    kfree(addr)
+#define A_FREE(addr)                    adf_os_mem_free(addr)
 #define A_NETIF_RX(skb)                 netif_rx(skb)
 #define A_NETIF_RX_NI(skb)              netif_rx_ni(skb)
 #endif
@@ -176,21 +160,12 @@ typedef spinlock_t                      A_MUTEX_T;
  * Timer Functions
  */
 #define A_MDELAY(msecs)                 mdelay(msecs)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30)
-#define A_MSLEEP(msecs)                                                    \
-{                                                                          \
-    set_current_state(TASK_INTERRUPTIBLE);                                 \
-    if (!kthread_should_stop()) { schedule_timeout((HZ*(msecs)) / 1000); } \
-    set_current_state(TASK_RUNNING);                                       \
-}
-#else
 #define A_MSLEEP(msecs)                                                    \
 {                                                                          \
     set_current_state(TASK_INTERRUPTIBLE);                                 \
     schedule_timeout((HZ * (msecs)) / 1000);                               \
     set_current_state(TASK_RUNNING);                                       \
 }
-#endif
 
 typedef struct timer_list               A_TIMER;
 

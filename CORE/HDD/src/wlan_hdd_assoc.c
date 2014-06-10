@@ -179,6 +179,24 @@ v_BOOL_t hdd_connIsConnected( hdd_station_ctx_t *pHddStaCtx )
    return( hdd_connGetConnectionState( pHddStaCtx, NULL ) );
 }
 
+eCsrBand hdd_connGetConnectedBand( hdd_station_ctx_t *pHddStaCtx )
+{
+   v_U8_t staChannel = 0;
+
+   if ( eConnectionState_Associated == pHddStaCtx->conn_info.connState )
+   {
+       staChannel = pHddStaCtx->conn_info.operationChannel;
+   }
+
+   if ( staChannel > 0 && staChannel < 14 )
+       return eCSR_BAND_24;
+   else if (staChannel >= 36 && staChannel <= 165 )
+      return eCSR_BAND_5G;
+   else  /* If station is not connected return as eCSR_BAND_ALL */
+      return eCSR_BAND_ALL;
+}
+
+
 //TODO - Not used anyhwere. Can be removed.
 #if 0
 //
@@ -697,14 +715,9 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
 #ifdef CONFIG_CNSS
         /* start timer in sta/p2p_cli */
         spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-        pHddCtx->sta_cnt++;
-        pAdapter->connection++;
-        if (1 == pAdapter->connection) {
-            pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
-            pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
-        }
-        if (1 == pHddCtx->sta_cnt)
-            hdd_start_bus_bw_compute_timer(pAdapter);
+        pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
+        pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
+        hdd_start_bus_bw_compute_timer(pAdapter);
         spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 #endif
 #endif
@@ -747,14 +760,9 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
 #ifdef MSM_PLATFORM
         /* stop timer in sta/p2p_cli */
         spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-        pHddCtx->sta_cnt--;
-        pAdapter->connection--;
-        if (0 == pAdapter->connection) {
-            pAdapter->prev_tx_packets = 0;
-            pAdapter->prev_rx_packets = 0;
-        }
-        if (0 == pHddCtx->sta_cnt)
-            hdd_stop_bus_bw_compute_timer(pAdapter);
+        pAdapter->prev_tx_packets = 0;
+        pAdapter->prev_rx_packets = 0;
+        hdd_stop_bus_bw_compute_timer(pAdapter);
         spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 #endif
     }
@@ -1273,10 +1281,10 @@ void hdd_PerformRoamSetKeyComplete(hdd_adapter_t *pAdapter)
     roamInfo.fAuthRequired = FALSE;
     vos_mem_copy(roamInfo.bssid,
                  pHddStaCtx->roam_info.bssid,
-                 WNI_CFG_BSSID_LEN);
+                 VOS_MAC_ADDR_SIZE);
     vos_mem_copy(roamInfo.peerMac,
                  pHddStaCtx->roam_info.peerMac,
-                 WNI_CFG_BSSID_LEN);
+                 VOS_MAC_ADDR_SIZE);
 
     halStatus = hdd_RoamSetKeyCompleteHandler(pAdapter,
                                   &roamInfo,
@@ -2170,7 +2178,7 @@ static eHalStatus roamRoamConnectStatusUpdateHandler( hdd_adapter_t *pAdapter, t
          {
             pHddStaCtx->ibss_enc_key.keyDirection = eSIR_TX_RX;
             memcpy(&pHddStaCtx->ibss_enc_key.peerMac,
-                              pRoamInfo->peerMac, WNI_CFG_BSSID_LEN);
+                              pRoamInfo->peerMac, VOS_MAC_ADDR_SIZE);
 
             VOS_TRACE( VOS_MODULE_ID_HDD,
                VOS_TRACE_LEVEL_INFO_HIGH, "New peer joined set PTK encType=%d",
@@ -2620,6 +2628,16 @@ eHalStatus hdd_RoamTdlsStatusUpdateHandler(hdd_adapter_t *pAdapter,
         {
 #ifdef CONFIG_TDLS_IMPLICIT
             hddTdlsPeer_t *curr_peer;
+
+            /* ignore TDLS_SHOULD_DISCOVER if any concurrency detected */
+            if ((1 << VOS_STA_MODE) != pHddCtx->concurrency_mode)
+            {
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+                          "%s: concurrency detected. ignore SHOULD_DISCOVER",
+                          __func__);
+                status = eHAL_STATUS_FAILURE;
+                break;
+            }
 
             curr_peer = wlan_hdd_tdls_get_peer(pAdapter, pRoamInfo->peerMac);
             if (!curr_peer)
@@ -4351,9 +4369,9 @@ void hdd_indicateCckmPreAuth(hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo)
     pos += nBytes;
     freeBytes -= nBytes;
 
-    vos_mem_copy(pos, pRoamInfo->bssid, WNI_CFG_BSSID_LEN);
-    pos += WNI_CFG_BSSID_LEN;
-    freeBytes -= WNI_CFG_BSSID_LEN;
+    vos_mem_copy(pos, pRoamInfo->bssid, VOS_MAC_ADDR_SIZE);
+    pos += VOS_MAC_ADDR_SIZE;
+    freeBytes -= VOS_MAC_ADDR_SIZE;
 
     nBytes = snprintf(pos, freeBytes, " %u:%u",
              pRoamInfo->timestamp[0], pRoamInfo->timestamp[1]);

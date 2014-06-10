@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -40,6 +40,13 @@
 #include <ol_txrx_api.h>  /* ol_txrx_pdev_handle */
 
 #define HTT_TX_MUTEX_TYPE adf_os_spinlock_t
+
+#ifdef QCA_TX_HTT2_SUPPORT
+#ifndef HTC_TX_HTT2_MAX_SIZE
+/* Should sync to the target's implementation. */
+#define HTC_TX_HTT2_MAX_SIZE    (120)
+#endif
+#endif /* QCA_TX_HTT2_SUPPORT */
 
 struct htt_pdev_t;
 
@@ -92,6 +99,12 @@ struct htt_pdev_t {
     adf_os_device_t osdev;
 
     HTC_ENDPOINT_ID htc_endpoint;
+
+#ifdef QCA_TX_HTT2_SUPPORT
+    HTC_ENDPOINT_ID htc_tx_htt2_endpoint;
+    u_int16_t htc_tx_htt2_max_size;
+#endif /* QCA_TX_HTT2_SUPPORT */
+
 #ifdef ATH_11AC_TXCOMPACT
     HTT_TX_MUTEX_TYPE		txnbufq_mutex;
     adf_nbuf_queue_t		txnbufq;
@@ -172,6 +185,7 @@ struct htt_pdev_t {
         u_int32_t dbg_mpdu_count;
         u_int32_t dbg_ring_idx;
         u_int32_t dbg_refill_cnt;
+        u_int32_t dbg_sync_success;
 #endif
     } rx_ring;
     int rx_desc_size_hl;

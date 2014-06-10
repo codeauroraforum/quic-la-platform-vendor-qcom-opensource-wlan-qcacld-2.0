@@ -146,7 +146,7 @@ typedef enum
 }eCsrPhyMode;
 
 
-typedef tANI_U8 tCsrBssid[WNI_CFG_BSSID_LEN];
+typedef tANI_U8 tCsrBssid[VOS_MAC_ADDR_SIZE];
 
 typedef enum
 {
@@ -259,6 +259,10 @@ typedef struct tagCsrStaParams
     tSirVHTCap VHTCap;
     tANI_U8    uapsd_queues;
     tANI_U8    max_sp;
+    tANI_U8    supported_channels_len;
+    tANI_U8    supported_channels[SIR_MAC_MAX_SUPP_CHANNELS];
+    tANI_U8    supported_oper_classes_len;
+    tANI_U8    supported_oper_classes[SIR_MAC_MAX_SUPP_OPER_CLASSES];
 }tCsrStaParams;
 
 typedef struct tagCsrScanRequest
@@ -350,7 +354,7 @@ typedef struct tagCsrEseCckmIe
 
 typedef struct tagCsrScanResultFilter
 {
-    tCsrBSSIDs BSSIDs;    //each bssid has a length of WNI_CFG_BSSID_LEN (6)
+    tCsrBSSIDs BSSIDs;    //each bssid has a length of VOS_MAC_ADDR_SIZE (6)
     tCsrSSIDs SSIDs;
     tCsrChannelInfo ChannelInfo;
     tCsrAuthList authType;
@@ -1421,7 +1425,12 @@ typedef struct tagCsrLinkEstablishParams
     tANI_U8 uapsdQueues;
     tANI_U8 maxSp;
     tANI_U8 isBufSta;
+    tANI_U8 isOffChannelSupported;
     tANI_U8 isResponder;
+    tANI_U8 supportedChannelsLen;
+    tANI_U8 supportedChannels[SIR_MAC_MAX_SUPP_CHANNELS];
+    tANI_U8 supportedOperClassesLen;
+    tANI_U8 supportedOperClasses[SIR_MAC_MAX_SUPP_OPER_CLASSES];
 }tCsrTdlsLinkEstablishParams;
 
 typedef struct tagCsrTdlsSendMgmt
@@ -1684,5 +1693,5 @@ eHalStatus csrSetBand(tHalHandle hHal, eCsrBand eBand);
 ---------------------------------------------------------------------------*/
 eCsrBand csrGetCurrentBand (tHalHandle hHal);
 
-typedef void (*csrReadyToSuspendCallback)(void *pContext);
+typedef void (*csrReadyToSuspendCallback)(void *pContext, boolean suspended);
 #endif

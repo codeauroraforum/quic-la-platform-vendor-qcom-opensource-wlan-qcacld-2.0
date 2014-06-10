@@ -108,6 +108,8 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #define PMAC_STRUCT( _hHal )  (  (tpAniSirGlobal)_hHal )
 
 #define ANI_DRIVER_TYPE(pMac)     (((tpAniSirGlobal)(pMac))->gDriverType)
+
+#define IS_MIRACAST_SESSION_PRESENT(pMac)     (((tpAniSirGlobal)(pMac))->fMiracastSessionPresent ? 1 : 0)
 // -------------------------------------------------------------------
 // Bss Qos Caps bit map definition
 #define LIM_BSS_CAPS_OFFSET_HCF 0
@@ -668,6 +670,7 @@ typedef struct sAniSirLim
 #ifdef FEATURE_WLAN_TDLS
     tANI_U8 gLimTDLSBufStaEnabled;
     tANI_U8 gLimTDLSUapsdMask;
+    tANI_U8 gLimTDLSOffChannelEnabled;
 #endif
 
 
@@ -928,6 +931,7 @@ tLimMlmOemDataRsp       *gpLimMlmOemDataRsp;
     tANI_U8 gLimDfsTargetChanNum;
     tANI_U8 fOffloadScanPending; /*Flag to track offload scan */
     tANI_U8 fOffloadScanP2PSearch; /*Flag to track the p2p search */
+    tANI_U8 fOffloadScanP2PListen; /*Flag to track the p2p listen */
     tANI_U8 probeCounter;
     tANI_U8 maxProbe;
 } tAniSirLim, *tpAniSirLim;
@@ -1000,6 +1004,7 @@ typedef struct sMacOpenParameters
  * offload currently, rest bits are unused
  */
     tANI_U8 olIniInfo;
+    v_BOOL_t ssdp;
     /*
      * DFS Phyerror Filtering offload status from ini
      * 0 indicates offload disabled
@@ -1011,6 +1016,9 @@ typedef struct sMacOpenParameters
 
     /* max offload peer */
     tANI_U8 apMaxOffloadPeers;
+
+    /* max offload reorder buffs */
+    tANI_U8 apMaxOffloadReorderBuffs;
 
 } tMacOpenParameters;
 
@@ -1112,6 +1120,9 @@ typedef struct sAniSirGlobal
     tANI_U16 mgmtSeqNum;
 #endif /* QCA_WIFI_2_0 */
     v_BOOL_t enable5gEBT;
+    /* Miracast session 0-Disabled, 1-Source, 2-sink*/
+    tANI_U8 fMiracastSessionPresent;
+
 } tAniSirGlobal;
 
 typedef enum

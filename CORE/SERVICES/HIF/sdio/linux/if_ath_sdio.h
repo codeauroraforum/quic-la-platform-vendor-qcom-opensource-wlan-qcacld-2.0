@@ -64,6 +64,15 @@ struct ath_hif_sdio_softc {
     struct hostdef_s *hostdef;
 };
 
+#if defined(CONFIG_ATH_PROCFS_DIAG_SUPPORT)
+int athdiag_procfs_init(void *scn);
+void athdiag_procfs_remove(void);
+#else
+static inline int athdiag_procfs_init(void *scn) { return 0; }
+static inline void athdiag_procfs_remove(void) { return; }
+#endif
+
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)
 #define DMA_MAPPING_ERROR(dev, addr) dma_mapping_error((addr))
 #else
@@ -87,5 +96,6 @@ void hif_reset_soc(void *ol_sc);
 void hif_register_tbl_attach(u32 hif_type);
 void target_register_tbl_attach(u32 target_type);
 
+void hif_get_hw_info(void *ol_sc, u32 *version, u32 *revision);
 
 #endif /* __IF_ATH_SDIO_H__*/

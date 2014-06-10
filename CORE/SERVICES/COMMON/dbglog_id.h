@@ -291,7 +291,8 @@ extern "C" {
 #define WHAL_ERROR_POWER_EDGE_PWR_TPSCALE          46
 #define WHAL_ERROR_POWER_CHAN_REGALLOW             47
 #define WHAL_ERROR_WAIT_REG_TIMEOUT                48
-#define WHAL_DBGID_DEFINITION_END                  49
+#define WHAL_ERROR_XTAL_SET                        49
+#define WHAL_DBGID_DEFINITION_END                  50
 
 #define COEX_DEBUGID_START              0
 #define BTCOEX_DBG_MCI_1                            1
@@ -565,6 +566,8 @@ extern "C" {
 #define SCAN_FWLOG_EVENT_PREEMPTED                  9
 #define SCAN_FWLOG_EVENT_RESTARTED                  10
 #define SCAN_FWLOG_EVENT_COMPLETED                  11
+#define SCAN_SM_REQ_NEXT_CH                         12
+#define SCAN_DBGID_DEFINITION_END                   13
 
 #define BEACON_EVENT_SWBA_SEND_FAILED               0
 #define BEACON_EVENT_EARLY_RX_BMISS_STATUS          1
@@ -681,7 +684,9 @@ extern "C" {
 #define WAL_DBGID_SMPS_DISABLE                      63
 #define WAL_DBGID_SMPS_ENABLE_HW_CNTRL              64
 #define WAL_DBGID_SMPS_SWSEL_CHAINMASK              65
-#define WAL_DBGID_DEFINITION_END                    66
+#define WAL_DBGID_SUSPEND                           66
+#define WAL_DBGID_RESUME                            67
+#define WAL_DBGID_DEFINITION_END                    68
 
 #define ANI_DBGID_POLL                               0
 #define ANI_DBGID_CONTROL                            1
@@ -877,7 +882,8 @@ extern "C" {
 #define ROAM_SUITABLE_AP_EVENT    33
 #define ROAM_RSN_IE_PARSE_ERROR   34
 #define ROAM_WPA_IE_PARSE_ERROR   35
-#define ROAM_DBGID_DEFINITION_END 36
+#define ROAM_SCAN_CMD_FROM_HOST   36
+#define ROAM_DBGID_DEFINITION_END 37
 
 /* DATA_TXRX module DBGIDs*/
 #define DATA_TXRX_DBGID_DEFINITION_START         0
@@ -1020,6 +1026,15 @@ extern "C" {
 #define RMC_SET_MODE                           14
 #define RMC_SET_ACTION_PERIOD                  15
 #define RMC_DBGID_DEFINITION_END               16
+
+/* Stats Module DBGIDs */
+#define WLAN_STATS_DBGID_DEFINITION_START                0
+#define WLAN_STATS_DBGID_EST_LINKSPEED_VDEV_EN_DIS       1
+#define WLAN_STATS_DBGID_EST_LINKSPEED_CHAN_TIME_START   2
+#define WLAN_STATS_DBGID_EST_LINKSPEED_CHAN_TIME_END     3
+#define WLAN_STATS_DBGID_EST_LINKSPEED_CALC              4
+#define WLAN_STATS_DBGID_EST_LINKSPEED_UPDATE_HOME_CHAN  5
+#define WLAN_STATS_DBGID_DEFINITION_END                  6
 
 #ifdef __cplusplus
 }

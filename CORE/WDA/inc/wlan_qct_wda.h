@@ -1263,6 +1263,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 #ifdef WLAN_FEATURE_11AC
 #define WDA_UPDATE_OP_MODE         SIR_HAL_UPDATE_OP_MODE
+#define WDA_UPDATE_RX_NSS          SIR_HAL_UPDATE_RX_NSS
 #define WDA_UPDATE_MEMBERSHIP      SIR_HAL_UPDATE_MEMBERSHIP
 #define WDA_UPDATE_USERPOS         SIR_HAL_UPDATE_USERPOS
 #endif
@@ -1335,6 +1336,12 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
 
 #define WDA_MODEM_POWER_STATE_IND SIR_HAL_MODEM_POWER_STATE_IND
+
+#define WDA_VDEV_STOP_IND           SIR_HAL_VDEV_STOP_IND
+
+#ifdef WLAN_FEATURE_STATS_EXT
+#define WDA_STATS_EXT_REQUEST              SIR_HAL_STATS_EXT_REQUEST
+#endif
 
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);

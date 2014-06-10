@@ -141,11 +141,12 @@ int hdd_hostapd_open (struct net_device *dev)
        goto done;
    }
 
+   WLAN_HDD_GET_AP_CTX_PTR(pAdapter)->dfs_cac_block_tx = VOS_TRUE;
+
    //Turn ON carrier state
    netif_carrier_on(dev);
    //Enable all Tx queues
    netif_tx_start_all_queues(dev);
-
 done:
    EXIT();
    return 0;
@@ -624,6 +625,9 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                             pSapEvent->sapevt.sapStartBssCompleteEvent.operatingChannel,
                               pSapEvent->sapevt.sapStartBssCompleteEvent.staId);
 
+            pHostapdAdapter->sessionId =
+                    pSapEvent->sapevt.sapStartBssCompleteEvent.sessionId;
+
             pHostapdState->vosStatus = pSapEvent->sapevt.sapStartBssCompleteEvent.status;
             vos_status = vos_event_set(&pHostapdState->vosEvent);
 
@@ -635,8 +639,17 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             else
             {
                 pHddApCtx->uBCStaId = pSapEvent->sapevt.sapStartBssCompleteEvent.staId;
-                pHostapdAdapter->sessionId =
-                        pSapEvent->sapevt.sapStartBssCompleteEvent.sessionId;
+
+#ifdef QCA_LL_TX_FLOW_CT
+                vos_timer_init(&pHostapdAdapter->tx_flow_control_timer,
+                               VOS_TIMER_TYPE_SW,
+                               hdd_tx_resume_timer_expired_handler,
+                               pHostapdAdapter);
+                WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
+                               hdd_tx_resume_cb,
+                               pHostapdAdapter->sessionId,
+                               (void *)pHostapdAdapter);
+#endif
                 //@@@ need wep logic here to set privacy bit
                 vos_status = hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
@@ -732,10 +745,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             if (VOS_TRUE == pHddCtx->dfs_radar_found)
             {
                pHddCtx->dfs_radar_found = VOS_FALSE;
-               if (WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode)
-               {
-                  netif_tx_start_all_queues(dev);
-               }
+            }
+            else
+            {
+                if (NV_CHANNEL_DFS !=
+                    vos_nv_getChannelEnabledState(pHddApCtx->operatingChannel))
+                {
+                    pHddApCtx->dfs_cac_block_tx = VOS_FALSE;
+                }
             }
 
             //Fill the params for sending IWEVCUSTOM Event with SOFTAP.enabled
@@ -786,6 +803,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
         case eSAP_DFS_CAC_END:
             wlan_hdd_send_svc_nlink_msg(WLAN_SVC_DFS_CAC_END_IND);
+            pHddApCtx->dfs_cac_block_tx = VOS_FALSE;
             break;
 
         case eSAP_DFS_RADAR_DETECT:
@@ -898,6 +916,18 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                vos_pkt_trace_buf_update("HA:ASSOC");
             }
 #endif /* QCA_PKT_PROTO_TRACE */
+
+#ifdef MSM_PLATFORM
+            /* start timer in sap/p2p_go */
+            if (pHddApCtx->bApActive == VOS_FALSE)
+            {
+                spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+                pHostapdAdapter->prev_tx_packets = pHostapdAdapter->stats.tx_packets;
+                pHostapdAdapter->prev_rx_packets = pHostapdAdapter->stats.rx_packets;
+                hdd_start_bus_bw_compute_timer(pHostapdAdapter);
+                spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+            }
+#endif
             pHddApCtx->bApActive = VOS_TRUE;
             // Stop AP inactivity timer
             if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_RUNNING)
@@ -911,30 +941,29 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 #endif
             vos_wake_lock_timeout_acquire(&pHddCtx->sap_wake_lock,
                                           HDD_SAP_WAKE_LOCK_DURATION);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
             {
-                struct station_info staInfo;
-                v_U16_t iesLen =  pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.iesLen;
+               struct station_info staInfo;
+               v_U16_t iesLen =  pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.iesLen;
 
-                memset(&staInfo, 0, sizeof(staInfo));
-                if (iesLen <= MAX_ASSOC_IND_IE_LEN )
-                {
-                    staInfo.assoc_req_ies =
-                        (const u8 *)&pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.ies[0];
-                    staInfo.assoc_req_ies_len = iesLen;
+               memset(&staInfo, 0, sizeof(staInfo));
+               if (iesLen <= MAX_ASSOC_IND_IE_LEN )
+               {
+                  staInfo.assoc_req_ies =
+                     (const u8 *)&pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.ies[0];
+                  staInfo.assoc_req_ies_len = iesLen;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,31))
-                    staInfo.filled |= STATION_INFO_ASSOC_REQ_IES;
+                  staInfo.filled |= STATION_INFO_ASSOC_REQ_IES;
 #endif
-                    cfg80211_new_sta(dev,
-                                 (const u8 *)&pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac.bytes[0],
-                                 &staInfo, GFP_KERNEL);
-                }
-                else
-                {
-                    hddLog(LOGE, FL(" Assoc Ie length is too long"));
-                }
-             }
-#endif
+                  cfg80211_new_sta(dev,
+                        (const u8 *)&pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac.bytes[0],
+                        &staInfo, GFP_KERNEL);
+               }
+               else
+               {
+                  hddLog(LOGE, FL(" Assoc Ie length is too long"));
+               }
+            }
+
             pScanInfo =  &pHostapdAdapter->scan_info;
             // Lets do abort scan to ensure smooth authentication for client
             if ((pScanInfo != NULL) && pScanInfo->mScanPending)
@@ -952,22 +981,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                   pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.timingMeasCap,
                   pHostapdAdapter->sessionId, pHddApCtx->operatingChannel);
             }
-#endif
-
-#ifdef MSM_PLATFORM
-#ifdef CONFIG_CNSS
-            /* start timer in sap/p2p_go */
-            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-            pHddCtx->sta_cnt++;
-            pHostapdAdapter->connection++;
-            if (1 == pHostapdAdapter->connection) {
-                pHostapdAdapter->prev_tx_packets = pHostapdAdapter->stats.tx_packets;
-                pHostapdAdapter->prev_rx_packets = pHostapdAdapter->stats.rx_packets;
-            }
-            if (1 == pHddCtx->sta_cnt)
-                hdd_start_bus_bw_compute_timer(pHostapdAdapter);
-            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
-#endif
 #endif
 
 #ifdef FEATURE_GREEN_AP
@@ -1043,11 +1056,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_TRUE);
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
             cfg80211_del_sta(dev,
                             (const u8 *)&pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac.bytes[0],
                             GFP_KERNEL);
-#endif
+
             //Update the beacon Interval if it is P2P GO
             vos_status = hdd_change_mcc_go_beacon_interval(pHostapdAdapter);
             if (VOS_STATUS_SUCCESS != vos_status)
@@ -1068,16 +1080,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
 #ifdef MSM_PLATFORM
             /*stop timer in sap/p2p_go */
-            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-            pHddCtx->sta_cnt--;
-            pHostapdAdapter->connection--;
-            if (0 == pHostapdAdapter->connection) {
+            if (pHddApCtx->bApActive == FALSE)
+            {
+                spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
                 pHostapdAdapter->prev_tx_packets = 0;
                 pHostapdAdapter->prev_rx_packets = 0;
-            }
-            if (0 == pHddCtx->sta_cnt)
                 hdd_stop_bus_bw_compute_timer(pHostapdAdapter);
-            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+                spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+            }
 #endif
 #ifdef FEATURE_GREEN_AP
             hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_DEL_STA_EVENT);
@@ -1358,6 +1368,75 @@ int hdd_softap_unpackIE(
 }
 
 int
+static iw_softap_set_ini_cfg(struct net_device *dev,
+                          struct iw_request_info *info,
+                          union iwreq_data *wrqu, char *extra)
+{
+    VOS_STATUS vstatus;
+    int ret = 0; /* success */
+    hdd_adapter_t *pAdapter = (netdev_priv(dev));
+    hdd_context_t *pHddCtx;
+
+    if (pAdapter == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                                        "%s: pAdapter is NULL!", __func__);
+        return -EINVAL;
+    }
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (ret != 0)
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: HDD context is not valid", __func__);
+        return ret;
+    }
+
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+              "%s: Received data %s", __func__, extra);
+
+    vstatus = hdd_execute_config_command(pHddCtx, extra);
+    if (VOS_STATUS_SUCCESS != vstatus)
+    {
+        ret = -EINVAL;
+    }
+
+    return ret;
+}
+
+int
+static iw_softap_get_ini_cfg(struct net_device *dev,
+                          struct iw_request_info *info,
+                          union iwreq_data *wrqu, char *extra)
+{
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+    hdd_context_t *pHddCtx;
+    int ret = 0;
+
+    if (pAdapter == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                                        "%s: pAdapter is NULL!", __func__);
+        return -EINVAL;
+    }
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (ret != 0)
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: HDD context is not valid", __func__);
+        return ret;
+    }
+
+    hdd_cfg_get_config(pHddCtx, extra, QCSAP_IOCTL_MAX_STR_LEN);
+    wrqu->data.length = strlen(extra)+1;
+
+    return 0;
+}
+
+int
 static iw_softap_setparam(struct net_device *dev,
                           struct iw_request_info *info,
                           union iwreq_data *wrqu, char *extra)
@@ -1610,10 +1689,10 @@ static iw_softap_setparam(struct net_device *dev,
 #ifdef DEBUG
          case QCSAP_FW_CRASH_INJECT:
              {
-                  hddLog(LOGE, "WE_FW_CRASH_INJECT");
+                  hddLog(LOGE, "WE_FW_CRASH_INJECT %d", set_value);
                   ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
                                                 (int)GEN_PARAM_CRASH_INJECT,
-                                                0, GEN_CMD);
+                                                set_value, GEN_CMD);
                   break;
              }
 #endif
@@ -1804,7 +1883,7 @@ static iw_softap_setparam(struct net_device *dev,
                 ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
                                 (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
                                 set_value, VDEV_CMD);
-                if (!ret) {
+                if (ret) {
                     hddLog(LOGE, "FAILED TO SET RTSCTS at SAP");
                     ret = -EIO;
                 }
@@ -2019,6 +2098,25 @@ static iw_softap_setparam(struct net_device *dev,
 #else
                   (void)sme_SetThermalLevel(hHal, set_value);
 #endif
+                  break;
+             }
+
+
+        case QCASAP_SET_DFS_IGNORE_CAC:
+             {
+                  hddLog(VOS_TRACE_LEVEL_INFO, "Set Dfs ignore CAC  %d",
+                            set_value);
+
+                  if (pHostapdAdapter->device_mode != WLAN_HDD_SOFTAP)
+                       return -EINVAL;
+
+                  ret = WLANSAP_Set_Dfs_Ignore_CAC(
+#ifdef WLAN_FEATURE_MBSSID
+                                WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
+#else
+                                pVosContext,
+#endif
+                                set_value);
                   break;
              }
 
@@ -3074,7 +3172,7 @@ static int iw_set_ap_encodeext(struct net_device *dev,
     int retval = 0;
     VOS_STATUS vstatus;
     struct iw_encode_ext *ext = (struct iw_encode_ext*)extra;
-    v_U8_t groupmacaddr[WNI_CFG_BSSID_LEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    v_U8_t groupmacaddr[VOS_MAC_ADDR_SIZE] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     int key_index;
     struct iw_point *encoding = &wrqu->encoding;
     tCsrRoamSetKey  setKey;
@@ -3100,10 +3198,10 @@ static int iw_set_ap_encodeext(struct net_device *dev,
          RemoveKey.keyId = key_index;
          if(ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY) {
               /*Key direction for group is RX only*/
-             vos_mem_copy(RemoveKey.peerMac,groupmacaddr,WNI_CFG_BSSID_LEN);
+             vos_mem_copy(RemoveKey.peerMac,groupmacaddr, VOS_MAC_ADDR_SIZE);
          }
          else {
-             vos_mem_copy(RemoveKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+             vos_mem_copy(RemoveKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
          }
          switch(ext->alg)
          {
@@ -3157,17 +3255,17 @@ static int iw_set_ap_encodeext(struct net_device *dev,
     if(ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY) {
       /*Key direction for group is RX only*/
        setKey.keyDirection = eSIR_RX_ONLY;
-       vos_mem_copy(setKey.peerMac,groupmacaddr,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,groupmacaddr, VOS_MAC_ADDR_SIZE);
     }
     else {
 
        setKey.keyDirection =  eSIR_TX_RX;
-       vos_mem_copy(setKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
     }
     if(ext->ext_flags & IW_ENCODE_EXT_SET_TX_KEY)
     {
        setKey.keyDirection = eSIR_TX_DEFAULT;
-       vos_mem_copy(setKey.peerMac,ext->addr.sa_data,WNI_CFG_BSSID_LEN);
+       vos_mem_copy(setKey.peerMac,ext->addr.sa_data, VOS_MAC_ADDR_SIZE);
     }
 
     /*For supplicant pae role is zero*/
@@ -4282,6 +4380,11 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
         "setTmLevel" },
 
+    {   QCASAP_SET_DFS_IGNORE_CAC,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "setDfsIgnoreCAC" },
+
 #endif /* QCA_WIFI_2_0 */
 
   { QCSAP_IOCTL_GETPARAM, 0,
@@ -4410,6 +4513,18 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
         "dataSnapshot" },
 
+    /* Set HDD CFG Ini param */
+    {   QCSAP_IOCTL_SET_INI_CFG,
+        IW_PRIV_TYPE_CHAR | QCSAP_IOCTL_MAX_STR_LEN,
+        0,
+        "setConfig" },
+
+    /* Get HDD CFG Ini param */
+    {   QCSAP_IOCTL_GET_INI_CFG,
+        0,
+        IW_PRIV_TYPE_CHAR | QCSAP_IOCTL_MAX_STR_LEN,
+        "getConfig" },
+
     /* handlers for main ioctl */
     {   QCSAP_IOCTL_SET_TRAFFIC_MONITOR,
         IW_PRIV_TYPE_INT| IW_PRIV_SIZE_FIXED | 1,
@@ -4441,6 +4556,8 @@ static const iw_handler hostapd_private[] = {
    [QCSAP_IOCTL_SET_TX_POWER - SIOCIWFIRSTPRIV]   = iw_softap_set_tx_power,
    [QCSAP_IOCTL_SET_MAX_TX_POWER - SIOCIWFIRSTPRIV]   = iw_softap_set_max_tx_power,
    [QCSAP_IOCTL_DATAPATH_SNAP_SHOT - SIOCIWFIRSTPRIV]  =   iw_display_data_path_snapshot,
+   [QCSAP_IOCTL_SET_INI_CFG - SIOCIWFIRSTPRIV]  =  iw_softap_set_ini_cfg,
+   [QCSAP_IOCTL_GET_INI_CFG - SIOCIWFIRSTPRIV]  =  iw_softap_get_ini_cfg,
    [QCSAP_IOCTL_SET_TRAFFIC_MONITOR - SIOCIWFIRSTPRIV]  =  iw_softap_set_trafficmonitor,
 };
 const struct iw_handler_def hostapd_handler_def = {
@@ -4452,7 +4569,7 @@ const struct iw_handler_def hostapd_handler_def = {
    .private_args     = hostapd_private_args,
    .get_wireless_stats = NULL,
 };
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29)
+
 struct net_device_ops net_ops_struct  = {
     .ndo_open = hdd_hostapd_open,
     .ndo_stop = hdd_hostapd_stop,
@@ -4465,7 +4582,6 @@ struct net_device_ops net_ops_struct  = {
     .ndo_change_mtu = hdd_hostapd_change_mtu,
     .ndo_select_queue = hdd_hostapd_select_queue,
  };
-#endif
 
 int hdd_set_hostapd(hdd_adapter_t *pAdapter)
 {
@@ -4474,18 +4590,7 @@ int hdd_set_hostapd(hdd_adapter_t *pAdapter)
 
 void hdd_set_ap_ops( struct net_device *pWlanHostapdDev )
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29)
   pWlanHostapdDev->netdev_ops = &net_ops_struct;
-#else
-  pWlanHostapdDev->open = hdd_hostapd_open;
-  pWlanHostapdDev->stop = hdd_hostapd_stop;
-  pWlanHostapdDev->uninit = hdd_hostapd_uninit;
-  pWlanHostapdDev->hard_start_xmit = hdd_softap_hard_start_xmit;
-  pWlanHostapdDev->tx_timeout = hdd_softap_tx_timeout;
-  pWlanHostapdDev->get_stats = hdd_softap_stats;
-  pWlanHostapdDev->set_mac_address = hdd_hostapd_set_mac_address;
-  pWlanHostapdDev->do_ioctl = hdd_hostapd_ioctl;
-#endif
 }
 
 VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
@@ -4634,6 +4739,7 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         vos_mem_copy(pWlanHostapdDev->dev_addr, (void *)macAddr,sizeof(tSirMacAddr));
         vos_mem_copy(pHostapdAdapter->macAddressCurrent.bytes, (void *)macAddr, sizeof(tSirMacAddr));
 
+        pHostapdAdapter->offloads_configured = FALSE;
         pWlanHostapdDev->destructor = free_netdev;
         pWlanHostapdDev->ieee80211_ptr = &pHostapdAdapter->wdev ;
         pHostapdAdapter->wdev.wiphy = pHddCtx->wiphy;
@@ -4641,9 +4747,7 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         init_completion(&pHostapdAdapter->tx_action_cnf_event);
         init_completion(&pHostapdAdapter->cancel_rem_on_chan_var);
         init_completion(&pHostapdAdapter->rem_on_chan_ready_event);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
         init_completion(&pHostapdAdapter->offchannel_tx_event);
-#endif
         init_completion(&pHostapdAdapter->scan_info.scan_req_completion_event);
         init_completion(&pHostapdAdapter->scan_info.abortscan_event_var);
         vos_event_init(&pHostapdAdapter->scan_info.scan_finished_event);

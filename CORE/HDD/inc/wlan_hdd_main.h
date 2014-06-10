@@ -71,9 +71,6 @@
 /*---------------------------------------------------------------------------
   Preprocessor definitions and constants
   -------------------------------------------------------------------------*/
-/** Number of attempts to detect/remove card */
-#define LIBRA_CARD_INSERT_DETECT_MAX_COUNT      5
-#define LIBRA_CARD_REMOVE_DETECT_MAX_COUNT      5
 /** Number of Tx Queues */
 #define NUM_TX_QUEUES 4
 /** HDD's internal Tx Queue Length. Needs to be a power of 2 */
@@ -234,15 +231,6 @@
 #define HDD_MAC_ADDR_LEN    6
 #define HDD_SESSION_ID_ANY  50 //This should be same as CSR_SESSION_ID_ANY
 
-#ifdef MSM_PLATFORM
-/* Threshold value for number of packets recevied in 3sec */
-#define HDD_HIGH_BUS_BANDWIDTH_THRESHOLD_RX 40000
-#define HDD_HIGH_BUS_BANDWIDTH_THRESHOLD_TX 40000
-#define HDD_MEDIUM_BUS_BANDWIDTH_THRESHOLD_TX 5000
-#define HDD_MEDIUM_BUS_BANDWIDTH_THRESHOLD_RX 5000
-#define HDD_BUS_BANDWIDTH_COMPUTE_INTERVAL  3000
-#endif
-
 #define HDD_MIN_TX_POWER (-100) // minimum tx power
 #define HDD_MAX_TX_POWER (+100)  // maximum tx power
 
@@ -313,8 +301,12 @@ extern spinlock_t hdd_context_lock;
 /* MAX OS Q block time value in msec
  * Prevent from permanent stall, resume OS Q if timer expired */
 #define WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME 1000
+#define WLAN_SAP_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME 100
 #define WLAN_HDD_TX_FLOW_CONTROL_MAX_24BAND_CH   14
 #endif /* QCA_LL_TX_FLOW_CT */
+
+/* Max PMKSAIDS available in cache */
+#define MAX_PMKSAIDS_IN_CACHE 8
 
 typedef struct hdd_tx_rx_stats_s
 {
@@ -619,6 +611,7 @@ typedef struct hdd_remain_on_chan_ctx
   v_U32_t p2pRemOnChanTimeStamp;
   vos_timer_t hdd_remain_on_chan_timer;
   action_pkt_buffer_t action_pkt_buff;
+  v_BOOL_t hdd_remain_on_chan_cancel_in_progress;
 }hdd_remain_on_chan_ctx_t;
 
 typedef enum{
@@ -690,6 +683,10 @@ struct hdd_station_ctx
    /*Save the wep/wpa-none keys*/
    tCsrRoamSetKey ibss_enc_key;
    v_BOOL_t hdd_ReassocScenario;
+
+   /* PMKID Cache */
+   tPmkidCacheInfo PMKIDCache[MAX_PMKSAIDS_IN_CACHE];
+   tANI_U32 PMKIDCacheIndex;
 };
 
 #define BSS_STOP    0
@@ -787,6 +784,7 @@ struct hdd_ap_ctx_s
    /* SAP Context */
    v_PVOID_t sapContext;
 #endif
+   v_BOOL_t dfs_cac_block_tx;
 };
 
 struct hdd_mon_ctx_s
@@ -891,6 +889,7 @@ typedef enum
 
 
 #define WLAN_HDD_ADAPTER_MAGIC 0x574c414e //ASCII "WLAN"
+
 struct hdd_adapter_s
 {
    void *pHddCtx;
@@ -957,10 +956,8 @@ struct hdd_adapter_s
    /* completion variable for cancel remain on channel Event */
    struct completion cancel_rem_on_chan_var;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
    /* completion variable for off channel  remain on channel Event */
    struct completion offchannel_tx_event;
-#endif
    /* Completion variable for action frame */
    struct completion tx_action_cnf_event;
    /* Completion variable for remain on channel ready */
@@ -1098,6 +1095,7 @@ struct hdd_adapter_s
     unsigned int tx_flow_low_watermark;
     unsigned int tx_flow_high_watermark_offset;
 #endif /* QCA_LL_TX_FLOW_CT */
+    v_BOOL_t offloads_configured;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1216,13 +1214,8 @@ struct hdd_context_s
 
    hdd_list_t hddAdapters; //List of adapters
 
-#ifdef WLAN_FEATURE_MBSSID
-   /* One per STA: 1 for RX_BCMC_STA_ID, 2 for SAP_SELF_STA_ID */
-   hdd_adapter_t *sta_to_adapter[WLAN_MAX_STA_COUNT + 4]; //One per sta. For quick reference.
-#else
-   /* One per STA: 1 for RX_BCMC_STA_ID, 1 for SAP_SELF_STA_ID */
-   hdd_adapter_t *sta_to_adapter[WLAN_MAX_STA_COUNT + 3]; //One per sta. For quick reference.
-#endif
+   /* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID, 1 for WDS_STAID */
+   hdd_adapter_t *sta_to_adapter[WLAN_MAX_STA_COUNT + VOS_MAX_NO_OF_SAP_MODE + 2]; //One per sta. For quick reference.
 
    /** Pointer for firmware image data */
    const struct firmware *fw;
@@ -1235,9 +1228,6 @@ struct hdd_context_s
 
    /** Pointer to the parent device */
    struct device *parent_dev;
-
-   pid_t  pid_sdio_claimed;
-   atomic_t sdio_claim_count;
 
    /** Config values read from qcom_cfg.ini file */
    hdd_config_t *cfg_ini;
@@ -1302,6 +1292,7 @@ struct hdd_context_s
 
 
    v_BOOL_t hdd_wlan_suspended;
+   v_BOOL_t suspended;
 
    spinlock_t filter_lock;
 
@@ -1413,13 +1404,10 @@ struct hdd_context_s
    /* DDR bus bandwidth compute timer
     */
     vos_timer_t    bus_bw_timer;
-    int            cur_bus_bw;
-    v_BOOL_t       bus_bw_triggered;
+    int            cur_vote_level;
     spinlock_t     bus_bw_lock;
-    int            sta_cnt;
 #endif
 
-    v_U8_t         drvr_miracast;
     v_U8_t         issplitscan_enabled;
 
     /* VHT80 allowed*/
@@ -1436,6 +1424,8 @@ struct hdd_context_s
 
     /* defining the chip/rom version */
     v_U32_t target_hw_version;
+    /* defining the chip/rom revision */
+    v_U32_t target_hw_revision;
 #endif
     struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -1547,6 +1537,7 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
 v_BOOL_t hdd_is_valid_mac_address(const tANI_U8* pMacAddr);
 VOS_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
 void hdd_ipv4_notifier_work_queue(struct work_struct *work);
+v_BOOL_t hdd_isConnectionInProgress( hdd_context_t *pHddCtx );
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 int wlan_hdd_setIPv6Filter(hdd_context_t *pHddCtx, tANI_U8 filterType, tANI_U8 sessionId);
 #endif
@@ -1634,6 +1625,10 @@ int hdd_wlan_green_ap_enable(hdd_adapter_t *pHostapdAdapter,
         v_U8_t enable);
 void hdd_wlan_green_ap_mc(hdd_context_t *pHddCtx,
         hdd_green_ap_event_t event);
+#endif
+
+#ifdef WLAN_FEATURE_STATS_EXT
+void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
 #endif
 
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

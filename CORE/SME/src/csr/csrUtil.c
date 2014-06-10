@@ -1430,6 +1430,21 @@ tANI_U8 csrGetInfraOperationChannel( tpAniSirGlobal pMac, tANI_U8 sessionId)
     return channel;
 }
 
+tANI_BOOLEAN csrIsSessionClientAndConnected(tpAniSirGlobal pMac, tANI_U8 sessionId)
+{
+    tCsrRoamSession *pSession = NULL;
+    if (CSR_IS_SESSION_VALID( pMac, sessionId) && csrIsConnStateInfra( pMac, sessionId))
+    {
+        pSession = CSR_GET_SESSION( pMac, sessionId);
+        if (NULL != pSession->pCurRoamProfile)
+        {
+            if ((pSession->pCurRoamProfile->csrPersona == VOS_STA_MODE) ||
+                (pSession->pCurRoamProfile->csrPersona == VOS_P2P_CLIENT_MODE))
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
 //This routine will return operating channel on FIRST BSS that is active/operating to be used for concurrency mode.
 //If other BSS is not up or not connected it will return 0
 
@@ -3950,6 +3965,7 @@ tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile 
     tANI_U8 *pGroupMgmtCipherSuite;
 #endif
     tDot11fBeaconIEs *pIesLocal = pIes;
+    eCsrAuthType negAuthType = eCSR_AUTH_TYPE_UNKNOWN;
 
     smsLog(pMac, LOGW, "%s called...", __func__);
 
@@ -3965,7 +3981,7 @@ tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile 
         // See if the cyphers in the Bss description match with the settings in the profile.
         fRSNMatch = csrGetRSNInformation( hHal, &pProfile->AuthType, pProfile->negotiatedUCEncryptionType,
                                             &pProfile->mcEncryptionType, &pIesLocal->RSN,
-                                            UnicastCypher, MulticastCypher, AuthSuite, &RSNCapabilities, NULL, NULL );
+                                            UnicastCypher, MulticastCypher, AuthSuite, &RSNCapabilities, &negAuthType, NULL );
         if ( !fRSNMatch ) break;
 
         pRSNIe->IeHeader.ElementID = SIR_MAC_RSN_EID;
@@ -3997,7 +4013,12 @@ tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile 
 
         pPMK = (tCsrRSNPMKIe *)( ((tANI_U8 *)(&pAuthSuite->AuthOui[ 1 ])) + sizeof(tANI_U16) );
 
-        if( csrLookupPMKID( pMac, sessionId, pSirBssDesc->bssId, &(PMKId[0]) ) )
+        // Don't include the PMK SA IDs for CCKM associations.
+        if (
+#ifdef FEATURE_WLAN_ESE
+                (eCSR_AUTH_TYPE_CCKM_RSN != negAuthType) &&
+#endif
+              csrLookupPMKID( pMac, sessionId, pSirBssDesc->bssId, &(PMKId[0])))
         {
             pPMK->cPMKIDs = 1;
 
@@ -5249,17 +5270,17 @@ tANI_BOOLEAN csrIsSsidInList( tHalHandle hHal, tSirMacSSid *pSsid, tCsrSSIDs *pS
 //like to use sirCompareMacAddr
 tANI_BOOLEAN csrIsMacAddressZero( tpAniSirGlobal pMac, tCsrBssid *pMacAddr )
 {
-    tANI_U8 bssid[WNI_CFG_BSSID_LEN] = {0, 0, 0, 0, 0, 0};
+    tANI_U8 bssid[VOS_MAC_ADDR_SIZE] = {0, 0, 0, 0, 0, 0};
 
-    return (vos_mem_compare(bssid, pMacAddr, WNI_CFG_BSSID_LEN));
+    return (vos_mem_compare(bssid, pMacAddr, VOS_MAC_ADDR_SIZE));
 }
 
 //like to use sirCompareMacAddr
 tANI_BOOLEAN csrIsMacAddressBroadcast( tpAniSirGlobal pMac, tCsrBssid *pMacAddr )
 {
-    tANI_U8 bssid[WNI_CFG_BSSID_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    tANI_U8 bssid[VOS_MAC_ADDR_SIZE] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-    return(vos_mem_compare(bssid, pMacAddr, WNI_CFG_BSSID_LEN));
+    return(vos_mem_compare(bssid, pMacAddr, VOS_MAC_ADDR_SIZE));
 }
 
 

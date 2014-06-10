@@ -163,6 +163,10 @@ void limUpdateAssocStaDatas(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpSirAsso
            return;
        }
 
+#ifdef WLAN_FEATURE_11AC
+        pStaDs->vhtSupportedRxNss = ((pStaDs->supportedRates.vhtRxMCSMap & MCSMAPMASK2x2)
+                                                                == MCSMAPMASK2x2) ? 1 : 2;
+#endif
        //If one of the rates is 11g rates, set the ERP mode.
        if ((phyMode == WNI_CFG_PHY_MODE_11G) && sirIsArate(pStaDs->supportedRates.llaRates[0] & 0x7f))
            pStaDs->erpEnabled = eHAL_SET;
@@ -384,16 +388,6 @@ limProcessAssocRspFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tANI_U8 sub
         vos_mem_free(pBeaconStruct);
         return;
     }
-#if 0
-    if (wlan_cfgGetStr(pMac, WNI_CFG_BSSID, currentBssId, &cfg) !=
-                                eSIR_SUCCESS)
-    {
-        /// Could not get BSSID from CFG. Log error.
-        limLog(pMac, LOGP, FL("could not retrieve BSSID"));
-        vos_mem_free(pBeaconStruct);
-        return;
-    }
-#endif //TO SUPPORT BT-AMP
     sirCopyMacAddr(currentBssId,psessionEntry->bssId);
 
     if (subType == LIM_ASSOC)

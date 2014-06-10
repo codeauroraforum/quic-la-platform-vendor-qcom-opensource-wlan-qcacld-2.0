@@ -139,7 +139,10 @@
 #define WMA_HW_DEF_SCAN_MAX_DURATION	  30000 /* 30 secs */
 
 /* Max offchannel duration */
-#define WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS 5
+#define WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS  (5)
+#define WMA_SCAN_NPROBES_DEFAULT            (2)
+#define WMA_SCAN_IDLE_TIME_DEFAULT          (25)
+#define WMA_P2P_SCAN_MAX_BURST_DURATION     (120)
 
 /* Roaming default values
  * All time and period values are in milliseconds.
@@ -579,6 +582,7 @@ typedef struct {
 	u_int8_t is_fw_assert;
 	struct wma_wow wow;
 	u_int8_t no_of_suspend_ind;
+	u_int8_t no_of_resume_ind;
 
 	/* Have a back up of arp info to send along
 	 * with ns info suppose if ns also enabled
@@ -604,6 +608,7 @@ typedef struct {
 	 * offload currently, rest bits are unused
 	 */
 	u_int8_t ol_ini_info;
+	v_BOOL_t ssdp;
         u_int8_t ibss_started;
         tSetBssKeyParams ibsskey_info;
 
@@ -614,6 +619,7 @@ typedef struct {
 #endif
 	vos_wake_lock_t wow_wake_lock;
 	int wow_nack;
+	u_int32_t ap_client_cnt;
 
 	vos_timer_t wma_scan_comp_timer;
 	scan_timer_info wma_scan_timer_info;
@@ -1262,7 +1268,6 @@ VOS_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, u_int32_t vdev_id,
 VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq,
 				v_S7_t first_rssi);
 
-#ifdef FEATURE_WLAN_SCAN_PNO
 
 #define WMA_NLO_FREQ_THRESH          1000         /* in MHz */
 #define WMA_SEC_TO_MSEC(sec)         (sec * 1000) /* sec to msec */
@@ -1270,13 +1275,14 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq,
 /* Default rssi threshold defined in CFG80211 */
 #define WMA_RSSI_THOLD_DEFAULT   -300
 
+#ifdef FEATURE_WLAN_SCAN_PNO
 #define WMA_PNO_WAKE_LOCK_TIMEOUT		(30 * 1000) /* in msec */
+#endif
 #define WMA_AUTH_REQ_RECV_WAKE_LOCK_TIMEOUT	(50 * 1000) /* in msec */
 #define WMA_ASSOC_REQ_RECV_WAKE_LOCK_DURATION	(30 * 1000) /* in msec */
 #define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION	(30 * 1000) /* in msec */
 #define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION	(30 * 1000) /* in msec */
 
-#endif
 
 /* U-APSD maximum service period of peer station */
 enum uapsd_peer_param_max_sp {

@@ -126,6 +126,10 @@ void PopulateDot11fLinkIden(tpAniSirGlobal pMac, tpPESession psessionEntry,
 void PopulateDot11fTdlsExtCapability(tpAniSirGlobal pMac,
                                     tDot11fIEExtCap *extCapability) ;
 
+void PopulateDot11fTdlsOffchannelParams(tpAniSirGlobal pMac,
+          tpPESession psessionEntry,
+          tDot11fIESuppChannels *suppChannels,
+          tDot11fIESuppOperatingClasses *suppOperClasses);
 void limLogVHTCap(tpAniSirGlobal pMac,
                               tDot11fIEVHTCaps *pDot11f);
 tSirRetStatus limPopulateVhtMcsSet(tpAniSirGlobal pMac,
@@ -955,6 +959,7 @@ static void PopulateDot11fTdlsHtVhtCap(tpAniSirGlobal pMac, uint32 selfDot11Mode
         {
             /* Include VHT Capability IE */
             PopulateDot11fVHTCaps( pMac, psessionEntry, vhtCap );
+            vhtCap->suBeamformeeCap = 0;
         }
         else
         {
@@ -1045,6 +1050,10 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
     PopulateDot11fTdlsHtVhtCap( pMac, selfDot11Mode, &tdlsDisRsp.HTCaps,
                                &tdlsDisRsp.VHTCaps, psessionEntry );
 
+    if ( 1 == pMac->lim.gLimTDLSOffChannelEnabled )
+        PopulateDot11fTdlsOffchannelParams( pMac, psessionEntry,
+                                            &tdlsDisRsp.SuppChannels,
+                                            &tdlsDisRsp.SuppOperatingClasses);
     /*
      * now we pack it.  First, how much space are we going to need?
      */
@@ -1331,6 +1340,10 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
     PopulateDotfTdlsVhtAID( pMac, selfDot11Mode, peerMac,
                             &tdlsSetupReq.AID, psessionEntry );
 
+    if ( 1 == pMac->lim.gLimTDLSOffChannelEnabled )
+        PopulateDot11fTdlsOffchannelParams( pMac, psessionEntry,
+                                            &tdlsSetupReq.SuppChannels,
+                                            &tdlsSetupReq.SuppOperatingClasses);
     /*
      * now we pack it.  First, how much space are we going to need?
      */
@@ -1756,6 +1769,10 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
     PopulateDotfTdlsVhtAID( pMac, selfDot11Mode, peerMac,
                             &tdlsSetupRsp.AID, psessionEntry );
 
+    if ( 1 == pMac->lim.gLimTDLSOffChannelEnabled )
+        PopulateDot11fTdlsOffchannelParams( pMac, psessionEntry,
+                                            &tdlsSetupRsp.SuppChannels,
+                                            &tdlsSetupRsp.SuppOperatingClasses);
     tdlsSetupRsp.Status.status = setupStatus ;
 
     /*
@@ -2437,8 +2454,8 @@ limTdlsPopulateDot11fVHTCaps(tpAniSirGlobal pMac,
     pDot11f->shortGI160and80plus80MHz =  uVHTCapabilityInfo.vhtCapInfo.shortGI160and80plus80MHz;
     pDot11f->txSTBC =  uVHTCapabilityInfo.vhtCapInfo.txSTBC;
     pDot11f->rxSTBC =  uVHTCapabilityInfo.vhtCapInfo.rxSTBC;
-    pDot11f->suBeamFormerCap =  uVHTCapabilityInfo.vhtCapInfo.suBeamFormerCap;
-    pDot11f->suBeamformeeCap =  uVHTCapabilityInfo.vhtCapInfo.suBeamformeeCap;
+    pDot11f->suBeamFormerCap = 0;
+    pDot11f->suBeamformeeCap = 0;
     pDot11f->csnofBeamformerAntSup =  uVHTCapabilityInfo.vhtCapInfo.csnofBeamformerAntSup;
     pDot11f->numSoundingDim =  uVHTCapabilityInfo.vhtCapInfo.numSoundingDim;
     pDot11f->muBeamformerCap =  uVHTCapabilityInfo.vhtCapInfo.muBeamformerCap;
@@ -2657,61 +2674,6 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
     return eSIR_FAILURE;
 }
 
-static int limTdlsSelectCBMode(tDphHashNode *pStaDs, tpPESession psessionEntry)
-{
-    tANI_U8 channel = psessionEntry->currentOperChannel;
-
-    if ( pStaDs->mlmStaContext.vhtCapability )
-    {
-        if ( channel== 36 || channel == 52 || channel == 100 ||
-             channel == 116 || channel == 149 )
-        {
-           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW - 1;
-        }
-        else if ( channel == 40 || channel == 56 || channel == 104 ||
-             channel == 120 || channel == 153 )
-        {
-           return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW - 1;
-        }
-        else if ( channel == 44 || channel == 60 || channel == 108 ||
-                  channel == 124 || channel == 157 )
-        {
-           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH -1;
-        }
-        else if ( channel == 48 || channel == 64 || channel == 112 ||
-             channel == 128 || channel == 161 )
-        {
-            return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH - 1;
-        }
-        else if ( channel == 165 )
-        {
-            return 0;
-        }
-    }
-    else if ( pStaDs->mlmStaContext.htCapability )
-    {
-        if ( channel== 40 || channel == 48 || channel == 56 ||
-             channel == 64 || channel == 104 || channel == 112 ||
-             channel == 120 || channel == 128 || channel == 136 ||
-             channel == 144 || channel == 153 || channel == 161 )
-        {
-           return 1;
-        }
-        else if ( channel== 36 || channel == 44 || channel == 52 ||
-             channel == 60 || channel == 100 || channel == 108 ||
-             channel == 116 || channel == 124 || channel == 132 ||
-             channel == 140 || channel == 149 || channel == 157 )
-        {
-           return 2;
-        }
-        else if ( channel == 165 )
-        {
-           return 0;
-        }
-    }
-    return 0;
-}
-
 /*
  * update HASH node entry info
  */
@@ -2721,6 +2683,7 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
     //tDot11fIEHTCaps *htCaps = &setupPeerInfo->tdlsPeerHTCaps ;
     tDot11fIEHTCaps htCap, *htCaps;
     tDot11fIEVHTCaps *pVhtCaps = NULL;
+    tDot11fIEVHTCaps *pVhtCaps_txbf = NULL;
 #ifdef WLAN_FEATURE_11AC
     tDot11fIEVHTCaps vhtCap;
     tANI_U8 cbMode;
@@ -2781,9 +2744,12 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
         }
 
         pStaDs->vhtLdpcCapable = pVhtCaps->ldpcCodingCap;
-        pStaDs->vhtBeamFormerCapable= pVhtCaps->suBeamFormerCap;
+        pStaDs->vhtBeamFormerCapable = 0;
         // TODO , is it necessary , Sunil???
         pMac->lim.gLimTdlsLinkMode = TDLS_LINK_MODE_AC;
+        pVhtCaps_txbf = (tDot11fIEVHTCaps *)(&pTdlsAddStaReq->vhtCap);
+        pVhtCaps_txbf->suBeamformeeCap = 0;
+        pVhtCaps_txbf->suBeamFormerCap = 0;
         pStaDs->vht_caps = pTdlsAddStaReq->vhtCap.vhtCapInfo;
     }
     else
@@ -2793,7 +2759,9 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
     }
 #endif
     /*Calculate the Secondary Coannel Offset */
-    cbMode = limTdlsSelectCBMode(pStaDs, psessionEntry);
+    cbMode = limSelectCBMode(pStaDs, psessionEntry,
+                             psessionEntry->currentOperChannel,
+                             pStaDs->vhtSupportedChannelWidthSet);
 
     pStaDs->htSecondaryChannelOffset = cbMode;
 
@@ -4934,6 +4902,34 @@ add_sta_error:
     return status ;
 }
 
+void PopulateDot11fTdlsOffchannelParams(tpAniSirGlobal pMac,
+                             tpPESession psessionEntry,
+                             tDot11fIESuppChannels *suppChannels,
+                             tDot11fIESuppOperatingClasses *suppOperClasses)
+{
+    tANI_U32   numChans = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+    tANI_U8    validChan[WNI_CFG_VALID_CHANNEL_LIST_LEN];
+    tANI_U8    i;
+    if (wlan_cfgGetStr(pMac, WNI_CFG_VALID_CHANNEL_LIST,
+                          validChan, &numChans) != eSIR_SUCCESS)
+    {
+        /**
+         * Could not get Valid channel list from CFG.
+         * Log error.
+         */
+         limLog(pMac, LOGP,
+                FL("could not retrieve Valid channel list"));
+    }
+    suppChannels->num_bands = (tANI_U8) numChans;
+
+    for ( i = 0U; i < suppChannels->num_bands; i++)
+    {
+        suppChannels->bands[i][0] = validChan[i];
+        suppChannels->bands[i][1] = 1;
+    }
+    suppChannels->present = 1 ;
+    return ;
+}
 /*
  * FUNCTION: Populate Link Identifier element IE
  *
@@ -4971,7 +4967,7 @@ void PopulateDot11fTdlsExtCapability(tpAniSirGlobal pMac,
 {
     extCapability->TDLSPeerPSMSupp = PEER_PSM_SUPPORT ;
     extCapability->TDLSPeerUAPSDBufferSTA = pMac->lim.gLimTDLSBufStaEnabled;
-    extCapability->TDLSChannelSwitching = CH_SWITCH_SUPPORT ;
+    extCapability->TDLSChannelSwitching = pMac->lim.gLimTDLSOffChannelEnabled ;
     extCapability->TDLSSupport = TDLS_SUPPORT ;
     extCapability->TDLSProhibited = TDLS_PROHIBITED ;
     extCapability->TDLSChanSwitProhibited = TDLS_CH_SWITCH_PROHIBITED ;
@@ -5384,7 +5380,32 @@ lim_tdls_del_sta_error:
     return eSIR_SUCCESS;
 }
 
-
+/* Intersects the two input arrays and outputs an array */
+/* For now the array length of tANI_U8 suffices */
+static void limTdlsGetIntersection(tANI_U8 *input_array1,tANI_U8 input1_length,
+                            tANI_U8 *input_array2,tANI_U8 input2_length,
+                            tANI_U8 *output_array,tANI_U8 *output_length)
+{
+    tANI_U8 i,j,k=0,flag=0;
+    for(i=0;i<input1_length;i++)
+    {
+        flag=0;
+        for(j=0;j<input2_length;j++)
+        {
+            if(input_array1[i]==input_array2[j])
+            {
+                flag=1;
+                break;
+            }
+        }
+        if(flag==1)
+        {
+            output_array[k]=input_array1[i];
+            k++;
+        }
+    }
+    *output_length = k;
+}
 /*
  * Process Link Establishment Request from SME .
  */
@@ -5459,6 +5480,48 @@ tSirRetStatus limProcesSmeTdlsLinkEstablishReq(tpAniSirGlobal pMac,
     pMsgTdlsLinkEstablishReq->uapsdQueues = pTdlsLinkEstablishReq->uapsdQueues;
     pMsgTdlsLinkEstablishReq->maxSp = pTdlsLinkEstablishReq->maxSp;
     pMsgTdlsLinkEstablishReq->isBufsta = pTdlsLinkEstablishReq->isBufSta;
+    pMsgTdlsLinkEstablishReq->isOffChannelSupported =
+                                pTdlsLinkEstablishReq->isOffChannelSupported;
+
+    if ( 0 != pTdlsLinkEstablishReq->supportedChannelsLen)
+    {
+        tANI_U32   selfNumChans = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+        tANI_U8    selfSupportedChannels[WNI_CFG_VALID_CHANNEL_LIST_LEN];
+        if (wlan_cfgGetStr(pMac, WNI_CFG_VALID_CHANNEL_LIST,
+                          selfSupportedChannels, &selfNumChans) != eSIR_SUCCESS)
+        {
+            /**
+             * Could not get Valid channel list from CFG.
+             * Log error.
+             */
+             limLog(pMac, LOGP,
+                    FL("could not retrieve Valid channel list"));
+        }
+
+        if (selfNumChans > WNI_CFG_VALID_CHANNEL_LIST_LEN) {
+             limLog(pMac, LOGE,
+                   FL("Channel List more than Valid Channel list"));
+             selfNumChans = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+        }
+
+        if (pTdlsLinkEstablishReq->supportedChannelsLen
+                                  > SIR_MAC_MAX_SUPP_CHANNELS ) {
+             limLog(pMac, LOGE,
+                   FL("Channel List is more than the supported Channel list"));
+             pTdlsLinkEstablishReq->supportedChannelsLen
+                                       = SIR_MAC_MAX_SUPP_CHANNELS;
+        }
+
+        limTdlsGetIntersection(selfSupportedChannels, selfNumChans,
+                               pTdlsLinkEstablishReq->supportedChannels,
+                               pTdlsLinkEstablishReq->supportedChannelsLen,
+                               pMsgTdlsLinkEstablishReq->validChannels,
+                               &pMsgTdlsLinkEstablishReq->validChannelsLen);
+    }
+    vos_mem_copy(pMsgTdlsLinkEstablishReq->validOperClasses,
+                        pTdlsLinkEstablishReq->supportedOperClasses, pTdlsLinkEstablishReq->supportedOperClassesLen);
+    pMsgTdlsLinkEstablishReq->validOperClassesLen =
+                                pTdlsLinkEstablishReq->supportedOperClassesLen;
     msg.type = WDA_SET_TDLS_LINK_ESTABLISH_REQ;
     msg.reserved = 0;
     msg.bodyptr = pMsgTdlsLinkEstablishReq;

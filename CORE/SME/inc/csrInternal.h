@@ -403,6 +403,8 @@ typedef struct tagScanCmd
         tCsrScanRequest   scanRequest;
         tCsrBGScanRequest bgScanRequest;
     }u;
+    //This flag will be set while aborting the scan due to band change
+    tANI_BOOLEAN            abortScanDueToBandChange;
 }tScanCmd;
 
 typedef struct tagRoamCmd
@@ -1160,6 +1162,8 @@ void csrScanResumeIMPS( tpAniSirGlobal pMac );
 eHalStatus csrInitGetChannels(tpAniSirGlobal pMac);
 eHalStatus csrScanFilter11dResult(tpAniSirGlobal pMac);
 
+eHalStatus csrScanFilterResults(tpAniSirGlobal pMac);
+
 eHalStatus csrSetModifyProfileFields(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                      tCsrRoamModifyProfileFields *pModifyProfileFields);
 /* ---------------------------------------------------------------------------
@@ -1259,7 +1263,25 @@ eHalStatus csrGetStatistics(tpAniSirGlobal pMac, eCsrStatsRequesterType requeste
   ---------------------------------------------------------------------------*/
 tANI_U16 csrGetTLSTAState(tpAniSirGlobal pMac, tANI_U8 staId);
 
-eHalStatus csrGetRssi(tpAniSirGlobal pMac,tCsrRssiCallback callback,tANI_U8 staId,tCsrBssid bssId,void * pContext,void * pVosContext);
+/* ---------------------------------------------------------------------------
+    \fn csrGetRssi
+    \ creates SME req packet for getRSSI and post to Self
+
+    \param pMac     - global MAC context
+    \param callback - hdd callback function to be called once FW returns the
+                      RSSI value
+    \param staId    - The staID to be passed to the TL to get the relevant
+                      TL STA State
+    \param bssID    - bssid for which RSSI is requested
+    \param lastRSSI - RSSI value at time of request. In case request cannot
+                      be sent to firmware, do not hold up but return this value.
+    \param pContext - user context to be passed back along with the callback
+    \param pVosContext - vos conext
+    \return the state as tANI_U16
+  ---------------------------------------------------------------------------*/
+eHalStatus csrGetRssi(tpAniSirGlobal pMac,tCsrRssiCallback callback,
+                      tANI_U8 staId, tCsrBssid bssId, tANI_S8 lastRSSI,
+                      void * pContext,void * pVosContext);
 
 /* ---------------------------------------------------------------------------
     \fn csrGetSnr
@@ -1402,6 +1424,7 @@ eHalStatus csrRoamUpdateWPARSNIEs( tpAniSirGlobal pMac, tANI_U32 sessionId, tSir
 void csrSetCfgPrivacy( tpAniSirGlobal pMac, tCsrRoamProfile *pProfile, tANI_BOOLEAN fPrivacy );
 tANI_S8 csrGetInfraSessionId( tpAniSirGlobal pMac );
 tANI_U8 csrGetInfraOperationChannel( tpAniSirGlobal pMac, tANI_U8 sessionId);
+tANI_BOOLEAN csrIsSessionClientAndConnected(tpAniSirGlobal pMac, tANI_U8 sessionId);
 tANI_U8 csrGetConcurrentOperationChannel( tpAniSirGlobal pMac );
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH

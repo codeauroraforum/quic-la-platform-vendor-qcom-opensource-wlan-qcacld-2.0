@@ -45,9 +45,7 @@
 #include "adf_nbuf.h"
 #include "wma_api.h"
 #include "vos_utils.h"
-#ifdef QCA_LL_TX_FLOW_CT
 #include "wdi_out.h"
-#endif /* QCA_LL_TX_FLOW_CT */
 #define ENTER() VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO, "Enter:%s", __func__)
 
 #define TLSHIM_LOGD(args...) \
@@ -445,6 +443,11 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 		return 0;
 	}
 
+	if (hdr->buf_len < sizeof(struct ieee80211_frame)) {
+		TLSHIM_LOGE("Invalid rx mgmt packet");
+		return 0;
+	}
+
 	rx_pkt = vos_mem_malloc(sizeof(*rx_pkt));
 	if (!rx_pkt) {
 		TLSHIM_LOGE("Failed to allocate rx packet");
@@ -484,7 +487,8 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 			      roundup(hdr->buf_len, 4),
 			      0, 4, FALSE);
 	if (!wbuf) {
-		TLSHIM_LOGE("Failed to allocate wbuf for mgmt rx");
+		TLSHIM_LOGE("%s: Failed to allocate wbuf for mgmt rx len(%u)",
+			__func__, hdr->buf_len);
 		vos_mem_free(rx_pkt);
 		return 0;
 	}
@@ -536,14 +540,39 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 		(mgt_subtype == IEEE80211_FC0_SUBTYPE_BEACON || mgt_subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP))
 	{
 	    /* remember this beacon to be used later for better_ap event */
+	    WMI_MGMT_RX_EVENTID_param_tlvs *last_tlvs =
+		(WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data;
 	    if (tl_shim->last_beacon_data) {
+		/* Free the previously allocated buffers */
+		if (last_tlvs->hdr)
+			vos_mem_free(last_tlvs->hdr);
+		if (last_tlvs->bufp)
+			vos_mem_free(last_tlvs->bufp);
                 vos_mem_free(tl_shim->last_beacon_data);
                 tl_shim->last_beacon_data = NULL;
 		tl_shim->last_beacon_len = 0;
 	    }
 	    if((tl_shim->last_beacon_data = vos_mem_malloc(data_len))) {
-			vos_mem_copy(tl_shim->last_beacon_data, data, data_len);
-			tl_shim->last_beacon_len = data_len;
+		u_int32_t buf_len = roundup(hdr->buf_len, sizeof(u_int32_t));
+
+		vos_mem_copy(tl_shim->last_beacon_data, data, data_len);
+		tl_shim->last_beacon_len = data_len;
+		last_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data;
+		if ((last_tlvs->hdr = vos_mem_malloc(sizeof(wmi_mgmt_rx_hdr)))) {
+		    vos_mem_copy(last_tlvs->hdr, hdr, sizeof(wmi_mgmt_rx_hdr));
+		    if ((last_tlvs->bufp = vos_mem_malloc(buf_len))) {
+			vos_mem_copy(last_tlvs->bufp, param_tlvs->bufp, buf_len);
+		    } else {
+			vos_mem_free(last_tlvs->hdr);
+			vos_mem_free(tl_shim->last_beacon_data);
+			tl_shim->last_beacon_data = NULL;
+			tl_shim->last_beacon_len = 0;
+		    }
+		} else {
+		    vos_mem_free(tl_shim->last_beacon_data);
+		    tl_shim->last_beacon_data = NULL;
+		    tl_shim->last_beacon_len = 0;
+		}
 	    }
 	}
 
@@ -726,6 +755,7 @@ static void tlshim_data_rx_cb(struct txrx_tl_shim_ctx *tl_shim,
 	buf = buf_list;
 	while (buf) {
 		next_buf = adf_nbuf_queue_next(buf);
+		adf_nbuf_set_next(buf, NULL); /* Add NULL terminator */
 		ret = data_rx(vos_ctx, buf, staid);
 		if (ret != VOS_STATUS_SUCCESS) {
 			TLSHIM_LOGE("Frame Rx to HDD failed");
@@ -788,6 +818,8 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 				TLSHIM_LOGE("Failed to allocate buf to cache the rx frames");
 				adf_nbuf_free(buf);
 			} else {
+				/* Add NULL terminator */
+				adf_nbuf_set_next(buf, NULL);
 				cache_buf->buf = buf;
 				adf_os_spin_lock_bh(&tl_shim->bufq_lock);
 				list_add_tail(&cache_buf->list,
@@ -811,6 +843,11 @@ static void tlshim_data_rx_handler(void *context, u_int16_t staid,
 
 		/* Flush the cached frames to HDD before passing new rx frame */
 		tl_shim_flush_rx_frames(vos_ctx, tl_shim, staid, 0);
+
+		if (!adf_os_atomic_read(&tl_shim->vdev_active[sta_info->vdev_id])) {
+			TLSHIM_LOGW("INACTIVE VDEV");
+			goto drop_rx_buf;
+		}
 		ret = data_rx(vos_ctx, rx_buf_list, staid);
 		if (ret == VOS_STATUS_E_INVAL) {
 #endif
@@ -889,15 +926,20 @@ static void tl_shim_cache_flush_work(struct work_struct *work)
 
 	for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
 		sta_info = &tl_shim->sta_info[i];
-		if (!sta_info->registered)
+		adf_os_spin_lock_bh(&sta_info->stainfo_lock);
+		if (!sta_info->registered) {
+			adf_os_spin_unlock_bh(&sta_info->stainfo_lock);
 			continue;
+        }
 
 		adf_os_spin_lock_bh(&tl_shim->bufq_lock);
 		if (sta_info->suspend_flush) {
 			adf_os_spin_unlock_bh(&tl_shim->bufq_lock);
+			adf_os_spin_unlock_bh(&sta_info->stainfo_lock);
 			continue;
 		}
 		adf_os_spin_unlock_bh(&tl_shim->bufq_lock);
+		adf_os_spin_unlock_bh(&sta_info->stainfo_lock);
 
 		tl_shim_flush_rx_frames(vos_ctx, tl_shim, i, 0);
 	}
@@ -932,6 +974,7 @@ void WLANTL_RegisterVdev(void *vos_ctx, void *vdev)
 	wdi_in_osif_vdev_register(vdev_handle, tl_shim, &txrx_ops);
 	/* TODO: Keep vdev specific tx callback, if needed */
 	tl_shim->tx = txrx_ops.tx.std;
+	adf_os_atomic_set(&tl_shim->vdev_active[vdev_handle->vdev_id], 1);
 }
 
 /*
@@ -948,6 +991,7 @@ void WLANTL_UnRegisterVdev(void *vos_ctx, u_int8_t vdev_id)
 		return;
 	}
 
+	adf_os_atomic_set(&tl_shim->vdev_active[vdev_id], 0);
 #ifdef QCA_LL_TX_FLOW_CT
 	WLANTL_DeRegisterTXFlowControl(vos_ctx, vdev_id);
 #endif /* QCA_LL_TX_FLOW_CT */
@@ -1032,13 +1076,18 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 
 #ifdef IPA_OFFLOAD
 adf_nbuf_t WLANTL_SendIPA_DataFrame(void *vos_ctx, void *vdev,
-                                    adf_nbuf_t skb)
+                                    adf_nbuf_t skb,  v_U8_t interface_id)
 {
     struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
                                                            vos_ctx);
 	adf_nbuf_t ret;
 
 	ENTER();
+
+	if (!adf_os_atomic_read(&tl_shim->vdev_active[interface_id])) {
+		TLSHIM_LOGW("INACTIVE VDEV");
+		return skb;
+	}
 
 	if ((tl_shim->ip_checksum_offload) && (skb->protocol == htons(ETH_P_IP))
 		 && (skb->ip_summed == CHECKSUM_PARTIAL))
@@ -1554,6 +1603,7 @@ VOS_STATUS WLANTL_RegisterSTAClient(void *vos_ctx,
 	struct ol_txrx_peer_t *peer;
 	ol_txrx_peer_update_param_t param;
 	struct tlshim_sta_info *sta_info;
+	privacy_exemption privacy_filter;
 
 	ENTER();
 	if (sta_desc->ucSTAId >= WLAN_MAX_STA_COUNT) {
@@ -1577,12 +1627,18 @@ VOS_STATUS WLANTL_RegisterSTAClient(void *vos_ctx,
 	sta_info->data_rx = rxcb;
 	sta_info->registered = true;
 	sta_info->first_rssi = rssi;
+	sta_info->vdev_id = peer->vdev->vdev_id;
 	adf_os_spin_unlock_bh(&sta_info->stainfo_lock);
 
 	param.qos_capable =  sta_desc->ucQosEnabled;
 	wdi_in_peer_update(peer->vdev, peer->mac_addr.raw, &param,
 			   ol_txrx_peer_update_qos_capable);
 	if (sta_desc->ucIsWapiSta) {
+		/*Privacy filter to accept unencrypted WAI frames*/
+		privacy_filter.ether_type = ETHERTYPE_WAI;
+		privacy_filter.filter_type = PRIVACY_FILTER_ALWAYS;
+		privacy_filter.packet_type = PRIVACY_FILTER_PACKET_BOTH;
+		ol_txrx_set_privacy_filters(peer->vdev, &privacy_filter, 1);
 		/* param.sec_type = ol_sec_type_wapi; */
 		/*
 		 * TODO: Peer update also updates the other security types
@@ -1642,7 +1698,7 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 	}
 	adf_os_mem_free(tl_shim->session_flow_control);
 #endif /* QCA_LL_TX_FLOW_CT */
-
+	adf_os_mem_free(tl_shim->vdev_active);
 #ifdef FEATURE_WLAN_ESE
 	vos_flush_work(&tl_shim->iapp_work.deferred_work);
 #endif
@@ -1651,6 +1707,10 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 	wdi_in_pdev_detach(((pVosContextType) vos_ctx)->pdev_txrx_ctx, 1);
 	// Delete beacon buffer hanging off tl_shim
 	if (tl_shim->last_beacon_data) {
+		if (((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->hdr)
+			vos_mem_free(((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->hdr);
+		if (((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->bufp)
+			vos_mem_free(((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->bufp);
 		vos_mem_free(tl_shim->last_beacon_data);
 	}
 	vos_free_context(vos_ctx, VOS_MODULE_ID_TL, tl_shim);
@@ -1665,9 +1725,7 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	struct txrx_tl_shim_ctx *tl_shim;
 	VOS_STATUS status;
 	u_int8_t i;
-#ifdef QCA_LL_TX_FLOW_CT
 	int max_vdev;
-#endif /* QCA_LL_TX_FLOW_CT */
 
 	ENTER();
 	status = vos_alloc_context(vos_ctx, VOS_MODULE_ID_TL,
@@ -1704,9 +1762,15 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	 * TODO: Allocate memory for tx callback for maximum supported
 	 * vdevs to maintain tx callbacks per vdev.
 	 */
+	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
+	tl_shim->vdev_active = adf_os_mem_alloc(NULL,
+		max_vdev * sizeof(adf_os_atomic_t));
+	for (i = 0; i < max_vdev; i++) {
+		adf_os_atomic_init(&tl_shim->vdev_active[i]);
+		adf_os_atomic_set(&tl_shim->vdev_active[i], 0);
+	}
 
 #ifdef QCA_LL_TX_FLOW_CT
-	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
 	tl_shim->session_flow_control = adf_os_mem_alloc(NULL,
 			max_vdev * sizeof(struct tlshim_session_flow_Control));
 	if (!tl_shim->session_flow_control) {
@@ -1854,11 +1918,11 @@ v_BOOL_t WLANTL_GetTxResource
 		return VOS_TRUE;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	if (!tl_shim->session_flow_control[sessionId].vdev) {
 		TLSHIM_LOGD("%s, session id %d, VDEV NULL",
                     __func__, sessionId);
-		adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+		adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 		return VOS_TRUE;
 	}
 
@@ -1866,7 +1930,7 @@ v_BOOL_t WLANTL_GetTxResource
 		(struct ol_txrx_vdev_t *)tl_shim->session_flow_control[sessionId].vdev,
 		low_watermark,
 		high_watermark_offset);
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return enough_resource;
 }
@@ -1909,7 +1973,7 @@ void WLANTL_TXFlowControlCb
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	if ((tl_shim->session_flow_control[sessionId].sessionId == sessionId) &&
 		(tl_shim->session_flow_control[sessionId].flowControl)) {
 		flow_control_cb = tl_shim->session_flow_control[sessionId].flowControl;
@@ -1919,7 +1983,7 @@ void WLANTL_TXFlowControlCb
 	if ((flow_control_cb) && (adpter_ctxt)) {
 		flow_control_cb(adpter_ctxt, resume_tx);
 	}
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
@@ -1962,11 +2026,16 @@ void WLANTL_RegisterTXFlowControl
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	if (sessionId >= wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx)) {
+		TLSHIM_LOGE("%s : Invalid session id", __func__);
+		return;
+	}
+
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	tl_shim->session_flow_control[sessionId].flowControl = flowControl;
 	tl_shim->session_flow_control[sessionId].sessionId = sessionId;
 	tl_shim->session_flow_control[sessionId].adpaterCtxt = adpaterCtxt;
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
@@ -2004,12 +2073,17 @@ void WLANTL_DeRegisterTXFlowControl
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+        if (sessionId >= wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx)) {
+                TLSHIM_LOGE("%s : Invalid session id", __func__);
+                return;
+        }
+
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	tl_shim->session_flow_control[sessionId].flowControl = NULL;
 	tl_shim->session_flow_control[sessionId].sessionId = 0xFF;
 	tl_shim->session_flow_control[sessionId].adpaterCtxt = NULL;
         tl_shim->session_flow_control[sessionId].vdev = NULL;
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
@@ -2052,17 +2126,17 @@ void WLANTL_SetAdapterMaxQDepth
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	if (!tl_shim->session_flow_control[sessionId].vdev) {
 		TLSHIM_LOGD("%s, session id %d, VDEV NULL",
                     __func__, sessionId);
-		adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+		adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 		return;
 	}
 	wdi_in_ll_set_tx_pause_q_depth(
 		(struct ol_txrx_vdev_t *)tl_shim->session_flow_control[sessionId].vdev,
 		max_q_depth);
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }

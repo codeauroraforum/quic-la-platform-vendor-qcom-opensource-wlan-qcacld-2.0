@@ -63,6 +63,7 @@ ath_hif_sdio_probe(void *context, void *hif_handle)
     struct ol_softc *ol_sc;
     HIF_DEVICE_OS_DEVICE_INFO os_dev_info;
     struct sdio_func *func = NULL;
+    const struct sdio_device_id *id;
     u_int32_t target_type;
     ENTER();
 
@@ -103,8 +104,14 @@ ath_hif_sdio_probe(void *context, void *hif_handle)
         target_register_tbl_attach(TARGET_TYPE_AR9888);
         target_type = TARGET_TYPE_AR9888;
 #elif defined(CONFIG_AR6320_SUPPORT)
-        hif_register_tbl_attach(HIF_TYPE_AR6320);
-        target_register_tbl_attach(TARGET_TYPE_AR6320);
+        id = ((HIF_DEVICE*)hif_handle)->id;
+        if (id->device == MANUFACTURER_ID_QCA9377_BASE) {
+            hif_register_tbl_attach(HIF_TYPE_AR6320V2);
+            target_register_tbl_attach(TARGET_TYPE_AR6320V2);
+        } else {
+            hif_register_tbl_attach(HIF_TYPE_AR6320);
+            target_register_tbl_attach(TARGET_TYPE_AR6320);
+        }
         target_type = TARGET_TYPE_AR6320;
 
 #endif
@@ -129,24 +136,30 @@ ath_hif_sdio_probe(void *context, void *hif_handle)
     ol_sc->hif_hdl = hif_handle;
     init_waitqueue_head(&ol_sc->sc_osdev->event_queue);
 
-    VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_ERROR," calling hdd_wlan_startup...");
+    if (athdiag_procfs_init(sc) != 0) {
+        VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_ERROR,
+                "%s athdiag_procfs_init failed",__func__);
+        ret =  A_ERROR;
+        goto err_attach1;
+    }
 
     ret = hdd_wlan_startup(&(func->dev), ol_sc);
-
     if ( ret ) {
         VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_FATAL," hdd_wlan_startup failed");
-        goto err_attach1;
+        goto err_attach2;
     }else{
         VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO," hdd_wlan_startup success!");
     }
 
     return 0;
-err_attach1:
-A_FREE(ol_sc);
-err_attach:
-   A_FREE(sc);
-   sc = NULL;
 
+err_attach2:
+    athdiag_procfs_remove();
+err_attach1:
+    A_FREE(ol_sc);
+err_attach:
+    A_FREE(sc);
+    sc = NULL;
 err_alloc:
     return ret;
 }
@@ -171,6 +184,8 @@ static A_STATUS
 ath_hif_sdio_remove(void *context, void *hif_handle)
 {
     ENTER();
+
+    athdiag_procfs_remove();
 
     if (sc && sc->ol_sc){
        A_FREE(sc->ol_sc);
@@ -209,7 +224,7 @@ ath_hif_sdio_power_change(void *context, A_UINT32 config)
 /*
  * Module glue.
  */
-#include "version.h"
+#include <linux/version.h>
 static char *version = "HIF (Atheros/multi-bss)";
 static char *dev_info = "ath_hif_sdio";
 
@@ -303,4 +318,11 @@ HIFCancelDeferredTargetSleep(HIF_DEVICE *hif_device)
 void hif_reset_soc(void *ol_sc)
 {
     ENTER("- dummy function!");
+}
+
+void hif_get_hw_info(void *ol_sc, u32 *version, u32 *revision)
+{
+    *version = ((struct ol_softc *)ol_sc)->target_version;
+    /* Chip revision should be supported, set to 0 for now */
+    *revision = 0;
 }
