@@ -3171,7 +3171,7 @@ static int wlan_hdd_change_iface_to_sta_mode(struct net_device *ndev,
     ENTER();
 
     wdev = ndev->ieee80211_ptr;
-    hdd_stop_adapter(pHddCtx, pAdapter);
+    hdd_stop_adapter(pHddCtx, pAdapter, VOS_TRUE);
 #ifdef FEATURE_WLAN_TDLS
     /* A Mutex Lock is introduced while changing the mode to
      * protect the concurrent access for the Adapters by TDLS
@@ -3409,12 +3409,12 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
                     if (pP2pAdapter)
                     {
-                        hdd_stop_adapter(pHddCtx, pP2pAdapter);
+                        hdd_stop_adapter(pHddCtx, pP2pAdapter, VOS_TRUE);
                         hdd_deinit_adapter(pHddCtx, pP2pAdapter);
                         hdd_close_adapter(pHddCtx, pP2pAdapter, VOS_TRUE);
                     }
                 }
-                hdd_stop_adapter( pHddCtx, pAdapter );
+                hdd_stop_adapter( pHddCtx, pAdapter, VOS_TRUE );
 #ifdef FEATURE_WLAN_TDLS
 
                 /* A Mutex Lock is introduced while changing the mode to
