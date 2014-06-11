@@ -861,7 +861,12 @@ static void wma_remove_peer(tp_wma_handle wma, u_int8_t *bssid,
 #define PEER_ALL_TID_BITMASK 0xffffffff
 	u_int32_t peer_tid_bitmap = PEER_ALL_TID_BITMASK;
 	u_int8_t *peer_addr = bssid;
-
+        if (!wma->peer_count)
+        {
+             WMA_LOGE("%s: Can't remove peer with peer_addr %pM vdevid %d peer_count %d",
+                    __func__, bssid, vdev_id, wma->peer_count);
+             return;
+        }
 	if (peer)
 		ol_txrx_peer_detach(peer);
 
@@ -1414,14 +1419,16 @@ static int wma_vdev_stop_ind(tp_wma_handle wma, u_int8_t *buf)
 		if (params->status == eHAL_STATUS_FW_MSG_TIMEDOUT){
 			vos_mem_free(params);
 			WMA_LOGE("%s: DEL BSS from ADD BSS timeout do not send "
-				"resp to UMAC", __func__);
+					"resp to UMAC (vdev id %x)",
+					__func__, resp_event->vdev_id);
 		} else {
 			params->status = VOS_STATUS_SUCCESS;
 			wma_send_msg(wma, WDA_DELETE_BSS_RSP, (void *)params, 0);
 		}
 
 		if (iface->del_staself_req) {
-			WMA_LOGD("%s: scheduling defered deletion", __func__);
+			WMA_LOGA("scheduling defered deletion (vdev id %x)",
+					resp_event->vdev_id);
 			wma_vdev_detach(wma, iface->del_staself_req, 1);
 		}
 	}
@@ -2145,7 +2152,7 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 	}
 
 	vos_mem_zero(csa_offload_event, sizeof(*csa_offload_event));
-	csa_offload_event->sessionId = vdev_id;
+	vos_mem_copy(csa_offload_event->bssId, &bssid, ETH_ALEN);
 
 	if (csa_event->ies_present_flag & WMI_CSA_IE_PRESENT) {
 		csa_ie = (struct ieee80211_channelswitch_ie *)(&csa_event->csa_ie[0]);
@@ -2170,7 +2177,9 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
 
-	WMA_LOGD("CSA: New Channel = %d", csa_offload_event->channel);
+	WMA_LOGD("CSA: New Channel = %d BSSID:%pM",
+			csa_offload_event->channel,
+			csa_offload_event->bssId);
 	wma->interfaces[vdev_id].is_channel_switch = VOS_TRUE;
 	wma_send_msg(wma, WDA_CSA_OFFLOAD_EVENT, (void *)csa_offload_event, 0);
 	return 0;
@@ -3092,6 +3101,8 @@ static int wma_stats_ext_event_handler(void *handle, u_int8_t *event_buf,
 	}
 
 	buf_ptr +=  sizeof(wmi_stats_ext_event_fixed_param) + WMI_TLV_HDR_SIZE ;
+
+	stats_ext_event->vdev_id = stats_ext_info->vdev_id;
 	stats_ext_event->event_data_len = stats_ext_info->data_len;
 	vos_mem_copy(stats_ext_event->event_data,
 		     buf_ptr,
@@ -3713,7 +3724,8 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 				vdev_id, peer);
 	}
 	if (adf_os_atomic_read(&iface->bss_status) == WMA_BSS_STATUS_STARTED) {
-		WMA_LOGA("BSS is not yet stopped. Defering vdev deletion");
+		WMA_LOGA("BSS is not yet stopped. Defering vdev(vdev id %x) deletion",
+				vdev_id);
 		iface->del_staself_req = pdel_sta_self_req_param;
 		return status;
 	}
@@ -4649,6 +4661,11 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 	int len = sizeof(*cmd);
 	tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(VOS_MODULE_ID_PE,
 				wma_handle->vos_context);
+
+	if (!pMac) {
+		WMA_LOGP("%s: pMac is NULL!", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 
 	len += WMI_TLV_HDR_SIZE; /* Length TLV placeholder for array of uint32 */
 	/* calculate the length of buffer required */
@@ -7023,7 +7040,8 @@ void wma_vdev_resp_timer(void *data)
 		WMA_LOGA("%s: WDA_DELETE_BSS_REQ timedout", __func__);
 		wma_send_msg(wma, WDA_DELETE_BSS_RSP, (void *)params, 0);
 		if (iface->del_staself_req) {
-			WMA_LOGD("%s: scheduling defered deletion", __func__);
+			WMA_LOGA("scheduling defered deletion(vdev id %x)",
+					tgt_req->vdev_id);
 			wma_vdev_detach(wma, iface->del_staself_req, 1);
 		}
 	} else if (tgt_req->msg_type == WDA_DEL_STA_SELF_REQ) {
@@ -7081,6 +7099,8 @@ void wma_vdev_resp_timer(void *data)
 		}
 		WMA_LOGI("%s: bssid %pM vdev_id %d", __func__, params->bssId,
 						tgt_req->vdev_id);
+		wma_send_msg(wma, WDA_ADD_BSS_RSP, (void *)params, 0);
+		goto free_tgt_req;
 error0:
 		if (peer)
 			wma_remove_peer(wma, params->bssId,
@@ -9220,6 +9240,8 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 					maxTxPower);
 	if (ret)
 		WMA_LOGE("failed to set WMI_VDEV_PARAM_TX_PWRLIMIT");
+	else
+		intr[vdev_id].max_tx_power = maxTxPower;
 
 	/* Slot time */
 	if (shortSlotTimeSupported)
@@ -21198,8 +21220,7 @@ struct ieee80211com* wma_dfs_attach(struct ieee80211com *dfs_ic)
  * change.This Configuration enables to program
  * the DFS pattern matching module.
  */
-void
-wma_dfs_configure(struct ieee80211com *ic)
+void wma_dfs_configure(struct ieee80211com *ic)
 {
 	struct ath_dfs_radar_tab_info rinfo;
 	int dfsdomain;
@@ -21347,8 +21368,7 @@ wma_dfs_configure_channel(struct ieee80211com *dfs_ic,
 /*
  * Configure the regulatory domain for DFS radar filter initialization
  */
-void
-wma_set_dfs_regdomain(tp_wma_handle wma)
+void wma_set_dfs_regdomain(tp_wma_handle wma)
 {
 	u_int8_t ctl;
 	u_int32_t regdmn = wma->reg_cap.eeprom_rd;
@@ -21397,67 +21417,98 @@ wma_set_dfs_regdomain(tp_wma_handle wma)
 			wma->dfs_ic->current_dfs_regdomain);
 }
 
+int wma_get_channels(struct ieee80211_channel *ichan,
+		struct wma_dfs_radar_channel_list *chan_list)
+{
+	uint8_t center_chan = vos_freq_to_chan(ichan->ic_vhtop_ch_freq_seg1);
+
+	chan_list->nchannels = 0;
+
+	if (IEEE80211_IS_CHAN_11AC_VHT80(ichan))
+	{
+		chan_list->nchannels= 4;
+		chan_list->channels[0] = center_chan - 6;
+		chan_list->channels[1] = center_chan - 2;
+		chan_list->channels[2] = center_chan + 2;
+		chan_list->channels[3] = center_chan + 6;
+	}
+	else if(IEEE80211_IS_CHAN_11N_HT40(ichan) ||
+			IEEE80211_IS_CHAN_11AC_VHT40(ichan))
+	{
+		chan_list->nchannels = 2;
+		chan_list->channels[0] = center_chan - 2;
+		chan_list->channels[1] = center_chan + 2;
+	}
+	else
+	{
+		chan_list->nchannels = 1;
+		chan_list->channels[0] = center_chan;
+	}
+
+	return chan_list->nchannels;
+}
+
+
 /*
  * Indicate Radar to SAP/HDD
  */
-int
-wma_dfs_indicate_radar(struct ieee80211com *ic,
-                                     struct ieee80211_channel *ichan)
+int wma_dfs_indicate_radar(struct ieee80211com *ic,
+		struct ieee80211_channel *ichan)
 {
-    tp_wma_handle wma;
-    void *hdd_ctx;
-    struct wma_dfs_radar_indication *radar_event;
-    struct hdd_dfs_radar_ind hdd_radar_event;
-    void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
+	tp_wma_handle wma;
+	void *hdd_ctx;
+	struct wma_dfs_radar_indication *radar_event;
+	struct hdd_dfs_radar_ind hdd_radar_event;
+	void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
 
-    wma = (tp_wma_handle) vos_get_context(VOS_MODULE_ID_WDA, vos_context);
+	wma = (tp_wma_handle) vos_get_context(VOS_MODULE_ID_WDA, vos_context);
 
-    if (wma == NULL)
-    {
-	    WMA_LOGE("%s: DFS- Invalid wma", __func__);
-	    return (0);
-    }
+	if (wma == NULL)
+	{
+		WMA_LOGE("%s: DFS- Invalid wma", __func__);
+		return (0);
+	}
 
-    hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD,wma->vos_context);
-    if (wma->dfs_ic != ic)
-    {
-        WMA_LOGE("%s:DFS- Invalid WMA handle",__func__);
-        return (0);
-    }
-    radar_event = (struct wma_dfs_radar_indication *)
-                   vos_mem_malloc(sizeof(struct wma_dfs_radar_indication));
-    if (radar_event == NULL)
-    {
-        WMA_LOGE("%s:DFS- Invalid radar_event",__func__);
-        return (0);
-    }
+	hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD,wma->vos_context);
+	if (wma->dfs_ic != ic)
+	{
+		WMA_LOGE("%s:DFS- Invalid WMA handle",__func__);
+		return (0);
+	}
+	radar_event = (struct wma_dfs_radar_indication *)
+		vos_mem_malloc(sizeof(struct wma_dfs_radar_indication));
+	if (radar_event == NULL)
+	{
+		WMA_LOGE("%s:DFS- Invalid radar_event",__func__);
+		return (0);
+	}
 
-    /*
-     * Do not post multiple Radar events on the same channel.
-     */
-    if ( ichan->ic_ieee  != (wma->dfs_ic->last_radar_found_chan) )
-    {
-        wma->dfs_ic->last_radar_found_chan = ichan->ic_ieee;
-        /* Indicate the radar event to HDD to stop the netif Tx queues*/
-        hdd_radar_event.ieee_chan_number = ichan->ic_ieee;
-        hdd_radar_event.chan_freq = ichan->ic_freq;
-        hdd_radar_event.dfs_radar_status = WMA_DFS_RADAR_FOUND;
-        wma->dfs_radar_indication_cb(hdd_ctx,&hdd_radar_event);
-        WMA_LOGE("%s:DFS- RADAR INDICATED TO HDD",__func__);
+	/*
+	 * Do not post multiple Radar events on the same channel.
+	 */
+	if ( ichan->ic_ieee  != (wma->dfs_ic->last_radar_found_chan) )
+	{
+		wma->dfs_ic->last_radar_found_chan = ichan->ic_ieee;
+		/* Indicate the radar event to HDD to stop the netif Tx queues*/
+		hdd_radar_event.ieee_chan_number = ichan->ic_ieee;
+		hdd_radar_event.chan_freq = ichan->ic_freq;
+		hdd_radar_event.dfs_radar_status = WMA_DFS_RADAR_FOUND;
+		wma->dfs_radar_indication_cb(hdd_ctx,&hdd_radar_event);
+		WMA_LOGE("%s:DFS- RADAR INDICATED TO HDD",__func__);
 
-       /*
-        * Indicate to the radar event to SAP to
-        * select a new channel and set CSA IE
-        */
-       radar_event->vdev_id = ic->vdev_id;
-       radar_event->ieee_chan_number = ichan->ic_ieee;
-       radar_event->chan_freq = ichan->ic_freq;
-       radar_event->dfs_radar_status = WMA_DFS_RADAR_FOUND;
-       radar_event->use_nol = ic->ic_dfs_usenol(ic);
-       wma_send_msg(wma, WDA_DFS_RADAR_IND, (void *)radar_event, 0);
-       WMA_LOGE("%s:DFS- WDA_DFS_RADAR_IND Message Posted",__func__);
-   }
-   return 1;
+		/*
+		 * Indicate to the radar event to SAP to
+		 * select a new channel and set CSA IE
+		 */
+		radar_event->vdev_id = ic->vdev_id;
+		wma_get_channels(ichan, &radar_event->chan_list);
+		radar_event->dfs_radar_status = WMA_DFS_RADAR_FOUND;
+		radar_event->use_nol = ic->ic_dfs_usenol(ic);
+		wma_send_msg(wma, WDA_DFS_RADAR_IND, (void *)radar_event, 0);
+		WMA_LOGE("%s:DFS- WDA_DFS_RADAR_IND Message Posted",__func__);
+	}
+
+	return 1;
 }
 
 static eHalStatus wma_set_smps_params(tp_wma_handle wma, tANI_U8 vdev_id, int value)
