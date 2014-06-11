@@ -4892,9 +4892,11 @@ VOS_STATUS wma_start_scan(tp_wma_handle wma_handle,
 		goto error;
 	}
 
-        if (msg_type == WDA_CHNL_SWITCH_REQ) {
-            wma_handle->roam_preauth_scan_id = cmd->scan_id;
-        }
+	if (msg_type == WDA_CHNL_SWITCH_REQ) {
+		adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
+		wma_handle->roam_preauth_scan_id = cmd->scan_id;
+		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+	}
 
 	WMA_LOGI("WMA --> WMI_START_SCAN_CMDID");
 
@@ -6743,6 +6745,9 @@ void wma_vdev_resp_timer(void *data)
 		WMA_LOGA("%s: WDA_SWITCH_CHANNEL_REQ timedout", __func__);
 		wma_send_msg(wma, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
 		wma->roam_preauth_chan_context = NULL;
+		adf_os_spin_lock_bh(&wma->roam_preauth_lock);
+		wma->roam_preauth_scan_id = -1;
+		adf_os_spin_unlock_bh(&wma->roam_preauth_lock);
 	} else if (tgt_req->msg_type == WDA_DELETE_BSS_REQ) {
 		tpDeleteBssParams params =
 			(tpDeleteBssParams)tgt_req->user_data;
@@ -6946,15 +6951,12 @@ VOS_STATUS wma_roam_preauth_chan_set(tp_wma_handle wma_handle,
         WMA_LOGI("%s: channel %d", __func__, params->channelNumber);
 
 	/* Check for prior operation in progress */
-	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
 	if (wma_handle->roam_preauth_chan_context != NULL) {
-		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 		vos_status = VOS_STATUS_E_FAILURE;
 		WMA_LOGE("%s: Rejected request. Previous operation in progress", __func__);
 		goto send_resp;
 	}
 	wma_handle->roam_preauth_chan_context = params;
-	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 
         /* Prepare a dummy scan request and get the
          * wmi_start_scan_cmd_fixed_param structure filled properly
@@ -6983,9 +6985,7 @@ VOS_STATUS wma_roam_preauth_chan_set(tp_wma_handle wma_handle,
 		return vos_status;
 	wma_handle->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_NONE;
 	/* Failed operation. Safely clear context */
-	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
         wma_handle->roam_preauth_chan_context = NULL;
-	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 
 send_resp:
 	WMA_LOGI("%s: sending WDA_SWITCH_CHANNEL_RSP, status = 0x%x",
@@ -7005,15 +7005,12 @@ VOS_STATUS wma_roam_preauth_chan_cancel(tp_wma_handle wma_handle,
 
         WMA_LOGI("%s: channel %d", __func__, params->channelNumber);
 	/* Check for prior operation in progress */
-	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
 	if (wma_handle->roam_preauth_chan_context != NULL) {
-		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 		vos_status = VOS_STATUS_E_FAILURE;
 		WMA_LOGE("%s: Rejected request. Previous operation in progress", __func__);
 		goto send_resp;
 	}
 	wma_handle->roam_preauth_chan_context = params;
-	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 
         abort_scan_req.SessionId = vdev_id;
         wma_handle->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_CANCEL_REQUESTED;
@@ -7021,9 +7018,7 @@ VOS_STATUS wma_roam_preauth_chan_cancel(tp_wma_handle wma_handle,
         if (vos_status == VOS_STATUS_SUCCESS)
 		return vos_status;
 	/* Failed operation. Safely clear context */
-	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
         wma_handle->roam_preauth_chan_context = NULL;
-	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 
 send_resp:
 	WMA_LOGI("%s: sending WDA_SWITCH_CHANNEL_RSP, status = 0x%x",
@@ -7084,11 +7079,30 @@ static void wma_roam_preauth_scan_event_handler(tp_wma_handle wma_handle,
                 params->smpsMode = SMPS_MODE_DISABLED;
                 params->status = vos_status;
                 wma_send_msg(wma_handle, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
-		adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
                 wma_handle->roam_preauth_chan_context = NULL;
-		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
         }
 
+}
+
+void wma_roam_preauth_ind(tp_wma_handle wma_handle, u_int8_t *buf) {
+	wmi_scan_event_fixed_param *wmi_event = NULL;
+	u_int8_t vdev_id;
+
+	wmi_event = (wmi_scan_event_fixed_param *)buf;
+	if (wmi_event == NULL) {
+		WMA_LOGE("%s: Invalid param wmi_event is null", __func__);
+		return;
+	}
+
+	vdev_id = wmi_event->vdev_id;
+	if (vdev_id >= wma_handle->max_bssid) {
+		WMA_LOGE("%s: Invalid vdev_id %d wmi_event %p", __func__,
+			vdev_id, wmi_event);
+		return;
+	}
+
+	wma_roam_preauth_scan_event_handler(wma_handle, vdev_id, wmi_event);
+	return;
 }
 
 /*
@@ -16817,6 +16831,11 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 					(tHalHiddenSsidVdevRestart *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
+		case WDA_ROAM_PREAUTH_IND:
+			wma_roam_preauth_ind(wma_handle,  msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
 			/* Do Nothing? MSG Body should be freed at here */
@@ -16838,6 +16857,8 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 	tSirScanOffloadEvent *scan_event;
 	u_int8_t vdev_id;
 	v_U32_t scan_id;
+	u_int8_t *buf;
+	vos_msg_t vos_msg = {0};
 	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
 
         param_buf = (WMI_SCAN_EVENTID_param_tlvs *) data;
@@ -16845,8 +16866,10 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
         vdev_id = wmi_event->vdev_id;
         scan_id = wma_handle->interfaces[vdev_id].scan_info.scan_id;
 
-        if (wma_handle->roam_preauth_scan_id == wmi_event->scan_id) {
-                /* This is the scan requested by roam preauth set_channel operation */
+	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
+	if (wma_handle->roam_preauth_scan_id == wmi_event->scan_id) {
+		/* This is the scan requested by roam preauth set_channel operation */
+		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 
 		if (wmi_event->event == WMI_SCAN_EVENT_COMPLETED) {
 			WMA_LOGE(" roam scan complete - scan_id %x, vdev_id %x",
@@ -16854,9 +16877,32 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 			wma_reset_scan_info(wma_handle, vdev_id);
 		}
 
-                wma_roam_preauth_scan_event_handler(wma_handle, vdev_id, wmi_event);
-                return 0;
-        }
+		buf = vos_mem_malloc(sizeof(wmi_scan_event_fixed_param));
+		if (!buf) {
+			WMA_LOGE("%s: Memory alloc failed for roam preauth ind",
+				__func__);
+			return -ENOMEM;
+		}
+		vos_mem_zero(buf, sizeof(wmi_scan_event_fixed_param));
+		vos_mem_copy(buf, (u_int8_t *)wmi_event,
+				sizeof(wmi_scan_event_fixed_param));
+
+		vos_msg.type = WDA_ROAM_PREAUTH_IND;
+		vos_msg.bodyptr = buf;
+		vos_msg.bodyval = 0;
+
+		if (VOS_STATUS_SUCCESS !=
+			vos_mq_post_message(VOS_MQ_ID_WDA, &vos_msg)) {
+			WMA_LOGE("%s: Failed to post WDA_ROAM_PREAUTH_IND msg",
+				 __func__);
+			vos_mem_free(buf);
+			return -1;
+		}
+		WMA_LOGD("%s: WDA_ROAM_PREAUTH_IND posted", __func__);
+		return 0;
+	}
+	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+
 	scan_event = (tSirScanOffloadEvent *) vos_mem_malloc
                                 (sizeof(tSirScanOffloadEvent));
 	if (!scan_event) {
