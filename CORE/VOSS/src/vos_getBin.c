@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -141,7 +141,7 @@ tVOS_CONCURRENCY_MODE vos_get_concurrency_mode( void )
     return con_mode;
 }
 
-v_BOOL_t vos_concurrent_sessions_running(void)
+v_BOOL_t vos_concurrent_open_sessions_running(void)
 {
     v_U8_t i=0;
     v_U8_t j=0;
@@ -155,7 +155,7 @@ v_BOOL_t vos_concurrent_sessions_running(void)
        {
           for (i=0; i < VOS_MAX_NO_OF_MODE; i++)
           {
-             j += pHddCtx->no_of_sessions[i];
+             j += pHddCtx->no_of_open_sessions[i];
           }
        }
     }
