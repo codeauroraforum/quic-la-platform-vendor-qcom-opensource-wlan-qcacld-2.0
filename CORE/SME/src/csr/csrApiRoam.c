@@ -313,24 +313,16 @@ eHalStatus csrOpen(tpAniSirGlobal pMac)
     return (status);
 }
 
-eHalStatus csr_init_chan_list(tpAniSirGlobal mac)
+eHalStatus csr_init_chan_list(tpAniSirGlobal mac, v_U8_t *alpha2)
 {
     eHalStatus status;
-    static uNvTables nv_tbl;
     v_REGDOMAIN_t reg_id;
     v_CountryInfoSource_t source = COUNTRY_INIT;
 
-    if (vos_nv_readDefaultCountryTable(&nv_tbl) == VOS_STATUS_SUCCESS) {
-       vos_mem_copy(mac->scan.countryCodeDefault,
-                    nv_tbl.defaultCountryTable.countryCode,
-                    WNI_CFG_COUNTRY_CODE_LEN);
-    } else {
-       smsLog(mac, LOGE, FL("fail to get NV_FIELD_IMAGE"));
-       /* hardcoded for now */
-       mac->scan.countryCodeDefault[0] = 'U';
-       mac->scan.countryCodeDefault[1] = 'S';
-       mac->scan.countryCodeDefault[2] = 'I';
-    }
+    mac->scan.countryCodeDefault[0] = alpha2[0];
+    mac->scan.countryCodeDefault[1] = alpha2[1];
+    mac->scan.countryCodeDefault[2] = alpha2[2];
+
     smsLog(mac, LOG1, FL("country Code from nvRam %.2s"),
            mac->scan.countryCodeDefault);
 
@@ -11953,13 +11945,8 @@ eHalStatus csrRoamIssueStartBss( tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRo
     }
 #endif //FEATURE_WLAN_DIAG_SUPPORT_CSR
     //Put RSN information in for Starting BSS
-    if (pProfile->nRSNReqIELength && pProfile->pRSNReqIE) {
-        pParam->nRSNIELength = (tANI_U16)pProfile->nRSNReqIELength;
-        pParam->pRSNIE = pProfile->pRSNReqIE;
-    } else if (pProfile->nWPAReqIELength && pProfile->pWPAReqIE) {
-        pParam->nRSNIELength = (tANI_U16)pProfile->nWPAReqIELength;
-        pParam->pRSNIE = pProfile->pWPAReqIE;
-    }
+    pParam->nRSNIELength = (tANI_U16)pProfile->nRSNReqIELength;
+    pParam->pRSNIE = pProfile->pRSNReqIE;
 
     pParam->privacy           = pProfile->privacy;
     pParam->fwdWPSPBCProbeReq = pProfile->fwdWPSPBCProbeReq;
