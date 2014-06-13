@@ -1323,7 +1323,6 @@ struct hdd_context_s
     int            sta_cnt;
 #endif
 
-    v_U8_t         drvr_miracast;
     v_U8_t         issplitscan_enabled;
 
     /* VHT80 allowed*/
