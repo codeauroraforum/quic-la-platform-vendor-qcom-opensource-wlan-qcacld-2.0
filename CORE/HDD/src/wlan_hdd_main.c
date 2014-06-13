@@ -346,17 +346,17 @@ static int hdd_netdev_notifier_call(struct notifier_block * nb,
    case NETDEV_GOING_DOWN:
         if( pAdapter->scan_info.mScanPending != FALSE )
         {
-           int result;
+           long result;
            INIT_COMPLETION(pAdapter->scan_info.abortscan_event_var);
            hdd_abort_mac_scan(pAdapter->pHddCtx, pAdapter->sessionId);
            result = wait_for_completion_interruptible_timeout(
                                &pAdapter->scan_info.abortscan_event_var,
                                msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-           if(!result)
+           if (result <= 0)
            {
               VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                         "%s: Timeout occurred while waiting for abortscan" ,
-                          __func__);
+                         "%s: Timeout occurred while waiting for abortscan %ld" ,
+                          __func__, result);
            }
         }
         else
@@ -602,8 +602,15 @@ void hdd_checkandupdate_phymode( hdd_context_t *pHddCtx)
                           eCSR_DISCONNECT_REASON_UNSPECIFIED );
 
        if (VOS_STATUS_SUCCESS == vosStatus)
-           wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
-                 msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+       {
+           long ret;
+
+           ret = wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
+                      msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+           if (0 >= ret)
+               hddLog(LOGE, FL("failure waiting for disconnect_comp_var %ld"),
+                               ret);
+       }
 
    }
 }
@@ -614,6 +621,7 @@ void hdd_checkandupdate_phymode( hdd_adapter_t *pAdapter, char *country_code)
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     hdd_config_t *cfg_param;
     eCsrPhyMode phyMode;
+    long ret;
 
     if (NULL == pHddCtx)
     {
@@ -665,9 +673,15 @@ void hdd_checkandupdate_phymode( hdd_adapter_t *pAdapter, char *country_code)
                            eCSR_DISCONNECT_REASON_UNSPECIFIED );
 
         if (VOS_STATUS_SUCCESS == vosStatus)
-            wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
-                  msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
-
+        {
+            ret = wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
+                   msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+            if (ret <= 0)
+            {
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                          "wait on disconnect_comp_var is failed %ld", ret);
+            }
+        }
     }
 }
 #endif //CONFIG_ENABLE_LINUX_REG
@@ -2999,7 +3013,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
    hdd_priv_data_t priv_data;
    tANI_U8 *command = NULL;
-   int ret = 0;
+   long ret = 0;
 
    if (NULL == pAdapter)
    {
@@ -3011,6 +3025,8 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
    if ((!ifr) || (!ifr->ifr_data))
    {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: invalid data", __func__);
        ret = -EINVAL;
        goto exit;
    }
@@ -3025,6 +3041,8 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
    if (copy_from_user(&priv_data, ifr->ifr_data, sizeof(hdd_priv_data_t)))
    {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             FL("failed to get data from user buffer"));
        ret = -EFAULT;
        goto exit;
    }
@@ -3051,6 +3069,8 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
    if (copy_from_user(command, priv_data.buf, priv_data.total_len))
    {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             FL("failed to get data from user buffer"));
        ret = -EFAULT;
        goto exit;
    }
@@ -3085,7 +3105,6 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
        else if(strncmp(command, "SETBAND", 7) == 0)
        {
            tANI_U8 *ptr = command ;
-           int ret = 0 ;
 
            /* Change band request received */
 
@@ -3095,6 +3114,9 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
                     "%s: SetBandCommand Info  comm %s UL %d, TL %d", __func__, command, priv_data.used_len, priv_data.total_len);
            /* Change band request received */
            ret = hdd_setBand_helper(dev, ptr);
+           if(ret != 0)
+              VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "%s: failed to set band ret=%ld",__func__, ret);
        }
        else if(strncmp(command, "SETWMMPS", 8) == 0)
        {
@@ -6606,6 +6628,8 @@ int hdd_stop (struct net_device *dev)
       )
    {
       /* SoftAP mode, so return from here */
+      VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                "%s: In SAP MODE", __func__);
       EXIT();
       return 0;
    }
@@ -6979,6 +7003,11 @@ static int hdd_set_mac_address(struct net_device *dev, void *addr)
                              (v_U8_t *)&pAdapter->macAddressCurrent,
                              sizeof( pAdapter->macAddressCurrent ),
                              hdd_set_mac_addr_cb, VOS_FALSE );
+   if( eHAL_STATUS_SUCCESS != halStatus)
+   {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s: failed to set MAC address in CFG", __func__);
+   }
 #endif
 
    memcpy(dev->dev_addr, psta_mac_addr->sa_data, ETH_ALEN);
@@ -7250,7 +7279,7 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    tANI_U32 type, subType;
-   int rc = 0;
+   long rc = 0;
 
    INIT_COMPLETION(pAdapter->session_open_comp_var);
    sme_SetCurrDeviceMode(pHddCtx->hHal, pAdapter->device_mode);
@@ -7277,10 +7306,10 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    rc = wait_for_completion_interruptible_timeout(
                         &pAdapter->session_open_comp_var,
                         msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-   if (!rc)
+   if (rc <= 0)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,
-             "Session is not opened within timeout period code %08d", rc );
+             "Session is not opened within timeout period code %ld", rc );
       status = VOS_STATUS_E_FAILURE;
       goto error_sme_open;
    }
@@ -7360,10 +7389,16 @@ error_register_wext:
                                     pAdapter->sessionId,
                                     hdd_smeCloseSessionCallback, pAdapter))
       {
+         long rc;
+
          //Block on a completion variable. Can't wait forever though.
-         wait_for_completion_timeout(
+         rc = wait_for_completion_timeout(
                           &pAdapter->session_close_comp_var,
                           msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
+         if (rc <= 0)
+             hddLog(VOS_TRACE_LEVEL_ERROR,
+                    FL("Session is not opened within timeout period code %ld"),
+                    rc);
       }
 }
 error_sme_open:
@@ -7378,15 +7413,16 @@ void hdd_cleanup_actionframe( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
 
    if( NULL != cfgState->buf )
    {
-      int rc;
+      long rc;
       INIT_COMPLETION(pAdapter->tx_action_cnf_event);
       rc = wait_for_completion_interruptible_timeout(
                      &pAdapter->tx_action_cnf_event,
                      msecs_to_jiffies(ACTION_FRAME_TX_TIMEOUT));
-      if(!rc)
+      if (rc <= 0)
       {
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-              ("ERROR: HDD Wait for Action Confirmation Failed!!"));
+              "%s ERROR: HDD Wait for Action Confirmation Failed!! %ld",
+              __func__, rc);
       }
    }
    return;
@@ -7707,9 +7743,17 @@ VOS_STATUS hdd_disable_bmps_imps(hdd_context_t *pHddCtx, tANI_U8 session_type)
               {
                  if(halStatus == eHAL_STATUS_PMC_PENDING)
                  {
+                    long ret;
                     //Block on a completion variable. Can't wait forever though
-                    wait_for_completion_interruptible_timeout(
-                         &pHddCtx->full_pwr_comp_var, msecs_to_jiffies(1000));
+                    ret = wait_for_completion_interruptible_timeout(
+                                   &pHddCtx->full_pwr_comp_var,
+                                   msecs_to_jiffies(1000));
+                    if (ret <= 0)
+                    {
+                        hddLog(VOS_TRACE_LEVEL_ERROR,
+                               "%s: wait on full_pwr_comp_var failed %ld",
+                               __func__, ret);
+                    }
                  }
                  else
                  {
@@ -7772,6 +7816,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
       if(VOS_STATUS_E_FAILURE == exitbmpsStatus)
       {
          //Fail to Exit BMPS
+         hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Fail to Exit BMPS", __func__);
          VOS_ASSERT(0);
          return NULL;
       }
@@ -7786,7 +7831,12 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          pAdapter = hdd_alloc_station_adapter( pHddCtx, macAddr, iface_name );
 
          if( NULL == pAdapter )
+         {
+            hddLog(VOS_TRACE_LEVEL_FATAL,
+                   FL("failed to allocate adapter for session %d"),
+                   session_type);
             return NULL;
+         }
 
          pAdapter->wdev.iftype = (session_type == WLAN_HDD_P2P_CLIENT) ?
                                   NL80211_IFTYPE_P2P_CLIENT:
@@ -7831,7 +7881,12 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
       {
          pAdapter = hdd_wlan_create_ap_dev( pHddCtx, macAddr, (tANI_U8 *)iface_name );
          if( NULL == pAdapter )
+         {
+            hddLog(VOS_TRACE_LEVEL_FATAL,
+                   FL("failed to allocate adapter for session %d"),
+                   session_type);
             return NULL;
+         }
 
          pAdapter->wdev.iftype = (session_type == WLAN_HDD_SOFTAP) ?
                                   NL80211_IFTYPE_AP:
@@ -7859,7 +7914,12 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
       {
          pAdapter = hdd_alloc_station_adapter( pHddCtx, macAddr, iface_name );
          if( NULL == pAdapter )
+         {
+            hddLog(VOS_TRACE_LEVEL_FATAL,
+                   FL("failed to allocate adapter for session %d"),
+                   session_type);
             return NULL;
+         }
 
          pAdapter->wdev.iftype = NL80211_IFTYPE_MONITOR;
          pAdapter->device_mode = session_type;
@@ -7896,7 +7956,13 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          pAdapter = hdd_alloc_station_adapter( pHddCtx, macAddr, iface_name );
 
          if( NULL == pAdapter )
+         {
+            hddLog(VOS_TRACE_LEVEL_FATAL,
+                   FL("failed to allocate adapter for session %d"),
+                   session_type);
             return NULL;
+         }
+
          /* Assign NL80211_IFTYPE_STATION as interface type to resolve Kernel Warning
           * message while loading driver in FTM mode. */
          pAdapter->wdev.iftype = NL80211_IFTYPE_STATION;
@@ -7912,6 +7978,8 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          break;
       default:
       {
+         hddLog(VOS_TRACE_LEVEL_FATAL,"%s Invalid session type %d",
+                __func__, session_type);
          VOS_ASSERT(0);
          return NULL;
       }
@@ -8124,7 +8192,11 @@ VOS_STATUS hdd_close_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 
    status = hdd_get_front_adapter ( pHddCtx, &pCurrent );
    if( VOS_STATUS_SUCCESS != status )
+   {
+      hddLog(VOS_TRACE_LEVEL_WARN,"%s: adapter list empty %d",
+             __func__, status);
       return status;
+   }
 
    while ( pCurrent->pAdapter != pAdapter )
    {
@@ -8229,6 +8301,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
    hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
    union iwreq_data wrqu;
    v_U8_t retry = 0;
+   long ret;
 
    ENTER();
 
@@ -8252,8 +8325,21 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
             //success implies disconnect command got queued up successfully
             if(halStatus == eHAL_STATUS_SUCCESS)
             {
-               wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
-               msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+               ret = wait_for_completion_interruptible_timeout(
+                          &pAdapter->disconnect_comp_var,
+                          msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+               if (ret <= 0)
+               {
+                   hddLog(VOS_TRACE_LEVEL_ERROR,
+                          "%s: wait on disconnect_comp_var failed %ld",
+                          __func__, ret);
+               }
+
+            }
+            else
+            {
+               hddLog(LOGE, "%s: failed to post disconnect event to SME",
+                      __func__);
             }
             memset(&wrqu, '\0', sizeof(wrqu));
             wrqu.ap_addr.sa_family = ARPHRD_ETHER;
@@ -8299,9 +8385,15 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
                                  hdd_smeCloseSessionCallback, pAdapter))
             {
                //Block on a completion variable. Can't wait forever though.
-               wait_for_completion_timeout(
+               ret = wait_for_completion_timeout(
                           &pAdapter->session_close_comp_var,
                           msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
+               if (0 >= ret)
+               {
+                  hddLog(LOGE,
+                         "%s: failure waiting for session_close_comp_var %ld",
+                         __func__, ret);
+               }
             }
          }
          break;
@@ -8354,8 +8446,8 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
 
                if (!VOS_IS_STATUS_SUCCESS(status))
                {
-                  hddLog(LOGE, "%s: failure waiting for WLANSAP_StopBss",
-                         __func__);
+                  hddLog(LOGE, "%s: failure waiting for WLANSAP_StopBss %d",
+                         __func__, status);
                }
             }
             else
@@ -8613,6 +8705,7 @@ VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx )
    hdd_adapter_t *pAdapter;
    VOS_STATUS status;
    v_U32_t roamId;
+   long ret;
 
    ENTER();
 
@@ -8633,9 +8726,12 @@ VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx )
          sme_RoamDisconnect(pHddCtx->hHal, pAdapter->sessionId,
                              eCSR_DISCONNECT_REASON_UNSPECIFIED);
 
-         wait_for_completion_interruptible_timeout(
+         ret = wait_for_completion_interruptible_timeout(
                                 &pAdapter->disconnect_comp_var,
                                 msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+         if (0 >= ret)
+            hddLog(LOGE, "%s: failure waiting for disconnect_comp_var %ld",
+                   __func__, ret);
 
          pWextState->roamProfile.csrPersona = pAdapter->device_mode;
          pHddCtx->isAmpAllowed = VOS_FALSE;
@@ -9410,6 +9506,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 
    if (VOS_FTM_MODE == hdd_get_conparam())
    {
+      hddLog(VOS_TRACE_LEVEL_INFO,"%s: FTM MODE",__func__);
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(QCA_WIFI_FTM)
       if (hdd_ftm_stop(pHddCtx))
       {
@@ -9428,6 +9525,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 
    if (VOS_STA_SAP_MODE == hdd_get_conparam())
    {
+      hddLog(VOS_TRACE_LEVEL_INFO,"%s: SAP MODE",__func__);
       pAdapter = hdd_get_adapter(pHddCtx,
                                    WLAN_HDD_SOFTAP);
    }
@@ -9435,6 +9533,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    {
       if (VOS_FTM_MODE != hdd_get_conparam())
       {
+         hddLog(VOS_TRACE_LEVEL_INFO,"%s: STA MODE",__func__);
          pAdapter = hdd_get_adapter(pHddCtx,
                                     WLAN_HDD_INFRA_STATION);
          if (pAdapter == NULL)
@@ -9824,7 +9923,8 @@ static VOS_STATUS hdd_update_config_from_nv(hdd_context_t* pHddCtx)
       {
          if(vos_is_macaddr_zero(&macFromNV[macLoop]))
          {
-            printk(KERN_ERR "not valid MAC from NV for %d", macLoop);
+            hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "not valid MAC from NV for %d", macLoop);
             /* This MAC is not valid, skip it
              * This MAC will be got from ini file */
          }
@@ -11859,10 +11959,10 @@ static void wlan_hdd_restart_deinit(hdd_context_t* pHddCtx)
    /* Cleanup */
    vos_status = vos_timer_stop( &pHddCtx->hdd_restart_timer );
    if (!VOS_IS_STATUS_SUCCESS(vos_status))
-          hddLog(LOGW, FL("Failed to stop HDD restart timer"));
+          hddLog(LOGE, FL("Failed to stop HDD restart timer"));
    vos_status = vos_timer_destroy(&pHddCtx->hdd_restart_timer);
    if (!VOS_IS_STATUS_SUCCESS(vos_status))
-          hddLog(LOGW, FL("Failed to destroy HDD restart timer"));
+          hddLog(LOGE, FL("Failed to destroy HDD restart timer"));
 
 }
 
