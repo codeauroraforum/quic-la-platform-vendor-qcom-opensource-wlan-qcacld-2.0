@@ -48,7 +48,9 @@
 #ifdef FEATURE_WLAN_TDLS
 #include "wlan_hdd_tdls.h"
 #endif
-
+#include "wlan_hdd_trace.h"
+#include "vos_types.h"
+#include "vos_trace.h"
 //Ms to Micro Sec
 #define MS_TO_MUS(x)   ((x)*1000);
 
@@ -609,6 +611,11 @@ int wlan_hdd_cfg80211_remain_on_channel( struct wiphy *wiphy,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
     struct net_device *dev = wdev->netdev;
 #endif
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( dev );
+
+    MTRACE(vos_trace(VOS_MODULE_ID_HDD,
+                     TRACE_CODE_HDD_REMAIN_ON_CHANNEL,
+                     pAdapter->sessionId, REMAIN_ON_CHANNEL_REQUEST));
     return wlan_hdd_request_remain_on_channel(wiphy, dev,
                                         chan,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
@@ -630,6 +637,10 @@ void hdd_remainChanReadyHandler( hdd_adapter_t *pAdapter )
     pRemainChanCtx = cfgState->remain_on_chan_ctx;
     if( pRemainChanCtx != NULL )
     {
+        MTRACE(vos_trace(VOS_MODULE_ID_HDD,
+                         TRACE_CODE_HDD_REMAINCHANREADYHANDLER,
+                         pAdapter->sessionId, pRemainChanCtx->duration));
+
         // Removing READY_EVENT_PROPOGATE_TIME from current time which gives
         // more accurate Remain on Channel start time.
         pRemainChanCtx->p2pRemOnChanTimeStamp =
@@ -883,6 +894,9 @@ int wlan_hdd_action( struct wiphy *wiphy, struct net_device *dev,
     hdd_adapter_t *goAdapter;
 #endif
 
+     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
+                      TRACE_CODE_HDD_ACTION, pAdapter->sessionId,
+                      pAdapter->device_mode ));
     status = wlan_hdd_validate_context(pHddCtx);
 
     if (0 != status)
@@ -1579,7 +1593,10 @@ int wlan_hdd_add_virtual_intf( struct wiphy *wiphy, char *name,
 #endif
     }
 
-    /*Allow addition multiple interface for WLAN_HDD_P2P_CLIENT session type*/
+    MTRACE(vos_trace(VOS_MODULE_ID_HDD,
+                     TRACE_CODE_HDD_ADD_VIRTUAL_INTF, NO_SESSION, type));
+    /*Allow addition multiple interface for WLAN_HDD_P2P_CLIENT and
+      WLAN_HDD_SOFTAP session type*/
     if ((hdd_get_adapter(pHddCtx, wlan_hdd_get_session_type(type)) != NULL)
 #ifdef QCA_WIFI_2_0
         && WLAN_HDD_P2P_CLIENT != wlan_hdd_get_session_type(type)
@@ -1641,10 +1658,14 @@ int wlan_hdd_del_virtual_intf( struct wiphy *wiphy, struct net_device *dev )
     struct net_device *dev = wdev->netdev;
 #endif
     hdd_context_t *pHddCtx = (hdd_context_t*) wiphy_priv(wiphy);
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR( dev );
     hdd_adapter_t *pVirtAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     int status;
     ENTER();
 
+    MTRACE(vos_trace(VOS_MODULE_ID_HDD,
+                     TRACE_CODE_HDD_DEL_VIRTUAL_INTF,
+                     pAdapter->sessionId, pAdapter->device_mode));
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: device_mode = %d",
            __func__,pVirtAdapter->device_mode);
 
