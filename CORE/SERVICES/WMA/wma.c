@@ -12983,6 +12983,7 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 	WOW_EVENT_INFO_fixed_param *wake_info;
 	struct wma_txrx_node *node;
 	u_int32_t wake_lock_duration = 0;
+	u_int32_t wow_buf_pkt_len = 0;
 
 	param_buf = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *) event;
 	if (!param_buf) {
@@ -13052,6 +13053,15 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 #endif
 
 	case WOW_REASON_HTT_EVENT:
+		break;
+	case WOW_REASON_PATTERN_MATCH_FOUND:
+		WMA_LOGD("Wake up for Rx packet, dump starting from ethernet hdr");
+		/* First 4-bytes of wow_packet_buffer is the length */
+		vos_mem_copy((u_int8_t *) &wow_buf_pkt_len,
+			     param_buf->wow_packet_buffer, 4);
+		vos_trace_hex_dump(VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_DEBUG,
+				   param_buf->wow_packet_buffer + 4,
+				   wow_buf_pkt_len);
 		break;
 
 	default:
