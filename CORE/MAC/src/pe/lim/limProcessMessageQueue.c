@@ -234,10 +234,16 @@ limDeferMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
 
     if (retCode == TX_SUCCESS)
     {
-        MTRACE(macTraceMsgRx(pMac, NO_SESSION, LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DEFERRED));)
+       limLog(pMac, LOG1,
+             FL("Deferred message(0x%X) limSmeState %d (prev sme state %d) sysRole %d mlm state %d (prev mlm state %d)"),
+             pMsg->type, pMac->lim.gLimSmeState, pMac->lim.gLimPrevSmeState,
+             pMac->lim.gLimSystemRole, pMac->lim.gLimMlmState,
+             pMac->lim.gLimPrevMlmState);
+       MTRACE(macTraceMsgRx(pMac, NO_SESSION, LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DEFERRED));)
     }
     else
     {
+        limLog(pMac, LOGE, FL("Dropped lim message (0x%X)"), pMsg->type);
         MTRACE(macTraceMsgRx(pMac, NO_SESSION, LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DROPPED));)
     }
 
@@ -639,6 +645,9 @@ limHandle80211Frames(tpAniSirGlobal pMac, tpSirMsgQ limMsg, tANI_U8 *pDeferMsg)
                limPktFree(pMac, HAL_TXRX_FRM_802_11_MGMT, pRxPacketInfo, limMsg->bodyptr);
                return;
             }
+            else
+               limLog(pMac,LOG1,"SessionId:%d Session Exist for given Bssid",
+                      psessionEntry->peSessionId);
         }
         //  For p2p resp frames search for valid session with DA as
         //  BSSID will be SA and session will be present with DA only
@@ -883,6 +892,7 @@ eHalStatus limSendStopScanOffloadReq(tpAniSirGlobal pMac, tANI_U8 SessionId)
         return eHAL_STATUS_FAILURE;
     }
 
+    limLog(pMac, LOG1, FL("Abort ongoing offload scan."));
     return eHAL_STATUS_SUCCESS;
 
 }

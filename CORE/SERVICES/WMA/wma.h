@@ -392,7 +392,7 @@ struct wma_wow {
 	v_BOOL_t deauth_enable;
 	v_BOOL_t disassoc_enable;
 	v_BOOL_t bmiss_enable;
-	v_BOOL_t gtk_err_enable;
+	v_BOOL_t gtk_err_enable[WMA_MAX_SUPPORTED_BSS];
 };
 #ifdef WLAN_FEATURE_11W
 #define CMAC_IPN_LEN         (6)
@@ -418,6 +418,17 @@ typedef struct {
 #define WMA_BSS_STATUS_STARTED 0x1
 #define WMA_BSS_STATUS_STOPPED 0x2
 
+typedef struct {
+	A_UINT32 vdev_id;
+	wmi_ssid ssid;
+	A_UINT32 flags;
+	A_UINT32 requestor_id;
+	A_UINT32  disable_hw_ack;
+	wmi_channel chan;
+	adf_os_atomic_t hidden_ssid_restart_in_progress;
+	tANI_U8 ssidHidden;
+} vdev_restart_params_t;
+
 struct wma_txrx_node {
 	u_int8_t addr[ETH_ALEN];
 	u_int8_t bssid[ETH_ALEN];
@@ -425,6 +436,7 @@ struct wma_txrx_node {
 #ifndef QCA_WIFI_ISOC
 	struct beacon_info *beacon;
 #endif
+	vdev_restart_params_t vdev_restart_params;
 	vdev_cli_config_t config;
 	struct scan_param scan_info;
 	u_int32_t type;
@@ -600,6 +612,7 @@ typedef struct {
         u_int32_t roam_preauth_scan_id;
         u_int16_t roam_preauth_chanfreq;
         void *roam_preauth_chan_context;
+	adf_os_spinlock_t roam_preauth_lock;
 
 	/* Here ol_ini_info is used to store ini
 	 * status of arp offload, ns offload

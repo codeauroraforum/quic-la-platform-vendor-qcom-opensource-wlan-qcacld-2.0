@@ -77,6 +77,10 @@
 
 #define SIR_MDIE_SIZE               3
 
+// Increase dwell time for P2P search in ms
+#define P2P_SEARCH_DWELL_TIME_INCREASE   20
+#define P2P_SOCIAL_CHANNELS              3
+
 /* Max number of channels are 165, but to access 165th element of array,
  *array of 166 is required.
  */
@@ -341,6 +345,7 @@ typedef enum eSirResultCodes
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
     eSIR_SME_GTK_OFFLOAD_GETINFO_REQ_FAILED,
 #endif // WLAN_FEATURE_GTK_OFFLOAD
+    eSIR_SME_DEAUTH_STATUS,
     eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE
 } tSirResultCodes;
 

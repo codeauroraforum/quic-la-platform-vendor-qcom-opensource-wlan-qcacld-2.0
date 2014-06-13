@@ -1020,6 +1020,7 @@ typedef struct tagCsrRoamStruct
     tANI_U8        RoamRssiDiff;
     tANI_BOOLEAN   isWESModeEnabled;
 #endif
+    tANI_U32 deauthRspStatus;
 }tCsrRoamStruct;
 
 

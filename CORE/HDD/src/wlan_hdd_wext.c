@@ -105,6 +105,7 @@
 #include "qc_sap_ioctl.h"
 #include "sme_Api.h"
 #include "wlan_qct_wda.h"
+#include "vos_trace.h"
 
 #ifdef QCA_PKT_PROTO_TRACE
 #include "vos_packet.h"
@@ -120,6 +121,7 @@ extern void hdd_resume_wlan(struct early_suspend *wlan_suspend);
 #endif
 
 #define HDD_FINISH_ULA_TIME_OUT    800
+
 
 extern int wlan_hdd_cfg80211_update_band(struct wiphy *wiphy, eCsrBand eBand);
 
@@ -382,6 +384,10 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #ifdef FEATURE_WLAN_TDLS
 #define WE_TDLS_CONFIG_PARAMS   5
 #endif
+
+#define WE_MTRACE_DUMP_CMD    8
+#define WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD    9
+
 #ifdef FEATURE_WLAN_TDLS
 #undef  MAX_VAR_ARGS
 #ifdef QCA_WIFI_2_0
@@ -7463,6 +7469,26 @@ int iw_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info
             }
             break;
 
+        case WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD:
+            {
+                hddLog(LOG1, "%s: SELECTIVE_MODULE_LOG %d arg1 %d arg2",
+                        __func__, apps_args[0], apps_args[1]);
+                vosTraceEnable(apps_args[0], apps_args[1]);
+            }
+            break;
+
+        case WE_MTRACE_DUMP_CMD:
+            {
+                hddLog(LOG1, "%s: MTRACE_DUMP code %d session %d count %d "
+                       "bitmask_of_module %d ",
+                        __func__, apps_args[0], apps_args[1], apps_args[2],
+                        apps_args[3]);
+                vosTraceDumpAll((void*)hHal , apps_args[0], apps_args[1],
+                                apps_args[2], apps_args[3]);
+
+            }
+            break;
+
         case WE_MCC_CONFIG_CREDENTIAL :
             {
                 cmd = 287; //Command should be updated if there is any change
@@ -10718,6 +10744,18 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
         0,
         "dump" },
+
+    /* handlers for sub-ioctl */
+    {   WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD,
+        IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+        0,
+        "setdumplog" },
+
+    {   WE_MTRACE_DUMP_CMD,
+        IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+        0,
+        "dumplog" },
+
     /* handlers for sub ioctl */
    {
        WE_MCC_CONFIG_CREDENTIAL,

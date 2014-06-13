@@ -964,6 +964,9 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
         sta_id = pHddStaCtx->conn_info.staId[0];
     }
      hdd_wmm_adapter_clear(pAdapter);
+#if defined(WLAN_FEATURE_VOWIFI_11R)
+    sme_FTReset(WLAN_HDD_GET_HAL_CTX(pAdapter));
+#endif
     //We should clear all sta register with TL, for now, only one.
     vstatus = hdd_roamDeregisterSTA( pAdapter, sta_id );
     if ( !VOS_IS_STATUS_SUCCESS(vstatus ) )
@@ -1497,6 +1500,11 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 #endif /* FEATURE_WLAN_ESE */
 
                 {
+                    hddLog(VOS_TRACE_LEVEL_INFO,
+                           "%s: sending connect indication to nl80211:for bssid " MAC_ADDRESS_STR " reason:%d and Status:%d",
+                           __func__, MAC_ADDR_ARRAY(pRoamInfo->bssid),
+                           roamResult, roamStatus);
+
                     /* inform connect result to nl80211 */
                     cfg80211_connect_result(dev, pRoamInfo->bssid,
                             reqRsnIe, reqRsnLength,
@@ -1637,8 +1645,19 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
         /* CR465478: Only send up a connection failure result when CSR has
          * completed operation - with a ASSOCIATION_FAILURE status.*/
-        if ( eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus )
+        if (eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus)
         {
+            if (pRoamInfo)
+                hddLog(VOS_TRACE_LEVEL_ERROR,
+                       "%s: send connect failure to nl80211: for bssid " MAC_ADDRESS_STR" reason:%d and Status:%d " ,
+                       __func__, MAC_ADDR_ARRAY(pRoamInfo->bssid),
+                       roamResult, roamStatus);
+            else
+                hddLog(VOS_TRACE_LEVEL_ERROR,
+                       "%s: connect failed: for bssid " MAC_ADDRESS_STR " reason:%d and Status:%d " ,
+                       __func__, MAC_ADDR_ARRAY(pWextState->req_bssId),
+                       roamResult, roamStatus);
+
             /* inform association failure event to nl80211 */
             if ( eCSR_ROAM_RESULT_ASSOC_FAIL_CON_CHANNEL == roamResult )
             {
@@ -4323,7 +4342,33 @@ void hdd_indicateEseAdjApRepInd(hdd_adapter_t *pAdapter,
     wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
 }
 
-void hdd_indicateEseBcnReportInd(const hdd_adapter_t *pAdapter,
+void hdd_indicateEseBcnReportNoResults(const hdd_adapter_t *pAdapter,
+                                       const tANI_U16 measurementToken,
+                                       const tANI_BOOLEAN flag,
+                                       const tANI_U8 numBss)
+{
+    union iwreq_data wrqu;
+    char buf[IW_CUSTOM_MAX];
+    char *pos = buf;
+    int nBytes = 0, freeBytes = IW_CUSTOM_MAX;
+
+    memset(&wrqu, '\0', sizeof(wrqu));
+    memset(buf, '\0', sizeof(buf));
+
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("CCXBCNREP=%d %d %d"), measurementToken, flag,
+           numBss);
+
+    nBytes = snprintf(pos, freeBytes, "CCXBCNREP=%d %d %d", measurementToken,
+                      flag, numBss);
+
+    wrqu.data.pointer = buf;
+    wrqu.data.length = nBytes;
+    // send the event
+    wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
+}
+
+
+static void hdd_indicateEseBcnReportInd(const hdd_adapter_t *pAdapter,
                                  const tCsrRoamInfo *pRoamInfo)
 {
     union iwreq_data wrqu;
@@ -4355,21 +4400,10 @@ void hdd_indicateEseBcnReportInd(const hdd_adapter_t *pAdapter,
         hddLog(VOS_TRACE_LEVEL_INFO, "Measurement Done but no scan results");
         /* If the measurement is none and no scan results found,
             indicate the supplicant about measurement done */
-        memset(&wrqu, '\0', sizeof(wrqu));
-        memset(buf, '\0', sizeof(buf));
-
-        hddLog(VOS_TRACE_LEVEL_INFO, "CCXBCNREP=%d %d %d %d",
-            pRoamInfo->pEseBcnReportRsp->measurementToken, pRoamInfo->pEseBcnReportRsp->flag,
-            pRoamInfo->pEseBcnReportRsp->numBss, tot_bcn_ieLen);
-
-        nBytes = snprintf(pos, freeBytes, "CCXBCNREP=%d %d %d",
-            pRoamInfo->pEseBcnReportRsp->measurementToken, pRoamInfo->pEseBcnReportRsp->flag,
+        hdd_indicateEseBcnReportNoResults(pAdapter,
+                                 pRoamInfo->pEseBcnReportRsp->measurementToken,
+                                 pRoamInfo->pEseBcnReportRsp->flag,
             pRoamInfo->pEseBcnReportRsp->numBss);
-
-        wrqu.data.pointer = buf;
-        wrqu.data.length = nBytes;
-        // send the event
-        wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
     }
     else
     {

@@ -535,11 +535,10 @@ send_fail_resp:
 static int wma_vdev_start_resp_handler(void *handle, u_int8_t *cmd_param_info,
 				       u_int32_t len)
 {
-	tp_wma_handle wma = (tp_wma_handle) handle;
-	struct wma_target_req *req_msg;
 	WMI_VDEV_START_RESP_EVENTID_param_tlvs *param_buf;
 	wmi_vdev_start_response_event_fixed_param *resp_event;
-	struct wma_txrx_node *iface;
+	u_int8_t *buf;
+	vos_msg_t vos_msg = {0};
 
 	WMA_LOGI("%s: Enter", __func__);
 	param_buf = (WMI_VDEV_START_RESP_EVENTID_param_tlvs *) cmd_param_info;
@@ -549,18 +548,80 @@ static int wma_vdev_start_resp_handler(void *handle, u_int8_t *cmd_param_info,
 	}
 
 	resp_event = param_buf->fixed_param;
+	buf = vos_mem_malloc(sizeof(wmi_vdev_start_response_event_fixed_param));
+	if (!buf) {
+		WMA_LOGE("%s: Failed alloc memory for buf", __func__);
+		return -EINVAL;
+	}
+	vos_mem_zero(buf, sizeof(wmi_vdev_start_response_event_fixed_param));
+	vos_mem_copy(buf, (u_int8_t *)resp_event,
+					sizeof(wmi_vdev_start_response_event_fixed_param));
+
+	vos_msg.type = WDA_VDEV_START_RSP_IND;
+	vos_msg.bodyptr = buf;
+	vos_msg.bodyval = 0;
+
+	if (VOS_STATUS_SUCCESS !=
+	    vos_mq_post_message(VOS_MQ_ID_WDA, &vos_msg)) {
+		WMA_LOGP("%s: Failed to post WDA_VDEV_START_RSP_IND msg", __func__);
+		vos_mem_free(buf);
+		return -1;
+	}
+	WMA_LOGD("WDA_VDEV_START_RSP_IND posted");
+	return 0;
+}
+
+static int wma_vdev_start_rsp_ind(tp_wma_handle wma, u_int8_t *buf)
+{
+	struct wma_target_req *req_msg;
+	struct wma_txrx_node *iface;
+	wmi_vdev_start_response_event_fixed_param *resp_event;
+
+	resp_event = (wmi_vdev_start_response_event_fixed_param *)buf;
+
+	if (!resp_event) {
+		WMA_LOGE("Invalid start response event buffer");
+		return -EINVAL;
+	}
+
+    if ((resp_event->vdev_id <= wma->max_bssid) &&
+        (adf_os_atomic_read
+		(&wma->interfaces[resp_event->vdev_id].vdev_restart_params.hidden_ssid_restart_in_progress)) &&
+		((wma->interfaces[resp_event->vdev_id].type == WMI_VDEV_TYPE_AP) &&
+		(wma->interfaces[resp_event->vdev_id].sub_type == 0))) {
+			WMA_LOGE("%s: vdev restart event recevied for hidden ssid set using IOCTL ", __func__);
+
+			if (wmi_unified_vdev_up_send(wma->wmi_handle, resp_event->vdev_id, 0,
+				wma->interfaces[resp_event->vdev_id].bssid) < 0) {
+					WMA_LOGE("%s : failed to send vdev up", __func__);
+					return -EEXIST;
+			}
+			adf_os_atomic_set
+			(&wma->interfaces[resp_event->vdev_id].vdev_restart_params.hidden_ssid_restart_in_progress,0);
+			wma->interfaces[resp_event->vdev_id].vdev_up = TRUE;
+	}
+
 	req_msg = wma_find_vdev_req(wma, resp_event->vdev_id,
 				    WMA_TARGET_REQ_TYPE_VDEV_START);
+
 	if (!req_msg) {
-		WMA_LOGP("%s: Failed to lookup request message for vdev %d",
+		WMA_LOGE("%s: Failed to lookup request message for vdev %d",
 			 __func__, resp_event->vdev_id);
 		return -EINVAL;
 	}
+
 	vos_timer_stop(&req_msg->event_timeout);
-        iface = &wma->interfaces[resp_event->vdev_id];
+
+	iface = &wma->interfaces[resp_event->vdev_id];
 	if (req_msg->msg_type == WDA_CHNL_SWITCH_REQ) {
 		tpSwitchChannelParams params =
 			(tpSwitchChannelParams) req_msg->user_data;
+		if(!params) {
+			WMA_LOGE("%s: channel switch params is NULL for vdev %d",
+				 __func__, resp_event->vdev_id);
+			return -EINVAL;
+		}
+
 		WMA_LOGD("%s: Send channel switch resp vdev %d status %d",
 			 __func__, resp_event->vdev_id, resp_event->status);
 		params->chainMask = resp_event->chain_mask;
@@ -1148,6 +1209,73 @@ static int wma_vdev_stop_resp_handler(void *handle, u_int8_t *cmd_param_info,
 	return 0;
 }
 
+void wma_hidden_ssid_vdev_restart_on_vdev_stop(tp_wma_handle wma_handle, u_int8_t sessionId)
+{
+	wmi_vdev_start_request_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	wmi_channel *chan;
+	int32_t len;
+	u_int8_t *buf_ptr;
+	struct wma_txrx_node *intr = wma_handle->interfaces;
+	int32_t ret=0;
+
+	len = sizeof(*cmd) + sizeof(wmi_channel) +
+			WMI_TLV_HDR_SIZE;
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGE("%s : wmi_buf_alloc failed", __func__);
+		adf_os_atomic_set(&intr[sessionId].vdev_restart_params.hidden_ssid_restart_in_progress,0);
+		return;
+	}
+	buf_ptr = (u_int8_t *) wmi_buf_data(buf);
+	cmd = (wmi_vdev_start_request_cmd_fixed_param *) buf_ptr;
+	chan = (wmi_channel *) (buf_ptr + sizeof(*cmd));
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+			WMITLV_TAG_STRUC_wmi_vdev_start_request_cmd_fixed_param,
+			WMITLV_GET_STRUCT_TLVLEN(
+			wmi_vdev_start_request_cmd_fixed_param));
+
+	WMITLV_SET_HDR(&chan->tlv_header,
+			WMITLV_TAG_STRUC_wmi_channel,
+			WMITLV_GET_STRUCT_TLVLEN(wmi_channel));
+
+	cmd->vdev_id = sessionId;
+	cmd->ssid.ssid_len = intr[sessionId].vdev_restart_params.ssid.ssid_len;
+	vos_mem_copy(cmd->ssid.ssid,
+		intr[sessionId].vdev_restart_params.ssid.ssid,
+		cmd->ssid.ssid_len);
+	cmd->flags = intr[sessionId].vdev_restart_params.flags;
+	if (intr[sessionId].vdev_restart_params.ssidHidden)
+		cmd->flags |= WMI_UNIFIED_VDEV_START_HIDDEN_SSID;
+	else
+		cmd->flags &= (0xFFFFFFFE);
+	cmd->requestor_id = intr[sessionId].vdev_restart_params.requestor_id;
+	cmd->disable_hw_ack = intr[sessionId].vdev_restart_params.disable_hw_ack;
+
+	chan->mhz = intr[sessionId].vdev_restart_params.chan.mhz;
+	chan->band_center_freq1 = intr[sessionId].vdev_restart_params.chan.band_center_freq1;
+	chan->band_center_freq2 = intr[sessionId].vdev_restart_params.chan.band_center_freq2;
+	chan->info = intr[sessionId].vdev_restart_params.chan.info;
+	chan->reg_info_1 = intr[sessionId].vdev_restart_params.chan.reg_info_1;
+	chan->reg_info_2 = intr[sessionId].vdev_restart_params.chan.reg_info_2;
+
+	cmd->num_noa_descriptors = 0;
+	buf_ptr = (u_int8_t *)(((u_int32_t) cmd) + sizeof(*cmd) +
+					sizeof(wmi_channel));
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+			cmd->num_noa_descriptors *
+			sizeof(wmi_p2p_noa_descriptor));
+
+	ret = wmi_unified_cmd_send(wma_handle->wmi_handle,buf,len,
+			WMI_VDEV_RESTART_REQUEST_CMDID);
+	if (ret < 0) {
+		WMA_LOGE("%s: Failed to send vdev restart command", __func__);
+		adf_os_atomic_set(&intr[sessionId].vdev_restart_params.hidden_ssid_restart_in_progress,0);
+		adf_nbuf_free(buf);
+	}
+}
+
 static int wma_vdev_stop_ind(tp_wma_handle wma, u_int8_t *buf)
 {
 	wmi_vdev_stopped_event_fixed_param *resp_event;
@@ -1165,6 +1293,15 @@ static int wma_vdev_stop_ind(tp_wma_handle wma, u_int8_t *buf)
 	}
 
 	resp_event = (wmi_vdev_stopped_event_fixed_param *)buf;
+
+	if ((resp_event->vdev_id <= wma->max_bssid) &&
+	(adf_os_atomic_read(&wma->interfaces[resp_event->vdev_id].vdev_restart_params.hidden_ssid_restart_in_progress)) &&
+	((wma->interfaces[resp_event->vdev_id].type == WMI_VDEV_TYPE_AP) &&
+	(wma->interfaces[resp_event->vdev_id].sub_type == 0))) {
+		WMA_LOGE("%s: vdev stop event recevied for hidden ssid set using IOCTL ", __func__);
+		wma_hidden_ssid_vdev_restart_on_vdev_stop(wma, resp_event->vdev_id);
+	}
+
 	req_msg = wma_find_vdev_req(wma, resp_event->vdev_id,
 				    WMA_TARGET_REQ_TYPE_VDEV_STOP);
 	if (!req_msg) {
@@ -3118,6 +3255,8 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 
         adf_os_spinlock_init(&wma_handle->vdev_detach_lock);
 
+        adf_os_spinlock_init(&wma_handle->roam_preauth_lock);
+
 	/* Register vdev start response event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   WMI_VDEV_START_RESP_EVENTID,
@@ -3219,6 +3358,7 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 err_dbglog_init:
 	adf_os_spinlock_destroy(&wma_handle->vdev_respq_lock);
 	adf_os_spinlock_destroy(&wma_handle->vdev_detach_lock);
+	adf_os_spinlock_destroy(&wma_handle->roam_preauth_lock);
 err_event_init:
 	wmi_unified_unregister_event_handler(wma_handle->wmi_handle,
 					     WMI_DEBUG_PRINT_EVENTID);
@@ -4391,6 +4531,8 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 	u_int8_t *buf_ptr;
 	int i;
 	int len = sizeof(*cmd);
+	tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(VOS_MODULE_ID_PE,
+				wma_handle->vos_context);
 
 	len += WMI_TLV_HDR_SIZE; /* Length TLV placeholder for array of uint32 */
 	/* calculate the length of buffer required */
@@ -4498,11 +4640,15 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 		case P2P_SCAN_TYPE_SEARCH:
 			WMA_LOGD("P2P_SCAN_TYPE_SEARCH");
 			cmd->scan_ctrl_flags |= WMI_SCAN_FILTER_PROBE_REQ;
-			cmd->repeat_probe_time = scan_req->maxChannelTime/3;
 			/* Default P2P burst duration of 120 ms will cover
 			 * 3 channels with default max dwell time 40 ms.
 			 */
 			cmd->burst_duration = WMA_P2P_SCAN_MAX_BURST_DURATION;
+			if (scan_req->channelList.numChannels == P2P_SOCIAL_CHANNELS
+			 && (!IS_MIRACAST_SESSION_PRESENT(pMac)))
+				cmd->repeat_probe_time = scan_req->maxChannelTime/5;
+			else
+				cmd->repeat_probe_time = scan_req->maxChannelTime/3;
 			break;
 		default:
 			WMA_LOGE("Invalid scan type");
@@ -4682,8 +4828,8 @@ VOS_STATUS wma_start_scan(tp_wma_handle wma_handle,
 	tSirScanOffloadEvent *scan_event;
 
 	if (scan_req->sessionId > wma_handle->max_bssid) {
-		WMA_LOGE("%s: Invalid vdev_id %d", __func__,
-			scan_req->sessionId);
+		WMA_LOGE("%s: Invalid vdev_id %d, msg_type : 0x%x", __func__,
+			scan_req->sessionId, msg_type);
 		goto error1;
 	}
 
@@ -4771,6 +4917,7 @@ error1:
                 }
                 scan_event->event = WMI_SCAN_EVENT_COMPLETED;
                 scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
+                scan_event->sessionId = scan_req->sessionId;
                 wma_send_msg(wma_handle, WDA_RX_SCAN_EVENT, (void *) scan_event, 0) ;
         }
 	return vos_status;
@@ -6525,6 +6672,24 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
       return VOS_STATUS_E_FAILURE;
    }
 
+	/* Store vdev params in SAP mode which can be used in vdev restart */
+	if (intr[req->vdev_id].type == WMI_VDEV_TYPE_AP &&
+		intr[req->vdev_id].sub_type == 0) {
+		intr[req->vdev_id].vdev_restart_params.vdev_id = req->vdev_id;
+		intr[req->vdev_id].vdev_restart_params.ssid.ssid_len = cmd->ssid.ssid_len;
+		vos_mem_copy(intr[req->vdev_id].vdev_restart_params.ssid.ssid, cmd->ssid.ssid,
+				cmd->ssid.ssid_len);
+		intr[req->vdev_id].vdev_restart_params.flags = cmd->flags;
+		intr[req->vdev_id].vdev_restart_params.requestor_id = cmd->requestor_id;
+		intr[req->vdev_id].vdev_restart_params.disable_hw_ack = cmd->disable_hw_ack;
+		intr[req->vdev_id].vdev_restart_params.chan.mhz = chan->mhz;
+		intr[req->vdev_id].vdev_restart_params.chan.band_center_freq1 = chan->band_center_freq1;
+		intr[req->vdev_id].vdev_restart_params.chan.band_center_freq2 = chan->band_center_freq1;
+		intr[req->vdev_id].vdev_restart_params.chan.info = chan->info;
+		intr[req->vdev_id].vdev_restart_params.chan.reg_info_1 = chan->reg_info_1;
+		intr[req->vdev_id].vdev_restart_params.chan.reg_info_2 = chan->reg_info_2;
+	}
+
 	return VOS_STATUS_SUCCESS;
 }
 
@@ -6555,7 +6720,14 @@ void wma_vdev_resp_timer(void *data)
 
 	WMA_LOGA("%s: request %d is timed out for vdev_id - %d", __func__,
 						tgt_req->msg_type, tgt_req->vdev_id);
-	wma_find_vdev_req(wma, tgt_req->vdev_id, tgt_req->type);
+	msg = wma_find_vdev_req(wma, tgt_req->vdev_id, tgt_req->type);
+
+	if (!msg) {
+		WMA_LOGE("%s: Failed to lookup request message - %d",
+			 __func__, tgt_req->msg_type);
+		return;
+	}
+
 	if (tgt_req->msg_type == WDA_CHNL_SWITCH_REQ) {
 		tpSwitchChannelParams params =
 			(tpSwitchChannelParams)tgt_req->user_data;
@@ -6684,7 +6856,7 @@ void wma_vdev_resp_timer(void *data)
 			WMA_LOGP("%s: Failed to find peer %pM", __func__, params->bssId);
 		}
 		msg = wma_fill_vdev_req(wma, tgt_req->vdev_id, WDA_DELETE_BSS_REQ,
-						WMA_TARGET_REQ_TYPE_VDEV_STOP, del_bss_params, 1000);
+						WMA_TARGET_REQ_TYPE_VDEV_STOP, del_bss_params, 2000);
 		if (!msg) {
 			WMA_LOGP("%s: Failed to fill vdev request for vdev_id %d",
 							__func__, tgt_req->vdev_id);
@@ -6765,6 +6937,17 @@ VOS_STATUS wma_roam_preauth_chan_set(tp_wma_handle wma_handle,
 
         WMA_LOGI("%s: channel %d", __func__, params->channelNumber);
 
+	/* Check for prior operation in progress */
+	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
+	if (wma_handle->roam_preauth_chan_context != NULL) {
+		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+		vos_status = VOS_STATUS_E_FAILURE;
+		WMA_LOGE("%s: Rejected request. Previous operation in progress", __func__);
+		goto send_resp;
+	}
+	wma_handle->roam_preauth_chan_context = params;
+	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+
         /* Prepare a dummy scan request and get the
          * wmi_start_scan_cmd_fixed_param structure filled properly
          */
@@ -6779,7 +6962,6 @@ VOS_STATUS wma_roam_preauth_chan_set(tp_wma_handle wma_handle,
         scan_req.scanType = eSIR_PASSIVE_SCAN;
         scan_req.p2pScanType = P2P_SCAN_TYPE_LISTEN;
         scan_req.sessionId = vdev_id;
-        wma_handle->roam_preauth_chan_context = params;
         wma_handle->roam_preauth_chanfreq = vos_chan_to_freq(params->channelNumber);
 
         /* set the state in advance before calling wma_start_scan and be ready
@@ -6789,9 +6971,22 @@ VOS_STATUS wma_roam_preauth_chan_set(tp_wma_handle wma_handle,
         wma_handle->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_REQUESTED;
         vos_status = wma_start_scan(wma_handle, &scan_req, WDA_CHNL_SWITCH_REQ);
 
-        if (vos_status != VOS_STATUS_SUCCESS)
-            wma_handle->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_NONE;
-        return vos_status;
+        if (vos_status == VOS_STATUS_SUCCESS)
+		return vos_status;
+	wma_handle->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_NONE;
+	/* Failed operation. Safely clear context */
+	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
+        wma_handle->roam_preauth_chan_context = NULL;
+	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+
+send_resp:
+	WMA_LOGI("%s: sending WDA_SWITCH_CHANNEL_RSP, status = 0x%x",
+			__func__, vos_status);
+	params->chainMask = wma_handle->pdevconfig.txchainmask;
+	params->smpsMode = SMPS_MODE_DISABLED;
+	params->status = vos_status;
+	wma_send_msg(wma_handle, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
+	return vos_status;
 }
 
 VOS_STATUS wma_roam_preauth_chan_cancel(tp_wma_handle wma_handle,
@@ -6801,11 +6996,34 @@ VOS_STATUS wma_roam_preauth_chan_cancel(tp_wma_handle wma_handle,
         VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
 
         WMA_LOGI("%s: channel %d", __func__, params->channelNumber);
+	/* Check for prior operation in progress */
+	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
+	if (wma_handle->roam_preauth_chan_context != NULL) {
+		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+		vos_status = VOS_STATUS_E_FAILURE;
+		WMA_LOGE("%s: Rejected request. Previous operation in progress", __func__);
+		goto send_resp;
+	}
+	wma_handle->roam_preauth_chan_context = params;
+	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
 
         abort_scan_req.SessionId = vdev_id;
         wma_handle->roam_preauth_scan_state = WMA_ROAM_PREAUTH_CHAN_CANCEL_REQUESTED;
-        wma_handle->roam_preauth_chan_context = params;
         vos_status = wma_stop_scan(wma_handle, &abort_scan_req);
+        if (vos_status == VOS_STATUS_SUCCESS)
+		return vos_status;
+	/* Failed operation. Safely clear context */
+	adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
+        wma_handle->roam_preauth_chan_context = NULL;
+	adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
+
+send_resp:
+	WMA_LOGI("%s: sending WDA_SWITCH_CHANNEL_RSP, status = 0x%x",
+			__func__, vos_status);
+	params->chainMask = wma_handle->pdevconfig.txchainmask;
+	params->smpsMode = SMPS_MODE_DISABLED;
+	params->status = vos_status;
+	wma_send_msg(wma_handle, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
         return vos_status;
 }
 
@@ -6858,7 +7076,9 @@ static void wma_roam_preauth_scan_event_handler(tp_wma_handle wma_handle,
                 params->smpsMode = SMPS_MODE_DISABLED;
                 params->status = vos_status;
                 wma_send_msg(wma_handle, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
+		adf_os_spin_lock_bh(&wma_handle->roam_preauth_lock);
                 wma_handle->roam_preauth_chan_context = NULL;
+		adf_os_spin_unlock_bh(&wma_handle->roam_preauth_lock);
         }
 
 }
@@ -10606,7 +10826,7 @@ static void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
         }
 
 	msg = wma_fill_vdev_req(wma, params->smesessionId, WDA_DELETE_BSS_REQ,
-				WMA_TARGET_REQ_TYPE_VDEV_STOP, params, 1000);
+				WMA_TARGET_REQ_TYPE_VDEV_STOP, params, 2000);
 	if (!msg) {
 		WMA_LOGP("%s: Failed to fill vdev request for vdev_id %d",
 			 __func__, params->smesessionId);
@@ -11522,7 +11742,6 @@ static int32_t wma_set_qpower_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, 
 	struct sAniSirGlobal *mac =
 		(struct sAniSirGlobal*)vos_get_context(VOS_MODULE_ID_PE,
 		wma->vos_context);
-	u_int32_t tx_wake_threshold = WMA_DEFAULT_QPOWER_TX_WAKE_THRESHOLD;
 	u_int32_t pspoll_count = WMA_DEFAULT_MAX_PSPOLL_BEFORE_WAKE;
 
 	WMA_LOGE("Set QPower Force(1)/Normal(0) Sleep vdevId %d val %d",
@@ -11541,11 +11760,6 @@ static int32_t wma_set_qpower_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, 
 	}
 	if (cfg_data_val) {
 		pspoll_count = (u_int32_t)cfg_data_val;
-	}
-
-	if (enable) {
-		/* override normal configuration and force station asleep */
-		tx_wake_threshold = WMI_STA_PS_TX_WAKE_THRESHOLD_NEVER;
 	}
 
 	/* Enable QPower */
@@ -11570,17 +11784,18 @@ static int32_t wma_set_qpower_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, 
 	WMA_LOGD("Wake policy set to to pspoll/uapsd vdevId %d",
 		vdev_id);
 
-	/* Set the Tx Wake Threshold */
-	ret = wmi_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
-					WMI_STA_PS_PARAM_TX_WAKE_THRESHOLD,
-					tx_wake_threshold);
+	if (enable) {
+		/* Set the Tx Wake Threshold */
+		ret = wmi_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+						WMI_STA_PS_PARAM_TX_WAKE_THRESHOLD,
+						WMI_STA_PS_TX_WAKE_THRESHOLD_NEVER);
 
-	if (ret) {
-		WMA_LOGE("Setting TxWake Threshold vdevId %d", vdev_id);
-		return ret;
+		if (ret) {
+			WMA_LOGE("Setting TxWake Threshold vdevId %d", vdev_id);
+			return ret;
+		}
+		WMA_LOGD("TxWake Threshold set to TX_WAKE_THRESHOLD_NEVER %d", vdev_id);
 	}
-	WMA_LOGD("TxWake Threshold set to %d vdevId %d",
-		tx_wake_threshold, vdev_id);
 
 	/* Set the QPower Ps Poll Count */
 	ret = wmi_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
@@ -13375,15 +13590,16 @@ static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
 			 wma->wow.bmiss_enable ? "enabled" : "disabled");
 
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
-	/* Configure GTK based wakeup */
+	/* Configure GTK based wakeup. Passing vdev_id 0 because
+	  wma_add_wow_wakeup_event always uses vdev 0 for wow wake event id*/
 	ret = wma_add_wow_wakeup_event(wma, WOW_GTK_ERR_EVENT,
-				       wma->wow.gtk_err_enable);
+				       wma->wow.gtk_err_enable[0]);
 	if (ret != VOS_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to configure GTK based wakeup");
 		goto end;
 	} else
 		WMA_LOGD("GTK based wakeup is %s in fw",
-			 wma->wow.gtk_err_enable ? "enabled" : "disabled");
+			 wma->wow.gtk_err_enable[0] ? "enabled" : "disabled");
 #endif
 	/* Configure probe req based wakeup */
 	ret = wma_add_wow_wakeup_event(wma, WOW_PROBE_REQ_WPS_IE_EVENT,
@@ -14584,7 +14800,7 @@ static VOS_STATUS wma_send_gtk_offload_req(tp_wma_handle wma, u_int8_t vdev_id,
 	/* Request target to enable GTK offload */
 	if (params->ulFlags == GTK_OFFLOAD_ENABLE) {
 		cmd->flags = GTK_OFFLOAD_ENABLE_OPCODE;
-		wma->wow.gtk_err_enable = TRUE;
+		wma->wow.gtk_err_enable[vdev_id] = TRUE;
 
 		/* Copy the keys and replay counter */
 		vos_mem_copy(cmd->KCK, params->aKCK, GTK_OFFLOAD_KCK_BYTES);
@@ -14592,7 +14808,7 @@ static VOS_STATUS wma_send_gtk_offload_req(tp_wma_handle wma, u_int8_t vdev_id,
 		vos_mem_copy(cmd->replay_counter, &params->ullKeyReplayCounter,
 			     GTK_REPLAY_COUNTER_BYTES);
 	} else {
-		wma->wow.gtk_err_enable = FALSE;
+		wma->wow.gtk_err_enable[vdev_id] = FALSE;
 		cmd->flags = GTK_OFFLOAD_DISABLE_OPCODE;
 	}
 
@@ -14623,10 +14839,17 @@ static VOS_STATUS wma_process_gtk_offload_req(tp_wma_handle wma,
 		goto out;
 	}
 
+	/* Validate vdev id */
+	if (vdev_id >= wma->max_bssid){
+		WMA_LOGE("invalid vdev_id %d for %pM", vdev_id, params->bssId);
+		status = VOS_STATUS_E_INVAL;
+		goto out;
+	}
+
 	if ((params->ulFlags == GTK_OFFLOAD_ENABLE) &&
-	    (wma->wow.gtk_err_enable == TRUE)) {
-		WMA_LOGD("%s GTK Offload already enabled. Disable it first",
-			 __func__);
+	    (wma->wow.gtk_err_enable[vdev_id] == TRUE)) {
+		WMA_LOGE("%s GTK Offload already enabled. Disable it first "
+			 "vdev_id %d", __func__, vdev_id);
 		params->ulFlags = GTK_OFFLOAD_DISABLE;
 		status = wma_send_gtk_offload_req(wma, vdev_id, params);
 		if (status != VOS_STATUS_SUCCESS) {
@@ -16144,6 +16367,31 @@ VOS_STATUS wma_stats_ext_req(void *wda_handle,
 
 #endif
 
+void wma_hidden_ssid_vdev_restart(tp_wma_handle wma_handle,
+                        tHalHiddenSsidVdevRestart *pReq)
+{
+        struct wma_txrx_node *intr = wma_handle->interfaces;
+
+        if ((pReq->sessionId  != intr[pReq->sessionId].vdev_restart_params.vdev_id) ||
+		!((intr[pReq->sessionId].type == WMI_VDEV_TYPE_AP) &&
+		(intr[pReq->sessionId].sub_type == 0)))
+        {
+                WMA_LOGE("%s : invalid session id", __func__);
+                return;
+        }
+
+        intr[pReq->sessionId].vdev_restart_params.ssidHidden = pReq->ssidHidden;
+        adf_os_atomic_set(&intr[pReq->sessionId].vdev_restart_params.hidden_ssid_restart_in_progress,1);
+
+        /* vdev stop -> vdev restart -> vdev up */
+        if (wmi_unified_vdev_stop_send(wma_handle->wmi_handle, pReq->sessionId)) {
+                WMA_LOGE("%s: %d Failed to send vdev stop",
+                         __func__, __LINE__);
+                adf_os_atomic_set(&intr[pReq->sessionId].vdev_restart_params.hidden_ssid_restart_in_progress,0);
+                return;
+        }
+}
+
 /*
  * function   : wma_mc_process_msg
  * Descriptin :
@@ -16552,6 +16800,15 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 		case WDA_WLAN_RESUME_REQ:
 			wma_resume_req(wma_handle);
 			break;
+		case WDA_VDEV_START_RSP_IND:
+			wma_vdev_start_rsp_ind(wma_handle, msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_HIDDEN_SSID_VDEV_RESTART:
+			wma_hidden_ssid_vdev_restart(wma_handle,
+					(tHalHiddenSsidVdevRestart *)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
 			/* Do Nothing? MSG Body should be freed at here */
@@ -16626,14 +16883,10 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 		scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
 		break;
 	case WMI_SCAN_EVENT_PREEMPTED:
-	{
-		tAbortScanParams abortScan;
-		abortScan.SessionId = vdev_id;
-		wma_stop_scan(wma_handle, &abortScan);
+                WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_PREEMPTED", __func__);
 		break;
-	}
 	case WMI_SCAN_EVENT_RESTARTED:
-		WMA_LOGP("%s: Unexpected Scan Event %u", __func__, wmi_event->event);
+		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_RESTARTED", __func__);
 		break;
 	}
 
@@ -17891,7 +18144,6 @@ VOS_STATUS wma_wmi_service_close(v_VOID_t *vos_ctx)
 	WMA_LOGD("%s: Exit", __func__);
 	return VOS_STATUS_SUCCESS;
 }
-
 
 /*
  * Detach DFS methods

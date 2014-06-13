@@ -72,19 +72,11 @@
 #endif
 
 #ifdef FEATURE_WLAN_ESE
-#ifdef QCA_WIFI_2_0
 /* These are the min/max tx power (non virtual rates) range
- * supported by rome hardware
- */
-#define MIN_TX_PWR_CAP    8
-#define MAX_TX_PWR_CAP    19
-#else
-/* These are the min/max tx power (non virtual rates) range
- * supported by prima hardware
+ * supported by prima/rome hardware
  */
 #define MIN_TX_PWR_CAP    8
 #define MAX_TX_PWR_CAP    22
-#endif
 
 #endif
 
@@ -189,7 +181,7 @@ __limFreshScanReqd(tpAniSirGlobal pMac, tANI_U8 returnFreshResults)
 
         }
     }
-    PELOG1(limLog(pMac, LOG1, FL("FreshScanReqd: %d "), validState);)
+   limLog(pMac, LOG1, FL("FreshScanReqd: %d "), validState);
 
    if( (validState) && (returnFreshResults & SIR_BG_SCAN_RETURN_FRESH_RESULTS))
     return TRUE;
@@ -1154,6 +1146,10 @@ static eHalStatus limSendHalStartScanOffloadReq(tpAniSirGlobal pMac,
         pScanOffloadReq->p2pScanType = P2P_SCAN_TYPE_SEARCH;
 
     pScanOffloadReq->sessionId = pScanReq->sessionId;
+
+    if (pScanOffloadReq->sessionId >= pMac->lim.maxBssId)
+        limLog(pMac, LOGE,FL("Invalid pe sessionID : %d"), pScanOffloadReq->sessionId);
+
     pScanOffloadReq->channelList.numChannels =
         pScanReq->channelList.numChannels;
     p = &(pScanOffloadReq->channelList.channelNumber[0]);
@@ -1178,7 +1174,7 @@ static eHalStatus limSendHalStartScanOffloadReq(tpAniSirGlobal pMac,
     pMac->lim.fOffloadScanPending = 1;
     if (pScanReq->p2pSearch)
         pMac->lim.fOffloadScanP2PSearch = 1;
-
+    limLog(pMac, LOG1, FL("Processed Offload Scan Request Successfully"));
     return eHAL_STATUS_SUCCESS;
 }
 
@@ -1215,7 +1211,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 #endif //FEATURE_WLAN_DIAG_SUPPORT
 
     pScanReq = (tpSirSmeScanReq) pMsgBuf;
-    PELOG1(limLog(pMac, LOG1, FL("SME SCAN REQ numChan %d min %d max %d IELen %d first %d fresh %d unique %d type %d mode %d rsp %d"),
+    limLog(pMac, LOG1, FL("SME SCAN REQ numChan %d min %d max %d IELen %d first %d fresh %d unique %d type %d mode %d rsp %d"),
            pScanReq->channelList.numChannels,
            pScanReq->minChannelTime,
            pScanReq->maxChannelTime,
@@ -1225,7 +1221,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
            pScanReq->returnUniqueResults,
            pScanReq->scanType,
            pScanReq->backgroundScanMode,
-           pMac->lim.gLimRspReqd ? 1 : 0);)
+           pMac->lim.gLimRspReqd ? 1 : 0);
 
     /* Since scan req always requires a response, we will overwrite response required here.
      * This is added esp to take care of the condition where in p2p go case, we hold the scan req and
@@ -1246,7 +1242,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     if (!limIsSmeScanReqValid(pMac, pScanReq))
     {
-        PELOGW(limLog(pMac, LOGW, FL("Received SME_SCAN_REQ with invalid parameters"));)
+        limLog(pMac, LOGE, FL("Received SME_SCAN_REQ with invalid parameters"));
 
         if (pMac->lim.gLimRspReqd)
         {
@@ -1269,6 +1265,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
        !pMac->lim.gScanInPowersave &&
        !limIsSystemInActiveState(pMac)))
     {
+       limLog(pMac, LOGE, FL("SCAN is disabled or SCAN in power save is disabled and system is in power save."));
         limSendSmeScanRsp(pMac, offsetof(tSirSmeScanRsp,bssDescription[0]), eSIR_SME_INVALID_PARAMETERS, pScanReq->sessionId, pScanReq->transactionId);
         return;
     }
@@ -1345,6 +1342,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
           if (eHAL_STATUS_SUCCESS !=
                   limSendHalStartScanOffloadReq(pMac, pScanReq))
           {
+              limLog(pMac, LOGE, FL("Couldn't send Offload scan request"));
               limSendSmeScanRsp(pMac,
                       offsetof(tSirSmeScanRsp, bssDescription[0]),
                       eSIR_SME_INVALID_PARAMETERS,
@@ -1358,6 +1356,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
           /*Change Global SME state  */
           /* Store the previous SME state */
+          limLog(pMac, LOG1, FL("Non Offload SCAN request "));
           pMac->lim.gLimPrevSmeState = pMac->lim.gLimSmeState;
           pMac->lim.gLimSmeState = eLIM_SME_WT_SCAN_STATE;
           MTRACE(macTrace(pMac, TRACE_CODE_SME_STATE, pScanReq->sessionId, pMac->lim.gLimSmeState));
@@ -1365,6 +1364,9 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
           if (pScanReq->channelList.numChannels == 0)
           {
               tANI_U32            cfg_len;
+
+              limLog(pMac, LOG1,
+                    FL("Scan all channels as Number of channels is 0"));
               // Scan all channels
               len = sizeof(tLimMlmScanReq) +
                   (sizeof( pScanReq->channelList.channelNumber ) * (WNI_CFG_VALID_CHANNEL_LIST_LEN - 1)) +
@@ -1463,6 +1465,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
           pMac->lim.gTransactionId = pScanReq->transactionId;
 
           // Issue LIM_MLM_SCAN_REQ to MLM
+          limLog(pMac, LOG1, FL("Issue Scan request command to MLM "));
           limPostMlmMessage(pMac, LIM_MLM_SCAN_REQ, (tANI_U32 *) pMlmScanReq);
       }
   } // if ((pMac->lim.gLimSmeState == eLIM_SME_IDLE_STATE) || ...
@@ -1514,6 +1517,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
             }
 #endif
+            limLog(pMac, LOG1, FL("Cached scan results are returned "));
 
             if (pMac->fScanOffload)
                  limFlushp2pScanResults(pMac);
@@ -1677,7 +1681,8 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         {
             /// Received invalid eWNI_SME_JOIN_REQ
             // Log the event
-            limLog(pMac, LOGW, FL("received SME_JOIN_REQ with invalid data"));
+            limLog(pMac, LOGW, FL("SessionId:%d Received SME_JOIN_REQ with invalid data"),
+                   pSmeJoinReq->sessionId);
             retCode = eSIR_SME_INVALID_PARAMETERS;
             goto end;
         }
@@ -1690,8 +1695,8 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         {
             if(peValidateBtJoinRequest(pMac)!= TRUE)
             {
-                limLog(pMac, LOGW, FL("Start Bss session not present::"
-                                   "SME_JOIN_REQ in unexpected state"));
+               limLog(pMac, LOGW, FL("SessionId:%d Start Bss session not present::SME_JOIN_REQ in unexpected state"),
+                      pSmeJoinReq->sessionId);
                 retCode = eSIR_SME_UNEXPECTED_REQ_RESULT_CODE;
                 psessionEntry = NULL;
                 goto end;
@@ -1714,8 +1719,8 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                 // Received eWNI_SME_JOIN_REQ for same
                 // BSS as currently associated.
                 // Log the event and send success
-                PELOGW(limLog(pMac, LOGW, FL("Received SME_JOIN_REQ for "
-                                                "currently joined BSS"));)
+                PELOGW(limLog(pMac, LOGW, FL("SessionId:%d Received SME_JOIN_REQ for currently joined BSS"),
+                       sessionId);)
                 /// Send Join success response to host
                 retCode = eSIR_SME_SUCCESS;
                 goto end;
@@ -1738,6 +1743,9 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                 retCode = eSIR_SME_RESOURCES_UNAVAILABLE;
                 goto end;
             }
+            else
+              limLog(pMac,LOG1,FL("SessionId:%d New session created"),
+                     sessionId);
         }
         handleHTCapabilityandHTInfo(pMac, psessionEntry);
         psessionEntry->isAmsduSupportInAMPDU = pSmeJoinReq->isAmsduSupportInAMPDU;
@@ -2045,6 +2053,8 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         /* Indicate whether spectrum management is enabled*/
         psessionEntry->spectrumMgtEnabled =
            pSmeJoinReq->spectrumMgtIndicator;
+           PELOG1(limLog(pMac,LOG1,FL("SessionId:%d MLM_JOIN_REQ is posted to MLM SM"),
+                         pMlmJoinReq->sessionId));
         /* Issue LIM_MLM_JOIN_REQ to MLM */
         limPostMlmMessage(pMac, LIM_MLM_JOIN_REQ, (tANI_U32 *) pMlmJoinReq);
         return;
@@ -2901,6 +2911,22 @@ __limProcessSmeDeauthReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
                         retCode       = eSIR_SME_STA_NOT_AUTHENTICATED;
                         deauthTrigger = eLIM_HOST_DEAUTH;
+
+/*
+               here we received deauth request from AP so sme state is
+               eLIM_SME_WT_DEAUTH_STATE.if we have ISSUED delSta then
+               mlm state should be eLIM_MLM_WT_DEL_STA_RSP_STATE and if
+               we got delBSS rsp then mlm state should be eLIM_MLM_IDLE_STATE
+               so the below condition captures the state where delSta
+               not done and firmware still in connected state.
+*/
+
+                        if (psessionEntry->limSmeState == eLIM_SME_WT_DEAUTH_STATE &&
+                            psessionEntry->limMlmState != eLIM_MLM_IDLE_STATE &&
+                            psessionEntry->limMlmState != eLIM_MLM_WT_DEL_STA_RSP_STATE)
+                        {
+                            retCode = eSIR_SME_DEAUTH_STATUS;
+                        }
                         goto sendDeauth;
                     }
 
@@ -4462,6 +4488,45 @@ end:
     return;
 } /*** end __limProcessSmeUpdateAPWPSIEs(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf) ***/
 
+#ifdef QCA_WIFI_2_0
+void
+limSendVdevRestart(tpAniSirGlobal pMac,
+                   tpPESession psessionEntry,
+                   tANI_U8 sessionId)
+{
+    tpHalHiddenSsidVdevRestart pHalHiddenSsidVdevRestart = NULL;
+    tSirMsgQ       msgQ;
+    tSirRetStatus  retCode = eSIR_SUCCESS;
+
+    if ( psessionEntry == NULL )
+    {
+        PELOGE(limLog(pMac, LOGE, "%s:%d: Invalid parameters", __func__, __LINE__ );)
+        return;
+    }
+
+    pHalHiddenSsidVdevRestart = vos_mem_malloc(sizeof(tHalHiddenSsidVdevRestart));
+    if (NULL == pHalHiddenSsidVdevRestart)
+    {
+        PELOGE(limLog(pMac, LOGE, "%s:%d: Unable to allocate memory", __func__, __LINE__ );)
+        return;
+    }
+
+    pHalHiddenSsidVdevRestart->ssidHidden = psessionEntry->ssidHidden;
+    pHalHiddenSsidVdevRestart->sessionId = sessionId;
+
+    msgQ.type = WDA_HIDDEN_SSID_VDEV_RESTART;
+    msgQ.bodyptr = pHalHiddenSsidVdevRestart;
+    msgQ.bodyval = 0;
+
+    retCode = wdaPostCtrlMsg(pMac, &msgQ);
+    if (eSIR_SUCCESS != retCode)
+    {
+        PELOGE(limLog(pMac, LOGE, "%s:%d: wdaPostCtrlMsg() failed", __func__, __LINE__ );)
+        vos_mem_free(pHalHiddenSsidVdevRestart);
+    }
+}
+#endif /* QCA_WIFI_2_0 */
+
 static void
 __limProcessSmeHideSSID(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 {
@@ -4488,6 +4553,11 @@ __limProcessSmeHideSSID(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     /* Update the session entry */
     psessionEntry->ssidHidden = pUpdateParams->ssidHidden;
+
+#ifdef QCA_WIFI_2_0
+    /* Send vdev restart */
+    limSendVdevRestart(pMac, psessionEntry, pUpdateParams->sessionId);
+#endif /* QCA_WIFI_2_0 */
 
     /* Update beacon */
     schSetFixedBeaconFields(pMac, psessionEntry);
@@ -5539,7 +5609,6 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
              */
             if (pMac->lim.fScanDisabled)
             {
-                PELOGE(limLog(pMac, LOGE, FL("Error: Scan Disabled"));)
                 if (pMsg->type == eWNI_SME_SCAN_REQ)
                 {
                    limSendSmeScanRsp(pMac,
@@ -5562,6 +5631,10 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
                      */
                     bufConsumed = FALSE;
                 }
+
+                limLog(pMac, LOGE,
+                       FL("Error: Scan Disabled.Return with error status for SME Message %s(%d)"),
+                       limMsgStr(pMsg->type), pMsg->type);
 
                 return bufConsumed;
             }

@@ -793,7 +793,8 @@ VosMCThread
       "%s: MC Thread exiting!!!!", __func__);
   complete_and_exit(&pSchedContext->McShutdown, 0);
 } /* VosMCThread() */
-int isWDresetInProgress(void)
+
+v_BOOL_t isWDresetInProgress(void)
 {
    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                 "%s: Reset is in Progress...",__func__);
@@ -803,7 +804,7 @@ int isWDresetInProgress(void)
    }
    else
    {
-      return 0;
+      return FALSE;
    }
 }
 /*---------------------------------------------------------------------------
@@ -1109,8 +1110,6 @@ static int VosTXThread ( void * Arg )
       if (!vos_is_mq_empty(&pSchedContext->wdiTxMq))
       {
         wpt_msg *pWdiMsg;
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  "%s: Servicing the VOS TX WDI Message queue",__func__);
 
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiTxMq);
 
@@ -1287,8 +1286,6 @@ static int VosRXThread ( void * Arg )
       if (!vos_is_mq_empty(&pSchedContext->wdiRxMq))
       {
         wpt_msg *pWdiMsg;
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  "%s: Servicing the VOS RX WDI Message queue",__func__);
 
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiRxMq);
         if ((NULL == pMsgWrapper) || (NULL == pMsgWrapper->pVosMsg))
