@@ -427,11 +427,13 @@ wlan_hdd_txrx_stypes[NUM_NL80211_IFTYPES] = {
 
 #ifdef WLAN_FEATURE_MBSSID
 
-/* Max. 3 devices = 1STA + 2SOFTAP */
 static const struct ieee80211_iface_limit
 wlan_hdd_iface_limit[] = {
     {
-        .max = 1,
+        /* We need 1 extra STA interface for OBSS scan when SAP starts
+         * with HT40 in STA+SAP concurrency mode
+         */
+        .max = 2,
         .types = BIT(NL80211_IFTYPE_STATION),
     },
     {
@@ -2374,6 +2376,11 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         pConfig->wps_state = SAP_WPS_DISABLED;
     }
     pConfig->fwdWPSPBCProbeReq  = 1; // Forward WPS PBC probe request frame up
+
+    pConfig->RSNEncryptType = eCSR_ENCRYPT_TYPE_NONE;
+    pConfig->mcRSNEncryptType = eCSR_ENCRYPT_TYPE_NONE;
+    (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->ucEncryptType =
+        eCSR_ENCRYPT_TYPE_NONE;
 
     pConfig->RSNWPAReqIELength = 0;
     memset(&pConfig->RSNWPAReqIE[0], 0, sizeof(pConfig->RSNWPAReqIE));
@@ -6202,6 +6209,20 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
         }
         if ( (WLAN_HDD_IBSS == pAdapter->device_mode) && operatingChannel)
         {
+            /*
+             * Need to post the IBSS power save parameters
+             * to WMA. WMA will configure this parameters
+             * to firmware if power save is enabled by the
+             * firmware.
+             */
+            status = hdd_setIbssPowerSaveParams(pAdapter);
+
+            if (VOS_STATUS_SUCCESS != status)
+            {
+                hddLog(VOS_TRACE_LEVEL_ERROR,
+                       "%s: Set IBSS Power Save Params Failed", __func__);
+                return -EINVAL;
+            }
             hdd_select_cbmode(pAdapter,operatingChannel);
         }
 
@@ -7004,7 +7025,8 @@ static int wlan_hdd_try_disconnect( hdd_adapter_t *pAdapter )
                          msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
             if (0 >=  ret)
             {
-                hddLog(LOGE, FL("Failed to receive disconnect event"));
+                hddLog(LOGE, FL("Failed to receive sme disconnect event session Id %d staDebugState %d"),
+                   pAdapter->sessionId, pHddStaCtx->staDebugState);
                 return -EALREADY;
             }
         }
@@ -7016,7 +7038,8 @@ static int wlan_hdd_try_disconnect( hdd_adapter_t *pAdapter )
                      msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
         if (0 >= ret)
         {
-            hddLog(LOGE, FL("Failed to receive disconnect event"));
+            hddLog(LOGE, FL("Failed to receive wait for comp disconnect event session Id %d staDebugState %d"),
+               pAdapter->sessionId, pHddStaCtx->staDebugState);
             return -EALREADY;
         }
     }
@@ -7192,11 +7215,15 @@ int wlan_hdd_disconnect( hdd_adapter_t *pAdapter, u16 reason )
         hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s csrRoamDisconnect failure, returned %d",
                __func__, (int)status );
+        pHddStaCtx->staDebugState = status;
         return -EINVAL;
     }
     status = wait_for_completion_interruptible_timeout(
                 &pAdapter->disconnect_comp_var,
                 msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+
+    pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
+
     if (!status)
     {
        hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -7498,6 +7525,17 @@ static int wlan_hdd_cfg80211_join_ibss( struct wiphy *wiphy,
 
     /* enable selected protection checks in IBSS mode */
     pRoamProfile->cfg_protection = IBSS_CFG_PROTECTION_ENABLE_MASK;
+
+    if (eHAL_STATUS_FAILURE == ccmCfgSetInt( pHddCtx->hHal,
+                                             WNI_CFG_IBSS_ATIM_WIN_SIZE,
+                                             pHddCtx->cfg_ini->ibssATIMWinSize,
+                                             NULL,
+                                             eANI_BOOLEAN_FALSE))
+    {
+        hddLog(LOGE,
+               "%s: Could not pass on WNI_CFG_IBSS_ATIM_WIN_SIZE to CCM",
+               __func__);
+    }
 
     /* BSSID is provided by upper layers hence no need to AUTO generate */
     if (NULL != params->bssid) {
