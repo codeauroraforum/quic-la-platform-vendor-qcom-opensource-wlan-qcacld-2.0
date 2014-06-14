@@ -451,9 +451,13 @@ void limHandleHeartBeatFailure(tpAniSirGlobal pMac,tpPESession psessionEntry)
         // Reset number of beacons received
         limResetHBPktCount(psessionEntry);
         return;
+
     }
-    if (((psessionEntry->limSystemRole == eLIM_STA_ROLE)||(psessionEntry->limSystemRole == eLIM_BT_AMP_STA_ROLE))&&
-         (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE))
+    if (((psessionEntry->limSystemRole == eLIM_STA_ROLE) ||
+         (psessionEntry->limSystemRole == eLIM_BT_AMP_STA_ROLE)) &&
+         (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE) &&
+         (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
+         (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE))
     {
         if (!pMac->sys.gSysEnableLinkMonitorMode)
             return;
