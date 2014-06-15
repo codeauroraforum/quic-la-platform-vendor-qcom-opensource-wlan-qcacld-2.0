@@ -80,7 +80,7 @@ extern tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define TL_INIT_STATE            0
 
 
-#define CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE 1000*30  //30s
+#define CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE 1000*30*4  //120s
 
 // TxMB Functions
 extern eHalStatus pmcPrepareCommand( tpAniSirGlobal pMac, tANI_U32 sessionId,
@@ -1327,10 +1327,10 @@ eHalStatus sme_Open(tHalHandle hHal)
 /*
  * sme_init_chan_list, triggers channel setup based on country code.
  */
-eHalStatus sme_init_chan_list(tHalHandle hal)
+eHalStatus sme_init_chan_list(tHalHandle hal, v_U8_t *alpha2)
 {
     tpAniSirGlobal mac = PMAC_STRUCT(hal);
-    return csr_init_chan_list(mac);
+    return csr_init_chan_list(mac, alpha2);
 }
 
 /*--------------------------------------------------------------------------

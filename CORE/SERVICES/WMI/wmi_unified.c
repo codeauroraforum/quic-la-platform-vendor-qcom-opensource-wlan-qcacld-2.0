@@ -44,6 +44,7 @@
 #include "wma_api.h"
 #include "wma.h"
 #include "macTrace.h"
+#include "vos_api.h"
 #include "if_pci.h"
 
 #define WMI_MIN_HEAD_ROOM 64
@@ -62,17 +63,17 @@ struct wmi_event_debug wmi_event_log_buffer[WMI_EVENT_DEBUG_MAX_ENTRY];
 	wmi_command_log_buffer[g_wmi_command_buf_idx].command = a;	\
 	adf_os_mem_copy(wmi_command_log_buffer[g_wmi_command_buf_idx].data, b , 16);\
 	wmi_command_log_buffer[g_wmi_command_buf_idx].time =		\
-		 adf_os_ticks_to_msecs(adf_os_ticks());			\
+		vos_get_monotonic_boottime();				\
 	g_wmi_command_buf_idx++;					\
 }
 
-#define WMI_EVENT_RECORD(a, b) {						\
+#define WMI_EVENT_RECORD(a, b) {					\
 	if (WMI_EVENT_DEBUG_MAX_ENTRY <= g_wmi_event_buf_idx)		\
 		g_wmi_event_buf_idx = 0;				\
 	wmi_event_log_buffer[g_wmi_event_buf_idx].event = a;		\
 	adf_os_mem_copy(wmi_event_log_buffer[g_wmi_event_buf_idx].data, b , 16);\
 	wmi_event_log_buffer[g_wmi_event_buf_idx].time =		\
-		adf_os_ticks_to_msecs(adf_os_ticks());			\
+		vos_get_monotonic_boottime();				\
 	g_wmi_event_buf_idx++;						\
 }
 
@@ -578,7 +579,7 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, int len,
 		//dump_CE_debug_register(scn->hif_sc);
 		adf_os_atomic_dec(&wmi_handle->pending_cmds);
 		pr_err("%s: MAX 1024 WMI Pending cmds reached.\n", __func__);
-		VOS_ASSERT(0);
+		VOS_BUG(0);
 		return -EBUSY;
 	}
 

@@ -117,7 +117,9 @@ hif_pci_interrupt_handler(int irq, void *arg)
     A_UINT16 val;
     A_UINT32 bar0;
 
-    adf_os_spin_lock_irqsave(&hif_state->suspend_lock);
+    if (sc->hif_init_done == TRUE) {
+        adf_os_spin_lock_irqsave(&hif_state->suspend_lock);
+    }
 
     if (adf_os_atomic_read(&sc->pci_link_suspended))
         goto irq_handled;
@@ -181,7 +183,9 @@ hif_pci_interrupt_handler(int irq, void *arg)
     tasklet_schedule(&sc->intr_tq);
 
 irq_handled:
-    adf_os_spin_unlock_irqrestore(&hif_state->suspend_lock);
+    if (sc->hif_init_done == TRUE) {
+        adf_os_spin_unlock_irqrestore(&hif_state->suspend_lock);
+    }
     return IRQ_HANDLED;
 }
 
@@ -1875,6 +1879,8 @@ hif_pci_resume(struct pci_dev *pdev)
         if ((val & 0x0000ff00) != 0)
             pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
     }
+
+    printk("\n%s: Rome PS: %d", __func__, val);
 
 #ifdef DISABLE_L1SS_STATES
     pci_read_config_dword(pdev, 0x188, &val);
