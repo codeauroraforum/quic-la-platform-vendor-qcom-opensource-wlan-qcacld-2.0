@@ -1265,8 +1265,12 @@ enum wma_cfg_cmd_id {
        /* Set time latency and time quota for MCC home channels */
        WMA_VDEV_MCC_SET_TIME_LATENCY,
        WMA_VDEV_MCC_SET_TIME_QUOTA,
-       /* Add any new command before this */
-       WMA_CMD_ID_MAX
+
+	/* dfs control interface */
+	WMA_VDEV_DFS_CONTROL_CMDID,
+
+	/* Add any new command before this */
+	WMA_CMD_ID_MAX
 };
 
 typedef struct wma_trigger_uapsd_params
