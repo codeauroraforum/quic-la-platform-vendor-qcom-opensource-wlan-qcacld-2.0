@@ -278,6 +278,11 @@
 #define CFG_REG_CHANGE_DEF_COUNTRY_MIN           ( 0 )
 #define CFG_REG_CHANGE_DEF_COUNTRY_MAX           ( 1 )
 
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_NAME    "gAdvertiseConcurrentOperation"
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_DEFAULT ( 1 )
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_MIN     ( 0 )
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_MAX     ( 1 )
+
 typedef enum
 {
     eHDD_DOT11_MODE_AUTO = 0, //covers all things we support
@@ -2906,6 +2911,7 @@ typedef struct
    v_U32_t                     pmfSaQueryMaxRetries;
    v_U32_t                     pmfSaQueryRetryInterval;
 #endif
+   v_BOOL_t                    advertiseConcurrentOperation;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
