@@ -990,6 +990,10 @@ typedef struct sMacOpenParameters
     tANI_U16 maxBssId;
     tANI_U32 frameTransRequired;
     tANI_U8 powersaveOffloadEnabled;
+    /* Powersave Parameters */
+    tANI_U8 staMaxLIModDtim;
+    tANI_U8 staModDtim;
+    tANI_U8 staDynamicDtim;
     tDriverType  driverType;
     tANI_U8 maxWoWFilters;
     tANI_U8 wowEnable;
