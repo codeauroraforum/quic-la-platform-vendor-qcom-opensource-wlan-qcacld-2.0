@@ -2247,6 +2247,9 @@ typedef struct sEnablePsParams
     /* SmeSession Id or Vdev Id */
     tANI_U32 sessionid;
 
+    /* Beacon DTIM Period */
+    tANI_U8 bcnDtimPeriod;
+
     /* success or failure */
     tANI_U32   status;
 }tEnablePsParams, *tpEnablePsParams;
