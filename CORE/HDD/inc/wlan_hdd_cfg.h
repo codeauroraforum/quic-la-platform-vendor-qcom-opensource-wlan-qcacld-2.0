@@ -278,6 +278,11 @@
 #define CFG_REG_CHANGE_DEF_COUNTRY_MIN           ( 0 )
 #define CFG_REG_CHANGE_DEF_COUNTRY_MAX           ( 1 )
 
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_NAME    "gAdvertiseConcurrentOperation"
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_DEFAULT ( 1 )
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_MIN     ( 0 )
+#define CFG_ADVERTISE_CONCURRENT_OPERATION_MAX     ( 1 )
+
 typedef enum
 {
     eHDD_DOT11_MODE_AUTO = 0, //covers all things we support
@@ -996,17 +1001,17 @@ typedef enum
 #define CFG_REORDER_TIME_BK_NAME                           "BkReorderTime"
 #define CFG_REORDER_TIME_BK_MIN                            30
 #define CFG_REORDER_TIME_BK_MAX                            1000
-#define CFG_REORDER_TIME_BK_DEFAULT                        100
+#define CFG_REORDER_TIME_BK_DEFAULT                        300
 
 #define CFG_REORDER_TIME_BE_NAME                           "BeReorderTime"
 #define CFG_REORDER_TIME_BE_MIN                            30
 #define CFG_REORDER_TIME_BE_MAX                            1000
-#define CFG_REORDER_TIME_BE_DEFAULT                        100
+#define CFG_REORDER_TIME_BE_DEFAULT                        300
 
 #define CFG_REORDER_TIME_VI_NAME                           "ViReorderTime"
 #define CFG_REORDER_TIME_VI_MIN                            30
 #define CFG_REORDER_TIME_VI_MAX                            1000
-#define CFG_REORDER_TIME_VI_DEFAULT                        100
+#define CFG_REORDER_TIME_VI_DEFAULT                        300
 
 #define CFG_REORDER_TIME_VO_NAME                           "VoReorderTime"
 #define CFG_REORDER_TIME_VO_MIN                            30
@@ -2405,6 +2410,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX                  ( 2000  )
 #endif
 
+#define CFG_INITIAL_DWELL_TIME_NAME            "gInitialDwellTime"
+#define CFG_INITIAL_DWELL_TIME_DEFAULT         (0)
+#define CFG_INITIAL_DWELL_TIME_MIN             (0)
+#define CFG_INITIAL_DWELL_TIME_MAX             (100)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2562,6 +2572,8 @@ typedef struct
    v_U32_t        nActiveMinChnTime;     //in units of milliseconds
    v_U32_t        nActiveMaxChnTime;     //in units of milliseconds
 
+   v_U32_t        nInitialDwellTime;     //in units of milliseconds
+
    v_U32_t        nActiveMinChnTimeBtc;     //in units of milliseconds
    v_U32_t        nActiveMaxChnTimeBtc;     //in units of milliseconds
 #ifdef WLAN_AP_STA_CONCURRENCY
@@ -2658,6 +2670,10 @@ typedef struct
    v_U8_t                       WfqViWeight;
    v_U8_t                       WfqVoWeight;
    v_U32_t                      DelayedTriggerFrmInt;
+   v_U16_t                      BkReorderAgingTime;
+   v_U16_t                      BeReorderAgingTime;
+   v_U16_t                      ViReorderAgingTime;
+   v_U16_t                      VoReorderAgingTime;
 
    /* Wowl pattern */
    char                        wowlPattern[1024];
@@ -2906,6 +2922,7 @@ typedef struct
    v_U32_t                     pmfSaQueryMaxRetries;
    v_U32_t                     pmfSaQueryRetryInterval;
 #endif
+   v_BOOL_t                    advertiseConcurrentOperation;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
