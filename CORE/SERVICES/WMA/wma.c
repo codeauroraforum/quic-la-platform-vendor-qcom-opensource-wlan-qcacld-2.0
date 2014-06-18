@@ -233,8 +233,7 @@ void wma_set_dfs_regdomain(tp_wma_handle wma);
 static VOS_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
 				    t_thermal_cmd_params thermal_info);
 
-static void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info,
-	                         v_BOOL_t sendResp);
+static void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info);
 
 static void wma_beacon_miss_handler(tp_wma_handle wma, u_int32_t vdev_id);
 
@@ -3317,10 +3316,9 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 
 	INIT_LIST_HEAD(&wma_handle->vdev_resp_queue);
 	adf_os_spinlock_init(&wma_handle->vdev_respq_lock);
-
-        adf_os_spinlock_init(&wma_handle->vdev_detach_lock);
-
-        adf_os_spinlock_init(&wma_handle->roam_preauth_lock);
+	adf_os_spinlock_init(&wma_handle->vdev_detach_lock);
+	adf_os_spinlock_init(&wma_handle->roam_preauth_lock);
+	adf_os_atomic_init(&wma_handle->is_wow_bus_suspended);
 
 	/* Register vdev start response event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -3855,7 +3853,9 @@ static VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 		vos_mem_set(&key_info, sizeof(key_info), 0);
 		key_info.smesessionId= vdev_id;
 		vos_mem_copy(key_info.peerMacAddr, peer_addr, ETH_ALEN);
-		wma_set_stakey(wma, &key_info, FALSE);
+        key_info.sendRsp = FALSE;
+
+		wma_set_stakey(wma, &key_info);
 	}
 #endif
 
@@ -4785,7 +4785,39 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 			 * intervals for NOA. Maximize number of channels in
 			 * every transition by using burst scan.
 			 */
-			cmd->burst_duration = scan_req->maxChannelTime;
+			if (IS_MIRACAST_SESSION_PRESENT(pMac)) {
+				/* When miracast is running, burst duration
+				 * needs to be minimum to avoid any stutter
+				 * or glitch in miracast during station scan
+				 */
+				if (scan_req->maxChannelTime <=
+					WMA_GO_MIN_ACTIVE_SCAN_BURST_DURATION)
+					cmd->burst_duration =
+						scan_req->maxChannelTime;
+				else
+					cmd->burst_duration =
+					WMA_GO_MIN_ACTIVE_SCAN_BURST_DURATION;
+			}
+			else {
+				/* If miracast is not running, accomodate max
+				 * stations to make the scans faster
+				 */
+				cmd->burst_duration =
+					WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS *
+					scan_req->maxChannelTime;
+				if (cmd->burst_duration >
+				WMA_GO_MAX_ACTIVE_SCAN_BURST_DURATION) {
+					u_int8_t channels =
+						WMA_P2P_SCAN_MAX_BURST_DURATION
+						/ scan_req->maxChannelTime;
+					if (channels)
+						cmd->burst_duration = channels *
+						scan_req->maxChannelTime;
+					else
+						cmd->burst_duration =
+					WMA_GO_MAX_ACTIVE_SCAN_BURST_DURATION;
+					}
+			}
 			break;
 		    }
 		    if (wma_is_STA_active(wma_handle) ||
@@ -7713,7 +7745,7 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 	}
 
 	if (params->htCapable) {
-		cmd->peer_flags |= WMI_PEER_HT;
+		cmd->peer_flags |= (WMI_PEER_HT | WMI_PEER_QOS);
 		cmd->peer_rate_caps |= WMI_RC_HT_FLAG;
 	}
 
@@ -7727,7 +7759,7 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 
 #ifdef WLAN_FEATURE_11AC
 	if (params->vhtCapable) {
-		cmd->peer_flags |= (WMI_PEER_HT | WMI_PEER_VHT);
+		cmd->peer_flags |= (WMI_PEER_HT | WMI_PEER_VHT | WMI_PEER_QOS);
 		cmd->peer_rate_caps |= WMI_RC_HT_FLAG;
 	}
 
@@ -10512,7 +10544,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
               * Set the PTK in 11r mode because we already have it.
               */
               if (iface->staKeyParams) {
-                  wma_set_stakey(wma, (tpSetStaKeyParams) iface->staKeyParams, FALSE);
+                  wma_set_stakey(wma, (tpSetStaKeyParams) iface->staKeyParams);
              }
 #endif
 	}
@@ -11020,7 +11052,7 @@ static void wma_set_ibsskey_helper(tp_wma_handle wma_handle, tpSetBssKeyParams k
         }
 }
 
-static void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info, v_BOOL_t sendResp)
+static void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info)
 {
 	wmi_buf_t buf;
 	int32_t status, i;
@@ -11136,7 +11168,7 @@ static void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info,
 	/* TODO: Should we wait till we get HTT_T2H_MSG_TYPE_SEC_IND? */
 	key_info->status = eHAL_STATUS_SUCCESS;
 out:
-        if (sendResp)
+        if (key_info->sendRsp)
             wma_send_msg(wma_handle, WDA_SET_STAKEY_RSP, (void *) key_info, 0);
 }
 
@@ -13468,6 +13500,16 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 	return 0;
 }
 
+static inline void wma_set_wow_bus_suspend(tp_wma_handle wma, int val) {
+
+	adf_os_atomic_set(&wma->is_wow_bus_suspended, val);
+}
+
+static inline int wma_get_wow_bus_suspend(tp_wma_handle wma) {
+
+	return adf_os_atomic_read(&wma->is_wow_bus_suspended);
+}
+
 /* Configures wow wakeup events. */
 static VOS_STATUS wma_add_wow_wakeup_event(tp_wma_handle wma,
 					   WOW_WAKE_EVENT_TYPE event,
@@ -13536,7 +13578,9 @@ static VOS_STATUS wma_send_wow_patterns_to_fw(tp_wma_handle wma,
 		     WMI_TLV_HDR_SIZE +
 		     0 * sizeof(WOW_MAGIC_PATTERN_CMD) +
 		     WMI_TLV_HDR_SIZE +
-		     0 * sizeof(A_UINT32);
+		     0 * sizeof(A_UINT32) +
+		     WMI_TLV_HDR_SIZE +
+		     1 * sizeof(A_UINT32);
 
 	buf = wmi_buf_alloc(wma->wmi_handle, len);
 	if (!buf) {
@@ -13613,6 +13657,11 @@ static VOS_STATUS wma_send_wow_patterns_to_fw(tp_wma_handle wma,
 	/* Fill TLV for pattern_info_timeout but no data. */
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, 0);
 	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* Fill TLV for ra_ratelimit_interval with dummy data as this fix elem*/
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, 1 * sizeof(A_UINT32));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	*(A_UINT32 *)buf_ptr = 0;
 
 	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
 				   WMI_WOW_ADD_WAKE_PATTERN_CMDID);
@@ -13986,6 +14035,28 @@ static bool wma_is_wow_prtn_cached(tp_wma_handle wma, u_int8_t vdev_id)
 	return false;
 }
 
+/* Unpause all the vdev after resume */
+static void wma_unpause_vdev(tp_wma_handle wma) {
+	int8_t vdev_id;
+	struct wma_txrx_node *iface;
+
+	for (vdev_id = 0; vdev_id < wma->max_bssid; vdev_id++) {
+		if (!wma->interfaces[vdev_id].handle)
+			continue;
+
+	#ifdef QCA_SUPPORT_TXRX_VDEV_PAUSE_LL
+	/* When host resume, by default, unpause all active vdev */
+		if (wma->interfaces[vdev_id].pause_bitmap) {
+			wdi_in_vdev_unpause(wma->interfaces[vdev_id].handle);
+			wma->interfaces[vdev_id].pause_bitmap = 0;
+		}
+	#endif /* QCA_SUPPORT_TXRX_VDEV_PAUSE_LL */
+
+		iface = &wma->interfaces[vdev_id];
+		iface->conn_state = FALSE;
+	}
+}
+
 static VOS_STATUS wma_resume_req(tp_wma_handle wma)
 {
 	VOS_STATUS ret = VOS_STATUS_SUCCESS;
@@ -14009,6 +14080,10 @@ static VOS_STATUS wma_resume_req(tp_wma_handle wma)
 	}
 
 end:
+	/* need to reset if hif_pci_suspend_fails */
+	wma_set_wow_bus_suspend(wma, 0);
+	/* unpause the vdev if left paused and hif_pci_suspend fails */
+	wma_unpause_vdev(wma);
 	return ret;
 }
 
@@ -14453,6 +14528,11 @@ enable_wow:
 send_ready_to_suspend:
 	wma_send_status_to_suspend_ind(wma, TRUE);
 
+	/* to handle race between hif_pci_suspend and
+	* unpause/pause tx handler
+	*/
+	wma_set_wow_bus_suspend(wma, 1);
+
 	return VOS_STATUS_SUCCESS;
 }
 
@@ -14521,8 +14601,6 @@ static VOS_STATUS wma_send_host_wakeup_ind_to_fw(tp_wma_handle wma)
 int wma_disable_wow_in_fw(WMA_HANDLE handle)
 {
 	tp_wma_handle wma = handle;
-	struct wma_txrx_node *iface;
-	int8_t vdev_id;
 	VOS_STATUS ret;
 
 	if(!wma->wow.wow_enable || !wma->wow.wow_enable_cmd_sent) {
@@ -14539,21 +14617,10 @@ int wma_disable_wow_in_fw(WMA_HANDLE handle)
 	wma->wow.wow_enable = FALSE;
 	wma->wow.wow_enable_cmd_sent = FALSE;
 
-	for (vdev_id = 0; vdev_id < wma->max_bssid; vdev_id++) {
-		if (!wma->interfaces[vdev_id].handle)
-			continue;
-
-	#ifdef QCA_SUPPORT_TXRX_VDEV_PAUSE_LL
-	/* When host resume, by default, unpause all active vdev */
-		if (wma->interfaces[vdev_id].pause_bitmap) {
-			wdi_in_vdev_unpause(wma->interfaces[vdev_id].handle);
-			wma->interfaces[vdev_id].pause_bitmap = 0;
-		}
-	#endif /* QCA_SUPPORT_TXRX_VDEV_PAUSE_LL */
-
-		iface = &wma->interfaces[vdev_id];
-		iface->conn_state = FALSE;
-	}
+	/* To allow the tx pause/unpause events */
+	wma_set_wow_bus_suspend(wma, 0);
+	/* Unpause the vdev as we are resuming */
+	wma_unpause_vdev(wma);
 
 	vos_wake_lock_timeout_acquire(&wma->wow_wake_lock, 2000);
 
@@ -17055,7 +17122,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			break;
 		case WDA_SET_STAKEY_REQ:
 			wma_set_stakey(wma_handle,
-					(tpSetStaKeyParams)msg->bodyptr, TRUE);
+					(tpSetStaKeyParams)msg->bodyptr);
 			break;
 		case WDA_DELETE_STA_REQ:
 			wma_delete_sta(wma_handle,
@@ -17484,6 +17551,12 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 
 	switch (wmi_event->event) {
 	case WMI_SCAN_EVENT_COMPLETED:
+		/*
+		 * return success always so that SME can pick whatever scan
+		 * results is available in scan cache(due to partial or
+		 * aborted scan)
+		 */
+		scan_event->reasonCode = eSIR_SME_SUCCESS;
 		if (wmi_event->scan_id == scan_id)
 			wma_reset_scan_info(wma_handle, vdev_id);
 		else
@@ -17494,14 +17567,10 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 		scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
 		break;
 	case WMI_SCAN_EVENT_PREEMPTED:
-	{
-		tAbortScanParams abortScan;
-		abortScan.SessionId = vdev_id;
-		wma_stop_scan(wma_handle, &abortScan);
+		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_PREEMPTED", __func__);
 		break;
-	}
 	case WMI_SCAN_EVENT_RESTARTED:
-		WMA_LOGW("%s: Unexpected Scan Event %u", __func__, wmi_event->event);
+		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_RESTARTED", __func__);
 		break;
 	}
 
@@ -17729,6 +17798,12 @@ static VOS_STATUS wma_tx_detach(tp_wma_handle wma_handle)
 static void wma_roam_better_ap_handler(tp_wma_handle wma, u_int32_t vdev_id)
 {
 	VOS_STATUS ret;
+	/* abort existing scan if any */
+	if (wma->interfaces[vdev_id].scan_info.scan_id != 0) {
+		tAbortScanParams abortScan;
+		abortScan.SessionId = vdev_id;
+		wma_stop_scan(wma, &abortScan);
+	}
 	ret = tlshim_mgmt_roam_event_ind(wma->vos_context, vdev_id);
 }
 
@@ -17882,6 +17957,11 @@ static int wma_mcc_vdev_tx_pause_evt_handler(void *handle, u_int8_t *event,
 	{
 		WMA_LOGE("Invalid roam event buffer");
 		return -EINVAL;
+	}
+
+	if (wma_get_wow_bus_suspend(wma)) {
+		WMA_LOGD(" Suspend is in progress: Pause/Unpause Tx is NoOp");
+		return 0;
 	}
 
 	wmi_event = param_buf->fixed_param;
@@ -20210,7 +20290,7 @@ int wma_resume_target(WMA_HANDLE handle)
 	}
 	wmi_pending_cmds = wmi_get_pending_cmds(wma_handle->wmi_handle);
 	while (wmi_pending_cmds && timeout++ < WMA_MAX_RESUME_RETRY) {
-		msleep(100);
+		msleep(1);
 		wmi_pending_cmds = wmi_get_pending_cmds(wma_handle->wmi_handle);
 	}
 

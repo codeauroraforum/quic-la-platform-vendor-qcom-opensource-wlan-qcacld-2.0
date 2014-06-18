@@ -3274,6 +3274,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
     eCsrRoamBssType LastBSSType;
     hdd_config_t *pConfig = NULL;
     eMib_dot11DesiredBssType connectedBssType;
+#ifdef WLAN_FEATURE_LPSS
+    hdd_adapter_t *pDataAdapter = NULL;
+    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
+#endif
     long ret;
     VOS_STATUS vstatus;
     eHalStatus hstatus;
@@ -3703,6 +3707,26 @@ done:
         pHddCtx->isAmpAllowed = VOS_TRUE;
     }
 #endif //WLAN_BTAMP_FEATURE
+
+#ifdef WLAN_FEATURE_LPSS
+    vstatus = hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+    while (NULL != pAdapterNode && VOS_STATUS_SUCCESS == status) {
+        pDataAdapter = pAdapterNode->pAdapter;
+        if (pDataAdapter) {
+            if (pDataAdapter->device_mode == WLAN_HDD_INFRA_STATION)
+                break;
+            if (pDataAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
+                break;
+            if (pDataAdapter->device_mode == WLAN_HDD_P2P_DEVICE)
+                break;
+        }
+        vstatus = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
+        pAdapterNode = pNext;
+    }
+
+    wlan_hdd_send_status_pkg(pDataAdapter, NULL, 1, 0);
+#endif
+
     EXIT();
     return 0;
 }
@@ -10664,11 +10688,11 @@ static int wlan_hdd_cfg80211_dump_survey(struct wiphy *wiphy,
 }
 
 /*
- * FUNCTION: wlan_hdd_cfg80211_resume_wlan
+ * FUNCTION: __wlan_hdd_cfg80211_resume_wlan
  * this is called when cfg80211 driver resume
  * driver updates  latest sched_scan scan result(if any) to cfg80211 database
  */
-int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
+int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 {
     hdd_context_t *pHddCtx = wiphy_priv(wiphy);
     hdd_adapter_t *pAdapter;
@@ -10775,11 +10799,22 @@ void wlan_hdd_cfg80211_ready_to_suspend(void *callbackContext, boolean suspended
 }
 #endif
 
+int wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __wlan_hdd_cfg80211_resume_wlan(wiphy);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
+
 /*
- * FUNCTION: wlan_hdd_cfg80211_suspend_wlan
+ * FUNCTION: __wlan_hdd_cfg80211_suspend_wlan
  * this is called when cfg80211 driver suspends
  */
-int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
+int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
                                    struct cfg80211_wowlan *wow)
 {
 #ifdef QCA_CONFIG_SMP
@@ -10921,6 +10956,17 @@ resume_tx:
 
 }
 
+int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
+                                   struct cfg80211_wowlan *wow)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __wlan_hdd_cfg80211_suspend_wlan(wiphy, wow);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
 /* cfg80211_ops */
 static struct cfg80211_ops wlan_hdd_cfg80211_ops =
 {
