@@ -167,6 +167,7 @@ static const t_probeTime_dwellTime
 	{28, 11}, /* 9 SSID */
 	{28, 8}   /* 10 SSID */
 };
+#define WMA_DWELL_TIME_PASSIVE_DEFAULT          (110)
 
 /* Roaming default values
  * All time and period values are in milliseconds.
