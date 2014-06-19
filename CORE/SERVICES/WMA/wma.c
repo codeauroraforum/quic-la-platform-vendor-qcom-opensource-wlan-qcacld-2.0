@@ -7340,6 +7340,25 @@ static int32_t wmi_unified_send_txbf(tp_wma_handle wma,
 			*((A_UINT8 *)&txbf_en)));
 }
 
+static void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value)
+{
+	if (*cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) {
+		WMA_LOGE("%s: Chainmask value exceeds the maximum"
+				" supported range setting it to"
+				" maximum value. Requested value %d"
+				" Updated value %d", __func__, *cmd_value,
+				WMA_MAX_RF_CHAINS(num_rf_chains));
+		*cmd_value = WMA_MAX_RF_CHAINS(num_rf_chains);
+	} else if (*cmd_value < WMA_MIN_RF_CHAINS) {
+		WMA_LOGE("%s: Chainmask value is less than the minimum"
+				" supported range setting it to"
+				" minimum value. Requested value %d"
+				" Updated value %d", __func__, *cmd_value,
+				WMA_MIN_RF_CHAINS);
+		*cmd_value = WMA_MIN_RF_CHAINS;
+	}
+}
+
 static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 					   tSirNwType nw_type,
 					   tpAddStaParams params)
@@ -7654,6 +7673,12 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
                 }
 	}
 
+	/*
+	 * Limit nss to max number of rf chain supported by target
+	 * Otherwise Fw will crash
+	 */
+	wma_update_txrx_chainmask(wma->num_rf_chains, &cmd->peer_nss);
+
 	intr->nss = cmd->peer_nss;
         cmd->peer_phymode = phymode;
 
@@ -7959,25 +7984,6 @@ wmi_unified_vdev_set_gtx_cfg_send(wmi_unified_t wmi_handle, u_int32_t if_id,
 		cmd->userGtxMask, cmd->gtxPERThreshold, cmd->gtxPERMargin,
 		cmd->gtxTPCstep, cmd->gtxTPCMin, cmd->gtxBWMask);
 	return wmi_unified_cmd_send(wmi_handle, buf, len, WMI_VDEV_SET_GTX_PARAMS_CMDID);
-}
-
-void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value)
-{
-	if (*cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) {
-		WMA_LOGE("%s: Chainmask value exceeds the maximum"
-				" supported range setting it to"
-				" maximum value. Requested value %d"
-				" Updated value %d", __func__, *cmd_value,
-				WMA_MAX_RF_CHAINS(num_rf_chains));
-		*cmd_value = WMA_MAX_RF_CHAINS(num_rf_chains);
-	} else if (*cmd_value < WMA_MIN_RF_CHAINS) {
-		WMA_LOGE("%s: Chainmask value is less than the minimum"
-				" supported range setting it to"
-				" minimum value. Requested value %d"
-				" Updated value %d", __func__, *cmd_value,
-				WMA_MIN_RF_CHAINS);
-		*cmd_value = WMA_MIN_RF_CHAINS;
-	}
 }
 
 static void wma_process_cli_set_cmd(tp_wma_handle wma,
