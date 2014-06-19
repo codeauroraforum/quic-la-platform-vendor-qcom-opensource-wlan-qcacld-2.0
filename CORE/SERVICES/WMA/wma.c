@@ -854,7 +854,12 @@ static void wma_remove_peer(tp_wma_handle wma, u_int8_t *bssid,
 #define PEER_ALL_TID_BITMASK 0xffffffff
 	u_int32_t peer_tid_bitmap = PEER_ALL_TID_BITMASK;
 	u_int8_t *peer_addr = bssid;
-
+        if (!wma->peer_count)
+        {
+             WMA_LOGE("%s: Can't remove peer with peer_addr %pM vdevid %d peer_count %d",
+                    __func__, bssid, vdev_id, wma->peer_count);
+             return;
+        }
 	if (peer)
 		ol_txrx_peer_detach(peer);
 
@@ -2093,7 +2098,7 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 	}
 
 	vos_mem_zero(csa_offload_event, sizeof(*csa_offload_event));
-	csa_offload_event->sessionId = vdev_id;
+	vos_mem_copy(csa_offload_event->bssId, &bssid, ETH_ALEN);
 
 	if (csa_event->ies_present_flag & WMI_CSA_IE_PRESENT) {
 		csa_ie = (struct ieee80211_channelswitch_ie *)(&csa_event->csa_ie[0]);
@@ -2118,7 +2123,9 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
 
-	WMA_LOGD("CSA: New Channel = %d", csa_offload_event->channel);
+	WMA_LOGD("CSA: New Channel = %d BSSID:%pM",
+			csa_offload_event->channel,
+			csa_offload_event->bssId);
 	wma->interfaces[vdev_id].is_channel_switch = VOS_TRUE;
 	wma_send_msg(wma, WDA_CSA_OFFLOAD_EVENT, (void *)csa_offload_event, 0);
 	return 0;
@@ -4511,6 +4518,64 @@ bool wma_check_scan_in_progress(WMA_HANDLE handle)
 	return false;
 }
 
+v_BOOL_t wma_is_SAP_active(tp_wma_handle wma_handle)
+{
+	int i;
+
+	for (i = 0; i < wma_handle->max_bssid; i++) {
+		if (!wma_handle->interfaces[i].vdev_up)
+			continue;
+		if (wma_handle->interfaces[i].type == WMI_VDEV_TYPE_AP &&
+		    wma_handle->interfaces[i].sub_type == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+v_BOOL_t wma_is_P2P_GO_active(tp_wma_handle wma_handle)
+{
+	int i;
+
+	for (i = 0; i < wma_handle->max_bssid; i++) {
+		if (!wma_handle->interfaces[i].vdev_up)
+			continue;
+		if (wma_handle->interfaces[i].type == WMI_VDEV_TYPE_AP &&
+		    wma_handle->interfaces[i].sub_type == WMI_UNIFIED_VDEV_SUBTYPE_P2P_GO)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+v_BOOL_t wma_is_P2P_CLI_active(tp_wma_handle wma_handle)
+{
+	int i;
+
+	for (i = 0; i < wma_handle->max_bssid; i++) {
+		if (!wma_handle->interfaces[i].vdev_up)
+			continue;
+		if (wma_handle->interfaces[i].type == WMI_VDEV_TYPE_STA &&
+		    wma_handle->interfaces[i].sub_type == WMI_UNIFIED_VDEV_SUBTYPE_P2P_CLIENT)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+v_BOOL_t wma_is_STA_active(tp_wma_handle wma_handle)
+{
+	int i;
+
+	for (i = 0; i < wma_handle->max_bssid; i++) {
+		if (!wma_handle->interfaces[i].vdev_up)
+			continue;
+		if (wma_handle->interfaces[i].type == WMI_VDEV_TYPE_STA &&
+		    wma_handle->interfaces[i].sub_type == 0)
+			return TRUE;
+		if (wma_handle->interfaces[i].type == WMI_VDEV_TYPE_IBSS)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 
 /* function   : wma_get_buf_start_scan_cmd
  * Descriptin :
@@ -4630,6 +4695,39 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 		if (scan_req->scanType == eSIR_PASSIVE_SCAN)
 			cmd->scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
 		cmd->scan_ctrl_flags |= WMI_SCAN_FILTER_PROBE_REQ;
+		/*
+		 * Decide burst_duration and dwell_time_active based on
+		 * what type of devices are active.
+		 */
+		do {
+		    if (wma_is_SAP_active(wma_handle)) {
+			/* Background scan while SoftAP is sending beacons.
+			 * Max duration of CTS2self is 32 ms, which limits
+			 * the dwell time.
+			 */
+		        cmd->dwell_time_active = MIN(scan_req->maxChannelTime,
+				(WMA_CTS_DURATION_MS_MAX - WMA_ROAM_SCAN_CHANNEL_SWITCH_TIME));
+			cmd->dwell_time_passive = cmd->dwell_time_active;
+			cmd->burst_duration = 0;
+			break;
+		    }
+		    if (wma_is_P2P_GO_active(wma_handle)) {
+			/* Background scan while GO is sending beacons.
+			 * Every off-channel transition has overhead of 2 beacon
+			 * intervals for NOA. Maximize number of channels in
+			 * every transition by using burst scan.
+			 */
+			cmd->burst_duration = scan_req->maxChannelTime;
+			break;
+		    }
+		    if (wma_is_STA_active(wma_handle) ||
+			wma_is_P2P_CLI_active(wma_handle)) {
+			/* Typical background scan. Disable burst scan for now. */
+			cmd->burst_duration = 0;
+			break;
+		    }
+		} while (0);
+
 	}
 	else {
 		WMA_LOGD("P2P Scan");
@@ -6896,6 +6994,8 @@ void wma_vdev_resp_timer(void *data)
 		}
 		WMA_LOGI("%s: bssid %pM vdev_id %d", __func__, params->bssId,
 						tgt_req->vdev_id);
+		wma_send_msg(wma, WDA_ADD_BSS_RSP, (void *)params, 0);
+		goto free_tgt_req;
 error0:
 		if (peer)
 			wma_remove_peer(wma, params->bssId,
@@ -7331,6 +7431,25 @@ static int32_t wmi_unified_send_txbf(tp_wma_handle wma,
 			*((A_UINT8 *)&txbf_en)));
 }
 
+static void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value)
+{
+	if (*cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) {
+		WMA_LOGE("%s: Chainmask value exceeds the maximum"
+				" supported range setting it to"
+				" maximum value. Requested value %d"
+				" Updated value %d", __func__, *cmd_value,
+				WMA_MAX_RF_CHAINS(num_rf_chains));
+		*cmd_value = WMA_MAX_RF_CHAINS(num_rf_chains);
+	} else if (*cmd_value < WMA_MIN_RF_CHAINS) {
+		WMA_LOGE("%s: Chainmask value is less than the minimum"
+				" supported range setting it to"
+				" minimum value. Requested value %d"
+				" Updated value %d", __func__, *cmd_value,
+				WMA_MIN_RF_CHAINS);
+		*cmd_value = WMA_MIN_RF_CHAINS;
+	}
+}
+
 static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 					   tSirNwType nw_type,
 					   tpAddStaParams params)
@@ -7645,6 +7764,12 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
                 }
 	}
 
+	/*
+	 * Limit nss to max number of rf chain supported by target
+	 * Otherwise Fw will crash
+	 */
+	wma_update_txrx_chainmask(wma->num_rf_chains, &cmd->peer_nss);
+
 	intr->nss = cmd->peer_nss;
         cmd->peer_phymode = phymode;
 
@@ -7950,25 +8075,6 @@ wmi_unified_vdev_set_gtx_cfg_send(wmi_unified_t wmi_handle, u_int32_t if_id,
 		cmd->userGtxMask, cmd->gtxPERThreshold, cmd->gtxPERMargin,
 		cmd->gtxTPCstep, cmd->gtxTPCMin, cmd->gtxBWMask);
 	return wmi_unified_cmd_send(wmi_handle, buf, len, WMI_VDEV_SET_GTX_PARAMS_CMDID);
-}
-
-void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value)
-{
-	if (*cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) {
-		WMA_LOGE("%s: Chainmask value exceeds the maximum"
-				" supported range setting it to"
-				" maximum value. Requested value %d"
-				" Updated value %d", __func__, *cmd_value,
-				WMA_MAX_RF_CHAINS(num_rf_chains));
-		*cmd_value = WMA_MAX_RF_CHAINS(num_rf_chains);
-	} else if (*cmd_value < WMA_MIN_RF_CHAINS) {
-		WMA_LOGE("%s: Chainmask value is less than the minimum"
-				" supported range setting it to"
-				" minimum value. Requested value %d"
-				" Updated value %d", __func__, *cmd_value,
-				WMA_MIN_RF_CHAINS);
-		*cmd_value = WMA_MIN_RF_CHAINS;
-	}
 }
 
 static void wma_process_cli_set_cmd(tp_wma_handle wma,
@@ -8875,6 +8981,8 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 					maxTxPower);
 	if (ret)
 		WMA_LOGE("failed to set WMI_VDEV_PARAM_TX_PWRLIMIT");
+	else
+		intr[vdev_id].max_tx_power = maxTxPower;
 
 	/* Slot time */
 	if (shortSlotTimeSupported)
