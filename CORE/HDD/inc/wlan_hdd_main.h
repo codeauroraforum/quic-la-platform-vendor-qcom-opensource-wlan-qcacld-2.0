@@ -1531,4 +1531,5 @@ void wlan_hdd_send_svc_nlink_msg(int type);
 void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
 #endif
 
+void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
