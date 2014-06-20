@@ -79,7 +79,7 @@
 #define WMA_READY_EVENTID_TIMEOUT          2000
 #define WMA_TGT_SUSPEND_COMPLETE_TIMEOUT   1000
 #define WMA_WAKE_LOCK_TIMEOUT              1000
-#define WMA_MAX_RESUME_RETRY               10
+#define WMA_MAX_RESUME_RETRY               1000
 #define WMA_RESUME_TIMEOUT                 3000
 #define MAX_MEM_CHUNKS                     32
 /*
@@ -124,7 +124,7 @@
 
 #ifdef WMA_DEBUG_ALWAYS
 #define WMA_LOGA(fmt, args...) \
-	printk(KERN_INFO "\n%s-%d: " fmt, __func__, __LINE__, ## args)
+	printk(KERN_INFO "%s-%d: " fmt"\n", __func__, __LINE__, ## args)
 #else
 #define WMA_LOGA(fmt, args...)
 #endif
@@ -134,6 +134,8 @@
 
 /* Prefix used by scan req ids generated on the host */
 #define WMA_HOST_SCAN_REQID_PREFIX	 0xA000
+/* Prefix used by roam scan req ids generated on the host */
+#define WMA_HOST_ROAM_SCAN_REQID_PREFIX  0xA800
 /* Prefix used by scan requestor id on host */
 #define WMA_HOST_SCAN_REQUESTOR_ID_PREFIX 0xA000
 #define WMA_HW_DEF_SCAN_MAX_DURATION	  30000 /* 30 secs */
@@ -143,6 +145,9 @@
 #define WMA_SCAN_NPROBES_DEFAULT            (2)
 #define WMA_SCAN_IDLE_TIME_DEFAULT          (25)
 #define WMA_P2P_SCAN_MAX_BURST_DURATION     (180)
+#define WMA_CTS_DURATION_MS_MAX             (32)
+#define WMA_GO_MIN_ACTIVE_SCAN_BURST_DURATION   (40)
+#define WMA_GO_MAX_ACTIVE_SCAN_BURST_DURATION   (120)
 
 /* Roaming default values
  * All time and period values are in milliseconds.
@@ -513,6 +518,15 @@ typedef struct {
 }scan_timer_info;
 
 typedef struct {
+	u_int32_t atimWindowLength;
+	u_int32_t isPowerSaveAllowed;
+	u_int32_t isPowerCollapseAllowed;
+	u_int32_t isAwakeonTxRxEnabled;
+	u_int32_t inactivityCount;
+	u_int32_t txSPEndInactivityTime;
+}ibss_power_save_params;
+
+typedef struct {
 	void *wmi_handle;
 	void *htc_handle;
 	void *vos_context;
@@ -634,11 +648,16 @@ typedef struct {
 	vos_wake_lock_t wow_wake_lock;
 	int wow_nack;
 	u_int32_t ap_client_cnt;
+	adf_os_atomic_t is_wow_bus_suspended;
 
 	vos_timer_t wma_scan_comp_timer;
 	scan_timer_info wma_scan_timer_info;
 
 	u_int8_t dfs_phyerr_filter_offload;
+	v_BOOL_t suitable_ap_hb_failure;
+
+	/* IBSS Power Save config Parameters */
+	ibss_power_save_params wma_ibss_power_save_params;
 
 }t_wma_handle, *tp_wma_handle;
 
@@ -1257,13 +1276,22 @@ typedef struct {
  * does not involve sending a wmi command.
  */
 enum wma_cfg_cmd_id {
-       WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID = WMI_CMDID_MAX,
-       WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
-       /* Set time latency and time quota for MCC home channels */
-       WMA_VDEV_MCC_SET_TIME_LATENCY,
-       WMA_VDEV_MCC_SET_TIME_QUOTA,
-       /* Add any new command before this */
-       WMA_CMD_ID_MAX
+	WMA_VDEV_TXRX_FWSTATS_ENABLE_CMDID = WMI_CMDID_MAX,
+	WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
+	/* Set time latency and time quota for MCC home channels */
+	WMA_VDEV_MCC_SET_TIME_LATENCY,
+	WMA_VDEV_MCC_SET_TIME_QUOTA,
+
+	/* IBSS Power Save Parameters */
+	WMA_VDEV_IBSS_SET_ATIM_WINDOW_SIZE,
+	WMA_VDEV_IBSS_SET_POWER_SAVE_ALLOWED,
+	WMA_VDEV_IBSS_SET_POWER_COLLAPSE_ALLOWED,
+	WMA_VDEV_IBSS_SET_AWAKE_ON_TX_RX,
+	WMA_VDEV_IBSS_SET_INACTIVITY_TIME,
+	WMA_VDEV_IBSS_SET_TXSP_END_INACTIVITY_TIME,
+
+	/* Add any new command before this */
+	WMA_CMD_ID_MAX
 };
 
 typedef struct wma_trigger_uapsd_params
@@ -1474,23 +1502,29 @@ typedef struct {
 
 #endif /* FEATURE_WLAN_TDLS */
 
+#define WMA_DFS_MAX_20M_SUB_CH 8
+
+struct wma_dfs_radar_channel_list {
+	A_UINT32	nchannels;
+	/*Channel number including bonded channels on which the RADAR is present */
+	u_int8_t	channels[WMA_DFS_MAX_20M_SUB_CH];
+};
+
 /*
  * Structure to indicate RADAR
  */
 
 struct wma_dfs_radar_indication {
-    /* unique id identifying the VDEV */
-    A_UINT32        vdev_id;
-    /*Channel number on which the RADAR is present */
-    u_int8_t        ieee_chan_number;
-    /* Channel Frequency*/
-    A_UINT32        chan_freq;
-    /* Flag to Indicate RADAR presence on the
-     * current operating channel
-     */
-    u_int32_t       dfs_radar_status;
-    /* Flag to indicate use NOL */
-    int             use_nol;
+	/* unique id identifying the VDEV */
+	A_UINT32        vdev_id;
+	/* Channel list on which RADAR is detected */
+	struct wma_dfs_radar_channel_list chan_list;
+	/* Flag to Indicate RADAR presence on the
+	 * current operating channel
+	 */
+	u_int32_t       dfs_radar_status;
+	/* Flag to indicate use NOL */
+	int             use_nol;
 };
 
 /*
@@ -1516,6 +1550,8 @@ u_int16_t   dfs_usenol(struct ieee80211com *ic);
 #define WMA_SMPS_MASK_LOWER_16BITS 0xFF
 #define WMA_SMPS_MASK_UPPER_3BITS 0x7
 #define WMA_SMPS_PARAM_VALUE_S 29
+
+#define WMA_MAX_SCAN_ID        0x00FF
 
 /* U-APSD Access Categories */
 enum uapsd_ac {

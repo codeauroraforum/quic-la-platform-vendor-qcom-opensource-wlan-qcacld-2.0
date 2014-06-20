@@ -695,6 +695,9 @@ struct hdd_station_ctx
    /* PMKID Cache */
    tPmkidCacheInfo PMKIDCache[MAX_PMKSAIDS_IN_CACHE];
    tANI_U32 PMKIDCacheIndex;
+
+   /* STA ctx debug variables */
+   int staDebugState;
 };
 
 #define BSS_STOP    0
@@ -865,7 +868,7 @@ typedef struct
     /*Channel*/
     tANI_U8  ch;
     /*RSSI or Level*/
-    tANI_U8  rssi;
+    tANI_S8  rssi;
     /*Age*/
     tANI_U32 age;
 }tHDDbatchScanRspApInfo;
@@ -1444,6 +1447,8 @@ struct hdd_context_s
     v_U32_t target_hw_version;
     /* defining the chip/rom revision */
     v_U32_t target_hw_revision;
+    /* chip/rom name */
+    const char *target_hw_name;
 #endif
     struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -1453,6 +1458,9 @@ struct hdd_context_s
 
     v_U8_t max_intf_count;
     v_U8_t current_intf_count;
+#ifdef WLAN_FEATURE_LPSS
+    v_U8_t lpss_support;
+#endif
 
     tSirScanType ioctl_scan_mode;
 
@@ -1509,6 +1517,8 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx );
 VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx );
 void hdd_dump_concurrency_info(hdd_context_t *pHddCtx);
 hdd_adapter_t * hdd_get_adapter_by_name( hdd_context_t *pHddCtx, tANI_U8 *name );
+hdd_adapter_t * hdd_get_adapter_by_vdev( hdd_context_t *pHddCtx,
+                                         tANI_U32 vdev_id );
 hdd_adapter_t * hdd_get_adapter_by_macaddr( hdd_context_t *pHddCtx, tSirMacAddr macAddr );
 hdd_adapter_t * hdd_get_mon_adapter( hdd_context_t *pHddCtx );
 VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter );
@@ -1548,6 +1558,7 @@ VOS_STATUS hdd_disable_bmps_imps(hdd_context_t *pHddCtx, tANI_U8 session_type);
 #ifdef QCA_WIFI_2_0
 void wlan_hdd_cfg80211_update_wiphy_caps(struct wiphy *wiphy);
 #endif
+VOS_STATUS hdd_setIbssPowerSaveParams(hdd_adapter_t *pAdapter);
 void wlan_hdd_cfg80211_update_reg_info(struct wiphy *wiphy);
 VOS_STATUS wlan_hdd_restart_driver(hdd_context_t *pHddCtx);
 void hdd_exchange_version_and_caps(hdd_context_t *pHddCtx);
@@ -1632,7 +1643,16 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter);
 
 #endif /*End of FEATURE_WLAN_BATCH_SCAN*/
 
-void wlan_hdd_send_svc_nlink_msg(int type);
+#ifdef WLAN_FEATURE_LPSS
+void wlan_hdd_send_status_pkg(hdd_adapter_t *pAdapter,
+                              hdd_station_ctx_t *pHddStaCtx,
+                              v_U8_t is_on,
+                              v_U8_t is_connected);
+void wlan_hdd_send_version_pkg(v_U32_t fw_version,
+                               v_U32_t chip_id,
+                               const char *chip_name);
+#endif
+void wlan_hdd_send_svc_nlink_msg(int type, void *data, int len);
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_U8_t enable);
 #endif
