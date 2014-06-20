@@ -1401,14 +1401,16 @@ static int wma_vdev_stop_ind(tp_wma_handle wma, u_int8_t *buf)
 		if (params->status == eHAL_STATUS_FW_MSG_TIMEDOUT){
 			vos_mem_free(params);
 			WMA_LOGE("%s: DEL BSS from ADD BSS timeout do not send "
-				"resp to UMAC", __func__);
+					"resp to UMAC (vdev id %x)",
+					__func__, resp_event->vdev_id);
 		} else {
 			params->status = VOS_STATUS_SUCCESS;
 			wma_send_msg(wma, WDA_DELETE_BSS_RSP, (void *)params, 0);
 		}
 
 		if (iface->del_staself_req) {
-			WMA_LOGD("%s: scheduling defered deletion", __func__);
+			WMA_LOGA("scheduling defered deletion (vdev id %x)",
+					resp_event->vdev_id);
 			wma_vdev_detach(wma, iface->del_staself_req, 1);
 		}
 	}
@@ -1642,6 +1644,40 @@ static int wma_stats_event_handler(void *handle, u_int8_t *cmd_param_info,
 		return -1;
 	}
 	WMA_LOGD("WDA_FW_STATS_IND posted");
+	return 0;
+}
+
+static int wma_link_speed_event_handler(void *handle, u_int8_t *cmd_param_info,
+					u_int32_t len)
+{
+	WMI_PEER_ESTIMATED_LINKSPEED_EVENTID_param_tlvs *param_buf;
+	wmi_peer_estimated_linkspeed_event_fixed_param *event;
+	tSirLinkSpeedInfo *ls_ind;
+	VOS_STATUS vos_status;
+	vos_msg_t sme_msg = {0} ;
+
+	param_buf = (WMI_PEER_ESTIMATED_LINKSPEED_EVENTID_param_tlvs *)cmd_param_info;
+	if (!param_buf) {
+		WMA_LOGE("%s: Invalid linkspeed event", __func__);
+		return -EINVAL;
+	}
+	event = param_buf->fixed_param;
+	ls_ind = (tSirLinkSpeedInfo *) vos_mem_malloc(sizeof(tSirLinkSpeedInfo));
+	if (!ls_ind) {
+		WMA_LOGE("%s: Invalid link speed buffer", __func__);
+		return -EINVAL;
+	}
+	ls_ind->estLinkSpeed = event->est_linkspeed_kbps;
+	sme_msg.type = eWNI_SME_LINK_SPEED_IND;
+	sme_msg.bodyptr = ls_ind;
+	sme_msg.bodyval = 0;
+
+	vos_status = vos_mq_post_message(VOS_MODULE_ID_SME, &sme_msg);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status) ) {
+		WMA_LOGE("%s: Fail to post linkspeed ind  msg", __func__);
+		vos_mem_free(ls_ind);
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -3281,6 +3317,10 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   WMI_UPDATE_STATS_EVENTID,
 					   wma_stats_event_handler);
+	/* register for linkspeed response event */
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+						WMI_PEER_ESTIMATED_LINKSPEED_EVENTID,
+						wma_link_speed_event_handler);
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -3660,7 +3700,8 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 				vdev_id, peer);
 	}
 	if (adf_os_atomic_read(&iface->bss_status) == WMA_BSS_STATUS_STARTED) {
-		WMA_LOGA("BSS is not yet stopped. Defering vdev deletion");
+		WMA_LOGA("BSS is not yet stopped. Defering vdev(vdev id %x) deletion",
+				vdev_id);
 		iface->del_staself_req = pdel_sta_self_req_param;
 		return status;
 	}
@@ -4598,6 +4639,11 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 	int len = sizeof(*cmd);
 	tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(VOS_MODULE_ID_PE,
 				wma_handle->vos_context);
+
+	if (!pMac) {
+		WMA_LOGP("%s: pMac is NULL!", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
 
 	len += WMI_TLV_HDR_SIZE; /* Length TLV placeholder for array of uint32 */
 	/* calculate the length of buffer required */
@@ -6936,7 +6982,8 @@ void wma_vdev_resp_timer(void *data)
 		WMA_LOGA("%s: WDA_DELETE_BSS_REQ timedout", __func__);
 		wma_send_msg(wma, WDA_DELETE_BSS_RSP, (void *)params, 0);
 		if (iface->del_staself_req) {
-			WMA_LOGD("%s: scheduling defered deletion", __func__);
+			WMA_LOGA("scheduling defered deletion(vdev id %x)",
+					tgt_req->vdev_id);
 			wma_vdev_detach(wma, iface->del_staself_req, 1);
 		}
 	} else if (tgt_req->msg_type == WDA_DEL_STA_SELF_REQ) {
@@ -7820,6 +7867,58 @@ wmi_unified_modem_power_state(wmi_unified_t wmi_handle, u_int32_t param_value)
 	}
 	return ret;
 }
+
+VOS_STATUS wma_get_link_speed(WMA_HANDLE handle,
+				tSirLinkSpeedInfo *pLinkSpeed)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	wmi_peer_get_estimated_linkspeed_cmd_fixed_param* cmd;
+	wmi_buf_t wmi_buf;
+	uint32_t   len;
+	u_int8_t *buf_ptr;
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		WMA_LOGE("%s: WMA is closed, can not issue get link speed cmd",
+                        __func__);
+		return VOS_STATUS_E_INVAL;
+	}
+	if (!WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
+				WMI_SERVICE_ESTIMATE_LINKSPEED)) {
+		WMA_LOGE("%s: Linkspeed feature bit not enabled",
+			__func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+	len  = sizeof(wmi_peer_get_estimated_linkspeed_cmd_fixed_param);
+	wmi_buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!wmi_buf) {
+		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+	buf_ptr = (u_int8_t *) wmi_buf_data(wmi_buf);
+
+	cmd = (wmi_peer_get_estimated_linkspeed_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_peer_get_estimated_linkspeed_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(wmi_peer_get_estimated_linkspeed_cmd_fixed_param));
+
+	/* Copy the peer macaddress to the wma buffer */
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(pLinkSpeed->peer_macaddr, &cmd->peer_macaddr);
+
+	WMA_LOGD("%s: pLinkSpeed->peerMacAddr: %pM, "
+			"peer_macaddr.mac_addr31to0: 0x%x, peer_macaddr.mac_addr47to32: 0x%x",
+			__func__, pLinkSpeed->peer_macaddr,
+			cmd->peer_macaddr.mac_addr31to0,
+			cmd->peer_macaddr.mac_addr47to32);
+
+	if (wmi_unified_cmd_send(wma_handle->wmi_handle, wmi_buf, len,
+		WMI_PEER_GET_ESTIMATED_LINKSPEED_CMDID)) {
+		WMA_LOGE("%s: failed to send link speed command", __func__);
+		adf_nbuf_free(wmi_buf);
+		return VOS_STATUS_E_FAILURE;
+	}
+	return VOS_STATUS_SUCCESS;
+}
+
 
 static int
 wmi_unified_pdev_set_param(wmi_unified_t wmi_handle, WMI_PDEV_PARAM param_id,
@@ -12978,6 +13077,7 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 	WOW_EVENT_INFO_fixed_param *wake_info;
 	struct wma_txrx_node *node;
 	u_int32_t wake_lock_duration = 0;
+	u_int32_t wow_buf_pkt_len = 0;
 
 	param_buf = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *) event;
 	if (!param_buf) {
@@ -13047,6 +13147,15 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 #endif
 
 	case WOW_REASON_HTT_EVENT:
+		break;
+	case WOW_REASON_PATTERN_MATCH_FOUND:
+		WMA_LOGD("Wake up for Rx packet, dump starting from ethernet hdr");
+		/* First 4-bytes of wow_packet_buffer is the length */
+		vos_mem_copy((u_int8_t *) &wow_buf_pkt_len,
+			     param_buf->wow_packet_buffer, 4);
+		vos_trace_hex_dump(VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_DEBUG,
+				   param_buf->wow_packet_buffer + 4,
+				   wow_buf_pkt_len);
 		break;
 
 	default:
@@ -16959,6 +17068,10 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			wma_fw_stats_ind(wma_handle, msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
+		case WDA_GET_LINK_SPEED:
+			wma_get_link_speed(wma_handle, msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
 		case WDA_MODEM_POWER_STATE_IND:
 			wma_notify_modem_power_state(wma_handle,
 					(tSirModemPowerStateInd *)msg->bodyptr);
@@ -16966,7 +17079,6 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			break;
 		case WDA_VDEV_STOP_IND:
 			wma_vdev_stop_ind(wma_handle, msg->bodyptr);
-			vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_WLAN_RESUME_REQ:
 			wma_resume_req(wma_handle);
@@ -17079,6 +17191,12 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 
 	switch (wmi_event->event) {
 	case WMI_SCAN_EVENT_COMPLETED:
+		/*
+		 * return success always so that SME can pick whatever scan
+		 * results is available in scan cache(due to partial or
+		 * aborted scan)
+		 */
+		scan_event->reasonCode = eSIR_SME_SUCCESS;
 		if (wmi_event->scan_id == scan_id)
 			wma_reset_scan_info(wma_handle, vdev_id);
 		else
@@ -17089,14 +17207,10 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 		scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
 		break;
 	case WMI_SCAN_EVENT_PREEMPTED:
-	{
-		tAbortScanParams abortScan;
-		abortScan.SessionId = vdev_id;
-		wma_stop_scan(wma_handle, &abortScan);
+		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_PREEMPTED", __func__);
 		break;
-	}
 	case WMI_SCAN_EVENT_RESTARTED:
-		WMA_LOGW("%s: Unexpected Scan Event %u", __func__, wmi_event->event);
+		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_RESTARTED", __func__);
 		break;
 	}
 
@@ -17324,6 +17438,12 @@ static VOS_STATUS wma_tx_detach(tp_wma_handle wma_handle)
 static void wma_roam_better_ap_handler(tp_wma_handle wma, u_int32_t vdev_id)
 {
 	VOS_STATUS ret;
+	/* abort existing scan if any */
+	if (wma->interfaces[vdev_id].scan_info.scan_id != 0) {
+		tAbortScanParams abortScan;
+		abortScan.SessionId = vdev_id;
+		wma_stop_scan(wma, &abortScan);
+	}
 	ret = tlshim_mgmt_roam_event_ind(wma->vos_context, vdev_id);
 }
 
