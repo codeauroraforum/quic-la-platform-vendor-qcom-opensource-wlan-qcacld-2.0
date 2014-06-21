@@ -3615,5 +3615,12 @@ eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, v_BOOL_t isAllowDFSChannelRoam
   --------------------------------------------------------------------------*/
 v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal);
 
+/* ---------------------------------------------------------------------------
+    \fn sme_staInMiddleOfRoaming
+    \brief  This function returns TRUE if STA is in the middle of roaming state
+    \param  hHal - HAL handle for device
+    \- return TRUE or FALSE
+    -------------------------------------------------------------------------*/
+tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal);
 
 #endif //#if !defined( __SME_API_H )
