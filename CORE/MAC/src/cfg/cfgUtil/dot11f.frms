@@ -116,6 +116,7 @@ const EID_AID                        =  197;
 const EID_EXT_CAP           	     =  127;
 const EID_OPERATING_MODE             =  199;
 const EID_WIDER_BW_CHANNEL_SWITCH_ANN=  194;
+const EID_CHANNEL_SWITCH_WRAPPER     = 196;
 const EID_VENDOR_SPECIFIC            = 221;
 
 const SIR_MAC_PROP_EXT_RATES_TYPE    =   0;
@@ -2649,6 +2650,10 @@ IE WiderBWChanSwitchAnn (EID_WIDER_BW_CHANNEL_SWITCH_ANN)
    newCenterChanFreq1,    1;
 }
 
+IE ChannelSwitchWrapper (EID_CHANNEL_SWITCH_WRAPPER)
+{
+    OPTIE IE  WiderBWChanSwitchAnn;
+}
 IE ExtCap (EID_EXT_CAP)
 {
     {
@@ -3342,7 +3347,8 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  ExtCap;
     OPTIE  OperatingMode;
     OPTIE  WiderBWChanSwitchAnn;
-	OPTIE  OBSSScanParameters;
+    OPTIE  OBSSScanParameters;
+    OPTIE  ChannelSwitchWrapper;
 } // End frame Beacon.
 
 // Ok, here's  the story on  Beacon1 & Beacon2.   We presumably beacon  a lot
@@ -3422,6 +3428,7 @@ FRAME Beacon2
     OPTIE  ExtCap;
     OPTIE  OperatingMode;
     OPTIE  WiderBWChanSwitchAnn;
+    OPTIE  ChannelSwitchWrapper;
 }
 
 // This frame is just Beacon with its Fixed Fields stripped out.  It's handy
@@ -3479,6 +3486,7 @@ FRAME BeaconIEs
     OPTIE  OperatingMode;
     OPTIE  WiderBWChanSwitchAnn;
 	OPTIE  OBSSScanParameters;
+    OPTIE  ChannelSwitchWrapper;
 
 } // End frame BeaconIEs.
 
@@ -3684,6 +3692,7 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  VHTExtBssLoad;
     OPTIE  ExtCap;
 	OPTIE  OBSSScanParameters;
+    OPTIE  ChannelSwitchWrapper;
 } // End frame ProbeResponse.
 
 FRAME Authentication                      // 7.2.3.10
