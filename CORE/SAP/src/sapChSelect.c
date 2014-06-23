@@ -581,7 +581,6 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle, tSapChSelSpectInfo *pSpectInfoPara
         if(*pChans == 14 &&
                eCSR_DOT11_MODE_11b != sme_GetPhyMode(halHandle))
         {
-            pChans++;
             continue;
         }
 
