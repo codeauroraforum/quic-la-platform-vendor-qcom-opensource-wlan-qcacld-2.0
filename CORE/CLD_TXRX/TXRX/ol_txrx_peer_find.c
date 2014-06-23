@@ -271,6 +271,7 @@ ol_txrx_peer_find_hash_erase(struct ol_txrx_pdev_t *pdev)
                  */
                 adf_os_atomic_init(&peer->ref_cnt); /* set to zero */
                 adf_os_atomic_inc(&peer->ref_cnt);  /* incr to one */
+                TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s: Delete Peer %p\n", __func__, peer);
                 ol_txrx_peer_unref_delete(peer);
             }
         }
@@ -332,6 +333,7 @@ ol_txrx_peer_find_add_id(
          * Peregrine/Rome has two peer id for each peer.
          */
         if (peer->peer_ids[0] == HTT_INVALID_PEER) {
+            TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s: Delete Peer %p\n", __func__, peer);
             ol_txrx_peer_unref_delete(peer);
         }
         if (ol_txrx_peer_find_add_id_to_obj(peer, peer_id)) {
@@ -452,6 +454,7 @@ ol_rx_peer_unmap_handler(
      * Remove a reference to the peer.
      * If there are no more references, delete the peer object.
      */
+    TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s: Delete Peer %p\n", __func__, peer);
     ol_txrx_peer_unref_delete(peer);
 }
 
