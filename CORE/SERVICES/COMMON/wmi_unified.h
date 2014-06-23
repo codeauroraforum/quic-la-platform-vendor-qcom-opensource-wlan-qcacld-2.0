@@ -3047,6 +3047,9 @@ typedef enum {
     /* Enable Aggregation State Trigger Event */
     WMI_VDEV_PARAM_AGGR_TRIG_EVENT_ENABLE,
 
+    /** DTIM policy */
+    WMI_VDEV_PARAM_DTIM_POLICY,
+
 } WMI_VDEV_PARAM;
 
 enum wmi_pkt_type {
