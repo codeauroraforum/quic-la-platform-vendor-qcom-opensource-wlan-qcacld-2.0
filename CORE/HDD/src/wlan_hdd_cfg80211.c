@@ -2524,9 +2524,10 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         else
             pConfig->SapHw_mode = eSAP_DOT11_MODE_11ac;
 
-        /* Disable VHT support in 2.4 GHz band */
-        if (pConfig->channel <= 14 &&
-            (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->enableVhtFor24GHzBand == FALSE)
+        if (((pConfig->channel <= 14) &&
+            (WLAN_HDD_GET_CTX(pHostapdAdapter)->cfg_ini->enableVhtFor24GHzBand
+                                                                 == FALSE)) ||
+            (WLAN_HDD_GET_CTX(pHostapdAdapter)->isVHT80Allowed == FALSE))
         {
             pConfig->SapHw_mode = eSAP_DOT11_MODE_11n;
         }
@@ -10575,6 +10576,11 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
         return -EAGAIN;
     }
 
+    if (sme_staInMiddleOfRoaming(pHddCtx->hHal)) {
+        hddLog(VOS_TRACE_LEVEL_DEBUG, FL("Roaming in progress "
+               "Do not allow suspend"));
+        return -EAGAIN;
+    }
 #ifdef QCA_WIFI_2_0
     /* Stop ongoing scan on each interface */
     status =  hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
