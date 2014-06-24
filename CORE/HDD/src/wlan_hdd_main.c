@@ -5007,7 +5007,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
        else if (strncmp(command, "SETDFSSCANMODE", 14) == 0)
        {
            tANI_U8 *value = command;
-           tANI_BOOLEAN dfsScanMode = CFG_ROAMING_DFS_CHANNEL_DEFAULT;
+           tANI_U8 dfsScanMode = CFG_ROAMING_DFS_CHANNEL_DEFAULT;
 
            /* Move pointer to ahead of SETDFSSCANMODE<delimiter> */
            value = value + 15;
@@ -5046,7 +5046,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
        }
        else if (strncmp(command, "GETDFSSCANMODE", 14) == 0)
        {
-           tANI_BOOLEAN dfsScanMode =
+           tANI_U8 dfsScanMode =
                    sme_GetDFSScanMode((tHalHandle)(pHddCtx->hHal));
            char extra[32];
            tANI_U8 len = 0;
