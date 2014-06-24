@@ -111,6 +111,10 @@
 #define CSR_JOIN_RETRY_TIMEOUT_PERIOD        ( 1 *  PAL_TIMER_TO_SEC_UNIT )  // 1 second
 #endif
 
+#define CSR_ROAMING_DFS_CHANNEL_DISABLED           (0)
+#define CSR_ROAMING_DFS_CHANNEL_ENABLED_NORMAL     (1)
+#define CSR_ROAMING_DFS_CHANNEL_ENABLED_ACTIVE     (2)
+
 typedef enum
 {
     eCsrNextScanNothing,
@@ -991,4 +995,8 @@ eHalStatus csrScanCreateEntryInScanCache(tpAniSirGlobal pMac, tANI_U32 sessionId
 eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac);
 eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
                                  tANI_U8 *pBSSId );
+#endif
+
+#ifdef QCA_HT_2040_COEX
+eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId, ePhyChanBondState cbMode);
 #endif

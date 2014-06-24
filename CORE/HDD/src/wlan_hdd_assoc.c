@@ -654,6 +654,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
             return;
         }
 
+        wlan_hdd_incr_active_session(pHddCtx, pAdapter->device_mode);
         memcpy(wrqu.ap_addr.sa_data, pCsrRoamInfo->pBssDesc->bssId, sizeof(pCsrRoamInfo->pBssDesc->bssId));
         type = WLAN_STA_ASSOC_DONE_IND;
 
@@ -728,6 +729,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
     }
     else if (eConnectionState_IbssConnected == pHddStaCtx->conn_info.connState) // IBss Associated
     {
+        wlan_hdd_incr_active_session(pHddCtx, pAdapter->device_mode);
         memcpy(wrqu.ap_addr.sa_data, pHddStaCtx->conn_info.bssId, ETH_ALEN);
         type = WLAN_STA_ASSOC_DONE_IND;
         pr_info("wlan: new IBSS connection to " MAC_ADDRESS_STR"\n",
@@ -902,11 +904,16 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
     }
 
     /* If only STA mode is on */
-    if((pHddCtx->concurrency_mode <= 1) && (pHddCtx->no_of_sessions[WLAN_HDD_INFRA_STATION] <=1))
+    if((pHddCtx->concurrency_mode <= 1) &&
+       (pHddCtx->no_of_open_sessions[WLAN_HDD_INFRA_STATION] <=1))
     {
         pHddCtx->isAmpAllowed = VOS_TRUE;
     }
     hdd_clearRoamProfileIe( pAdapter );
+    wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
+    if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION) {
+        hdd_wmm_init( pHddCtx, hddWmmDscpToUpMapInfra );
+    }
 
     // indicate 'disconnect' status to wpa_supplicant...
     hdd_SendAssociationEvent(dev,pRoamInfo);
@@ -971,8 +978,8 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
                    if(NULL != pHddCtx)
                    {
                        //Only P2P Client is there Enable Bmps back
-                       if((0 == pHddCtx->no_of_sessions[VOS_STA_SAP_MODE]) &&
-                          (0 == pHddCtx->no_of_sessions[VOS_P2P_GO_MODE]))
+                       if((0 == pHddCtx->no_of_open_sessions[VOS_STA_SAP_MODE]) &&
+                          (0 == pHddCtx->no_of_open_sessions[VOS_P2P_GO_MODE]))
                        {
                            if (pHddCtx->hdd_wlan_suspended)
                            {
@@ -1204,8 +1211,11 @@ static VOS_STATUS hdd_roamRegisterSTA( hdd_adapter_t *pAdapter,
    // then go to 'authenticated'.  For all other authentication types
    // (those that donot require upper layer authentication) we can put
    // TL directly into 'authenticated' state.
-   if (staDesc.wSTAType != WLAN_STA_IBSS)
-      VOS_ASSERT( fConnected );
+   if (staDesc.wSTAType != WLAN_STA_IBSS) {
+      VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_MED,
+                 "STA type %d fConnected %d", staDesc.wSTAType, fConnected);
+   }
+
 
    if ( !pRoamInfo->fAuthRequired )
    {
@@ -1233,24 +1243,22 @@ static void hdd_SendReAssocEvent(struct net_device *dev, hdd_adapter_t *pAdapter
 {
     unsigned int len = 0;
     u8 *pFTAssocRsp = NULL;
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     v_U8_t *rspRsnIe = kmalloc(IW_GENERIC_IE_MAX, GFP_KERNEL);
     tANI_U32 rspRsnLength = 0;
     struct ieee80211_channel *chan;
 
-    if (!rspRsnIe)
-    {
+    if (!rspRsnIe) {
         hddLog(LOGE, "%s: Unable to allocate RSN IE", __func__);
         return;
     }
 
-    if (pCsrRoamInfo == NULL)
-    {
+    if (pCsrRoamInfo == NULL) {
         hddLog(LOGE, "%s: Invalid CSR roam info", __func__);
         goto done;
     }
 
-    if (pCsrRoamInfo->nAssocRspLength == 0)
-    {
+    if (pCsrRoamInfo->nAssocRspLength == 0) {
         hddLog(LOGE, "%s: Invalid assoc response length", __func__);
         goto done;
     }
@@ -1265,6 +1273,15 @@ static void hdd_SendReAssocEvent(struct net_device *dev, hdd_adapter_t *pAdapter
     hddLog(LOG1, "%s: AssocRsp is now at %02x%02x", __func__,
                     (unsigned int)pFTAssocRsp[0],
                     (unsigned int)pFTAssocRsp[1]);
+
+    /* Active session count is decremented upon disconnection, but during
+     * roaming, there is no disconnect indication and hence active session
+     * count is not decremented.
+     * After roaming is completed, active session count is incremented
+     * as a part of connect indication but effectively after roaming the
+     * active session count should still be the same and hence upon
+     * successful reassoc decrement the active session count here */
+    wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
 
     // Send the Assoc Resp, the supplicant needs this for initial Auth.
     len = pCsrRoamInfo->nAssocRspLength - FT_ASSOC_RSP_IES_OFFSET;
@@ -1341,7 +1358,6 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
         // indicate 'connect' status to userspace
         hdd_SendAssociationEvent(dev,pRoamInfo);
-
 
         // Initialize the Linkup event completion variable
         INIT_COMPLETION(pAdapter->linkup_event_var);
@@ -1647,7 +1663,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
         /*Handle all failure conditions*/
         hdd_connSetConnectionState( pHddStaCtx, eConnectionState_NotConnected);
-        if((pHddCtx->concurrency_mode <= 1) && (pHddCtx->no_of_sessions[WLAN_HDD_INFRA_STATION] <=1))
+        if((pHddCtx->concurrency_mode <= 1) &&
+           (pHddCtx->no_of_open_sessions[WLAN_HDD_INFRA_STATION] <=1))
         {
             pHddCtx->isAmpAllowed = VOS_TRUE;
         }
@@ -1661,7 +1678,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
         // If ps offload is enabled, fw will take care in case of concurrency.
         if(((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) ||
             (WLAN_HDD_P2P_CLIENT == pAdapter->device_mode)) &&
-            (vos_concurrent_sessions_running()) &&
+            (vos_concurrent_open_sessions_running()) &&
             !pHddCtx->cfg_ini->enablePowersaveOffload)
         {
            //Enable BMPS only of other Session is P2P Client
@@ -1675,8 +1692,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                if(NULL != pHddCtx)
                {
                     //Only P2P Client is there Enable Bmps back
-                    if((0 == pHddCtx->no_of_sessions[VOS_STA_SAP_MODE]) &&
-                       (0 == pHddCtx->no_of_sessions[VOS_P2P_GO_MODE]))
+                    if((0 == pHddCtx->no_of_open_sessions[VOS_STA_SAP_MODE]) &&
+                       (0 == pHddCtx->no_of_open_sessions[VOS_P2P_GO_MODE]))
                     {
                          if (pHddCtx->hdd_wlan_suspended)
                          {
@@ -1719,12 +1736,23 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
             }
             else
             {
-                if (pRoamInfo)
+                if (pRoamInfo) {
+                    eCsrAuthType authType =
+                        pWextState->roamProfile.AuthType.authType[0];
+                    v_BOOL_t isWep = (authType == eCSR_AUTH_TYPE_OPEN_SYSTEM) ||
+                                    (authType == eCSR_AUTH_TYPE_SHARED_KEY);
+
+                    /* In case of OPEN-WEP or SHARED-WEP authentication,
+                     * send exact protocol reason code. This enables user
+                     * applications to reconnect the station with correct
+                     * configuration.
+                     */
                     cfg80211_connect_result ( dev, pRoamInfo->bssid,
                         NULL, 0, NULL, 0,
-                        WLAN_STATUS_UNSPECIFIED_FAILURE,
+                        isWep ? pRoamInfo->reasonCode :
+                            WLAN_STATUS_UNSPECIFIED_FAILURE,
                         GFP_KERNEL );
-                else
+                } else
                     cfg80211_connect_result ( dev, pWextState->req_bssId,
                         NULL, 0, NULL, 0,
                         WLAN_STATUS_UNSPECIFIED_FAILURE,
@@ -1734,6 +1762,9 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
         /*Clear the roam profile*/
         hdd_clearRoamProfileIe( pAdapter );
+        if (WLAN_HDD_INFRA_STATION == pAdapter->device_mode) {
+            hdd_wmm_init( pHddCtx, hddWmmDscpToUpMapInfra );
+        }
 
         netif_tx_disable(dev);
         netif_carrier_off(dev);

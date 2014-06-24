@@ -57,6 +57,7 @@
 #include "limSendMessages.h"
 #include "limApi.h"
 #include "wmmApsd.h"
+#include "sirMacProtDef.h"
 
 #include "sapApi.h"
 
@@ -571,7 +572,11 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         }
         else
         {
-            if((psessionEntry = peCreateSession(pMac,pSmeStartBssReq->bssId,&sessionId, pMac->lim.maxStation)) == NULL)
+            if((psessionEntry = peCreateSession(pMac,
+                                                pSmeStartBssReq->bssId,
+                                                &sessionId,
+                                                pMac->lim.maxStation,
+                                                pSmeStartBssReq->bssType)) == NULL)
             {
                 limLog(pMac, LOGW, FL("Session Can not be created "));
                 retCode = eSIR_SME_RESOURCES_UNAVAILABLE;
@@ -1770,7 +1775,11 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         else       /* Session Entry does not exist for given BSSId */
         {
             /* Try to Create a new session */
-            if((psessionEntry = peCreateSession(pMac,pSmeJoinReq->bssDescription.bssId,&sessionId, pMac->lim.maxStation)) == NULL)
+            if((psessionEntry = peCreateSession(pMac,
+                    pSmeJoinReq->bssDescription.bssId,
+                    &sessionId,
+                    pMac->lim.maxStation,
+                    eSIR_INFRASTRUCTURE_MODE )) == NULL)
             {
                 limLog(pMac, LOGE, FL("Session Can not be created "));
                 retCode = eSIR_SME_RESOURCES_UNAVAILABLE;
@@ -4732,7 +4741,62 @@ __limProcessSmeChangeBI(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     return;
 } /*** end __limProcessSmeChangeBI(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf) ***/
 
+#ifdef QCA_HT_2040_COEX
+static void __limProcessSmeSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
+{
+    tpSirSetHT2040Mode     pSetHT2040Mode;
+    tpPESession             psessionEntry;
+    tANI_U8  sessionId = 0;
 
+    PELOG1(limLog(pMac, LOG1,
+           FL("received Set HT 20/40 mode message")););
+    if(pMsgBuf == NULL)
+    {
+        limLog(pMac, LOGE,FL("Buffer is Pointing to NULL"));
+        return;
+    }
+
+    pSetHT2040Mode = (tpSirSetHT2040Mode)pMsgBuf;
+
+    if((psessionEntry = peFindSessionByBssid(pMac, pSetHT2040Mode->bssId,
+                                                   &sessionId)) == NULL)
+    {
+        limLog(pMac, LOG1, FL("Session does not exist for given BSSID "));
+        limPrintMacAddr(pMac, pSetHT2040Mode->bssId, LOG1);
+        return;
+    }
+
+    limLog(pMac, LOG1, FL("Update session entry for cbMod=%d"),
+                           pSetHT2040Mode->cbMode);
+    /*Update sessionEntry HT related fields*/
+    switch(pSetHT2040Mode->cbMode)
+    {
+    case PHY_SINGLE_CHANNEL_CENTERED:
+        psessionEntry->htSupportedChannelWidthSet = eHT_CHANNEL_WIDTH_20MHZ;
+        psessionEntry->htSecondaryChannelOffset = PHY_SINGLE_CHANNEL_CENTERED;
+        psessionEntry->htRecommendedTxWidthSet = eHT_CHANNEL_WIDTH_20MHZ;
+        break;
+    case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+        psessionEntry->htSupportedChannelWidthSet = eHT_CHANNEL_WIDTH_40MHZ;
+        psessionEntry->htSecondaryChannelOffset = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
+        psessionEntry->htRecommendedTxWidthSet = eHT_CHANNEL_WIDTH_40MHZ;
+        break;
+    case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+        psessionEntry->htSupportedChannelWidthSet = eHT_CHANNEL_WIDTH_40MHZ;
+        psessionEntry->htSecondaryChannelOffset = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
+        psessionEntry->htRecommendedTxWidthSet = eHT_CHANNEL_WIDTH_40MHZ;
+        break;
+    default:
+        limLog(pMac, LOGE,FL("Invalid cbMode"));
+        return;
+    }
+
+    /* Update beacon */
+    schSetFixedBeaconFields(pMac, psessionEntry);
+    limSendBeaconInd(pMac, psessionEntry);
+    return;
+}
+#endif
 
 /** -------------------------------------------------------------
 \fn limProcessSmeDelBaPeerInd
@@ -5889,6 +5953,12 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
              __limProcessSmeChangeBI(pMac, pMsgBuf );
              break;
 
+#ifdef QCA_HT_2040_COEX
+        case eWNI_SME_SET_HT_2040_MODE:
+             __limProcessSmeSetHT2040Mode(pMac, pMsgBuf);
+             break;
+#endif
+
 #if defined WLAN_FEATURE_VOWIFI
         case eWNI_SME_NEIGHBOR_REPORT_REQ_IND:
         case eWNI_SME_BEACON_REPORT_RESP_XMIT_IND:
@@ -6300,6 +6370,7 @@ limProcessSmeDfsCsaIeRequest(tpAniSirGlobal pMac, tANI_U32 *pMsg)
     tpSirDfsCsaIeRequest  pDfsCsaIeRequest = (tSirDfsCsaIeRequest *)pMsg;
     tpPESession           psessionEntry = NULL;
     int i;
+    tANI_U32 chanWidth = 0;
 
     if ( pMsg == NULL )
     {
@@ -6325,6 +6396,87 @@ limProcessSmeDfsCsaIeRequest(tpAniSirGlobal pMac, tANI_U32 *pMsg)
         /* Channel switch announcement needs to be included in beacon */
         psessionEntry->dfsIncludeChanSwIe = VOS_TRUE;
         psessionEntry->gLimChannelSwitch.switchCount = LIM_MAX_CSA_IE_UPDATES;
+
+        /* Validate if SAP is operating HT or VHT
+         * mode and set the Channel Switch Wrapper
+         * element with the Wide Band Switch
+         * subelement..
+         */
+#ifdef WLAN_FEATURE_11AC
+        if (VOS_TRUE == psessionEntry->vhtCapability)
+        {
+            if (WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ ==
+                                        psessionEntry->vhtTxChannelWidthSet)
+            {
+                chanWidth = eHT_CHANNEL_WIDTH_80MHZ;
+            }
+            else if (WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ ==
+                                        psessionEntry->vhtTxChannelWidthSet)
+            {
+                chanWidth = psessionEntry->htSupportedChannelWidthSet;
+            }
+
+            /*
+             * Now encode the Wider Channel BW element
+             * depending on the chanWidth.
+             */
+            switch(chanWidth)
+            {
+                case eHT_CHANNEL_WIDTH_20MHZ:
+                    /*
+                     * Wide channel BW sublement in channel
+                     * wrapper element is not required in case
+                     * of 20 Mhz operation. Currently It is set
+                     * only set in case of 40/80 Mhz Operation.
+                     */
+                    psessionEntry->dfsIncludeChanWrapperIe = VOS_FALSE;
+                    psessionEntry->gLimWiderBWChannelSwitch.newChanWidth =
+                                            WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+                    break;
+                case eHT_CHANNEL_WIDTH_40MHZ:
+                    psessionEntry->dfsIncludeChanWrapperIe = VOS_TRUE;
+                    psessionEntry->gLimWiderBWChannelSwitch.newChanWidth =
+                                            WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+                    break;
+                case eHT_CHANNEL_WIDTH_80MHZ:
+                    psessionEntry->dfsIncludeChanWrapperIe = VOS_TRUE;
+                    psessionEntry->gLimWiderBWChannelSwitch.newChanWidth =
+                                            WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+                    break;
+                case eHT_CHANNEL_WIDTH_160MHZ:
+                    psessionEntry->dfsIncludeChanWrapperIe = VOS_TRUE;
+                    psessionEntry->gLimWiderBWChannelSwitch.newChanWidth =
+                                            WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+                    break;
+                default:
+                    psessionEntry->dfsIncludeChanWrapperIe = VOS_FALSE;
+                    /* Need to handle 80+80 Mhz Scenario
+                     * When 80+80 is supported set the
+                     * gLimWiderBWChannelSwitch.newChanWidth
+                     * to 3
+                     */
+                    PELOGE(limLog(pMac, LOGE, FL("Invalid Channel Width"));)
+                    break;
+            }
+            /*
+             * Fetch the center channel based on the channel width
+             */
+            psessionEntry->gLimWiderBWChannelSwitch.newCenterChanFreq0 =
+                           limGetCenterChannel(pMac,
+                             pDfsCsaIeRequest->targetChannel,
+                             psessionEntry->htSecondaryChannelOffset,
+                             psessionEntry->gLimWiderBWChannelSwitch.newChanWidth);
+            /*
+             * This is not applicable for 20/40/80 Mhz.
+             * Only used when we support 80+80 Mhz
+             * operation. In case of 80+80 Mhz, this
+             * parameter indicates center channel
+             * frequency index of 80 Mhz channel
+             * of frequency segment 1.
+             */
+            psessionEntry->gLimWiderBWChannelSwitch.newCenterChanFreq1 = 0;
+        }
+#endif
 
         /* Send CSA IE request from here */
         if (schSetFixedBeaconFields(pMac, psessionEntry) != eSIR_SUCCESS)

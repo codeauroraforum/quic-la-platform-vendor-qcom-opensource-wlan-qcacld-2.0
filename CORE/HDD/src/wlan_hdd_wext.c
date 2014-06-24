@@ -367,6 +367,9 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_DUMP_CHANINFO_START     13
 #define WE_DUMP_CHANINFO           14
 #define WE_DUMP_WATCHDOG           15
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+#define WE_DUMP_PCIE_LOG           16
+#endif
 #endif
 
 /* Private ioctls and their sub-ioctls */
@@ -609,6 +612,49 @@ static void *mem_alloc_copy_from_user_helper(const void *wrqu_data, size_t len)
     }
     ptr[len] = '\0';
     return ptr;
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_priv_get_data -
+
+   Helper function to get compatible struct iw_point passed to ioctl
+
+  \param  - p_priv_data - pointer to iw_point struct to be filled
+            wrqu - Pointer to IOCTL Data received from userspace
+
+  \return - 0 if p_priv_data successfully filled
+            error otherwise
+
+  --------------------------------------------------------------------------*/
+int hdd_priv_get_data(struct iw_point *p_priv_data,
+                      union iwreq_data *wrqu)
+{
+   if ((NULL == p_priv_data) || (NULL == wrqu)) {
+      return -EINVAL;
+   }
+
+#ifdef CONFIG_COMPAT
+   if (is_compat_task()) {
+      struct compat_iw_point *p_compat_priv_data;
+
+      /* Compat task: typecast to compat structure and copy the members. */
+      p_compat_priv_data = (struct compat_iw_point *) &wrqu->data;
+
+      p_priv_data->pointer = compat_ptr(p_compat_priv_data->pointer);
+      p_priv_data->length  = p_compat_priv_data->length;
+      p_priv_data->flags   = p_compat_priv_data->flags;
+   } else {
+#endif /* #ifdef CONFIG_COMPAT */
+
+      /* Non compat task: directly copy the structure. */
+      memcpy(p_priv_data, &wrqu->data, sizeof(struct iw_point));
+
+#ifdef CONFIG_COMPAT
+   }
+#endif /* #ifdef CONFIG_COMPAT */
+
+   return 0;
 }
 
 /**---------------------------------------------------------------------------
@@ -1378,6 +1424,7 @@ void hdd_clearRoamProfileIe( hdd_adapter_t *pAdapter)
 #endif
 
    pWextState->roamProfile.bWPSAssociation = VOS_FALSE;
+   pWextState->roamProfile.bOSENAssociation = VOS_FALSE;
    pWextState->roamProfile.pAddIEScan = (tANI_U8 *)NULL;
    pWextState->roamProfile.nAddIEScanLength = 0;
    pWextState->roamProfile.pAddIEAssoc = (tANI_U8 *)NULL;
@@ -7418,6 +7465,16 @@ static int iw_setnone_getnone(struct net_device *dev, struct iw_request_info *in
                                           0, GEN_CMD);
             break;
         }
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+        case WE_DUMP_PCIE_LOG:
+        {
+          hddLog(LOGE, "WE_DUMP_PCIE_LOG");
+          ret = process_wma_set_command((int) pAdapter->sessionId,
+                                        (int) GEN_PARAM_DUMP_PCIE_ACCESS_LOG,
+                                        0, GEN_CMD);
+          break;
+        }
+#endif
 #endif
         default:
         {
@@ -8804,6 +8861,8 @@ void wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set)
             hddLog(VOS_TRACE_LEVEL_ERROR, FL("Could not allocate Memory"));
             return;
         }
+        vos_mem_zero(pMulticastAddrs, sizeof(tSirRcvFltMcAddrList));
+        pMulticastAddrs->action = set;
 
         if (set)
         {
@@ -8840,12 +8899,26 @@ void wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set)
              */
             if (pAdapter->mc_addr_list.isFilterApplied)
             {
+#ifdef QCA_WIFI_2_0
+                pMulticastAddrs->ulMulticastAddrCnt =
+                                 pAdapter->mc_addr_list.mc_cnt;
+                for (i = 0; i < pAdapter->mc_addr_list.mc_cnt; i++) {
+                    memcpy(pMulticastAddrs->multicastAddr[i],
+                           pAdapter->mc_addr_list.addr[i],
+                           sizeof(pAdapter->mc_addr_list.addr[i]));
+                }
+#else
                 pMulticastAddrs->ulMulticastAddrCnt = 0;
+#endif
                 sme_8023MulticastList(hHal, pAdapter->sessionId,
                                       pMulticastAddrs);
             }
 
         }
+        /* MAddrCnt is MulticastAddrCnt */
+        hddLog(VOS_TRACE_LEVEL_INFO, "smeSessionId:%d; set:%d; MCAdddrCnt :%d",
+              pAdapter->sessionId, set, pMulticastAddrs->ulMulticastAddrCnt);
+
         pAdapter->mc_addr_list.isFilterApplied = set ? TRUE : FALSE;
         vos_mem_free(pMulticastAddrs);
     }
@@ -10824,6 +10897,12 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         0,
         "dump_watchdog" },
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+    {   WE_DUMP_PCIE_LOG,
+        0,
+        0,
+        "dump_pcie_log" },
+#endif
 #endif
     /* handlers for main ioctl */
     {   WLAN_PRIV_SET_VAR_INT_GET_NONE,
