@@ -492,6 +492,8 @@ struct wma_txrx_node {
 #if defined WLAN_FEATURE_VOWIFI_11R
         void    *staKeyParams;
 #endif
+	v_BOOL_t ps_enabled;
+	u_int32_t dtim_policy;
 };
 
 #if defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
@@ -649,6 +651,11 @@ typedef struct {
 
 	u_int8_t dfs_phyerr_filter_offload;
 	v_BOOL_t suitable_ap_hb_failure;
+
+	/* Powersave Configuration Parameters */
+	u_int8_t staMaxLIModDtim;
+	u_int8_t staModDtim;
+	u_int8_t staDynamicDtim;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
@@ -1549,4 +1556,5 @@ enum uapsd_up {
 };
 
 #define WMA_TGT_INVALID_SNR (-1)
+#define WMA_DYNAMIC_DTIM_SETTING_THRESHOLD 2
 #endif
