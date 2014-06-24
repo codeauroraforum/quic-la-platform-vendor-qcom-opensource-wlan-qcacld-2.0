@@ -162,3 +162,77 @@ v_BOOL_t vos_concurrent_open_sessions_running(void)
 
     return (j>1);
 }
+
+#ifdef WLAN_FEATURE_MBSSID
+v_BOOL_t vos_concurrent_sap_sessions_running(v_VOID_t)
+{
+    v_U8_t i=0;
+    hdd_context_t *pHddCtx;
+    v_CONTEXT_t pVosContext = vos_get_global_context( VOS_MODULE_ID_HDD, NULL );
+
+    if (NULL != pVosContext)
+    {
+       pHddCtx = vos_get_context( VOS_MODULE_ID_HDD, pVosContext);
+       if (NULL != pHddCtx)
+       {
+             i = pHddCtx->no_of_open_sessions[VOS_STA_SAP_MODE];
+       }
+    }
+
+    return (i>1);
+}
+#endif
+
+
+/**---------------------------------------------------------------------------
+ *
+ *   \brief vos_max_concurrent_connections_reached()
+ *
+ *   This function checks for presence of concurrency where more than
+ *   one connection exists and it returns TRUE if the max concurrency is
+ *   reached.
+ *
+ *   Example:
+ *   STA + STA (wlan0 and wlan1 are connected) - returns TRUE
+ *   STA + STA (wlan0 connected and wlan1 disconnected) - returns FALSE
+ *   DUT with P2P-GO + P2P-CLIENT connection) - returns TRUE
+ *
+ *   \param  - None
+ *
+ *   \return - VOS_TRUE or VOS_FALSE
+ *
+ * --------------------------------------------------------------------------*/
+v_BOOL_t vos_max_concurrent_connections_reached (void)
+{
+    v_U8_t i = 0, j = 0;
+    hdd_context_t *pHddCtx;
+    v_CONTEXT_t pVosContext = vos_get_global_context(VOS_MODULE_ID_HDD, NULL);
+
+    if (NULL != pVosContext) {
+        pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+        if (NULL != pHddCtx) {
+            for (i = 0; i < VOS_MAX_NO_OF_MODE; i++)
+                j += pHddCtx->no_of_active_sessions[i];
+
+            return (j > (pHddCtx->cfg_ini->gMaxConcurrentActiveSessions - 1));
+       }
+    }
+
+    return VOS_FALSE;
+}
+
+void vos_clear_concurrent_session_count(void)
+{
+    v_U8_t i = 0;
+    hdd_context_t *pHddCtx;
+    v_CONTEXT_t pVosContext = vos_get_global_context(VOS_MODULE_ID_HDD, NULL);
+
+    if (NULL != pVosContext) {
+        pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+        if (NULL != pHddCtx) {
+            for (i = 0; i < VOS_MAX_NO_OF_MODE; i++)
+                pHddCtx->no_of_active_sessions[i] = 0;
+       }
+    }
+}
+
