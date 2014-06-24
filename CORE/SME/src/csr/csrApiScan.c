@@ -2176,10 +2176,19 @@ eHalStatus csrScanGetResult(tpAniSirGlobal pMac, tCsrScanResultFilter *pFilter, 
                     }
 
                     smsLog(pMac, LOG1, FL("SSID Matched"));
-                    fMatch = csrIsSecurityMatch( pMac, &pFilter->authType, &pFilter->EncryptionType, &pFilter->mcEncryptionType,
-                                 &pBssDesc->Result.BssDescriptor, pIes, NULL, NULL, NULL );
+
+                    if ( pFilter->bOSENAssociation )
+                    {
+                        fMatch = TRUE;
+                    }
+                    else
+                    {
+                        fMatch = csrIsSecurityMatch( pMac, &pFilter->authType,
+                       &pFilter->EncryptionType, &pFilter->mcEncryptionType,
+                      &pBssDesc->Result.BssDescriptor, pIes, NULL, NULL, NULL );
+                    }
                     if ((pBssDesc->Result.pvIes == NULL) && pIes)
-                        vos_mem_free(pIes);
+                         vos_mem_free(pIes);
 
                     if (fMatch)
                         smsLog(pMac, LOG1, FL(" Security Matched"));
@@ -6877,7 +6886,8 @@ eHalStatus csrScanTriggerIdleScan(tpAniSirGlobal pMac, tANI_U32 *pTimeInterval)
     eHalStatus status = eHAL_STATUS_CSR_WRONG_STATE;
 
     //Do not trigger IMPS in case of concurrency
-    if (vos_concurrent_sessions_running() && csrIsAnySessionInConnectState(pMac))
+    if (vos_concurrent_open_sessions_running() &&
+        csrIsAnySessionInConnectState(pMac))
     {
         smsLog( pMac, LOG1, FL("Cannot request IMPS because Concurrent Sessions Running") );
         return (status);
@@ -7017,7 +7027,7 @@ void csrScanCancelIdleScan(tpAniSirGlobal pMac)
 
     if(eANI_BOOLEAN_FALSE == pMac->scan.fCancelIdleScan)
     {
-        if (vos_concurrent_sessions_running()) {
+        if (vos_concurrent_open_sessions_running()) {
             return;
         }
         smsLog(pMac, LOG1, "  csrScanCancelIdleScan");

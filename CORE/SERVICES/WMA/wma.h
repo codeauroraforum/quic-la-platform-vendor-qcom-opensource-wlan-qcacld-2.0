@@ -148,6 +148,7 @@
 #define WMA_CTS_DURATION_MS_MAX             (32)
 #define WMA_GO_MIN_ACTIVE_SCAN_BURST_DURATION   (40)
 #define WMA_GO_MAX_ACTIVE_SCAN_BURST_DURATION   (120)
+#define WMA_DWELL_TIME_PASSIVE_DEFAULT          (110)
 
 /* Roaming default values
  * All time and period values are in milliseconds.
@@ -489,6 +490,8 @@ struct wma_txrx_node {
 #if defined WLAN_FEATURE_VOWIFI_11R
         void    *staKeyParams;
 #endif
+	v_BOOL_t ps_enabled;
+	u_int32_t dtim_policy;
 };
 
 #if defined(QCA_WIFI_FTM) && !defined(QCA_WIFI_ISOC)
@@ -658,7 +661,15 @@ typedef struct {
 
 	/* IBSS Power Save config Parameters */
 	ibss_power_save_params wma_ibss_power_save_params;
+#ifdef FEATURE_WLAN_RA_FILTERING
+	v_BOOL_t IsRArateLimitEnabled;
+	u_int16_t RArateLimitInterval;
+#endif
 
+	/* Powersave Configuration Parameters */
+	u_int8_t staMaxLIModDtim;
+	u_int8_t staModDtim;
+	u_int8_t staDynamicDtim;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
@@ -1324,7 +1335,9 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq,
 #define WMA_ASSOC_REQ_RECV_WAKE_LOCK_DURATION	(30 * 1000) /* in msec */
 #define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION	(30 * 1000) /* in msec */
 #define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION	(30 * 1000) /* in msec */
-
+#ifdef FEATURE_WLAN_RA_FILTERING
+#define WMA_RA_MATCH_RECV_WAKE_LOCK_DURATION    (5 * 1000) /* in msec */
+#endif
 
 /* U-APSD maximum service period of peer station */
 enum uapsd_peer_param_max_sp {
@@ -1579,4 +1592,5 @@ enum uapsd_up {
 };
 
 #define WMA_TGT_INVALID_SNR (-1)
+#define WMA_DYNAMIC_DTIM_SETTING_THRESHOLD 2
 #endif

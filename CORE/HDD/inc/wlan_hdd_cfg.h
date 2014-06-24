@@ -2480,7 +2480,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_LL_TX_LBW_FLOW_LWM                     "TxLbwFlowLowWaterMark"
 #define CFG_LL_TX_LBW_FLOW_LWM_MIN                 ( 0 )
 #define CFG_LL_TX_LBW_FLOW_LWM_MAX                 ( 1000 )
-#define CFG_LL_TX_LBW_FLOW_LWM_DEFAULT             ( 650 )
+#define CFG_LL_TX_LBW_FLOW_LWM_DEFAULT             ( 450 )
 
 #define CFG_LL_TX_LBW_FLOW_HWM_OFFSET              "TxLbwFlowHighWaterMarkOffset"
 #define CFG_LL_TX_LBW_FLOW_HWM_OFFSET_MIN          ( 0 )
@@ -2525,6 +2525,18 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_DEFAULT  (2)
 #endif
 
+#ifdef FEATURE_WLAN_RA_FILTERING
+#define CFG_RA_FILTER_ENABLE_NAME                  "gRAFilterEnable"
+#define CFG_RA_FILTER_ENABLE_MIN                   (0)
+#define CFG_RA_FILTER_ENABLE_MAX                   (1)
+#define CFG_RA_FILTER_ENABLE_DEFAULT               (0)
+
+#define CFG_RA_RATE_LIMIT_INTERVAL_NAME            "gRArateLimitInterval"
+#define CFG_RA_RATE_LIMIT_INTERVAL_MIN             (60)
+#define CFG_RA_RATE_LIMIT_INTERVAL_MAX             (300)
+#define CFG_RA_RATE_LIMIT_INTERVAL_DEFAULT         (60)/*60 SEC*/
+#endif
+
 //Enable Memory Debug
 #ifdef MEMORY_DEBUG
 #define CFG_ENABLE_MEMORY_DEBUG_NAME             "gEnableMemoryDebug"
@@ -2541,10 +2553,13 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_OVERRIDE_COUNTRY_CODE                "gStaCountryCode"
 #define CFG_OVERRIDE_COUNTRY_CODE_DEFAULT        "000"
 
-#define CFG_ROAMING_DFS_CHANNEL_NAME                "gAllowDFSChannelRoam"
-#define CFG_ROAMING_DFS_CHANNEL_MIN                 (0)
-#define CFG_ROAMING_DFS_CHANNEL_MAX                 (1)
-#define CFG_ROAMING_DFS_CHANNEL_DEFAULT             (1)
+#define CFG_ROAMING_DFS_CHANNEL_NAME               "gAllowDFSChannelRoam"
+#define CFG_ROAMING_DFS_CHANNEL_DISABLED           (0)
+#define CFG_ROAMING_DFS_CHANNEL_ENABLED_NORMAL     (1)
+#define CFG_ROAMING_DFS_CHANNEL_ENABLED_ACTIVE     (2)
+#define CFG_ROAMING_DFS_CHANNEL_MIN                (CFG_ROAMING_DFS_CHANNEL_DISABLED)
+#define CFG_ROAMING_DFS_CHANNEL_MAX                (CFG_ROAMING_DFS_CHANNEL_ENABLED_ACTIVE)
+#define CFG_ROAMING_DFS_CHANNEL_DEFAULT            (CFG_ROAMING_DFS_CHANNEL_ENABLED_NORMAL)
 
 #ifdef MSM_PLATFORM
 #define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD           "gBusBandwidthHighThreshold"
@@ -2578,6 +2593,18 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_PMF_SA_QUERY_RETRY_INTERVAL_DEFAULT              ( 200    )
 #define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MIN                  ( 0 )
 #define CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX                  ( 2000  )
+#endif
+
+#define CFG_MAX_CONCURRENT_CONNECTIONS_NAME       "gMaxConcurrentActiveSessions"
+#define CFG_MAX_CONCURRENT_CONNECTIONS_DEFAULT    ( 2 )
+#define CFG_MAX_CONCURRENT_CONNECTIONS_MIN        ( 1 )
+#define CFG_MAX_CONCURRENT_CONNECTIONS_MAX        ( 4 )
+
+#ifdef QCA_HT_2040_COEX
+#define CFG_ENABLE_HT_2040_COEX                    "gHT2040CoexEnabled"
+#define CFG_ENABLE_HT_2040_COEX_MIN                ( 0 )
+#define CFG_ENABLE_HT_2040_COEX_MAX                ( 1 )
+#define CFG_ENABLE_HT_2040_COEX_DEFAULT            ( 0 )
 #endif
 
 /*---------------------------------------------------------------------------
@@ -2848,6 +2875,10 @@ typedef struct
    v_U8_t                      mcastBcastFilterSetting;
    v_BOOL_t                    fhostArpOffload;
    v_BOOL_t                    ssdp;
+#ifdef FEATURE_WLAN_RA_FILTERING
+   v_BOOL_t                    IsRArateLimitEnabled;
+   v_U16_t                     RArateLimitInterval;
+#endif
 #ifdef FEATURE_WLAN_SCAN_PNO
    v_BOOL_t                    PnoOffload;
 #endif
@@ -3102,7 +3133,7 @@ typedef struct
    v_BOOL_t                    IsMemoryDebugSupportEnabled;
 #endif
 
-   v_BOOL_t                    allowDFSChannelRoam;
+   v_U8_t                      allowDFSChannelRoam;
 
    v_BOOL_t                    debugP2pRemainOnChannel;
 
@@ -3126,6 +3157,12 @@ typedef struct
 #ifdef WLAN_FEATURE_11W
    v_U32_t                     pmfSaQueryMaxRetries;
    v_U32_t                     pmfSaQueryRetryInterval;
+#endif
+
+   v_U8_t                      gMaxConcurrentActiveSessions;
+
+#ifdef QCA_HT_2040_COEX
+   v_BOOL_t                    ht2040CoexEnabled;
 #endif
 } hdd_config_t;
 

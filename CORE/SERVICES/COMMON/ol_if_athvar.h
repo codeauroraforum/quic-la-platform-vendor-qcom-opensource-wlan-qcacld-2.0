@@ -90,6 +90,17 @@ enum ol_ath_tx_ecodes  {
     RX_RCV_MSG_TYPE_TEST
 } ;
 
+#ifdef HIF_SDIO
+#define MAX_FILE_NAME     20
+struct ol_fw_files {
+    char image_file[MAX_FILE_NAME];
+    char board_data[MAX_FILE_NAME];
+    char otp_data[MAX_FILE_NAME];
+    char utf_file[MAX_FILE_NAME];
+    char utf_board_data[MAX_FILE_NAME];
+};
+#endif
+
 #ifndef ATH_CAP_DCS_CWIM
 #define ATH_CAP_DCS_CWIM 0x1
 #define ATH_CAP_DCS_WLANIM 0x2
@@ -217,10 +228,10 @@ struct ol_softc {
     u_int32_t               set_ht_vht_ies:1; /* true if vht ies are set on target */
     bool                    scn_cwmenable;    /*CWM enable/disable state*/
     u_int8_t                max_no_of_peers;
-    struct completion       ramdump_event;
-    bool                    crash_shutdown;
 #ifdef CONFIG_CNSS
     struct cnss_fw_files fw_files;
+#elif defined(HIF_SDIO)
+    struct ol_fw_files fw_files;
 #endif
 };
 

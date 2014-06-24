@@ -8258,7 +8258,7 @@ eHalStatus sme_8023MulticastList (tHalHandle hHal, tANI_U8 sessionId, tpSirRcvFl
     if(pSession == NULL )
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Unable to find "
-            "the right session", __func__);
+            "the session Id: %d", __func__, sessionId);
         return eHAL_STATUS_FAILURE;
     }
 
@@ -11629,6 +11629,121 @@ VOS_STATUS sme_notify_modem_power_state(tHalHandle hHal, tANI_U32 value)
    return VOS_STATUS_SUCCESS;
 }
 
+#ifdef QCA_HT_2040_COEX
+VOS_STATUS sme_notify_ht2040_mode(tHalHandle hHal, tANI_U16 staId,
+             v_MACADDR_t macAddrSTA, v_U8_t sessionId, tANI_U8 channel_type)
+{
+    vos_msg_t msg;
+    tUpdateVHTOpMode *pHtOpMode = NULL;
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+
+    if (NULL == pMac)
+   {
+      return VOS_STATUS_E_FAILURE;
+   }
+
+   pHtOpMode = vos_mem_malloc(sizeof(tUpdateVHTOpMode));
+   if ( NULL == pHtOpMode )
+   {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+       "%s: Not able to allocate memory for setting OP mode",
+       __func__);
+      return VOS_STATUS_E_FAILURE;
+   }
+
+   switch (channel_type)
+   {
+   case eHT_CHAN_HT20:
+       pHtOpMode->opMode = eHT_CHANNEL_WIDTH_20MHZ;
+       break;
+
+   case eHT_CHAN_HT40MINUS:
+   case eHT_CHAN_HT40PLUS:
+       pHtOpMode->opMode = eHT_CHANNEL_WIDTH_40MHZ;
+       break;
+
+   default:
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+       "%s: Invalid OP mode",
+       __func__);
+       return VOS_STATUS_E_FAILURE;
+   }
+
+   pHtOpMode->staId = staId,
+   vos_mem_copy(pHtOpMode->peer_mac, macAddrSTA.bytes,
+                 sizeof(tSirMacAddr));
+   pHtOpMode->smesessionId = sessionId;
+
+   msg.type     = WDA_UPDATE_OP_MODE;
+   msg.reserved = 0;
+   msg.bodyptr  = pHtOpMode;
+   if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(VOS_MODULE_ID_WDA, &msg)))
+   {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+         "%s: Not able to post WDA_UPDATE_OP_MODE message"
+         " to WDA", __func__);
+       vos_mem_free(pHtOpMode);
+       return VOS_STATUS_E_FAILURE;
+   }
+
+   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+       "%s: Notifed FW about OP mode: %d for staId=%d",
+       __func__, pHtOpMode->opMode, staId);
+
+
+   return VOS_STATUS_SUCCESS;
+}
+
+/* ---------------------------------------------------------------------------
+
+    \fn sme_SetHT2040Mode
+
+    \brief To update HT Operation beacon IE.
+
+    \param
+
+    \return eHalStatus  SUCCESS
+                        FAILURE or RESOURCES
+                        The API finished and failed.
+
+  -------------------------------------------------------------------------------*/
+eHalStatus sme_SetHT2040Mode(tHalHandle hHal, tANI_U8 sessionId, tANI_U8 channel_type)
+{
+   eHalStatus status = eHAL_STATUS_FAILURE;
+   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+   ePhyChanBondState cbMode;
+
+   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+       "%s: Update HT operation beacon IE, channel_type=%d",
+       __func__, channel_type);
+
+   switch (channel_type)
+   {
+   case eHT_CHAN_HT20:
+       cbMode = PHY_SINGLE_CHANNEL_CENTERED;
+       break;
+   case eHT_CHAN_HT40MINUS:
+       cbMode = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
+       break;
+   case eHT_CHAN_HT40PLUS:
+       cbMode = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
+       break;
+   default:
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+          "%s:Error!!! Invalid HT20/40 mode !",
+          __func__);
+       return VOS_STATUS_E_FAILURE;
+   }
+   status = sme_AcquireGlobalLock(&pMac->sme);
+   if (HAL_STATUS_SUCCESS(status))
+   {
+      status = csrSetHT2040Mode(pMac, sessionId, cbMode);
+      sme_ReleaseGlobalLock(&pMac->sme );
+   }
+   return (status);
+}
+#endif
+
 /*
  * SME API to enable/disable idle mode powersave
  * This should be called only if powersave offload
@@ -12390,17 +12505,18 @@ eHalStatus sme_StatsExtEvent(tHalHandle hHal, void* pMsg)
 
 /* ---------------------------------------------------------------------------
     \fn sme_UpdateDFSScanMode
-    \brief  Update DFS roam Mode
+    \brief  Update DFS roam scan mode
             This function is called through dynamic setConfig callback function
-            to configure isAllowDFSChannelRoam.
+            to configure allowDFSChannelRoam.
     \param  hHal - HAL handle for device
-    \param  isAllowDFSChannelRoam - Enable/Disable DFS roaming scan
-    \return eHAL_STATUS_SUCCESS - SME update allowDFSChannelRoam config
+    \param  allowDFSChannelRoam - DFS roaming scan mode 0 (disable),
+            1 (passive), 2 (active)
+    \return eHAL_STATUS_SUCCESS - SME update DFS roaming scan config
             successfully.
-            Other status means SME is failed to update isAllowDFSChannelRoam.
+            Other status means SME failed to update DFS roaming scan config.
+    \sa
     -------------------------------------------------------------------------*/
-
-eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, v_BOOL_t isAllowDFSChannelRoam)
+eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, v_U8_t allowDFSChannelRoam)
 {
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
     eHalStatus          status    = eHAL_STATUS_SUCCESS;
@@ -12411,11 +12527,11 @@ eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, v_BOOL_t isAllowDFSChannelRoam
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
                      "LFR runtime successfully set AllowDFSChannelRoam Mode to "
                      "%d - old value is %d - roam state is %s",
-                     isAllowDFSChannelRoam,
+                     allowDFSChannelRoam,
                      pMac->roam.configParam.allowDFSChannelRoam,
                      macTraceGetNeighbourRoamState(
                      pMac->roam.neighborRoamInfo.neighborRoamState));
-        pMac->roam.configParam.allowDFSChannelRoam = isAllowDFSChannelRoam;
+        pMac->roam.configParam.allowDFSChannelRoam = allowDFSChannelRoam;
         sme_ReleaseGlobalLock( &pMac->sme );
     }
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
@@ -12430,13 +12546,13 @@ eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, v_BOOL_t isAllowDFSChannelRoam
 }
 
 /*--------------------------------------------------------------------------
-  \brief sme_GetWESMode() - get WES Mode
-  This is a synchronous call
-  \param hHal - The handle returned by macOpen
-  \return DFS roaming mode Enabled(1)/Disabled(0)
+  \brief sme_GetDFSScanMode() - get DFS roam scan mode
+            This is a synchronous call
+  \param hHal - The handle returned by macOpen.
+  \return DFS roaming scan mode 0 (disable), 1 (passive), 2 (active)
   \sa
   --------------------------------------------------------------------------*/
-v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal)
+v_U8_t sme_GetDFSScanMode(tHalHandle hHal)
 {
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
     return pMac->roam.configParam.allowDFSChannelRoam;
@@ -12473,3 +12589,73 @@ eHalStatus sme_UpdateAddIE(tHalHandle hHal,
     return (status);
 }
 
+/* ---------------------------------------------------------------------------
+    \fn sme_staInMiddleOfRoaming
+    \brief  This function returns TRUE if STA is in the middle of roaming state
+    \param  hHal - HAL handle for device
+    \- return TRUE or FALSE
+    -------------------------------------------------------------------------*/
+tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac   = PMAC_STRUCT( hHal );
+    eHalStatus     status = eHAL_STATUS_SUCCESS;
+    tANI_BOOLEAN   ret    = FALSE;
+
+    if (eHAL_STATUS_SUCCESS == (status = sme_AcquireGlobalLock(&pMac->sme))) {
+        ret = csrNeighborMiddleOfRoaming(hHal);
+        sme_ReleaseGlobalLock(&pMac->sme);
+    }
+    return ret;
+}
+
+eHalStatus sme_UpdateDSCPtoUPMapping( tHalHandle hHal,
+                                      sme_QosWmmUpType  *dscpmapping)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    eHalStatus status    = eHAL_STATUS_SUCCESS;
+    v_U8_t i, j;
+    status = sme_AcquireGlobalLock( &pMac->sme );
+    if ( HAL_STATUS_SUCCESS( status ) )
+    {
+        if ( !pMac->QosMapSet.present )
+        {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                     "%s: QOS Mapping IE not present", __func__);
+            sme_ReleaseGlobalLock( &pMac->sme);
+            return eHAL_STATUS_FAILURE;
+        }
+        else
+        {
+            for (i = 0; i < 8; i++)
+            {
+                for (j = pMac->QosMapSet.dscp_range[i][0];
+                               j <= pMac->QosMapSet.dscp_range[i][1]; j++)
+                {
+                   if ((pMac->QosMapSet.dscp_range[i][0] == 255) &&
+                                (pMac->QosMapSet.dscp_range[i][1] == 255))
+                   {
+                       dscpmapping[j]= 0;
+                       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                       "%s: User Priority %d is not used in mapping",
+                                                             __func__, i);
+                       break;
+                   }
+                   else
+                   {
+                       dscpmapping[j]= i;
+                   }
+                }
+            }
+            for (i = 0; i < pMac->QosMapSet.num_dscp_exceptions; i++)
+            {
+                if (pMac->QosMapSet.dscp_exceptions[i][0] != 255)
+                {
+                    dscpmapping[pMac->QosMapSet.dscp_exceptions[i][0] ] =
+                                         pMac->QosMapSet.dscp_exceptions[i][1];
+                }
+            }
+        }
+    }
+    sme_ReleaseGlobalLock( &pMac->sme);
+    return status;
+}

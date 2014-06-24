@@ -412,6 +412,9 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
    macOpenParms.driverType         = eDRIVER_TYPE_PRODUCTION;
    macOpenParms.powersaveOffloadEnabled =
       pHddCtx->cfg_ini->enablePowersaveOffload;
+   macOpenParms.staDynamicDtim = pHddCtx->cfg_ini->enableDynamicDTIM;
+   macOpenParms.staModDtim = pHddCtx->cfg_ini->enableModulatedDTIM;
+   macOpenParms.staMaxLIModDtim = pHddCtx->cfg_ini->fMaxLIModulatedDTIM;
    macOpenParms.wowEnable          = pHddCtx->cfg_ini->wowEnable;
    macOpenParms.maxWoWFilters      = pHddCtx->cfg_ini->maxWoWFilters;
   /* Here olIniInfo is used to store ini status of arp offload
@@ -433,6 +436,10 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
                         pHddCtx->cfg_ini->fDfsPhyerrFilterOffload;
   if (pHddCtx->cfg_ini->ssdp)
       macOpenParms.ssdp = pHddCtx->cfg_ini->ssdp;
+#endif
+#ifdef FEATURE_WLAN_RA_FILTERING
+   macOpenParms.RArateLimitInterval = pHddCtx->cfg_ini->RArateLimitInterval;
+   macOpenParms.IsRArateLimitEnabled = pHddCtx->cfg_ini->IsRArateLimitEnabled;
 #endif
 
    macOpenParms.apMaxOffloadPeers = pHddCtx->cfg_ini->apMaxOffloadPeers;

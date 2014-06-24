@@ -863,6 +863,10 @@ typedef enum {
 #define WMI_OEM_MEASUREMENT_REQ    0x03
 #define WMI_OEM_MEASUREMENT_RSP    0x04
 #define WMI_OEM_ERROR_REPORT_RSP   0x05
+#define WMI_OEM_NAN_MEAS_REQ       0x06
+#define WMI_OEM_NAN_MEAS_RSP       0x07
+#define WMI_OEM_NAN_PEER_INFO      0x08
+
 
 /* below message subtype is internal to CLD. Target should
  * never use internal response type
@@ -1597,8 +1601,10 @@ typedef struct {
 /**When set, certain errors are ignored and scan continues.
 * Different FW scan engine may use its own logic to decide what errors to ignore*/
 #define WMI_SCAN_CONTINUE_ON_ERROR 0x80
-/* Enable promiscous mode for CCXv4 */
+/** Enable promiscous mode for ese */
 #define WMI_SCAN_FILTER_PROMISCOUS 0x100
+/** allow to send probe req on DFS channel */
+#define WMI_SCAN_FLAG_FORCE_ACTIVE_ON_DFS 0x200
 
 /** WMI_SCAN_CLASS_MASK must be the same value as IEEE80211_SCAN_CLASS_MASK */
 #define WMI_SCAN_CLASS_MASK 0xFF000000
@@ -3470,6 +3476,14 @@ typedef enum {
     * instead of waiting for the inactivity timeout. */
     WMI_VDEV_PARAM_TXSP_END_INACTIVITY_TIME_MS,
 
+    /** DTIM policy */
+    WMI_VDEV_PARAM_DTIM_POLICY,
+
+    /* When IBSS network is initialized, PS-supporting device
+    * does not enter protocol sleep state during first
+    * WMI_VDEV_PARAM_IBSS_PS_WARMUP_TIME_SECS seconds. */
+    WMI_VDEV_PARAM_IBSS_PS_WARMUP_TIME_SECS,
+
 } WMI_VDEV_PARAM;
 
 /* Length of ATIM Window in TU */
@@ -4332,6 +4346,9 @@ typedef struct {
 #define WMI_PEER_TX_FAIL_CNT_THR                        0xA
 /* Enable H/W retry and Enable H/W Send CTS2S before Data */
 #define WMI_PEER_SET_HW_RETRY_CTS2S                     0xB
+
+/* Set peer advertised IBSS atim window length */
+#define WMI_PEER_IBSS_ATIM_WINDOW_LENGTH                0xC
 
 /** mimo ps values for the parameter WMI_PEER_MIMO_PS_STATE  */
 #define WMI_PEER_MIMO_PS_NONE                          0x0

@@ -1352,6 +1352,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 #define WDA_ROAM_PREAUTH_IND        SIR_HAL_ROAM_PREAUTH_IND
 
+#define WDA_TBTT_UPDATE_IND         SIR_HAL_TBTT_UPDATE_IND
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
@@ -2248,6 +2249,9 @@ typedef struct sEnablePsParams
 
     /* SmeSession Id or Vdev Id */
     tANI_U32 sessionid;
+
+    /* Beacon DTIM Period */
+    tANI_U8 bcnDtimPeriod;
 
     /* success or failure */
     tANI_U32   status;

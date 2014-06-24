@@ -1736,10 +1736,12 @@ VOS_STATUS hdd_wlan_reset_initialization(void)
  */
 void hdd_set_wlan_suspend_mode(bool suspend)
 {
+    vos_ssr_protect(__func__);
     if (suspend)
         hdd_suspend_wlan(NULL, NULL);
     else
         hdd_resume_wlan();
+    vos_ssr_unprotect(__func__);
 }
 
 static void hdd_ssr_timer_init(void)
@@ -2136,7 +2138,8 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    }
 
    /* Initialize the WMM module */
-   vosStatus = hdd_wmm_init(pHddCtx);
+   vosStatus = hdd_wmm_init(pHddCtx, hddWmmDscpToUpMapInfra);
+   vosStatus = hdd_wmm_init(pHddCtx, hddWmmDscpToUpMapP2p);
    if ( !VOS_IS_STATUS_SUCCESS( vosStatus ))
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: hdd_wmm_init failed", __func__);

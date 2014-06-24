@@ -4320,8 +4320,9 @@ static eCsrJoinState csrRoamJoinNextBss( tpAniSirGlobal pMac, tSmeCmd *pCommand,
                     pScanResult = GET_BASE_ADDR(pCommand->u.roamCmd.pRoamBssEntry, tCsrScanResult, Link);
                     /*If concurrency enabled take the concurrent connected channel first. */
                     /* Valid multichannel concurrent sessions exempted */
-                    if (vos_concurrent_sessions_running() &&
-                        !csrIsValidMcConcurrentSession(pMac, sessionId, &pScanResult->Result.BssDescriptor))
+                    if (vos_concurrent_open_sessions_running() &&
+                        !csrIsValidMcConcurrentSession(pMac, sessionId,
+                                           &pScanResult->Result.BssDescriptor))
                     {
                         concurrentChannel =
                             csrGetConcurrentOperationChannel(pMac);
@@ -4494,8 +4495,23 @@ static eCsrJoinState csrRoamJoinNextBss( tpAniSirGlobal pMac, tSmeCmd *pCommand,
         {
             //Need to assign these value because they are used in csrIsSameProfile
             pScanResult = GET_BASE_ADDR(pCommand->u.roamCmd.pRoamBssEntry, tCsrScanResult, Link);
-            pCommand->u.roamCmd.roamProfile.negotiatedUCEncryptionType = pScanResult->ucEncryptionType; //Negotiated while building scan result.
-            pCommand->u.roamCmd.roamProfile.negotiatedMCEncryptionType = pScanResult->mcEncryptionType;
+           /* The OSEN IE doesn't provide the cipher suite.
+            * Therefore set to constant value of AES */
+            if(pCommand->u.roamCmd.roamProfile.bOSENAssociation)
+            {
+                pCommand->u.roamCmd.roamProfile.negotiatedUCEncryptionType =
+                                                         eCSR_ENCRYPT_TYPE_AES;
+                pCommand->u.roamCmd.roamProfile.negotiatedMCEncryptionType =
+                                                         eCSR_ENCRYPT_TYPE_AES;
+            }
+            else
+            {
+                  //Negotiated while building scan result.
+                pCommand->u.roamCmd.roamProfile.negotiatedUCEncryptionType =
+                                                 pScanResult->ucEncryptionType;
+                pCommand->u.roamCmd.roamProfile.negotiatedMCEncryptionType =
+                                                 pScanResult->mcEncryptionType;
+            }
             pCommand->u.roamCmd.roamProfile.negotiatedAuthType = pScanResult->authType;
             if ( CSR_IS_START_IBSS(&pCommand->u.roamCmd.roamProfile) )
             {
@@ -6356,6 +6372,7 @@ eHalStatus csrRoamCopyProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pDstProfile,
         pDstProfile->CBMode = pSrcProfile->CBMode;
         /*Save the WPS info*/
         pDstProfile->bWPSAssociation = pSrcProfile->bWPSAssociation;
+        pDstProfile->bOSENAssociation = pSrcProfile->bOSENAssociation;
         pDstProfile->uapsd_mask = pSrcProfile->uapsd_mask;
         pDstProfile->beaconInterval = pSrcProfile->beaconInterval;
         pDstProfile->privacy           = pSrcProfile->privacy;
@@ -6731,8 +6748,10 @@ eHalStatus csrRoamConnect(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoamProfi
     csrScanCancelIdleScan(pMac);
     //Only abort the scan if it is not used for other roam/connect purpose
     csrScanAbortMacScan(pMac, sessionId, eCSR_SCAN_ABORT_DEFAULT);
-    if (!vos_concurrent_sessions_running() && (VOS_STA_SAP_MODE == pProfile->csrPersona))//In case of AP mode we do not want idle mode scan
+    if (!vos_concurrent_open_sessions_running() &&
+       (VOS_STA_SAP_MODE == pProfile->csrPersona))
     {
+        /* In case of AP mode we do not want idle mode scan */
         csrScanDisable(pMac);
     }
     csrRoamRemoveDuplicateCommand(pMac, sessionId, NULL, eCsrHddIssued);
@@ -6794,10 +6813,12 @@ eHalStatus csrRoamConnect(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoamProfi
                 if(NULL != pProfile)
                 {
                     pScanFilter->bWPSAssociation = pProfile->bWPSAssociation;
+                    pScanFilter->bOSENAssociation = pProfile->bOSENAssociation;
                 }
                 else
                 {
                     pScanFilter->bWPSAssociation = 0;
+                    pScanFilter->bOSENAssociation = 0;
                 }
                 do
                 {
@@ -9133,6 +9154,7 @@ eHalStatus csrRoamPrepareFilterFromProfile(tpAniSirGlobal pMac, tCsrRoamProfile 
 #endif /* FEATURE_WLAN_WAPI */
         /*Save the WPS info*/
         pScanFilter->bWPSAssociation = pProfile->bWPSAssociation;
+        pScanFilter->bOSENAssociation = pProfile->bOSENAssociation;
         if( pProfile->countryCode[0] )
         {
             //This causes the matching function to use countryCode as one of the criteria.
@@ -12525,6 +12547,7 @@ eHalStatus csrRoamRemoveConnectedBssFromScanCache(tpAniSirGlobal pMac,
             //Also ignore the following fields
             pScanFilter->uapsd_mask = 0;
             pScanFilter->bWPSAssociation = eANI_BOOLEAN_FALSE;
+            pScanFilter->bOSENAssociation = eANI_BOOLEAN_FALSE;
             pScanFilter->countryCode[0] = 0;
             pScanFilter->phyMode = eCSR_DOT11_MODE_TAURUS;
             csrLLLock(&pMac->scan.scanResultList);
@@ -13671,6 +13694,47 @@ csrSendChngMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U32 sessionId)
     }
      return status;
 }
+
+#ifdef QCA_HT_2040_COEX
+eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId, ePhyChanBondState cbMode)
+{
+    tpSirSetHT2040Mode pMsg;
+    tANI_U16 len = 0;
+    eHalStatus status   = eHAL_STATUS_SUCCESS;
+    tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
+
+    if(!pSession)
+    {
+        smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
+        return eHAL_STATUS_FAILURE;
+    }
+
+     /* Create the message and send to lim */
+     len = sizeof(tSirSetHT2040Mode);
+     pMsg = vos_mem_malloc(len);
+     if ( NULL == pMsg )
+        status = eHAL_STATUS_FAILURE;
+     else
+        status = eHAL_STATUS_SUCCESS;
+     if(HAL_STATUS_SUCCESS(status))
+     {
+         vos_mem_set(pMsg, sizeof(tSirSetHT2040Mode), 0);
+         pMsg->messageType     = eWNI_SME_SET_HT_2040_MODE;
+         pMsg->length          = len;
+
+        // bssId
+        vos_mem_copy((tSirMacAddr *)pMsg->bssId, &pSession->selfMacAddr,
+                     sizeof(tSirMacAddr));
+        smsLog( pMac, LOG1, FL("CSR Attempting to set HT20/40 mode for Bssid= "MAC_ADDRESS_STR),
+               MAC_ADDR_ARRAY(pMsg->bssId));
+        pMsg->sessionId       = sessionId;
+        smsLog(pMac, LOG1, FL("  session %d HT20/40 mode %d"), sessionId, cbMode);
+        pMsg->cbMode = cbMode;
+        status = palSendMBMessage(pMac->hHdd, pMsg);
+    }
+     return status;
+}
+#endif
 
 eHalStatus csrSendMBDeauthReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirMacAddr bssId, tANI_U16 reasonCode )
 {
@@ -16263,7 +16327,8 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reas
               (eCSR_BAND_ALL == eBand))
           {
               /*Allow DFS channels only if the DFS channel roam flag is enabled */
-              if(((pMac->roam.configParam.allowDFSChannelRoam) ||
+              if(((pMac->roam.configParam.allowDFSChannelRoam
+                                != CSR_ROAMING_DFS_CHANNEL_DISABLED) ||
                   (!CSR_IS_CHANNEL_DFS(*ChannelList))) &&
                  csrRoamIsChannelValid(pMac, *ChannelList) &&
                  *ChannelList && (num_channels < SIR_ROAM_MAX_CHANNELS))
@@ -16281,7 +16346,8 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reas
           ChannelList = pMac->scan.occupiedChannels.channelList;
           for(i=0; i<pMac->scan.occupiedChannels.numChannels; i++)
           {
-              if(((pMac->roam.configParam.allowDFSChannelRoam) ||
+              if(((pMac->roam.configParam.allowDFSChannelRoam
+                                != CSR_ROAMING_DFS_CHANNEL_DISABLED) ||
                   (!CSR_IS_CHANNEL_DFS(*ChannelList))) && *ChannelList &&
                  (num_channels < SIR_ROAM_MAX_CHANNELS))
               {
@@ -16314,7 +16380,8 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reas
           ChannelList = currChannelListInfo->ChannelList;
           for (i=0;i<currChannelListInfo->numOfChannels;i++)
           {
-           if(((pMac->roam.configParam.allowDFSChannelRoam) ||
+           if(((pMac->roam.configParam.allowDFSChannelRoam
+                                != CSR_ROAMING_DFS_CHANNEL_DISABLED) ||
                 (!CSR_IS_CHANNEL_DFS(*ChannelList))) && *ChannelList)
            {
             pRequestBuf->ConnectedNetwork.ChannelCache[num_channels++] = *ChannelList;
@@ -16362,7 +16429,8 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reas
     }
     for(i=0; i<pMac->roam.numValidChannels; i++)
     {
-        if(((pMac->roam.configParam.allowDFSChannelRoam) ||
+        if(((pMac->roam.configParam.allowDFSChannelRoam
+                                != CSR_ROAMING_DFS_CHANNEL_DISABLED) ||
             (!CSR_IS_CHANNEL_DFS(*ChannelList))) && *ChannelList)
         {
             pRequestBuf->ValidChannelList[num_channels++] = *ChannelList;
@@ -16407,6 +16475,7 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 command, tANI_U8 reas
                                              pRequestBuf->p5GProbeTemplate,
                                              &pRequestBuf->us5GProbeTemplateLen,
                                              pSession);
+   pRequestBuf->allowDFSChannelRoam = pMac->roam.configParam.allowDFSChannelRoam;
    msg.type     = WDA_ROAM_SCAN_OFFLOAD_REQ;
    msg.reserved = 0;
    msg.bodyptr  = pRequestBuf;

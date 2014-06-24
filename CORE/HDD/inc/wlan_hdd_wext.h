@@ -224,6 +224,9 @@ typedef enum
 #define HS20_OUI_TYPE   "\x50\x6f\x9a\x10"
 #define HS20_OUI_TYPE_SIZE  4
 
+#define OSEN_OUI_TYPE   "\x50\x6f\x9a\x12"
+#define OSEN_OUI_TYPE_SIZE  4
+
 #ifdef WLAN_FEATURE_WFD
 #define WFD_OUI_TYPE   "\x50\x6f\x9a\x0a"
 #define WFD_OUI_TYPE_SIZE  4
@@ -382,6 +385,9 @@ extern int iw_set_var_ints_getnone(struct net_device *dev, struct iw_request_inf
 
 extern int iw_set_three_ints_getnone(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra);
+
+extern int hdd_priv_get_data(struct iw_point *p_priv_data,
+                             union iwreq_data *wrqu);
 
 extern VOS_STATUS wlan_hdd_get_linkspeed_for_peermac(hdd_adapter_t *pAdapter,
                                                      tSirMacAddr macAddress);

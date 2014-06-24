@@ -64,6 +64,11 @@ typedef struct sPowersaveoffloadInfo
   ------------------------------------------------------------------------*/
 #define NUM_WEP_KEYS 4
 
+// Maximum allowable size of a beacon frame
+#define SCH_MAX_BEACON_SIZE    512
+
+#define SCH_MAX_PROBE_RESP_SIZE 512
+
 /*--------------------------------------------------------------------------
   Type declarations
   ------------------------------------------------------------------------*/
@@ -320,7 +325,6 @@ typedef struct sPESession           // Added to Support BT-AMP
     tANI_U8 vhtCapability;
     tANI_U8 vhtTxChannelWidthSet;
     tLimOperatingModeInfo  gLimOperatingMode;
-    tLimWiderBWChannelSwitchInfo  gLimWiderBWChannelSwitch;
     tANI_U8    vhtCapabilityPresentInBeacon;
     tANI_U8    apCenterChan;
     tANI_U8    apChanWidth;
@@ -329,6 +333,7 @@ typedef struct sPESession           // Added to Support BT-AMP
     tANI_U8    enableVhtpAid;
     tANI_U8    enableVhtGid;
 #endif
+    tLimWiderBWChannelSwitchInfo  gLimWiderBWChannelSwitch;
     tANI_U8    enableAmpduPs;
     tANI_U8    enableHtSmps;
     tANI_U8    htSmpsvalue;
@@ -418,6 +423,9 @@ typedef struct sPESession           // Added to Support BT-AMP
     /* Flag to indicate Chan Sw announcement is required */
     tANI_U8  dfsIncludeChanSwIe;
 
+    /* Flag to indicate Chan Wrapper Element is required */
+    tANI_U8  dfsIncludeChanWrapperIe;
+
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
     tANI_U8  cc_switch_mode;
 #endif
@@ -425,6 +433,17 @@ typedef struct sPESession           // Added to Support BT-AMP
     tANI_BOOLEAN isCiscoVendorAP;
 
     tSirAddIeParams     addIeParams;
+
+    tANI_U8 *pSchProbeRspTemplate;
+    // Beginning portion of the beacon frame to be written to TFP
+    tANI_U8 *pSchBeaconFrameBegin;
+    // Trailing portion of the beacon frame to be written to TFP
+    tANI_U8 *pSchBeaconFrameEnd;
+    // Size of the beginning portion
+    tANI_U16 schBeaconOffsetBegin;
+    // Size of the trailing portion
+    tANI_U16 schBeaconOffsetEnd;
+
 }tPESession, *tpPESession;
 
 #define LIM_MAX_ACTIVE_SESSIONS 4
@@ -439,20 +458,27 @@ typedef struct sPESession           // Added to Support BT-AMP
 
   \brief peCreateSession() - creates a new PE session given the BSSID
 
-  This function returns the session context and the session ID if the session
-  corresponding to the passed BSSID is found in the PE session table.
+  This function returns the session context and the session ID if the
+  session corresponding to the passed BSSID is found in the PE session
+  table.
 
-  \param pMac                   - pointer to global adapter context
-  \param bssid                   - BSSID of the new session
-  \param sessionId             -session ID is returned here, if session is created.
-
-  \return tpPESession          - pointer to the session context or NULL if session can not be created.
+  \param pMac                  - pointer to global adapter context
+  \param bssid                 - BSSID of the new session
+  \param sessionId             - session ID is returned here, if session is
+                                 created.
+  \param bssType               - bss type of new session to do conditional
+                                 memory allocation.
+  \return tpPESession          - pointer to the session context or NULL if
+                                 session can not be created.
 
   \sa
 
   --------------------------------------------------------------------------*/
-tpPESession peCreateSession(tpAniSirGlobal pMac, tANI_U8 *bssid , tANI_U8* sessionId, tANI_U16 numSta);
-
+tpPESession peCreateSession(tpAniSirGlobal pMac,
+                            tANI_U8 *bssid,
+                            tANI_U8* sessionId,
+                            tANI_U16 numSta,
+                            tSirBssType bssType);
 
 /*--------------------------------------------------------------------------
   \brief peFindSessionByBssid() - looks up the PE session given the BSSID.

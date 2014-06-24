@@ -994,6 +994,10 @@ typedef struct sMacOpenParameters
     tANI_U16 maxBssId;
     tANI_U32 frameTransRequired;
     tANI_U8 powersaveOffloadEnabled;
+    /* Powersave Parameters */
+    tANI_U8 staMaxLIModDtim;
+    tANI_U8 staModDtim;
+    tANI_U8 staDynamicDtim;
     tDriverType  driverType;
     tANI_U8 maxWoWFilters;
     tANI_U8 wowEnable;
@@ -1019,6 +1023,11 @@ typedef struct sMacOpenParameters
 
     /* max offload reorder buffs */
     tANI_U8 apMaxOffloadReorderBuffs;
+
+#ifdef FEATURE_WLAN_RA_FILTERING
+    tANI_U16 RArateLimitInterval;
+    v_BOOL_t IsRArateLimitEnabled;
+#endif
 
 } tMacOpenParameters;
 
@@ -1122,7 +1131,7 @@ typedef struct sAniSirGlobal
     v_BOOL_t enable5gEBT;
     /* Miracast session 0-Disabled, 1-Source, 2-sink*/
     tANI_U8 fMiracastSessionPresent;
-
+    tSirQosMapSet QosMapSet;
 } tAniSirGlobal;
 
 typedef enum

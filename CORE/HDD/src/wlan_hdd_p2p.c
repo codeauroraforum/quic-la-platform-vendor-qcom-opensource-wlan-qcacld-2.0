@@ -37,6 +37,7 @@
 #include <wlan_hdd_hostapd.h>
 #include <net/cfg80211.h>
 #include "sme_Api.h"
+#include "sme_QosApi.h"
 #include "wlan_hdd_p2p.h"
 #include "sapApi.h"
 #include "wlan_hdd_main.h"
@@ -722,10 +723,16 @@ int wlan_hdd_cfg80211_remain_on_channel( struct wiphy *wiphy,
 
 void hdd_remainChanReadyHandler( hdd_adapter_t *pAdapter )
 {
-    hdd_cfg80211_state_t *cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
-    hdd_remain_on_chan_ctx_t* pRemainChanCtx;
+    hdd_cfg80211_state_t *cfgState = NULL;
+    hdd_remain_on_chan_ctx_t* pRemainChanCtx = NULL;
     VOS_STATUS status;
 
+    if (NULL == pAdapter)
+    {
+        hddLog(LOGE, FL("pAdapter is NULL"));
+        return;
+    }
+    cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
     hddLog( LOG1, "Ready on chan ind");
 
     mutex_lock(&cfgState->remain_on_chan_ctx_lock);
@@ -1427,6 +1434,7 @@ int hdd_setP2pNoa( struct net_device *dev, tANI_U8 *command )
     tP2pPsConfig NoA;
     int count, duration, start_time;
     char *param;
+    int ret;
 
     param = strnchr(command, strlen(command), ' ');
     if (param == NULL)
@@ -1436,9 +1444,15 @@ int hdd_setP2pNoa( struct net_device *dev, tANI_U8 *command )
        return -EINVAL;
     }
     param++;
-    sscanf(param, "%d %d %d", &count, &start_time, &duration);
+    ret = sscanf(param, "%d %d %d", &count, &start_time, &duration);
+    if (ret != 3) {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+               "%s: P2P_SET GO NoA: fail to read params, ret=%d",
+                __func__, ret);
+        return -EINVAL;
+    }
     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-               "%s: P2P_SET GO NoA: count=%d duration=%d interval=%d",
+               "%s: P2P_SET GO NoA: count=%d start_time=%d duration=%d",
                 __func__, count, start_time, duration);
     duration = MS_TO_MUS(duration);
     /* PS Selection
@@ -1504,6 +1518,7 @@ int hdd_setP2pOpps( struct net_device *dev, tANI_U8 *command )
     tP2pPsConfig NoA;
     char *param;
     int legacy_ps, opp_ps, ctwindow;
+    int ret;
 
     param = strnchr(command, strlen(command), ' ');
     if (param == NULL)
@@ -1513,7 +1528,13 @@ int hdd_setP2pOpps( struct net_device *dev, tANI_U8 *command )
         return -EINVAL;
     }
     param++;
-    sscanf(param, "%d %d %d", &legacy_ps, &opp_ps, &ctwindow);
+    ret = sscanf(param, "%d %d %d", &legacy_ps, &opp_ps, &ctwindow);
+    if (ret != 3) {
+        VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s: P2P_SET GO PS: fail to read params, ret=%d",
+                 __func__, ret);
+        return -EINVAL;
+    }
     VOS_TRACE (VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                  "%s: P2P_SET GO PS: legacy_ps=%d opp_ps=%d ctwindow=%d",
                  __func__, legacy_ps, opp_ps, ctwindow);
@@ -1670,7 +1691,7 @@ struct net_device* wlan_hdd_add_virtual_intf(
     {
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                 "%s:LOGP in Progress. Ignore!!!", __func__);
-       return NULL;
+       return ERR_PTR(-EINVAL);
     }
 
     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
@@ -1690,7 +1711,7 @@ struct net_device* wlan_hdd_add_virtual_intf(
        hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Interface type %d already exists. "
                   "Two interfaces of same type are not supported currently.",
                   __func__, type);
-       return NULL;
+       return ERR_PTR(-EINVAL);
     }
 
     if (pHddCtx->cfg_ini->isP2pDeviceAddrAdministrated &&
@@ -1855,6 +1876,7 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
     hdd_cfg80211_state_t *cfgState = NULL;
     VOS_STATUS status;
     hdd_remain_on_chan_ctx_t* pRemainChanCtx = NULL;
+    hdd_context_t *pHddCtx;
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: Frame Type = %d Frame Length = %d",
             __func__, frameType, nFrameLength);
@@ -1864,6 +1886,7 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
         hddLog(LOGE, FL("pAdapter is NULL"));
         return;
     }
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
     if (0 == nFrameLength)
     {
@@ -2091,6 +2114,11 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
             }
         }
 #endif
+        if((pbFrames[WLAN_HDD_PUBLIC_ACTION_FRAME_OFFSET] == WLAN_HDD_QOS_ACTION_FRAME)&&
+             (pbFrames[WLAN_HDD_PUBLIC_ACTION_FRAME_OFFSET+1] == WLAN_HDD_QOS_MAP_CONFIGURE) )
+        {
+           sme_UpdateDSCPtoUPMapping(pHddCtx->hHal, hddWmmDscpToUpMapInfra);
+        }
     }
 
     //Indicate Frame Over Normal Interface
