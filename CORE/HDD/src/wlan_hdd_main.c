@@ -10648,7 +10648,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if (status != VOS_STATUS_SUCCESS) {
       hddLog(VOS_TRACE_LEVEL_FATAL,
              "%s: Failed to init channel list", __func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    if (0 == enable_dfs_chan_scan || 1 == enable_dfs_chan_scan)
@@ -10672,7 +10672,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if ( VOS_STATUS_SUCCESS != status )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Failed hdd_set_sme_config", __func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    //Initialize the WMM module
@@ -10680,7 +10680,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if (!VOS_IS_STATUS_SUCCESS(status))
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: hdd_wmm_init failed", __func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    /* In the integrated architecture we update the configuration from
@@ -10691,7 +10691,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if (FALSE == hdd_update_config_dat(pHddCtx))
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: config update failed",__func__ );
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    // Apply the NV to cfg.dat
@@ -10772,7 +10772,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       {
          hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Failed to set MAC Address. "
                 "HALStatus is %08d [x%08x]",__func__, halStatus, halStatus );
-         goto err_vosclose;
+         goto err_wiphy_unregister;
       }
    }
 
@@ -10781,7 +10781,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_start failed",__func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -11241,6 +11241,11 @@ err_close_adapter:
 err_vosstop:
    vos_stop(pVosContext);
 
+err_wiphy_unregister:
+#ifdef CONFIG_ENABLE_LINUX_REG
+   wiphy_unregister(wiphy);
+#endif
+
 err_vosclose:
    status = vos_sched_close( pVosContext );
    if (!VOS_IS_STATUS_SUCCESS(status))    {
@@ -11250,12 +11255,10 @@ err_vosclose:
    }
    vos_close(pVosContext );
 
-#ifdef CONFIG_ENABLE_LINUX_REG
-   wiphy_unregister(wiphy);
-
 err_vos_nv_close:
-   vos_nv_close();
 
+#ifdef CONFIG_ENABLE_LINUX_REG
+   vos_nv_close();
 err_clkvote:
 #endif
 
