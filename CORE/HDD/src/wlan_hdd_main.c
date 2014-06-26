@@ -5428,7 +5428,7 @@ void hdd_getBand_helper(hdd_context_t *pHddCtx, int *pBand)
  *     for third interface it will be hw_macaddr[0](bit5..7) + 2, etc.
  */
 
-static void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr)
+void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr)
 {
     int8_t i;
     u_int8_t macaddr_b0, tmp_br0;
