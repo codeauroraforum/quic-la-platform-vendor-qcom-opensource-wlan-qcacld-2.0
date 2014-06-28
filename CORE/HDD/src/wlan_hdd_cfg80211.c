@@ -2613,7 +2613,8 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     if (!VOS_IS_STATUS_SUCCESS(status))
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                 ("ERROR: HDD vos wait for single_event failed!!"));
+                 ("%s: ERROR: HDD vos wait for single_event failed!!"),
+                 __func__);
         smeGetCommandQStatus(hHal);
         VOS_ASSERT(0);
         return -EINVAL;
@@ -2883,7 +2884,8 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
                 if (!VOS_IS_STATUS_SUCCESS(status))
                 {
                     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                             ("ERROR: HDD vos wait for single_event failed!!"));
+                             ("%s: ERROR: HDD vos wait for single_event failed!!"),
+                             __func__);
                     VOS_ASSERT(0);
                 }
             }
