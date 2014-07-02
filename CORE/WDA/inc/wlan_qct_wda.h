@@ -1252,6 +1252,9 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_DHCP_START_IND              SIR_HAL_DHCP_START_IND
 #define WDA_DHCP_STOP_IND               SIR_HAL_DHCP_STOP_IND
 
+#ifdef QCA_WIFI_2_0
+#define WDA_HIDDEN_SSID_VDEV_RESTART    SIR_HAL_HIDE_SSID_VDEV_RESTART
+#endif /* QCA_WIFI_2_0 */
 
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 #define WDA_GTK_OFFLOAD_REQ             SIR_HAL_GTK_OFFLOAD_REQ
@@ -1334,10 +1337,21 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_FW_STATS_IND           SIR_HAL_FW_STATS_IND
 #define WDA_DISASSOC_TX_COMP       SIR_HAL_DISASSOC_TX_COMP
 #define WDA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
+#define WDA_GET_LINK_SPEED         SIR_HAL_GET_LINK_SPEED
 
 #define WDA_MODEM_POWER_STATE_IND SIR_HAL_MODEM_POWER_STATE_IND
 
+#define WDA_VDEV_STOP_IND           SIR_HAL_VDEV_STOP_IND
 
+#ifdef WLAN_FEATURE_STATS_EXT
+#define WDA_STATS_EXT_REQUEST              SIR_HAL_STATS_EXT_REQUEST
+#endif
+
+#define WDA_VDEV_START_RSP_IND      SIR_HAL_VDEV_START_RSP_IND
+
+#define WDA_ROAM_PREAUTH_IND        SIR_HAL_ROAM_PREAUTH_IND
+
+#define WDA_TBTT_UPDATE_IND         SIR_HAL_TBTT_UPDATE_IND
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
@@ -2232,6 +2246,9 @@ typedef struct sEnablePsParams
 
     /* SmeSession Id or Vdev Id */
     tANI_U32 sessionid;
+
+    /* Beacon DTIM Period */
+    tANI_U8 bcnDtimPeriod;
 
     /* success or failure */
     tANI_U32   status;

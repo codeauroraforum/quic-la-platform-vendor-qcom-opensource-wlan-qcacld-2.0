@@ -118,6 +118,7 @@ struct ol_softc {
 
     u_int32_t target_type;  /* A_TARGET_TYPE_* */
     u_int32_t target_version;
+    u_int32_t target_revision;
     u_int8_t  crm_version_string[64];  /* store pHalStartRsp->startRspParams.wcnssCrmVersionString */
     u_int8_t  wlan_version_string[64]; /* store pHalStartRsp->startRspParams.wcnssWlanVersionString */
     ol_target_status  target_status; /* target status */
@@ -206,8 +207,6 @@ struct ol_softc {
     u_int32_t               set_ht_vht_ies:1; /* true if vht ies are set on target */
     bool                    scn_cwmenable;    /*CWM enable/disable state*/
     u_int8_t                max_no_of_peers;
-    struct completion       ramdump_event;
-    bool                    crash_shutdown;
 };
 
 #ifdef PERE_IP_HDR_ALIGNMENT_WAR

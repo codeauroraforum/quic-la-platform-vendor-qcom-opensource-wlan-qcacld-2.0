@@ -44,13 +44,10 @@
 #include "wma_api.h"
 #include "wma.h"
 #include "macTrace.h"
+#include "vos_api.h"
 #include "if_pci.h"
 
 #define WMI_MIN_HEAD_ROOM 64
-
-#define WMI_EMPTY_HTC_QUEUE_MAX_RETRY 40
-#define WMI_SLEEP_TO_FLUSH_HTC_QUEUE 40
-
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 
 u_int32_t g_wmi_command_buf_idx = 0;
@@ -64,18 +61,19 @@ struct wmi_event_debug wmi_event_log_buffer[WMI_EVENT_DEBUG_MAX_ENTRY];
 	if (WMI_EVENT_DEBUG_MAX_ENTRY <= g_wmi_command_buf_idx)		\
 		g_wmi_command_buf_idx = 0;				\
 	wmi_command_log_buffer[g_wmi_command_buf_idx].command = a;	\
-	adf_os_mem_copy(wmi_command_log_buffer[g_wmi_command_buf_idx].data, b , 8);\
+	adf_os_mem_copy(wmi_command_log_buffer[g_wmi_command_buf_idx].data, b , 16);\
 	wmi_command_log_buffer[g_wmi_command_buf_idx].time =		\
-						 adf_os_ticks();	\
+		vos_get_monotonic_boottime();				\
 	g_wmi_command_buf_idx++;					\
 }
 
-#define WMI_EVENT_RECORD(a) {						\
+#define WMI_EVENT_RECORD(a, b) {					\
 	if (WMI_EVENT_DEBUG_MAX_ENTRY <= g_wmi_event_buf_idx)		\
 		g_wmi_event_buf_idx = 0;				\
 	wmi_event_log_buffer[g_wmi_event_buf_idx].event = a;		\
+	adf_os_mem_copy(wmi_event_log_buffer[g_wmi_event_buf_idx].data, b , 16);\
 	wmi_event_log_buffer[g_wmi_event_buf_idx].time =		\
-						adf_os_ticks();		\
+		vos_get_monotonic_boottime();				\
 	g_wmi_event_buf_idx++;						\
 }
 
@@ -520,6 +518,11 @@ static u_int8_t* get_wmi_cmd_string(WMI_CMD_ID wmi_command)
 		CASE_RETURN_STRING(WMI_NAN_CMDID);
 		/* Modem power state cmd */
 		CASE_RETURN_STRING(WMI_MODEM_POWER_STATE_CMDID);
+		CASE_RETURN_STRING(WMI_REQUEST_STATS_EXT_CMDID);
+		CASE_RETURN_STRING(WMI_OBSS_SCAN_ENABLE_CMDID);
+		CASE_RETURN_STRING(WMI_OBSS_SCAN_DISABLE_CMDID);
+		CASE_RETURN_STRING(WMI_PEER_GET_ESTIMATED_LINKSPEED_CMDID);
+		CASE_RETURN_STRING(WMI_ROAM_SCAN_CMD);
 	}
 	return "Invalid WMI cmd";
 }
@@ -576,7 +579,7 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, int len,
 		//dump_CE_debug_register(scn->hif_sc);
 		adf_os_atomic_dec(&wmi_handle->pending_cmds);
 		pr_err("%s: MAX 1024 WMI Pending cmds reached.\n", __func__);
-		VOS_ASSERT(0);
+		VOS_BUG(0);
 		return -EBUSY;
 	}
 
@@ -603,7 +606,7 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, int len,
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 	adf_os_spin_lock_bh(&wmi_handle->wmi_record_lock);
-        /*Record 8 bytes of WMI cmd data - exclude TLV and WMI headers*/
+        /*Record 16 bytes of WMI cmd data - exclude TLV and WMI headers*/
         WMI_COMMAND_RECORD(cmd_id ,((u_int32_t *)adf_nbuf_data(buf) + 2));
 	adf_os_spin_unlock_bh(&wmi_handle->wmi_record_lock);
 #endif
@@ -778,7 +781,8 @@ void __wmi_control_rx(struct wmi_unified *wmi_handle, wmi_buf_t evt_buf)
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 		adf_os_spin_lock_bh(&wmi_handle->wmi_record_lock);
-		WMI_EVENT_RECORD(id);
+		/* Exclude 4 bytes of TLV header */
+		WMI_EVENT_RECORD(id, ((u_int8_t *)data + 4));
 		adf_os_spin_unlock_bh(&wmi_handle->wmi_record_lock);
 #endif
 		/* Call the WMI registered event handler */
@@ -936,33 +940,4 @@ int wmi_get_pending_cmds(wmi_unified_t wmi_handle)
 void wmi_set_target_suspend(wmi_unified_t wmi_handle, A_BOOL val)
 {
 	adf_os_atomic_set(&wmi_handle->is_target_suspended, val);
-}
-
-int wmi_is_suspend_ready(wmi_unified_t wmi_handle)
-{
-	int i=0;
-	int wmi_pending_cmds = 0;
-
-	wmi_pending_cmds = wmi_get_pending_cmds(wmi_handle);
-	while (wmi_pending_cmds) {
-
-		/* sleep to let WMI Pending Cmds Flush in HTC queue */
-
-		msleep(WMI_SLEEP_TO_FLUSH_HTC_QUEUE);
-
-		wmi_pending_cmds = wmi_get_pending_cmds(wmi_handle);
-
-		if (i > WMI_EMPTY_HTC_QUEUE_MAX_RETRY) {
-			pr_err("Host has Pending cmds to send:%d.Fail to suspend."
-				"Available_host_credits:%d\n", wmi_pending_cmds,
-						wmi_get_host_credits(wmi_handle));
-			VOS_ASSERT(0);
-			return -1;
-		}
-
-		i=i+1;
-	}
-
-	pr_info("%s:Pending wmi_pending_cmds:%d \n", __func__, wmi_pending_cmds);
-	return 0;
 }

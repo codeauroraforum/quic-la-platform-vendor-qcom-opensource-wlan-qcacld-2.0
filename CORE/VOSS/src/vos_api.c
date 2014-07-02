@@ -74,6 +74,7 @@
 #endif
 
 #include "sapApi.h"
+#include "vos_trace.h"
 
 
 #ifdef WLAN_BTAMP_FEATURE
@@ -169,6 +170,13 @@ VOS_STATUS vos_preOpen ( v_CONTEXT_t *pVosContext )
    vos_mem_zero(gpVosContext, sizeof(VosContextType));
 
    *pVosContext = gpVosContext;
+
+   /* Initialize the spinlock */
+   vos_trace_spin_lock_init();
+   /* it is the right time to initialize MTRACE structures */
+   #if defined(TRACE_RECORD)
+       vosTraceInit();
+   #endif
 
    return VOS_STATUS_SUCCESS;
 
@@ -277,6 +285,7 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
 
    /* Initialize the timer module */
    vos_timer_module_init();
+
 
    /* Initialize the probe event */
    if (vos_event_init(&gpVosContext->ProbeEvent) != VOS_STATUS_SUCCESS)
@@ -397,6 +406,9 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
    macOpenParms.driverType         = eDRIVER_TYPE_PRODUCTION;
    macOpenParms.powersaveOffloadEnabled =
       pHddCtx->cfg_ini->enablePowersaveOffload;
+   macOpenParms.staDynamicDtim = pHddCtx->cfg_ini->enableDynamicDTIM;
+   macOpenParms.staModDtim = pHddCtx->cfg_ini->enableModulatedDTIM;
+   macOpenParms.staMaxLIModDtim = pHddCtx->cfg_ini->fMaxLIModulatedDTIM;
    macOpenParms.wowEnable          = pHddCtx->cfg_ini->wowEnable;
    macOpenParms.maxWoWFilters      = pHddCtx->cfg_ini->maxWoWFilters;
   /* Here olIniInfo is used to store ini status of arp offload
@@ -1370,14 +1382,26 @@ v_U8_t vos_is_logp_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext)
 
 void vos_set_logp_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
 {
+  hdd_context_t *pHddCtx = NULL;
+
   if (gpVosContext == NULL)
   {
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
         "%s: global voss context is NULL", __func__);
     return;
   }
+  gpVosContext->isLogpInProgress = value;
 
-   gpVosContext->isLogpInProgress = value;
+  /* HDD uses it's own context variable to check if SSR in progress,
+   * instead of modifying all HDD APIs set the HDD context variable
+   * here */
+   pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, gpVosContext);
+   if (!pHddCtx) {
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+               "%s: HDD context is Null", __func__);
+      return;
+   }
+   pHddCtx->isLogpInProgress = value;
 }
 
 v_U8_t vos_is_load_unload_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext)
@@ -1394,14 +1418,20 @@ v_U8_t vos_is_load_unload_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleCo
 
 void vos_set_load_unload_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
 {
-  if (gpVosContext == NULL)
-  {
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-        "%s: global voss context is NULL", __func__);
-    return;
-  }
+    if (gpVosContext == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                "%s: global voss context is NULL", __func__);
+        return;
+    }
+    gpVosContext->isLoadUnloadInProgress = value;
 
-   gpVosContext->isLoadUnloadInProgress = value;
+#ifdef CONFIG_CNSS
+    if (value)
+        cnss_set_driver_status(CNSS_LOAD_UNLOAD);
+    else
+        cnss_set_driver_status(CNSS_INITIALIZED);
+#endif
 }
 
 v_U8_t vos_is_reinit_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext)
@@ -2159,6 +2189,10 @@ vos_fetch_tl_cfg_parms
   pTLConfig->ucAcWeights[1] = pConfig->WfqBeWeight;
   pTLConfig->ucAcWeights[2] = pConfig->WfqViWeight;
   pTLConfig->ucAcWeights[3] = pConfig->WfqVoWeight;
+  pTLConfig->ucReorderAgingTime[0] = pConfig->BkReorderAgingTime;/*WLANTL_AC_BK*/
+  pTLConfig->ucReorderAgingTime[1] = pConfig->BeReorderAgingTime;/*WLANTL_AC_BE*/
+  pTLConfig->ucReorderAgingTime[2] = pConfig->ViReorderAgingTime;/*WLANTL_AC_VI*/
+  pTLConfig->ucReorderAgingTime[3] = pConfig->VoReorderAgingTime;/*WLANTL_AC_VO*/
   pTLConfig->uDelayedTriggerFrmInt = pConfig->DelayedTriggerFrmInt;
   pTLConfig->uMinFramesProcThres = pConfig->MinFramesProcThres;
   pTLConfig->ip_checksum_offload = pConfig->enableIPChecksumOffload;
@@ -2543,4 +2577,16 @@ v_BOOL_t vos_is_packet_log_enabled(void)
    }
 
    return pHddCtx->cfg_ini->enablePacketLog;
+}
+
+v_U64_t vos_get_monotonic_boottime(void)
+{
+#ifdef CONFIG_CNSS
+   struct timespec ts;
+
+   cnss_get_monotonic_boottime(&ts);
+   return (((v_U64_t)ts.tv_sec * 1000000) + (ts.tv_nsec / 1000));
+#else
+   return adf_os_ticks_to_msecs(adf_os_ticks());
+#endif
 }

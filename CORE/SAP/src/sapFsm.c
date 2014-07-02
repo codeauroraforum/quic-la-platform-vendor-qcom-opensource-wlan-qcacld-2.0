@@ -81,6 +81,9 @@
 /*----------------------------------------------------------------------------
  *  External declarations for global context
  * -------------------------------------------------------------------------*/
+#ifdef FEATURE_WLAN_CH_AVOID
+extern sapSafeChannelType safeChannels[];
+#endif /* FEATURE_WLAN_CH_AVOID */
 
 /*----------------------------------------------------------------------------
  * Static Variable Definitions
@@ -1173,7 +1176,7 @@ sapFsm
              else if (msg == eSAP_MAC_START_FAILS)
              {
                  /*Transition from STARTING to DISCONNECTED (both without substates)*/
-                 VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, from state %s => %s",
+                 VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR, "In %s, from state %s => %s",
                             __func__, "eSAP_STARTING", "eSAP_DISCONNECTED");
 
                  /*Action code for transition */
@@ -1436,6 +1439,12 @@ sapconvertToCsrProfile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType, t
     //wps config info
     profile->wps_state = pconfig_params->wps_state;
 
+#ifdef WLAN_FEATURE_11W
+    // MFP capable/required
+    profile->MFPCapable = pconfig_params->mfpCapable ? 1 : 0;
+    profile->MFPRequired = pconfig_params->mfpRequired ? 1 : 0;
+#endif
+
     return eSAP_STATUS_SUCCESS; /* Success.  */
 }
 
@@ -1678,6 +1687,9 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
     v_U8_t bandEndChannel ;
     v_U32_t enableLTECoex;
     tHalHandle hHal = VOS_GET_HAL_CB(sapContext->pvosGCtx);
+#ifdef FEATURE_WLAN_CH_AVOID
+    v_U8_t i;
+#endif
 
     if (NULL == hHal)
     {
@@ -1806,8 +1818,25 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
         {
             if( regChannels[loopCount].enabled )
             {
-                list[channelCount] = rfChannels[loopCount].channelNum;
-                channelCount++;
+#ifdef FEATURE_WLAN_CH_AVOID
+                for( i = 0; i < NUM_20MHZ_RF_CHANNELS; i++ )
+                {
+                    if( (safeChannels[i].channelNumber ==
+                                rfChannels[loopCount].channelNum) )
+                    {
+                        /* Check if channel is safe */
+                        if(VOS_TRUE == safeChannels[i].isSafe)
+                        {
+#endif
+                            list[channelCount] =
+                                     rfChannels[loopCount].channelNum;
+                            channelCount++;
+#ifdef FEATURE_WLAN_CH_AVOID
+                        }
+                        break;
+                    }
+                }
+#endif
             }
         }
     }

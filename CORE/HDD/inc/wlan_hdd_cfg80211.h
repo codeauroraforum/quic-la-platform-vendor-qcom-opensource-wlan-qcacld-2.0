@@ -97,6 +97,8 @@
 #endif
 #endif
 
+#define MAX_CHANNEL (MAX_2_4GHZ_CHANNEL + NUM_5GHZ_CHANNELS)
+
 typedef struct {
    u8 element_id;
    u8 len;
@@ -109,14 +111,41 @@ typedef struct {
 #endif
 
 /* Vendor id to be used in vendor specific command and events
- * to user space
+ * to user space.
+ * NOTE: The authoritative place for definition of QCA_NL80211_VENDOR_ID,
+ * vendor subcmd definitions prefixed with QCA_NL80211_VENDOR_SUBCMD, and
+ * qca_wlan_vendor_attr is open source file src/common/qca-vendor.h in
+ * git://w1.fi/srv/git/hostap.git; the values here are just a copy of that
  */
-#define QCOM_NL80211_VENDOR_ID                0x001374
-
 /* Vendor speicific sub-command id and their index */
+#define QCA_NL80211_VENDOR_ID                          0x001374
+#define QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY      10
+#define QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY       11
+#define QCA_NL80211_VENDOR_SUBCMD_NAN                  12
+#define QCA_NL80211_VENDOR_SUBCMD_STATS_EXT            13
+
+enum qca_wlan_vendor_attr
+{
+    QCA_WLAN_VENDOR_ATTR_INVALID = 0,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY */
+    QCA_WLAN_VENDOR_ATTR_DFS     = 1,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_NAN */
+    QCA_WLAN_VENDOR_ATTR_NAN     = 2,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_STATS_EXT */
+    QCA_WLAN_VENDOR_ATTR_STATS_EXT     = 3,
+    /* keep last */
+    QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
+    QCA_WLAN_VENDOR_ATTR_MAX       = QCA_WLAN_VENDOR_ATTR_AFTER_LAST - 1,
+};
+
+/* Vendor specific sub-command index, may change later due to NAN */
+#ifdef WLAN_FEATURE_STATS_EXT
+#define QCA_NL80211_VENDOR_SUBCMD_STATS_EXT_INDEX   1
+#endif /* WLAN_FEATURE_STATS_EXT */
+
+/* Vendor specific sub-command id and their index */
 #ifdef FEATURE_WLAN_CH_AVOID
-#define QCOM_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY         10
-#define QCOM_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX   0
+#define QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX   0
 #endif /* FEATURE_WLAN_CH_AVOID */
 
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -213,7 +242,7 @@ void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len);
 #endif
 
 #ifdef QCA_WIFI_2_0
-void hdd_suspend_wlan(void (*callback)(void *callbackContext),
+void hdd_suspend_wlan(void (*callback)(void *callbackContext, boolean suspended),
                       void *callbackContext);
 void hdd_resume_wlan(void);
 #endif

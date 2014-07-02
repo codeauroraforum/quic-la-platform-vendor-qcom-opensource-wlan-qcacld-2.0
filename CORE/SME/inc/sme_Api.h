@@ -54,6 +54,7 @@
 #include "btcApi.h"
 #include "vos_nvitem.h"
 #include "p2p_Api.h"
+#include "smeInternal.h"
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
 #include "oemDataApi.h"
@@ -233,13 +234,15 @@ eHalStatus sme_Open(tHalHandle hHal);
 
   \param hal - The handle returned by macOpen.
 
+  \param alpha2 - Country code passed by the hdd context.
+
   \return eHAL_STATUS_SUCCESS - SME is successfully initialized.
 
         Other status means SME is failed to be initialized
   \sa
 
 ---------------------------------------------------------------------------*/
-eHalStatus sme_init_chan_list(tHalHandle hal);
+eHalStatus sme_init_chan_list(tHalHandle hal, v_U8_t *alpha2);
 
 /*--------------------------------------------------------------------------
 
@@ -910,9 +913,25 @@ eHalStatus sme_GetStatistics(tHalHandle hHal, eCsrStatsRequesterType requesterId
   ---------------------------------------------------------------------------*/
 tANI_U16 smeGetTLSTAState(tHalHandle hHal, tANI_U8 staId);
 
+/* ---------------------------------------------------------------------------
+    \fn sme_GetRssi
+    \brief a wrapper function that client calls to register a callback to get
+           RSSI
+
+    \param hHal - HAL handle for device
+    \param callback - SME sends back the requested stats using the callback
+    \param staId -    The station ID for which the stats is requested for
+    \param bssid - The bssid of the connected session
+    \param lastRSSI - RSSI value at time of request. In case fw cannot provide
+                      RSSI, do not hold up but return this value.
+    \param pContext - user context to be passed back along with the callback
+    \param pVosContext - vos context
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
 eHalStatus sme_GetRssi(tHalHandle hHal,
-                             tCsrRssiCallback callback,
-                             tANI_U8 staId, tCsrBssid bssId, void *pContext, void* pVosContext);
+                       tCsrRssiCallback callback,
+                       tANI_U8 staId, tCsrBssid bssId, tANI_S8 lastRSSI,
+                       void *pContext, void* pVosContext);
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetSnr
@@ -1281,6 +1300,18 @@ extern eHalStatus sme_RequestStandby (
 extern eHalStatus sme_RegisterPowerSaveCheck (
    tHalHandle hHal,
    tANI_BOOLEAN (*checkRoutine) (void *checkContext), void *checkContext);
+
+/* ---------------------------------------------------------------------------
+    \fn sme_Register11dScanDoneCallback
+    \brief  Register a routine of type csrScanCompleteCallback which is
+            called whenever an 11d scan is done
+    \param  hHal - The handle returned by macOpen.
+    \param  callback -  11d scan complete routine to be registered
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
+extern eHalStatus sme_Register11dScanDoneCallback (
+   tHalHandle hHal,
+   csrScanCompleteCallback);
 
 /* ---------------------------------------------------------------------------
     \fn sme_DeregisterPowerSaveCheck
@@ -3494,8 +3525,78 @@ eHalStatus sme_SetThermalLevel( tHalHandle hHal, tANI_U8 level );
    \- return eHalStatus
   -------------------------------------------------------------------------*/
 eHalStatus sme_TxpowerLimit( tHalHandle hHal, tSirTxPowerLimit *psmetx);
+/* ---------------------------------------------------------------------------
+   \fn sme_GetLinkSpeed
+   \brief SME API to get the linkspeed for peermac
+   \param hHal
+   \param lsReq: peermac address to retrieve linkspeed
+   \param plsContext: callback context
+   \param pCallbackfn: callback fn with response (linkspeed)
+   \- return eHalStatus
+ -------------------------------------------------------------------------*/
+eHalStatus sme_GetLinkSpeed(tHalHandle hHal,tSirLinkSpeedInfo *lsReq,void *plsContext,
+                            void (*pCallbackfn)(tSirLinkSpeedInfo *indParam, void *pContext) );
 #endif
 eHalStatus sme_UpdateConnectDebug(tHalHandle hHal, tANI_U32 set_value);
 eHalStatus sme_ApDisableIntraBssFwd(tHalHandle hHal, tANI_U8 sessionId,
                                     tANI_BOOLEAN disablefwd);
+
+#ifdef WLAN_FEATURE_STATS_EXT
+
+typedef struct sStatsExtRequestReq {
+  tANI_U32 request_data_len;
+  tANI_U8* request_data;
+} tStatsExtRequestReq, *tpStatsExtRequestReq;
+
+typedef void (* StatsExtCallback)(void *, tStatsExtEvent *);
+
+void sme_StatsExtRegisterCallback(tHalHandle hHal, StatsExtCallback callback);
+
+eHalStatus sme_StatsExtRequest(tANI_U8 session_id, tpStatsExtRequestReq input);
+
+eHalStatus sme_StatsExtEvent (tHalHandle hHal, void* pMsg);
+
+#endif
+/* ---------------------------------------------------------------------------
+    \fn sme_UpdateDFSScanMode
+    \brief  Update DFS roam scan mode
+            This function is called through dynamic setConfig callback function
+            to configure allowDFSChannelRoam.
+    \param  hHal - HAL handle for device
+    \param  allowDFSChannelRoam - DFS roaming scan mode 0 (disable),
+            1 (passive), 2 (active)
+    \return eHAL_STATUS_SUCCESS - SME update DFS roaming scan config
+            successfully.
+            Other status means SME failed to update DFS roaming scan config.
+    \sa
+    -------------------------------------------------------------------------*/
+eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal, v_U8_t allowDFSChannelRoam);
+
+/*--------------------------------------------------------------------------
+  \brief sme_GetDFSScanMode() - get DFS roam scan mode
+            This is a synchronous call
+  \param hHal - The handle returned by macOpen.
+  \return DFS roaming mode 0 (disabled), 1 (passive), 2 (active)
+  \sa
+  --------------------------------------------------------------------------*/
+v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal);
+
+/* ---------------------------------------------------------------------------
+    \fn sme_staInMiddleOfRoaming
+    \brief  This function returns TRUE if STA is in the middle of roaming state
+    \param  hHal - HAL handle for device
+    \- return TRUE or FALSE
+    -------------------------------------------------------------------------*/
+tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal);
+
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+/* ---------------------------------------------------------------------------
+    \fn sme_abortRoamScan
+    \brief  API to abort current roam scan cycle by roam scan offload module.
+    \param  hHal - The handle returned by macOpen.
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
+
+eHalStatus sme_abortRoamScan(tHalHandle hHal);
+#endif //#if WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 #endif //#if !defined( __SME_API_H )

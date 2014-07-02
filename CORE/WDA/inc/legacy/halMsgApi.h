@@ -372,7 +372,19 @@ typedef struct
 
     // PE session id now added to all HAL<->PE transacations
     // HAL sends back response with no modification
+    tANI_U8     sendRsp;
 } tSetStaKeyParams, *tpSetStaKeyParams;
+
+typedef struct sLimMlmSetKeysReq
+{
+    tSirMacAddr     peerMacAddr;
+    tANI_U8         sessionId;      //Added For BT-AMP Support
+    tANI_U8         smesessionId;   // Added for drivers based on wmi interface
+    tANI_U16        aid;
+    tAniEdType      edType;    // Encryption/Decryption type
+    tANI_U8         numKeys;
+    tSirKeys        key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
+} tLimMlmSetKeysReq, *tpLimMlmSetKeysReq;
 
 //
 // Mesg header is used from tSirMsgQ
@@ -1010,12 +1022,19 @@ typedef struct
     tANI_U16 smpsMode;
 
     tANI_U8  isDfsChannel;
+
+    tANI_U8  vhtCapable;
 }tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef struct CSAOffloadParams {
-   u_int8_t sessionId;
-   u_int8_t channel;
-   u_int8_t switchmode;
+   tANI_U8 channel;
+   tANI_U8 switchmode;
+   tANI_U8 sec_chan_offset;
+   tANI_U8 new_ch_width;       /* New channel width */
+   tANI_U8 new_ch_freq_seg1;   /* Channel Center frequency 1 */
+   tANI_U8 new_ch_freq_seg2;   /* Channel Center frequency 2 */
+   tANI_U32 ies_present_flag;   /* WMI_CSA_EVENT_IES_PRESENT_FLAG */
+   tSirMacAddr bssId;
 }*tpCSAOffloadParams, tCSAOffloadParams;
 
 typedef void (*tpSetLinkStateCallback)(tpAniSirGlobal pMac, void *msgParam );
@@ -1437,6 +1456,14 @@ typedef struct sTdlsLinkEstablishParams
    tANI_U32  status;
 }tTdlsLinkEstablishParams, *tpTdlsLinkEstablishParams;
 
+#ifdef QCA_WIFI_2_0
+typedef struct tHalHiddenSsidVdevRestart
+{
+   tANI_U8   ssidHidden;
+   tANI_U8 sessionId;
+}tHalHiddenSsidVdevRestart,*tpHalHiddenSsidVdevRestart;
+#endif /* QCA_WIFI_2_0 */
+
 static inline void halGetTxTSFtimer(tpAniSirGlobal pMac,
                                                 tSirMacTimeStamp *pTime)
 {
@@ -1484,5 +1511,18 @@ typedef __ani_attr_pre_packed struct sDisableIntraBssFwd
    tANI_U16  sessionId;
    tANI_BOOLEAN disableintrabssfwd;
 } __ani_attr_packed tDisableIntraBssFwd, *tpDisableIntraBssFwd;
+
+
+#ifdef WLAN_FEATURE_STATS_EXT
+
+typedef struct sStatsExtRequest
+{
+    tANI_U32 vdev_id;
+    tANI_U32 request_data_len;
+    tANI_U8 request_data[];
+} tStatsExtRequest, *tpStatsExtRequest;
+
+
+#endif
 
 #endif /* _HALMSGAPI_H_ */

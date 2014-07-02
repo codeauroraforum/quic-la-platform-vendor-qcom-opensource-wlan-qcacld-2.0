@@ -54,6 +54,7 @@
 #include <a_debug.h>
 #include "hif_pci.h"
 #include "vos_trace.h"
+#include "vos_api.h"
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
 #include <net/cnss.h>
 #endif
@@ -82,8 +83,11 @@ ATH_DEBUG_INSTANTIATE_MODULE_VAR(hif,
 #endif
 
 
-#if CONFIG_ATH_PCIE_ACCESS_DEBUG
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
 spinlock_t pcie_access_log_lock;
+unsigned int pcie_access_log_seqnum = 0;
+HIF_ACCESS_LOG pcie_access_log[PCIE_ACCESS_LOG_NUM];
+static void HIFTargetDumpAccessLog(void);
 #endif
 
 /* Forward references */
@@ -102,6 +106,9 @@ static int hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info);
 #define AGC_DUMP         1
 #define CHANINFO_DUMP    2
 #define BB_WATCHDOG_DUMP 3
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+#define PCIE_ACCESS_DUMP 4
+#endif
 /*
  * Fix EV118783, poll to check whether a BMI response comes
  * other than waiting for the interruption which may be lost.
@@ -180,10 +187,6 @@ int HIFInit(OSDRV_CALLBACKS *callbacks)
     HIF_osDrvcallback.deviceResumeHandler = callbacks->deviceResumeHandler;
     HIF_osDrvcallback.deviceWakeupHandler = callbacks->deviceWakeupHandler;
     HIF_osDrvcallback.context = callbacks->context;
-
-#if CONFIG_ATH_PCIE_ACCESS_DEBUG
-    spin_lock_init(&pcie_access_log_lock);
-#endif
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n",__FUNCTION__));
     return EOK;
@@ -491,14 +494,16 @@ HIFPostInit(HIF_DEVICE *hif_device, void *unused, MSG_BASED_HIF_CALLBACKS *callb
     struct HIF_CE_state *hif_state = (struct HIF_CE_state *)hif_device;
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("+%s\n",__FUNCTION__));
-
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+    spin_lock_init(&pcie_access_log_lock);
+#endif
     /* Save callbacks for later installation */
     A_MEMCPY(&hif_state->msg_callbacks_pending, callbacks, sizeof(hif_state->msg_callbacks_pending));
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n",__FUNCTION__));
 }
 
-void
+int
 hif_completion_thread_startup(struct HIF_CE_state *hif_state)
 {
     struct CE_handle *ce_diag = hif_state->ce_diag;
@@ -545,7 +550,7 @@ hif_completion_thread_startup(struct HIF_CE_state *hif_state)
                     A_MALLOC(completions_needed * sizeof(struct HIF_CE_completion_state));
             if (!compl_state) {
                 AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("ath ERROR: compl_state has no mem\n"));
-                return;
+                return -1;
             }
             pipe_info->completion_space = compl_state;
 
@@ -565,6 +570,7 @@ hif_completion_thread_startup(struct HIF_CE_state *hif_state)
 
     }
     A_TARGET_ACCESS_UNLIKELY(targid);
+    return 0;
 }
 
 void
@@ -1368,20 +1374,26 @@ void HIFDump(HIF_DEVICE *hif_device, u_int8_t cmd_id, bool start)
         priv_dump_bbwatchdog(sc);
         break;
 
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+    case PCIE_ACCESS_DUMP:
+        HIFTargetDumpAccessLog();
+        break;
+#endif
     default:
         AR_DEBUG_PRINTF(ATH_DEBUG_INFO, ("Invalid htc dump command\n"));
         break;
     }
 }
 
-void
+A_STATUS
 HIFStart(HIF_DEVICE *hif_device)
 {
     struct HIF_CE_state *hif_state = (struct HIF_CE_state *)hif_device;
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("+%s\n",__FUNCTION__));
 
-    hif_completion_thread_startup(hif_state);
+    if (hif_completion_thread_startup(hif_state))
+        return A_ERROR;
 
     hif_msg_callbacks_install(hif_device);
 
@@ -1391,6 +1403,8 @@ HIFStart(HIF_DEVICE *hif_device)
     hif_state->started = TRUE;
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n",__FUNCTION__));
+
+    return A_OK;
 }
 
 void
@@ -1444,6 +1458,9 @@ hif_recv_buffer_cleanup_on_pipe(struct HIF_CE_pipe_info *pipe_info)
     scn = sc->ol_sc;
     ce_hdl = pipe_info->ce_hdl;
 
+    if (scn->adf_dev == NULL) {
+       return;
+    }
     while (CE_revoke_recv_next(ce_hdl, &per_CE_context, (void **)&netbuf, &CE_data) == A_OK)
     {
         adf_nbuf_unmap_single(scn->adf_dev, netbuf, ADF_OS_DMA_FROM_DEVICE);
@@ -1480,6 +1497,16 @@ hif_send_buffer_cleanup_on_pipe(struct HIF_CE_pipe_info *pipe_info)
     {
         if (netbuf != CE_SENDLIST_ITEM_CTXT)
         {
+            /*
+             * Packets enqueued by htt_h2t_ver_req_msg() and
+             * htt_h2t_rx_ring_cfg_msg_ll() have already been freed in
+             * htt_htc_misc_pkt_pool_free() in WLANTL_Close(), so do not
+             * free them here again by checking whether it's the EndPoint
+             * which they are queued in.
+             */
+            if (id == hif_state->sc->htc_endpoint) {
+                return;
+            }
             /* Indicate the completion to higer layer to free the buffer */
             hif_state->msg_callbacks_current.txCompletionHandler(
                 hif_state->msg_callbacks_current.Context, netbuf, id);
@@ -1983,8 +2010,8 @@ HIF_wake_target_cpu(struct hif_pci_softc *sc)
         ASSERT(rv == A_OK);
 }
 
-#define HIF_MIN_SLEEP_INACTIVITY_TIME_MS     10
-#define HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS 20
+#define HIF_MIN_SLEEP_INACTIVITY_TIME_MS     50
+#define HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS 60
 static void
 HIF_sleep_entry(void *arg)
 {
@@ -1998,9 +2025,11 @@ HIF_sleep_entry(void *arg)
 		idle_ms = adf_os_ticks_to_msecs(adf_os_ticks()
 					- hif_state->sleep_ticks);
 		if (idle_ms >= HIF_MIN_SLEEP_INACTIVITY_TIME_MS) {
-			A_PCI_WRITE32(pci_addr + PCIE_LOCAL_BASE_ADDRESS +
+			if (!adf_os_atomic_read(&sc->pci_link_suspended)) {
+				A_PCI_WRITE32(pci_addr + PCIE_LOCAL_BASE_ADDRESS +
 				PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_RESET);
-			hif_state->fake_sleep = FALSE;
+				hif_state->fake_sleep = FALSE;
+			}
 		} else {
 			adf_os_timer_start(&hif_state->sleep_timer,
 				HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS);
@@ -2063,6 +2092,8 @@ HIF_PCIDeviceProbed(hif_handle_t hif_hdl)
     hif_state->sc = sc;
 
     adf_os_spinlock_init(&hif_state->keep_awake_lock);
+
+    adf_os_spinlock_init(&hif_state->suspend_lock);
 
     adf_os_atomic_init(&hif_state->hif_thread_idle);
     adf_os_atomic_inc(&hif_state->hif_thread_idle);
@@ -2234,6 +2265,7 @@ HIF_PCIDeviceProbed(hif_handle_t hif_hdl)
 		  goto done;
 	     }
 	     if (CHIP_ID_VERSION_GET(chip_id) == 0xD) {
+             scn->target_revision = CHIP_ID_REVISION_GET(chip_id);
              switch(CHIP_ID_REVISION_GET(chip_id)) {
              case 0x2: /* ROME 1.3 */
                  /* 2 banks are switched to IRAM */
@@ -2366,10 +2398,8 @@ HIFTargetSleepStateAdjust(A_target_id_t targid,
     struct hif_pci_softc *sc = hif_state->sc;
 
 
-#ifdef TARGET_RECOVERY_AFTER_LINK_DOWN
     if (sc->recovery)
         return -EACCES;
-#endif
 
     if (sleep_ok) {
         adf_os_spin_lock_irqsave(&hif_state->keep_awake_lock);
@@ -2448,14 +2478,11 @@ HIFTargetSleepStateAdjust(A_target_id_t targid,
                            A_PCI_READ32(pci_addr + PCIE_LOCAL_BASE_ADDRESS
                                         + RTC_STATE_ADDRESS));
 
-#ifdef TARGET_RECOVERY_AFTER_LINK_DOWN
                     printk("%s:error, can't wakeup target\n", __func__);
                     sc->recovery = true;
+                    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
                     schedule_work(&recovery_work);
                     return -EACCES;
-#else
-                    VOS_BUG(0);
-#endif
                 }
 
                 OS_DELAY(curr_delay);
@@ -2503,7 +2530,7 @@ HIFTargetForcedAwake(A_target_id_t targid)
     return (awake && pcie_forced_awake);
 }
 
-#if CONFIG_ATH_PCIE_ACCESS_DEBUG
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
 A_UINT32
 HIFTargetReadChecked(A_target_id_t targid, A_UINT32 offset)
 {
@@ -2563,7 +2590,40 @@ void
 HIFdebug(void)
 {
     /* BUG_ON(1); */
-    BREAK();
+//    BREAK();
+}
+
+void
+HIFTargetDumpAccessLog(void)
+{
+    int idx, len, start_idx, cur_idx;
+    unsigned long irq_flags;
+
+    spin_lock_irqsave(&pcie_access_log_lock, irq_flags);
+    if (pcie_access_log_seqnum > PCIE_ACCESS_LOG_NUM)
+    {
+        len = PCIE_ACCESS_LOG_NUM;
+        start_idx = pcie_access_log_seqnum % PCIE_ACCESS_LOG_NUM;
+    }
+    else
+    {
+        len = pcie_access_log_seqnum;
+        start_idx = 0;
+    }
+
+    for(idx = 0; idx < len; idx++)
+    {
+        cur_idx = (start_idx + idx) % PCIE_ACCESS_LOG_NUM;
+        printk("idx:%d\t sn:%u wr:%d addr:%p val:%u.\n",
+               idx,
+               pcie_access_log[cur_idx].seqnum,
+               pcie_access_log[cur_idx].is_write,
+               pcie_access_log[cur_idx].addr,
+               pcie_access_log[cur_idx].value);
+    }
+
+    pcie_access_log_seqnum = 0;
+    spin_unlock_irqrestore(&pcie_access_log_lock, irq_flags);
 }
 #endif
 
@@ -2628,4 +2688,11 @@ void *hif_get_targetdef(HIF_DEVICE *hif_device)
 	struct hif_pci_softc *sc = hif_state->sc;
 
 	return sc->targetdef;
+}
+
+void HIFsuspendwow(HIF_DEVICE *hif_device)
+{
+       struct HIF_CE_state *hif_state = (struct HIF_CE_state *)hif_device;
+       struct hif_pci_softc *sc = hif_state->sc;
+       adf_os_atomic_set(&sc->wow_done, 1);
 }

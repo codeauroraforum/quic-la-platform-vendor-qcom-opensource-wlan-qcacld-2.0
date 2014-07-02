@@ -389,17 +389,6 @@ typedef struct sLimMlmPurgeStaInd
     tANI_U8         sessionId;
 } tLimMlmPurgeStaInd, *tpLimMlmPurgeStaInd;
 
-typedef struct sLimMlmSetKeysReq
-{
-    tSirMacAddr     peerMacAddr;
-    tANI_U8         sessionId;      //Added For BT-AMP Support
-    tANI_U8         smesessionId;   // Added for drivers based on wmi interface
-    tANI_U16        aid;
-    tAniEdType      edType;    // Encryption/Decryption type
-    tANI_U8         numKeys;
-    tSirKeys        key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
-} tLimMlmSetKeysReq, *tpLimMlmSetKeysReq;
-
 typedef struct sLimMlmSetKeysCnf
 {
     tSirMacAddr     peerMacAddr;
@@ -862,7 +851,11 @@ void limProcessMlmHalBADeleteInd( tpAniSirGlobal pMac,
 void limProcessMlmRemoveKeyRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ );
 
 void limProcessLearnIntervalTimeout(tpAniSirGlobal pMac);
+
 #ifdef WLAN_FEATURE_11W
+//11w send SA query request action frame
+tSirRetStatus limSendSaQueryRequestFrame( tpAniSirGlobal pMac, tANI_U8 *transId,
+                                          tSirMacAddr peer, tpPESession psessionEntry );
 //11w SA query request action frame handler
 tSirRetStatus limSendSaQueryResponseFrame( tpAniSirGlobal pMac,
                    tANI_U8 *transId, tSirMacAddr peer,tpPESession psessionEntry);
@@ -1035,6 +1028,10 @@ limGetIElenFromBssDescription(tpSirBssDescription pBssDescr)
 void
 limSendBeaconInd(tpAniSirGlobal pMac, tpPESession psessionEntry);
 
+#ifdef QCA_WIFI_2_0
+void
+limSendVdevRestart(tpAniSirGlobal pMac, tpPESession psessionEntry, tANI_U8 sessionId);
+#endif /* QCA_WIFI_2_0 */
 
 void limGetWPSPBCSessions(tpAniSirGlobal pMac, tANI_U8 *addr, tANI_U8 *uuid_e, eWPSPBCOverlap *overlap, tpPESession psessionEntry);
 void limWPSPBCTimeout(tpAniSirGlobal pMac, tpPESession psessionEntry);

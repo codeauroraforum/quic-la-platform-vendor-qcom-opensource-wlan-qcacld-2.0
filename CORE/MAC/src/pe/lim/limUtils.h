@@ -72,6 +72,9 @@ typedef enum
     *pCurVal = (tLimBAState)(((pSta->baState >> tid*2) & 0x3));\
 }
 
+#define VHT_MCS_3x3_MASK    0x30
+#define VHT_MCS_2x2_MASK    0x0C
+
 typedef struct sAddBaInfo
 {
     tANI_U16 fBaEnable : 1;
@@ -84,6 +87,18 @@ typedef struct sAddBaCandidate
     tSirMacAddr staAddr;
     tAddBaInfo baInfo[STACFG_MAX_TC];
 }tAddBaCandidate, *tpAddBaCandidate;
+
+#ifdef WLAN_FEATURE_11W
+typedef union uPmfSaQueryTimerId
+{
+    struct
+    {
+        tANI_U8 sessionId;
+        tANI_U16 peerIdx;
+    } fields;
+    tANI_U32 value;
+} tPmfSaQueryTimerId, *tpPmfSaQueryTimerId;
+#endif
 
 // LIM utility functions
 void limGetBssidFromPkt(tpAniSirGlobal, tANI_U8 *, tANI_U8 *, tANI_U32 *);
@@ -239,6 +254,60 @@ static inline tANI_U8
         (newState == eSIR_HT_MIMO_PS_DYNAMIC ||newState == eSIR_HT_MIMO_PS_STATIC))
         return TRUE;
     return FALSE;
+}
+
+static inline int limSelectCBMode(tDphHashNode *pStaDs, tpPESession psessionEntry,
+                                  tANI_U8 channel, tANI_U8 chan_bw)
+{
+    if ( pStaDs->mlmStaContext.vhtCapability && chan_bw)
+    {
+        if ( channel== 36 || channel == 52 || channel == 100 ||
+             channel == 116 || channel == 149 )
+        {
+           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW - 1;
+        }
+        else if ( channel == 40 || channel == 56 || channel == 104 ||
+             channel == 120 || channel == 153 )
+        {
+           return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW - 1;
+        }
+        else if ( channel == 44 || channel == 60 || channel == 108 ||
+                  channel == 124 || channel == 157 )
+        {
+           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH -1;
+        }
+        else if ( channel == 48 || channel == 64 || channel == 112 ||
+             channel == 128 || channel == 161 )
+        {
+            return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH - 1;
+        }
+        else if ( channel == 165 )
+        {
+            return PHY_SINGLE_CHANNEL_CENTERED;
+        }
+    }
+    else if ( pStaDs->mlmStaContext.htCapability )
+    {
+        if ( channel== 40 || channel == 48 || channel == 56 ||
+             channel == 64 || channel == 104 || channel == 112 ||
+             channel == 120 || channel == 128 || channel == 136 ||
+             channel == 144 || channel == 153 || channel == 161 )
+        {
+           return PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
+        }
+        else if ( channel== 36 || channel == 44 || channel == 52 ||
+             channel == 60 || channel == 100 || channel == 108 ||
+             channel == 116 || channel == 124 || channel == 132 ||
+             channel == 140 || channel == 149 || channel == 157 )
+        {
+           return PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
+        }
+        else if ( channel == 165 )
+        {
+           return PHY_SINGLE_CHANNEL_CENTERED;
+        }
+    }
+    return PHY_SINGLE_CHANNEL_CENTERED;
 }
 
 /// ANI peer station count management and associated actions
@@ -501,6 +570,11 @@ void limCleanUpDisassocDeauthReq(tpAniSirGlobal pMac, tANI_U8 *staMac, tANI_BOOL
 
 tANI_BOOLEAN limCheckDisassocDeauthAckPending(tpAniSirGlobal pMac, tANI_U8 *staMac);
 
+#ifdef WLAN_FEATURE_11W
+void limPmfSaQueryTimerHandler(void *pMacGlobal, tANI_U32 param);
+#endif
+
+
 
 void limUtilsframeshtons(tpAniSirGlobal  pCtx,
                             tANI_U8  *pOut,
@@ -511,4 +585,10 @@ void limUtilsframeshtonl(tpAniSirGlobal  pCtx,
                             tANI_U8  *pOut,
                             tANI_U32  pIn,
                             tANI_U8  fMsb);
+
+void limSetProtectedBit(tpAniSirGlobal  pMac,
+                           tpPESession     psessionEntry,
+                           tSirMacAddr     peer,
+                           tpSirMacMgmtHdr pMacHdr);
+
 #endif /* __LIM_UTILS_H */

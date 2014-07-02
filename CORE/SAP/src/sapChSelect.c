@@ -85,13 +85,6 @@
 )
 
 #ifdef FEATURE_WLAN_CH_AVOID
-/* Store channel safty information */
-typedef struct
-{
-   v_U16_t   channelNumber;
-   v_BOOL_t  isSafe;
-} sapSafeChannelType;
-
 sapSafeChannelType safeChannels[NUM_20MHZ_RF_CHANNELS] =
 {
   /*CH  , SAFE, default safe */
@@ -551,12 +544,6 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle, tSapChSelSpectInfo *pSpectInfoPara
 
     VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s", __func__);
 
-#ifdef FEATURE_WLAN_CH_AVOID
-    sapUpdateUnsafeChannelList();
-#endif /* FEATURE_WLAN_CH_AVOID */
-
-    // Channels for that 2.4GHz band
-    //Considered only for 2.4GHz need to change in future to support 5GHz support
     pSpectInfoParams->numSpectChans = pMac->scan.base20MHzChannels.numChannels;
 
     // Allocate memory for weight computation of 2.4GHz
@@ -593,7 +580,9 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle, tSapChSelSpectInfo *pSpectInfoPara
         /* OFDM rates are not supported on channel 14 */
         if(*pChans == 14 &&
                eCSR_DOT11_MODE_11b != sme_GetPhyMode(halHandle))
+        {
             continue;
+        }
 
 #ifdef FEATURE_WLAN_CH_AVOID
         if (VOS_TRUE == chSafe)
@@ -2105,6 +2094,10 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
     tSapChSelSpectInfo oSpectInfoParams = {NULL,0};
     tSapChSelSpectInfo *pSpectInfoParams = &oSpectInfoParams; // Memory? NB
     v_U8_t bestChNum = SAP_CHANNEL_NOT_SELECTED;
+#ifdef FEATURE_WLAN_CH_AVOID
+    v_U8_t i;
+    v_U8_t firstSafeChannelInRange = SAP_CHANNEL_NOT_SELECTED;
+#endif
 #ifdef SOFTAP_CHANNEL_RANGE
     v_U32_t startChannelNum;
     v_U32_t endChannelNum;
@@ -2116,9 +2109,49 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
 
     if (NULL == pScanResult)
     {
-        //scan is successfull, but no AP is present, select the first channel is channel range
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                  "%s: No external AP present\n", __func__);
+        //scan is successfull, but no AP is present
         ccmCfgGetInt( halHandle, WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL, &startChannelNum);
+        ccmCfgGetInt( halHandle, WNI_CFG_SAP_CHANNEL_SELECT_END_CHANNEL, &endChannelNum);
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                  "%s: start - end: %d - %d\n", __func__,
+                  startChannelNum, endChannelNum);
+
+#ifndef FEATURE_WLAN_CH_AVOID /* FEATURE_WLAN_CH_AVOID NOT defined case*/
+        // pick the first channel in configured range
         return startChannelNum;
+#else /* FEATURE_WLAN_CH_AVOID defined */
+        sapUpdateUnsafeChannelList();
+
+        // any safe channels in the configured range?
+        for (i = 0; i < NUM_20MHZ_RF_CHANNELS; i++)
+        {
+            if((safeChannels[i].channelNumber >= startChannelNum) &&
+               (safeChannels[i].channelNumber <= endChannelNum))
+            {
+                if (safeChannels[i].isSafe == VOS_TRUE)
+                {
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                        "%s: channel %d in the configuration is safe\n", __func__,
+                        safeChannels[i].channelNumber);
+                    firstSafeChannelInRange = safeChannels[i].channelNumber;
+                    break;
+                }
+
+                VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                    "%s: channel %d in the configuration is unsafe\n", __func__,
+                    safeChannels[i].channelNumber);
+            }
+        }
+
+        // preference is given to channels in the configured range which are safe
+        // if there is not such one, then we return start channel in the configuration
+        if (firstSafeChannelInRange != SAP_CHANNEL_NOT_SELECTED)
+            return firstSafeChannelInRange;
+        else
+            return startChannelNum;
+#endif /* !FEATURE_WLAN_CH_AVOID */
     }
 
     // Initialize the structure pointed by pSpectInfoParams

@@ -69,7 +69,7 @@ int HIF_deregister(void);
 
 void HIFPostInit(HIF_DEVICE *hifDevice, void *hHTC, MSG_BASED_HIF_CALLBACKS *callbacks);
 
-void HIFStart(HIF_DEVICE *hifDevice);
+A_STATUS HIFStart(HIF_DEVICE *hifDevice);
 
 void HIFStop(HIF_DEVICE *hifDevice);
 void HIFFlushSurpriseRemove(HIF_DEVICE *hifDevice);
@@ -141,6 +141,8 @@ u_int16_t HIFGetMaxQueueNumber(HIF_DEVICE *hifDevice, u_int8_t PipeID);
 
 void HIFDumpInfo(HIF_DEVICE *hifDevice);
 void *hif_get_targetdef(HIF_DEVICE *hif_device);
+void HIFsuspendwow(HIF_DEVICE *hif_device);
+
 #ifdef __cplusplus
 }
 #endif

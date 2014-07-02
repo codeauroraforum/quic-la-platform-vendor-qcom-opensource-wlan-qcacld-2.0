@@ -291,7 +291,8 @@ extern "C" {
 #define WHAL_ERROR_POWER_EDGE_PWR_TPSCALE          46
 #define WHAL_ERROR_POWER_CHAN_REGALLOW             47
 #define WHAL_ERROR_WAIT_REG_TIMEOUT                48
-#define WHAL_DBGID_DEFINITION_END                  49
+#define WHAL_ERROR_XTAL_SET                        49
+#define WHAL_DBGID_DEFINITION_END                  50
 
 #define COEX_DEBUGID_START              0
 #define BTCOEX_DBG_MCI_1                            1
@@ -875,7 +876,10 @@ extern "C" {
 #define ROAM_CONFIG_SCAN_MODE     31
 #define ROAM_BMISS_FINAL_SCAN_ENABLE 32
 #define ROAM_SUITABLE_AP_EVENT    33
-#define ROAM_DBGID_DEFINITION_END 34
+#define ROAM_RSN_IE_PARSE_ERROR   34
+#define ROAM_WPA_IE_PARSE_ERROR   35
+#define ROAM_SCAN_CMD_FROM_HOST   36
+#define ROAM_DBGID_DEFINITION_END 37
 
 /* DATA_TXRX module DBGIDs*/
 #define DATA_TXRX_DBGID_DEFINITION_START         0

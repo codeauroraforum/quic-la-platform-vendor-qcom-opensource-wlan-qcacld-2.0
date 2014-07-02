@@ -75,6 +75,9 @@
 #ifdef FEATURE_WLAN_ESE
 #define RRM_ROAM_SCORE_NEIGHBOR_IAPP_LIST                       30
 #endif
+
+v_TIME_t RRM_scan_timer;
+
 /**---------------------------------------------------------------------------
 
   \brief rrmLLPurgeNeighborCache() -
@@ -503,7 +506,19 @@ static eHalStatus sme_RrmSendScanResult( tpAniSirGlobal pMac,
 
    filter.fMeasurement = TRUE;
 
-   csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid*)pSmeRrmContext->sessionBssId, &sessionId );
+   /*
+    * In case this is beacon report request from last AP (before roaming)
+    * following call to csrRoamGetSessionIdFromBSSID will fail, hence use
+    * current session ID instead of one stored in SME rrm context
+    */
+   if (eHAL_STATUS_FAILURE ==
+        csrRoamGetSessionIdFromBSSID(pMac,
+                                     (tCsrBssid*)pSmeRrmContext->sessionBssId,
+                                      &sessionId )) {
+       smsLog( pMac, LOG1, FL("BSSID mismatch, using current sessionID"));
+       sessionId = pMac->roam.roamSession->sessionId;
+   }
+
    status = sme_ScanGetResult(pMac, (tANI_U8)sessionId, &filter, &pResult);
 
    if( filter.SSIDs.SSIDList )
@@ -570,7 +585,10 @@ static eHalStatus sme_RrmSendScanResult( tpAniSirGlobal pMac,
    while (pScanResult)
    {
       pNextResult = sme_ScanResultGetNext(pMac, pResult);
-      pScanResultsArr[counter++] = pScanResult;
+      if(pScanResult->timer >= RRM_scan_timer)
+      {
+          pScanResultsArr[counter++] = pScanResult;
+      }
       pScanResult = pNextResult; //sme_ScanResultGetNext(hHal, pResult);
       if (counter >= SIR_BCN_REPORT_MAX_BSS_DESC)
          break;
@@ -683,6 +701,13 @@ eHalStatus sme_RrmIssueScanReq( tpAniSirGlobal pMac )
    tANI_U32 sessionId;
    tSirScanType scanType;
 
+   status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid*)pSmeRrmContext->sessionBssId, &sessionId );
+   if( status != eHAL_STATUS_SUCCESS )
+   {
+       smsLog( pMac, LOGE, "%s : Invalid sme Session ID", __func__);
+       return eHAL_STATUS_FAILURE;
+   }
+
    if ((pSmeRrmContext->currentIndex) >= pSmeRrmContext->channelList.numOfChannels)
        return status;
 
@@ -735,6 +760,8 @@ eHalStatus sme_RrmIssueScanReq( tpAniSirGlobal pMac )
        smsLog( pMac, LOG1, "Scan Type(%d) Max Dwell Time(%d)", scanRequest.scanType,
                   scanRequest.maxChnTime );
 
+       RRM_scan_timer = vos_timer_get_system_time();
+
 #if defined WLAN_VOWIFI_DEBUG
        smsLog( pMac, LOGE, "For Duration %d ", scanRequest.maxChnTime );
 #endif
@@ -753,7 +780,6 @@ eHalStatus sme_RrmIssueScanReq( tpAniSirGlobal pMac )
        /* set requestType to full scan */
        scanRequest.requestType = eCSR_SCAN_REQUEST_FULL_SCAN;
 
-       csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid*)pSmeRrmContext->sessionBssId, &sessionId );
        status = sme_ScanRequest( pMac, (tANI_U8)sessionId, &scanRequest, &scanId, &sme_RrmScanRequestCallback, NULL );
 
        if ( pSmeRrmContext->ssId.length )
@@ -766,6 +792,12 @@ eHalStatus sme_RrmIssueScanReq( tpAniSirGlobal pMac )
    }
    else if (eSIR_BEACON_TABLE == scanType)  /* beacon table */
    {
+       /*In beacon table mode, scan results are taken directly from scan cache
+         without issuing any scan request. So, it is not proper to update
+         RRM_scan_timer with latest time and hence made it to zero to satisfy
+         pScanResult->timer >= RRM_scan_timer  */
+       RRM_scan_timer = 0;
+
        if ((pSmeRrmContext->currentIndex + 1) < pSmeRrmContext->channelList.numOfChannels)
        {
            sme_RrmSendScanResult( pMac, 1, &pSmeRrmContext->channelList.ChannelList[pSmeRrmContext->currentIndex], false );

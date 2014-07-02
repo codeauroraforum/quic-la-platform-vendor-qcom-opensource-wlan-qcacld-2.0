@@ -2442,10 +2442,10 @@ NIM
 WNI_CFG_BLOCK_ACK_ENABLED    I    4    8
 V    RW    NP RESTART
 LIM
-0    3    2
+0    3    0
 V    RW    NP RESTART
 LIM
-0    3    2
+0    3    0
 
 #ENUM DELAYED 0
 #ENUM IMMEDIATE 1
@@ -4541,6 +4541,32 @@ LIM
 V    RW    NP
 LIM
 10   20    10
+
+*
+* PMF SA Query Maximum Retries
+*
+
+WNI_CFG_PMF_SA_QUERY_MAX_RETRIES    I    4    1
+V    RW   NP RESTART
+NONE
+0    20   5
+V    RW   NP RESTART
+NONE
+0    20   5
+
+*
+* PMF SA Query Retry Interval (in TUs)
+*
+
+WNI_CFG_PMF_SA_QUERY_RETRY_INTERVAL    I    4    1
+V    RW   NP RESTART
+NONE
+0    2000 200
+V    RW   NP RESTART
+NONE
+0    2000 200
+
+
 *
 *MCC ENABLE/DISABLE ADAPTIVE RX Drain feature
 *

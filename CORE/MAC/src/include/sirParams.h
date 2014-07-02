@@ -95,7 +95,6 @@ typedef enum {
 #ifdef FEATURE_WLAN_BATCH_SCAN
    BATCH_SCAN = 30,
 #endif
-
    //MAX_FEATURE_SUPPORTED = 128
 } placeHolderInCapBitmap;
 
@@ -668,6 +667,23 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_UPDATE_RX_NSS              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 257)
 #endif
 
+#define SIR_HAL_VDEV_STOP_IND              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 258)
+
+#ifdef WLAN_FEATURE_STATS_EXT
+#define SIR_HAL_STATS_EXT_REQUEST          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 259)
+#define SIR_HAL_STATS_EXT_EVENT            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 260)
+#endif /* WLAN_FEATURE_STATS_EXT */
+
+#ifdef QCA_WIFI_2_0
+#define SIR_HAL_HIDE_SSID_VDEV_RESTART     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 261)
+#endif /* QCA_WIFI_2_0 */
+
+#define SIR_HAL_VDEV_START_RSP_IND         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 262)
+#define SIR_HAL_GET_LINK_SPEED             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 263)
+
+#define SIR_HAL_ROAM_PREAUTH_IND           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 264)
+
+#define SIR_HAL_TBTT_UPDATE_IND            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 265)
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types

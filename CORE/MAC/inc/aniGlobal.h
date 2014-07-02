@@ -108,6 +108,8 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #define PMAC_STRUCT( _hHal )  (  (tpAniSirGlobal)_hHal )
 
 #define ANI_DRIVER_TYPE(pMac)     (((tpAniSirGlobal)(pMac))->gDriverType)
+
+#define IS_MIRACAST_SESSION_PRESENT(pMac)     (((tpAniSirGlobal)(pMac))->fMiracastSessionPresent ? 1 : 0)
 // -------------------------------------------------------------------
 // Bss Qos Caps bit map definition
 #define LIM_BSS_CAPS_OFFSET_HCF 0
@@ -988,6 +990,10 @@ typedef struct sMacOpenParameters
     tANI_U16 maxBssId;
     tANI_U32 frameTransRequired;
     tANI_U8 powersaveOffloadEnabled;
+    /* Powersave Parameters */
+    tANI_U8 staMaxLIModDtim;
+    tANI_U8 staModDtim;
+    tANI_U8 staDynamicDtim;
     tDriverType  driverType;
     tANI_U8 maxWoWFilters;
     tANI_U8 wowEnable;
@@ -1111,6 +1117,9 @@ typedef struct sAniSirGlobal
     tANI_U16 mgmtSeqNum;
 #endif /* QCA_WIFI_2_0 */
     v_BOOL_t enable5gEBT;
+    /* Miracast session 0-Disabled, 1-Source, 2-sink*/
+    tANI_U8 fMiracastSessionPresent;
+
 } tAniSirGlobal;
 
 typedef enum

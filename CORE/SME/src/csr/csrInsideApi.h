@@ -111,6 +111,10 @@
 #define CSR_JOIN_RETRY_TIMEOUT_PERIOD        ( 1 *  PAL_TIMER_TO_SEC_UNIT )  // 1 second
 #endif
 
+#define CSR_ROAMING_DFS_CHANNEL_DISABLED           (0)
+#define CSR_ROAMING_DFS_CHANNEL_ENABLED_NORMAL     (1)
+#define CSR_ROAMING_DFS_CHANNEL_ENABLED_ACTIVE     (2)
+
 typedef enum
 {
     eCsrNextScanNothing,
@@ -590,6 +594,8 @@ eHalStatus csrScanGetBaseChannels( tpAniSirGlobal pMac, tCsrChannelInfo * pChann
 eHalStatus csrQueueSmeCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand, tANI_BOOLEAN fHighPriority );
 tSmeCmd *csrGetCommandBuffer( tpAniSirGlobal pMac );
 void csrReleaseCommand(tpAniSirGlobal pMac, tSmeCmd *pCommand);
+void csrScanFlushBssEntry(tpAniSirGlobal pMac,
+                                 tpSmeCsaOffloadInd pCsaOffloadInd);
 #ifdef FEATURE_WLAN_WAPI
 tANI_BOOLEAN csrIsProfileWapi( tCsrRoamProfile *pProfile );
 #endif /* FEATURE_WLAN_WAPI */
@@ -976,7 +982,7 @@ eHalStatus csrSetTxPower(tpAniSirGlobal pMac, v_U8_t sessionId, v_U8_t mW);
 eHalStatus csrScanCreateEntryInScanCache(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                          tCsrBssid bssid, tANI_U8 channel);
 
-eHalStatus csrUpdateChannelList(tCsrScanStruct *pScan);
+eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac);
 eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
                                  tANI_U8 *pBSSId );
 #endif

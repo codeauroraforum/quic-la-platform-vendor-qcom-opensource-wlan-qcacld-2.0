@@ -946,6 +946,7 @@ static void PopulateDot11fTdlsHtVhtCap(tpAniSirGlobal pMac, uint32 selfDot11Mode
         {
             /* Include VHT Capability IE */
             PopulateDot11fVHTCaps( pMac, psessionEntry, vhtCap );
+            vhtCap->suBeamformeeCap = 0;
         }
         else
         {
@@ -2425,8 +2426,8 @@ limTdlsPopulateDot11fVHTCaps(tpAniSirGlobal pMac,
     pDot11f->shortGI160and80plus80MHz =  uVHTCapabilityInfo.vhtCapInfo.shortGI160and80plus80MHz;
     pDot11f->txSTBC =  uVHTCapabilityInfo.vhtCapInfo.txSTBC;
     pDot11f->rxSTBC =  uVHTCapabilityInfo.vhtCapInfo.rxSTBC;
-    pDot11f->suBeamFormerCap =  uVHTCapabilityInfo.vhtCapInfo.suBeamFormerCap;
-    pDot11f->suBeamformeeCap =  uVHTCapabilityInfo.vhtCapInfo.suBeamformeeCap;
+    pDot11f->suBeamFormerCap = 0;
+    pDot11f->suBeamformeeCap = 0;
     pDot11f->csnofBeamformerAntSup =  uVHTCapabilityInfo.vhtCapInfo.csnofBeamformerAntSup;
     pDot11f->numSoundingDim =  uVHTCapabilityInfo.vhtCapInfo.numSoundingDim;
     pDot11f->muBeamformerCap =  uVHTCapabilityInfo.vhtCapInfo.muBeamformerCap;
@@ -2645,61 +2646,6 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
     return eSIR_FAILURE;
 }
 
-static int limTdlsSelectCBMode(tDphHashNode *pStaDs, tpPESession psessionEntry)
-{
-    tANI_U8 channel = psessionEntry->currentOperChannel;
-
-    if ( pStaDs->mlmStaContext.vhtCapability )
-    {
-        if ( channel== 36 || channel == 52 || channel == 100 ||
-             channel == 116 || channel == 149 )
-        {
-           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW - 1;
-        }
-        else if ( channel == 40 || channel == 56 || channel == 104 ||
-             channel == 120 || channel == 153 )
-        {
-           return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW - 1;
-        }
-        else if ( channel == 44 || channel == 60 || channel == 108 ||
-                  channel == 124 || channel == 157 )
-        {
-           return PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH -1;
-        }
-        else if ( channel == 48 || channel == 64 || channel == 112 ||
-             channel == 128 || channel == 161 )
-        {
-            return PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH - 1;
-        }
-        else if ( channel == 165 )
-        {
-            return 0;
-        }
-    }
-    else if ( pStaDs->mlmStaContext.htCapability )
-    {
-        if ( channel== 40 || channel == 48 || channel == 56 ||
-             channel == 64 || channel == 104 || channel == 112 ||
-             channel == 120 || channel == 128 || channel == 136 ||
-             channel == 144 || channel == 153 || channel == 161 )
-        {
-           return 1;
-        }
-        else if ( channel== 36 || channel == 44 || channel == 52 ||
-             channel == 60 || channel == 100 || channel == 108 ||
-             channel == 116 || channel == 124 || channel == 132 ||
-             channel == 140 || channel == 149 || channel == 157 )
-        {
-           return 2;
-        }
-        else if ( channel == 165 )
-        {
-           return 0;
-        }
-    }
-    return 0;
-}
-
 /*
  * update HASH node entry info
  */
@@ -2709,6 +2655,7 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
     //tDot11fIEHTCaps *htCaps = &setupPeerInfo->tdlsPeerHTCaps ;
     tDot11fIEHTCaps htCap, *htCaps;
     tDot11fIEVHTCaps *pVhtCaps = NULL;
+    tDot11fIEVHTCaps *pVhtCaps_txbf = NULL;
 #ifdef WLAN_FEATURE_11AC
     tDot11fIEVHTCaps vhtCap;
     tANI_U8 cbMode;
@@ -2769,9 +2716,12 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
         }
 
         pStaDs->vhtLdpcCapable = pVhtCaps->ldpcCodingCap;
-        pStaDs->vhtBeamFormerCapable= pVhtCaps->suBeamFormerCap;
+        pStaDs->vhtBeamFormerCapable = 0;
         // TODO , is it necessary , Sunil???
         pMac->lim.gLimTdlsLinkMode = TDLS_LINK_MODE_AC;
+        pVhtCaps_txbf = (tDot11fIEVHTCaps *)(&pTdlsAddStaReq->vhtCap);
+        pVhtCaps_txbf->suBeamformeeCap = 0;
+        pVhtCaps_txbf->suBeamFormerCap = 0;
         pStaDs->vht_caps = pTdlsAddStaReq->vhtCap.vhtCapInfo;
     }
     else
@@ -2781,7 +2731,9 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
     }
 #endif
     /*Calculate the Secondary Coannel Offset */
-    cbMode = limTdlsSelectCBMode(pStaDs, psessionEntry);
+    cbMode = limSelectCBMode(pStaDs, psessionEntry,
+                             psessionEntry->currentOperChannel,
+                             pStaDs->vhtSupportedChannelWidthSet);
 
     pStaDs->htSecondaryChannelOffset = cbMode;
 

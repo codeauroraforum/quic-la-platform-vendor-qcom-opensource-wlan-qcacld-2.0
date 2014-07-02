@@ -58,6 +58,78 @@
 #include "sirApi.h"
 
 /**
+ * limRemoveSsidFromScanCache()
+ *
+ *FUNCTION:
+ * This function is called by limSendSmeLfrScanRsp() to clean given
+ * ssid from scan cache.
+ *
+ *PARAMS:
+ * @param pMac         Pointer to Global MAC structure
+ * @param pSsid        SSID to clean from scan list
+ *
+ *LOGIC:
+ *
+ *ASSUMPTIONS:
+ * NA
+ *
+ * @return entriesLeft Number of SSID left in scan cache
+ */
+tANI_S16 limRemoveSsidFromScanCache(tpAniSirGlobal pMac, tSirMacSSid *pSsid)
+{
+    tANI_U16              i = 0;
+    tLimScanResultNode    *pCurr = NULL;
+    tLimScanResultNode    *pPrev = NULL;
+    tANI_S16              entriesLeft = 0;
+
+    if (pSsid == NULL)
+    {
+        limLog(pMac, LOGW, FL("pSsid is NULL"));
+        return -1;
+    }
+
+    for (i = 0; i < LIM_MAX_NUM_OF_SCAN_RESULTS; i++)
+    {
+        if (pMac->lim.gLimCachedScanHashTable[i] != NULL)
+        {
+            pPrev = pMac->lim.gLimCachedScanHashTable[i];
+            pCurr = pPrev->next;
+            while (pCurr)
+            {
+                entriesLeft++;
+                if (vos_mem_compare((tANI_U8* ) pCurr->bssDescription.ieFields+1,
+                                   (tANI_U8 *) &pSsid->length,
+                                   (tANI_U8) (pSsid->length + 1)) == VOS_TRUE)
+                {
+                    pCurr=pCurr->next;
+                    vos_mem_free(pPrev->next);
+                    pPrev->next = pCurr;
+                    entriesLeft--;
+                }
+                else
+                {
+                    pCurr = pCurr->next;
+                    pPrev = pPrev->next;
+                }
+            } /* while(pCurr)  */
+            pCurr = pMac->lim.gLimCachedScanHashTable[i];
+            if (vos_mem_compare((tANI_U8* ) pCurr->bssDescription.ieFields+1,
+                               (tANI_U8 *) &pSsid->length,
+                               (tANI_U8) (pSsid->length + 1)) == VOS_TRUE)
+            {
+                pMac->lim.gLimCachedScanHashTable[i] = pMac->lim.gLimCachedScanHashTable[i]->next;
+                vos_mem_free(pCurr);
+            }
+            else
+            {
+                entriesLeft++;
+            }
+        } /* if( pMac->lim.gLimCachedScanHashTable[i] != NULL)  */
+    } /* for (i = 0; i < LIM_MAX_NUM_OF_SCAN_RESULTS; i++) */
+    return entriesLeft;
+}
+
+/**
  * limSendSmeRsp()
  *
  *FUNCTION:
@@ -745,6 +817,7 @@ limSendSmeScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
 
     if(0 == bssCount)
     {
+       length = sizeof(tSirSmeScanRsp);
        limPostSmeScanRspMessage(pMac, length, resultCode, smesessionId, smetranscationId);
        if (NULL != pSirSmeScanRsp)
        {
@@ -815,6 +888,7 @@ limSendSmeLfrScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
     tANI_U16              i, bssCount;
     tANI_U8               *pbBuf;
     tSirBssDescription    *pDesc;
+    tANI_S16              scanEntriesLeft = 0;
 
     PELOG1(limLog(pMac, LOG1,
        FL("Sending message SME_SCAN_RSP with length=%d reasonCode %s\n"),
@@ -1009,6 +1083,14 @@ limSendSmeLfrScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
     }
     // Discard previously cached scan results
     limReInitLfrScanResults(pMac);
+
+    // delete the returned entries from normal cache (gLimCachedScanHashTable)
+    scanEntriesLeft = limRemoveSsidFromScanCache(pMac,
+                 &pMac->roam.roamSession[smesessionId].connectedProfile.SSID);
+    PELOG2(limLog(pMac,
+                  LOG2,
+                  FL("Scan Entries Left after cleanup: %d",
+                     scanEntriesLeft)));
 
     return;
 
@@ -2743,7 +2825,12 @@ void limSendExitBmpsInd(tpAniSirGlobal pMac, tExitBmpsReason reasonCode,
 void limHandleCSAoffloadMsg(tpAniSirGlobal pMac,tpSirMsgQ MsgQ)
 {
    tpPESession psessionEntry;
+   tSirMsgQ  mmhMsg;
    tpCSAOffloadParams csa_params = (tpCSAOffloadParams)(MsgQ->bodyptr);
+   tpSmeCsaOffloadInd pCsaOffloadInd;
+   tpDphHashNode pStaDs = NULL ;
+   tANI_U8 sessionId;
+   tANI_U16 aid = 0 ;
 
    if(!csa_params)
    {
@@ -2751,12 +2838,15 @@ void limHandleCSAoffloadMsg(tpAniSirGlobal pMac,tpSirMsgQ MsgQ)
       return;
    }
 
-   psessionEntry = peFindSessionBySessionId(pMac, csa_params->sessionId);
+   psessionEntry = peFindSessionByBssid(pMac, csa_params->bssId, &sessionId);
    if(!psessionEntry)
    {
       limLog(pMac, LOGP, FL("Session does not exist for given sessionID"));
       goto err;
    }
+
+   pStaDs = dphLookupHashEntry(pMac, psessionEntry->bssId, &aid,
+                                      &psessionEntry->dph.dphHashTable);
 
    if (psessionEntry->limSystemRole == eLIM_STA_ROLE)
    {
@@ -2766,7 +2856,65 @@ void limHandleCSAoffloadMsg(tpAniSirGlobal pMac,tpSirMsgQ MsgQ)
       psessionEntry->gLimChannelSwitch.primaryChannel = csa_params->channel;
       psessionEntry->gLimChannelSwitch.state = eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
       psessionEntry->gLimChannelSwitch.secondarySubBand = PHY_SINGLE_CHANNEL_CENTERED;
+
+#ifdef WLAN_FEATURE_11AC
+      if(psessionEntry->vhtCapability)
+      {
+          if ( csa_params->ies_present_flag & lim_wbw_ie_present )
+          {
+              psessionEntry->gLimWiderBWChannelSwitch.newChanWidth =
+                                          csa_params->new_ch_width;
+              psessionEntry->gLimWiderBWChannelSwitch.newCenterChanFreq0 =
+                                          csa_params->new_ch_freq_seg1;
+              psessionEntry->gLimWiderBWChannelSwitch.newCenterChanFreq1 =
+                                          csa_params->new_ch_freq_seg2;
+
+              psessionEntry->gLimChannelSwitch.state =
+                                     eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
+
+              psessionEntry->gLimChannelSwitch.secondarySubBand =
+                                                 limSelectCBMode(pStaDs,
+                                                     psessionEntry,
+                                                     csa_params->channel,
+                                                     csa_params->new_ch_width);
+          }
+
+      } else
+#endif
+      if (psessionEntry->htCapability) {
+          psessionEntry->gLimChannelSwitch.secondarySubBand =
+                                             limSelectCBMode(pStaDs,
+                                                 psessionEntry,
+                                                 csa_params->channel,
+                                                 csa_params->new_ch_width);
+          if (psessionEntry->gLimChannelSwitch.secondarySubBand) {
+              psessionEntry->gLimChannelSwitch.state =
+                                     eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
+          }
+      }
+      limLog(pMac, LOG1, FL("secondarySubBand = %d"),
+             psessionEntry->gLimChannelSwitch.secondarySubBand);
+
       limPrepareFor11hChannelSwitch(pMac, psessionEntry);
+      pCsaOffloadInd = vos_mem_malloc(sizeof(tSmeCsaOffloadInd));
+      if (NULL == pCsaOffloadInd) {
+          limLog(pMac, LOGE,
+                   FL("AllocateMemory failed for eWNI_SME_CSA_OFFLOAD_EVENT"));
+          goto err;
+      }
+
+      vos_mem_set(pCsaOffloadInd, sizeof(tSmeCsaOffloadInd), 0);
+      pCsaOffloadInd->mesgType = eWNI_SME_CSA_OFFLOAD_EVENT;
+      pCsaOffloadInd->mesgLen = sizeof(tSmeCsaOffloadInd);
+      vos_mem_copy(pCsaOffloadInd->bssId, psessionEntry->bssId,
+                   sizeof(tSirMacAddr));
+      mmhMsg.type = eWNI_SME_CSA_OFFLOAD_EVENT;
+      mmhMsg.bodyptr = pCsaOffloadInd;
+      mmhMsg.bodyval = 0;
+      PELOG1(limLog(pMac, LOG1, FL("Sending eWNI_SME_CSA_OFFLOAD_EVENT to SME. "));)
+      MTRACE(macTraceMsgTx(pMac, psessionEntry->peSessionId, mmhMsg.type));
+      limReInitScanResults(pMac);
+      limSysProcessMmhMsgApi(pMac, &mmhMsg,  ePROT);
    }
 
 err:

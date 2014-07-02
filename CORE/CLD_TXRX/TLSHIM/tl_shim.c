@@ -45,9 +45,7 @@
 #include "adf_nbuf.h"
 #include "wma_api.h"
 #include "vos_utils.h"
-#ifdef QCA_LL_TX_FLOW_CT
 #include "wdi_out.h"
-#endif /* QCA_LL_TX_FLOW_CT */
 #define ENTER() VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO, "Enter:%s", __func__)
 
 #define TLSHIM_LOGD(args...) \
@@ -408,6 +406,38 @@ next_nbuf:
 /*AR9888/AR6320  noise floor approx value*/
 #define TLSHIM_TGT_NOISE_FLOOR_DBM (-96)
 
+#ifdef WLAN_FEATURE_11W
+
+/*
+ * @brief - This routine will find the iface based on vdev id of provided bssid
+ * @param - vos_ctx - vos context
+ * @param - mac_addr - bss MAC address of received frame
+ * @param - vdev_id - virtual device id
+ */
+static struct wma_txrx_node*
+tlshim_mgmt_find_iface(void *vos_ctx, u_int8_t *mac_addr, u_int32_t *vdev_id)
+{
+	struct ol_txrx_vdev_t *vdev = NULL;
+	struct wma_txrx_node *iface = NULL;
+	tp_wma_handle wma = NULL;
+
+	wma = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
+	if (wma) {
+		/*
+		 * Based on received frame's bssid, we will try to
+		 * retrieve the vdev id. If we find the vdev then we will
+		 * override with found vdev_id else we will use supplied
+		 * vdev_id
+		 */
+		vdev = tl_shim_get_vdev_by_addr(vos_ctx, mac_addr);
+		if (vdev) {
+			*vdev_id = vdev->vdev_id;
+		}
+		iface = &wma->interfaces[*vdev_id];
+	}
+	return iface;
+}
+#endif
 static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 				       u_int32_t data_len, bool saved_beacon, u_int32_t vdev_id)
 {
@@ -417,10 +447,9 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 	WMI_MGMT_RX_EVENTID_param_tlvs *param_tlvs = NULL;
 	wmi_mgmt_rx_hdr *hdr = NULL;
 #ifdef WLAN_FEATURE_11W
-        struct wma_txrx_node *iface = NULL;
-	tp_wma_handle wma;
+	struct wma_txrx_node *iface = NULL;
 	u_int8_t *efrm, *orig_hdr;
-        u_int16_t key_id;
+	u_int16_t key_id;
 #endif /* WLAN_FEATURE_11W */
 
 	vos_pkt_t *rx_pkt;
@@ -442,6 +471,11 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 	hdr = param_tlvs->hdr;
 	if (!hdr) {
 		TLSHIM_LOGE("Rx event is NULL");
+		return 0;
+	}
+
+	if (hdr->buf_len < sizeof(struct ieee80211_frame)) {
+		TLSHIM_LOGE("Invalid rx mgmt packet");
 		return 0;
 	}
 
@@ -484,7 +518,8 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 			      roundup(hdr->buf_len, 4),
 			      0, 4, FALSE);
 	if (!wbuf) {
-		TLSHIM_LOGE("Failed to allocate wbuf for mgmt rx");
+		TLSHIM_LOGE("%s: Failed to allocate wbuf for mgmt rx len(%u)",
+			__func__, hdr->buf_len);
 		vos_mem_free(rx_pkt);
 		return 0;
 	}
@@ -536,89 +571,115 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 		(mgt_subtype == IEEE80211_FC0_SUBTYPE_BEACON || mgt_subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP))
 	{
 	    /* remember this beacon to be used later for better_ap event */
+	    WMI_MGMT_RX_EVENTID_param_tlvs *last_tlvs =
+		(WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data;
 	    if (tl_shim->last_beacon_data) {
+		/* Free the previously allocated buffers */
+		if (last_tlvs->hdr)
+			vos_mem_free(last_tlvs->hdr);
+		if (last_tlvs->bufp)
+			vos_mem_free(last_tlvs->bufp);
                 vos_mem_free(tl_shim->last_beacon_data);
                 tl_shim->last_beacon_data = NULL;
 		tl_shim->last_beacon_len = 0;
 	    }
-	    if((tl_shim->last_beacon_data = vos_mem_malloc(data_len))) {
-			vos_mem_copy(tl_shim->last_beacon_data, data, data_len);
-			tl_shim->last_beacon_len = data_len;
+	    if((tl_shim->last_beacon_data = vos_mem_malloc(sizeof(WMI_MGMT_RX_EVENTID_param_tlvs)))) {
+		u_int32_t buf_len = roundup(hdr->buf_len, sizeof(u_int32_t));
+
+		vos_mem_copy(tl_shim->last_beacon_data, data, sizeof(WMI_MGMT_RX_EVENTID_param_tlvs));
+		tl_shim->last_beacon_len = sizeof(WMI_MGMT_RX_EVENTID_param_tlvs);
+		last_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data;
+		if ((last_tlvs->hdr = vos_mem_malloc(sizeof(wmi_mgmt_rx_hdr)))) {
+		    vos_mem_copy(last_tlvs->hdr, hdr, sizeof(wmi_mgmt_rx_hdr));
+		    if ((last_tlvs->bufp = vos_mem_malloc(buf_len))) {
+			vos_mem_copy(last_tlvs->bufp, param_tlvs->bufp, buf_len);
+		    } else {
+			vos_mem_free(last_tlvs->hdr);
+			vos_mem_free(tl_shim->last_beacon_data);
+			tl_shim->last_beacon_data = NULL;
+			tl_shim->last_beacon_len = 0;
+		    }
+		} else {
+		    vos_mem_free(tl_shim->last_beacon_data);
+		    tl_shim->last_beacon_data = NULL;
+		    tl_shim->last_beacon_len = 0;
+		}
 	    }
 	}
 
 #ifdef WLAN_FEATURE_11W
-	wma = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
-	if (wma)
-	        iface = &wma->interfaces[vdev_id];
-	if (iface && iface->rmfEnabled && mgt_type == IEEE80211_FC0_TYPE_MGT &&
+	if (mgt_type == IEEE80211_FC0_TYPE_MGT &&
 		(mgt_subtype == IEEE80211_FC0_SUBTYPE_DISASSOC ||
 		 mgt_subtype == IEEE80211_FC0_SUBTYPE_DEAUTH ||
 		 mgt_subtype == IEEE80211_FC0_SUBTYPE_ACTION))
 	{
-		if ((wh)->i_fc[1] & IEEE80211_FC1_WEP)
+		iface = tlshim_mgmt_find_iface(vos_ctx, wh->i_addr3, &vdev_id);
+		if (iface && iface->rmfEnabled)
 		{
-			orig_hdr = (u_int8_t*) adf_nbuf_data(wbuf);
-
-			/* Strip privacy headers (and trailer)
-			   for a received frame */
-			vos_mem_move(orig_hdr + IEEE80211_CCMP_HEADERLEN,
-					wh, sizeof(*wh));
-			adf_nbuf_pull_head(wbuf, IEEE80211_CCMP_HEADERLEN);
-			adf_nbuf_trim_tail(wbuf, IEEE80211_CCMP_MICLEN);
-
-			rx_pkt->pkt_meta.mpdu_hdr_ptr = adf_nbuf_data(wbuf);
-			rx_pkt->pkt_meta.mpdu_len = adf_nbuf_len(wbuf);
-			rx_pkt->pkt_meta.mpdu_data_len =
-				rx_pkt->pkt_meta.mpdu_len -
-				rx_pkt->pkt_meta.mpdu_hdr_len;
-			rx_pkt->pkt_meta.mpdu_data_ptr =
-				rx_pkt->pkt_meta.mpdu_hdr_ptr +
-				rx_pkt->pkt_meta.mpdu_hdr_len;
-			rx_pkt->pkt_buf = wbuf;
-		}
-		else
-		{
-			if (IEEE80211_IS_BROADCAST(wh->i_addr1) ||
-				 IEEE80211_IS_MULTICAST(wh->i_addr1))
+			if ((wh)->i_fc[1] & IEEE80211_FC1_WEP)
 			{
-				efrm = adf_nbuf_data(wbuf) + adf_nbuf_len(wbuf);
+				orig_hdr = (u_int8_t*) adf_nbuf_data(wbuf);
 
-				key_id = (u_int16_t)*(efrm - vos_get_mmie_size() + 2);
-				if (!((key_id == WMA_IGTK_KEY_INDEX_4) ||
-					(key_id == WMA_IGTK_KEY_INDEX_5))) {
-					TLSHIM_LOGE("Invalid KeyID(%d)"
-					" dropping the frame", key_id);
-					vos_pkt_return_packet(rx_pkt);
-					return 0;
-				}
+				/* Strip privacy headers (and trailer)
+				   for a received frame */
+				vos_mem_move(orig_hdr + IEEE80211_CCMP_HEADERLEN,
+						wh, sizeof(*wh));
+				adf_nbuf_pull_head(wbuf, IEEE80211_CCMP_HEADERLEN);
+				adf_nbuf_trim_tail(wbuf, IEEE80211_CCMP_MICLEN);
 
-				if (vos_is_mmie_valid(iface->key.key,
-				    iface->key.key_id[key_id - WMA_IGTK_KEY_INDEX_4].ipn,
-					 (u_int8_t *)wh, efrm))
-				{
-					TLSHIM_LOGD("Protected BC/MC frame MMIE"
-						" validation successful");
-
-					/* Remove MMIE */
-					adf_nbuf_trim_tail(wbuf,
-						vos_get_mmie_size());
-				}
-				else
-				{
-					TLSHIM_LOGE("BC/MC MIC error or MMIE"
-					" not present, dropping the frame");
-					vos_pkt_return_packet(rx_pkt);
-					return 0;
-				}
+				rx_pkt->pkt_meta.mpdu_hdr_ptr = adf_nbuf_data(wbuf);
+				rx_pkt->pkt_meta.mpdu_len = adf_nbuf_len(wbuf);
+				rx_pkt->pkt_meta.mpdu_data_len =
+					rx_pkt->pkt_meta.mpdu_len -
+					rx_pkt->pkt_meta.mpdu_hdr_len;
+				rx_pkt->pkt_meta.mpdu_data_ptr =
+					rx_pkt->pkt_meta.mpdu_hdr_ptr +
+					rx_pkt->pkt_meta.mpdu_hdr_len;
+				rx_pkt->pkt_buf = wbuf;
 			}
 			else
 			{
-				TLSHIM_LOGD("Rx unprotected unicast mgmt frame");
-				rx_pkt->pkt_meta.dpuFeedback =
-					 DPU_FEEDBACK_UNPROTECTED_ERROR;
-			}
+				if (IEEE80211_IS_BROADCAST(wh->i_addr1) ||
+					 IEEE80211_IS_MULTICAST(wh->i_addr1))
+				{
+					efrm = adf_nbuf_data(wbuf) + adf_nbuf_len(wbuf);
 
+					key_id = (u_int16_t)*(efrm - vos_get_mmie_size() + 2);
+					if (!((key_id == WMA_IGTK_KEY_INDEX_4) ||
+						(key_id == WMA_IGTK_KEY_INDEX_5))) {
+						TLSHIM_LOGE("Invalid KeyID(%d)"
+						" dropping the frame", key_id);
+						vos_pkt_return_packet(rx_pkt);
+						return 0;
+					}
+
+					if (vos_is_mmie_valid(iface->key.key,
+					    iface->key.key_id[key_id - WMA_IGTK_KEY_INDEX_4].ipn,
+						 (u_int8_t *)wh, efrm))
+					{
+						TLSHIM_LOGD("Protected BC/MC frame MMIE"
+							" validation successful");
+
+						/* Remove MMIE */
+						adf_nbuf_trim_tail(wbuf,
+							vos_get_mmie_size());
+					}
+					else
+					{
+						TLSHIM_LOGE("BC/MC MIC error or MMIE"
+						" not present, dropping the frame");
+						vos_pkt_return_packet(rx_pkt);
+						return 0;
+					}
+				}
+				else
+				{
+					TLSHIM_LOGD("Rx unprotected unicast mgmt frame");
+					rx_pkt->pkt_meta.dpuFeedback =
+						 DPU_FEEDBACK_UNPROTECTED_ERROR;
+				}
+
+			}
 		}
 	}
 #endif /* WLAN_FEATURE_11W */
@@ -932,6 +993,7 @@ void WLANTL_RegisterVdev(void *vos_ctx, void *vdev)
 	wdi_in_osif_vdev_register(vdev_handle, tl_shim, &txrx_ops);
 	/* TODO: Keep vdev specific tx callback, if needed */
 	tl_shim->tx = txrx_ops.tx.std;
+	adf_os_atomic_set(&tl_shim->vdev_active[vdev_handle->vdev_id], 1);
 }
 
 /*
@@ -948,6 +1010,7 @@ void WLANTL_UnRegisterVdev(void *vos_ctx, u_int8_t vdev_id)
 		return;
 	}
 
+	adf_os_atomic_set(&tl_shim->vdev_active[vdev_id], 0);
 #ifdef QCA_LL_TX_FLOW_CT
 	WLANTL_DeRegisterTXFlowControl(vos_ctx, vdev_id);
 #endif /* QCA_LL_TX_FLOW_CT */
@@ -1032,13 +1095,18 @@ adf_nbuf_t WLANTL_SendSTA_DataFrame(void *vos_ctx, u_int8_t sta_id,
 
 #ifdef IPA_OFFLOAD
 adf_nbuf_t WLANTL_SendIPA_DataFrame(void *vos_ctx, void *vdev,
-                                    adf_nbuf_t skb)
+                                    adf_nbuf_t skb,  v_U8_t interface_id)
 {
     struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
                                                            vos_ctx);
 	adf_nbuf_t ret;
 
 	ENTER();
+
+	if (!adf_os_atomic_read(&tl_shim->vdev_active[interface_id])) {
+		TLSHIM_LOGW("INACTIVE VDEV");
+		return nbuf;
+	}
 
 	if ((tl_shim->ip_checksum_offload) && (skb->protocol == htons(ETH_P_IP))
 		 && (skb->ip_summed == CHECKSUM_PARTIAL))
@@ -1492,7 +1560,15 @@ VOS_STATUS WLANTL_ChangeSTAState(void *vos_ctx, u_int8_t sta_id,
 			TLSHIM_LOGE("Failed to set the peer state to authorized");
 			return VOS_STATUS_E_FAULT;
 		}
+
+		if (peer->vdev->opmode == wlan_op_mode_sta) {
+#ifdef QCA_SUPPORT_TXRX_VDEV_PAUSE_LL
+			wdi_in_vdev_unpause(peer->vdev,
+				    OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED);
+#endif
+		}
 	}
+
 	return VOS_STATUS_SUCCESS;
 }
 
@@ -1648,7 +1724,7 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 	}
 	adf_os_mem_free(tl_shim->session_flow_control);
 #endif /* QCA_LL_TX_FLOW_CT */
-
+	adf_os_mem_free(tl_shim->vdev_active);
 #ifdef FEATURE_WLAN_ESE
 	vos_flush_work(&tl_shim->iapp_work.deferred_work);
 #endif
@@ -1657,6 +1733,10 @@ VOS_STATUS WLANTL_Close(void *vos_ctx)
 	wdi_in_pdev_detach(((pVosContextType) vos_ctx)->pdev_txrx_ctx, 1);
 	// Delete beacon buffer hanging off tl_shim
 	if (tl_shim->last_beacon_data) {
+		if (((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->hdr)
+			vos_mem_free(((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->hdr);
+		if (((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->bufp)
+			vos_mem_free(((WMI_MGMT_RX_EVENTID_param_tlvs *) tl_shim->last_beacon_data)->bufp);
 		vos_mem_free(tl_shim->last_beacon_data);
 	}
 	vos_free_context(vos_ctx, VOS_MODULE_ID_TL, tl_shim);
@@ -1671,9 +1751,7 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	struct txrx_tl_shim_ctx *tl_shim;
 	VOS_STATUS status;
 	u_int8_t i;
-#ifdef QCA_LL_TX_FLOW_CT
 	int max_vdev;
-#endif /* QCA_LL_TX_FLOW_CT */
 
 	ENTER();
 	status = vos_alloc_context(vos_ctx, VOS_MODULE_ID_TL,
@@ -1710,9 +1788,15 @@ VOS_STATUS WLANTL_Open(void *vos_ctx, WLANTL_ConfigInfoType *tl_cfg)
 	 * TODO: Allocate memory for tx callback for maximum supported
 	 * vdevs to maintain tx callbacks per vdev.
 	 */
+	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
+	tl_shim->vdev_active = adf_os_mem_alloc(NULL,
+		max_vdev * sizeof(adf_os_atomic_t));
+	for (i = 0; i < max_vdev; i++) {
+		adf_os_atomic_init(&tl_shim->vdev_active[i]);
+		adf_os_atomic_set(&tl_shim->vdev_active[i], 0);
+	}
 
 #ifdef QCA_LL_TX_FLOW_CT
-	max_vdev = wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx);
 	tl_shim->session_flow_control = adf_os_mem_alloc(NULL,
 			max_vdev * sizeof(struct tlshim_session_flow_Control));
 	if (!tl_shim->session_flow_control) {
@@ -1860,11 +1944,11 @@ v_BOOL_t WLANTL_GetTxResource
 		return VOS_TRUE;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	if (!tl_shim->session_flow_control[sessionId].vdev) {
 		TLSHIM_LOGD("%s, session id %d, VDEV NULL",
                     __func__, sessionId);
-		adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+		adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 		return VOS_TRUE;
 	}
 
@@ -1872,7 +1956,7 @@ v_BOOL_t WLANTL_GetTxResource
 		(struct ol_txrx_vdev_t *)tl_shim->session_flow_control[sessionId].vdev,
 		low_watermark,
 		high_watermark_offset);
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return enough_resource;
 }
@@ -1915,7 +1999,7 @@ void WLANTL_TXFlowControlCb
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	if ((tl_shim->session_flow_control[sessionId].sessionId == sessionId) &&
 		(tl_shim->session_flow_control[sessionId].flowControl)) {
 		flow_control_cb = tl_shim->session_flow_control[sessionId].flowControl;
@@ -1925,7 +2009,7 @@ void WLANTL_TXFlowControlCb
 	if ((flow_control_cb) && (adpter_ctxt)) {
 		flow_control_cb(adpter_ctxt, resume_tx);
 	}
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
@@ -1968,11 +2052,16 @@ void WLANTL_RegisterTXFlowControl
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	if (sessionId >= wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx)) {
+		TLSHIM_LOGE("%s : Invalid session id", __func__);
+		return;
+	}
+
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	tl_shim->session_flow_control[sessionId].flowControl = flowControl;
 	tl_shim->session_flow_control[sessionId].sessionId = sessionId;
 	tl_shim->session_flow_control[sessionId].adpaterCtxt = adpaterCtxt;
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
@@ -2010,12 +2099,17 @@ void WLANTL_DeRegisterTXFlowControl
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+        if (sessionId >= wdi_out_cfg_max_vdevs(((pVosContextType)vos_ctx)->cfg_ctx)) {
+                TLSHIM_LOGE("%s : Invalid session id", __func__);
+                return;
+        }
+
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	tl_shim->session_flow_control[sessionId].flowControl = NULL;
 	tl_shim->session_flow_control[sessionId].sessionId = 0xFF;
 	tl_shim->session_flow_control[sessionId].adpaterCtxt = NULL;
         tl_shim->session_flow_control[sessionId].vdev = NULL;
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
@@ -2058,17 +2152,17 @@ void WLANTL_SetAdapterMaxQDepth
 		return;
 	}
 
-	adf_os_spin_lock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_lock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 	if (!tl_shim->session_flow_control[sessionId].vdev) {
 		TLSHIM_LOGD("%s, session id %d, VDEV NULL",
                     __func__, sessionId);
-		adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+		adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 		return;
 	}
 	wdi_in_ll_set_tx_pause_q_depth(
 		(struct ol_txrx_vdev_t *)tl_shim->session_flow_control[sessionId].vdev,
 		max_q_depth);
-	adf_os_spin_unlock(&tl_shim->session_flow_control[sessionId].fc_lock);
+	adf_os_spin_unlock_bh(&tl_shim->session_flow_control[sessionId].fc_lock);
 
 	return;
 }
