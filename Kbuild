@@ -43,7 +43,7 @@ ifeq ($(KERNEL_BUILD), 0)
         #Flag to enable LTE CoEx feature
                 CONFIG_QCOM_LTE_COEX := y
         #Flag to enable LPSS feature
-                CONFIG_WLAN_FEATURE_LPSS := y
+                CONFIG_WLAN_FEATURE_LPSS := n
                 endif
         endif
 
