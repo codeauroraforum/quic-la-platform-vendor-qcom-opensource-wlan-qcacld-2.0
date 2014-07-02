@@ -658,8 +658,6 @@ int dump_CE_register(struct ol_softc *scn)
 			if (!((j+1)%5) || (CE_reg_word_size - 1) == j)
 				printk("\n");
 		}
-
-		msleep(1);
 	}
 
 	return EOK;
@@ -1593,8 +1591,6 @@ int ol_diag_read(struct ol_softc *scn, u_int8_t *buffer,
 					if (remainder < PCIE_READ_LIMIT)
 						readSize = remainder;
 				}
-
-				msleep(5);
 			}
 		} else {
 			result = HIFDiagReadMem(scn->hif_hdl, pos,
@@ -1805,6 +1801,7 @@ u_int8_t ol_get_number_of_peers_supported(struct ol_softc *scn)
 
 	switch (scn->target_version) {
 		case AR6320_REV1_1_VERSION:
+		case AR6320_REV2_1_VERSION:
 			if(scn->max_no_of_peers > MAX_SUPPORTED_PEERS_REV1_1)
 				max_no_of_peers = MAX_SUPPORTED_PEERS_REV1_1;
 			else
