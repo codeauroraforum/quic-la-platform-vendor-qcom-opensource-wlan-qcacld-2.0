@@ -5532,8 +5532,6 @@ static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
     /* Set the LDPC capability */
     phtCapInfo->advCodingCap = cfg->ht_rx_ldpc;
 
-    if (phtCapInfo->txSTBC && !cfg->ht_tx_stbc)
-        phtCapInfo->txSTBC = cfg->ht_tx_stbc;
 
     if (pconfig->ShortGI20MhzEnable && !cfg->ht_sgi_20)
         pconfig->ShortGI20MhzEnable = cfg->ht_sgi_20;
@@ -5549,6 +5547,12 @@ static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
     {
         pconfig->enable2x2 = 0;
     }
+    if (!(cfg->ht_tx_stbc && pconfig->enable2x2))
+    {
+        pconfig->enableTxSTBC = 0;
+    }
+    phtCapInfo->txSTBC = pconfig->enableTxSTBC;
+
     status = ccmCfgSetInt(hdd_ctx->hHal, WNI_CFG_HT_CAP_INFO,
                           *(tANI_U16 *)phtCapInfo, NULL, eANI_BOOLEAN_FALSE);
     if (status != eHAL_STATUS_SUCCESS)
@@ -10361,6 +10365,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    hdd_config_t *pConfig;
 #endif
    int ret;
+   int i;
    struct wiphy *wiphy;
 #ifdef QCA_WIFI_2_0
    adf_os_device_t adf_ctx;
@@ -10523,6 +10528,16 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_config;
    }
 
+   /* Initialize struct for saving f/w log setting will be used
+   after ssr */
+   pHddCtx->fw_log_settings.enable = 0;
+   pHddCtx->fw_log_settings.dl_type = 0;
+   pHddCtx->fw_log_settings.dl_report = 0;
+   pHddCtx->fw_log_settings.dl_loglevel = 0;
+   pHddCtx->fw_log_settings.index = 0;
+   for (i = 0; i < MAX_MOD_LOGLEVEL; i++) {
+       pHddCtx->fw_log_settings.dl_mod_loglevel[i] = 0;
+   }
    // Update VOS trace levels based upon the cfg.ini
    hdd_vos_trace_enable(VOS_MODULE_ID_BAP,
                         pHddCtx->cfg_ini->vosTraceEnableBAP);
