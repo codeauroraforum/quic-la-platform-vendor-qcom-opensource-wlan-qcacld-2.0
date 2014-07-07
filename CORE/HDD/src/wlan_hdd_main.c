@@ -8595,6 +8595,7 @@ VOS_STATUS hdd_close_all_adapters( hdd_context_t *pHddCtx )
 void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter)
 {
     tANI_U8 *bssid = NULL;
+    tSirUpdateIE updateIE;
     switch (pHostapdAdapter->device_mode)
     {
     case WLAN_HDD_INFRA_STATION:
@@ -8624,14 +8625,16 @@ void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter)
                pHostapdAdapter->device_mode);
         return;
     }
+
+    vos_mem_copy(updateIE.bssid, bssid, sizeof(tSirMacAddr));
+        updateIE.smeSessionId =  pHostapdAdapter->sessionId;
+        updateIE.ieBufferlength = 0;
+        updateIE.pAdditionIEBuffer = NULL;
+        updateIE.append = VOS_TRUE;
+        updateIE.notify = VOS_FALSE;
     if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pHostapdAdapter),
-                      pHostapdAdapter->sessionId,
-                      bssid,
-                      NULL,
-                      0,
-                      VOS_TRUE) == eHAL_STATUS_FAILURE)
-    {
-        hddLog(LOGE, "Could not pass on Additional IE data to PE");
+            &updateIE, eUPDATE_IE_PROBE_RESP) == eHAL_STATUS_FAILURE) {
+        hddLog(LOGE, FL("Could not pass on PROBE_RSP_BCN data to PE"));
     }
 }
 
@@ -8642,6 +8645,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
    hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
    union iwreq_data wrqu;
    v_U8_t retry = 0;
+   tSirUpdateIE updateIE ;
 
    ENTER();
 
@@ -8781,13 +8785,12 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
          if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags))
          {
             VOS_STATUS status;
-            hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
             //Stop Bss.
 #ifdef WLAN_FEATURE_MBSSID
             status = WLANSAP_StopBss(WLAN_HDD_GET_SAP_CTX_PTR(pAdapter));
 #else
-            status = WLANSAP_StopBss(pHddCtx->pvosContext);
+            status = WLANSAP_StopBss((WLAN_HDD_GET_CTX(pAdapter))->pvosContext);
 #endif
 
             if (VOS_IS_STATUS_SUCCESS(status))
@@ -8809,21 +8812,23 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
             }
             clear_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags);
 
-            if (eHAL_STATUS_FAILURE ==
-                ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_PROBE_RSP_BCN_ADDNIE_FLAG,
-                             0, NULL, eANI_BOOLEAN_FALSE))
-            {
-               hddLog(LOGE,
-                      "%s: Failed to set WNI_CFG_PROBE_RSP_BCN_ADDNIE_FLAG",
-                      __func__);
+            vos_mem_copy(updateIE.bssid, pAdapter->macAddressCurrent.bytes,
+                   sizeof(tSirMacAddr));
+            updateIE.smeSessionId = pAdapter->sessionId;
+            updateIE.ieBufferlength = 0;
+            updateIE.pAdditionIEBuffer = NULL;
+            updateIE.append = VOS_FALSE;
+            updateIE.notify = VOS_FALSE;
+            /* Probe bcn reset */
+            if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pAdapter),
+                              &updateIE, eUPDATE_IE_PROBE_BCN)
+                              == eHAL_STATUS_FAILURE) {
+                hddLog(LOGE, FL("Could not pass on PROBE_RSP_BCN data to PE"));
             }
-
-            if ( eHAL_STATUS_FAILURE == ccmCfgSetInt((WLAN_HDD_GET_CTX(pAdapter))->hHal,
-                     WNI_CFG_ASSOC_RSP_ADDNIE_FLAG, 0, NULL,
-                     eANI_BOOLEAN_FALSE) )
-            {
-               hddLog(LOGE,
-                     "Could not pass on WNI_CFG_ASSOC_RSP_ADDNIE_FLAG to CCM");
+            /* Assoc resp reset */
+            if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pAdapter),
+                    &updateIE, eUPDATE_IE_ASSOC_RESP) == eHAL_STATUS_FAILURE) {
+                hddLog(LOGE, FL("Could not pass on ASSOC_RSP data to PE"));
             }
 
             // Reset WNI_CFG_PROBE_RSP Flags
