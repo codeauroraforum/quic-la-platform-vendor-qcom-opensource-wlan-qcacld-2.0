@@ -31,7 +31,7 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_PRIMA_WLAN_11AC_HIGH_TP := y
 
 	#Flag to enable TDLS feature
-	CONFIG_QCOM_TDLS := y
+	CONFIG_QCOM_TDLS := n
 
 	#Flag to enable Fast Transition (11r) feature
 	CONFIG_QCOM_VOWIFI_11R := y
