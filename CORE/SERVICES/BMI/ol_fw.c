@@ -649,8 +649,6 @@ int dump_CE_register(struct ol_softc *scn)
 			if (!((j+1)%5) || (CE_reg_word_size - 1) == j)
 				printk("\n");
 		}
-
-		msleep(1);
 	}
 
 	return EOK;
@@ -1592,8 +1590,6 @@ int ol_diag_read(struct ol_softc *scn, u_int8_t *buffer,
 					if (remainder < PCIE_READ_LIMIT)
 						readSize = remainder;
 				}
-
-				msleep(5);
 			}
 		} else {
 			result = HIFDiagReadMem(scn->hif_hdl, pos,
