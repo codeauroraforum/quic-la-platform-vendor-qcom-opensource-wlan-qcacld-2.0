@@ -3475,6 +3475,15 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
                 CFG_ENABLE_HT_2040_COEX_MAX ),
 #endif
 
+#ifdef FEATURE_GREEN_AP
+   REG_VARIABLE( CFG_ENABLE_GREEN_AP_FEATURE, WLAN_PARAM_Integer,
+                 hdd_config_t, enableGreenAP,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_ENABLE_GREEN_AP_FEATURE_DEFAULT,
+                 CFG_ENABLE_GREEN_AP_FEATURE_MIN,
+                 CFG_ENABLE_GREEN_AP_FEATURE_MAX ),
+#endif
+
    REG_VARIABLE(CFG_IGNORE_CAC_NAME, WLAN_PARAM_Integer,
                 hdd_config_t, ignoreCAC,
                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3986,6 +3995,12 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
           "Name = [gIgnoreCAC] Value = [%u] ",
           pHddCtx->cfg_ini->ignoreCAC);
+#ifdef FEATURE_GREEN_AP
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+          "Name = [gEnableGreenAp] Value = [%u] ",
+          pHddCtx->cfg_ini->enableGreenAP);
+#endif
+
 }
 
 
