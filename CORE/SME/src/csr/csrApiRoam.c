@@ -4698,6 +4698,12 @@ eHalStatus csrRoamProcessCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand )
                 pIes = NULL;
             }
         }
+        else
+        {
+            smsLog(pMac, LOGE, FL
+                    ("Reassoc To Same AP failed since Connected BSS is NULL"));
+            return eHAL_STATUS_FAILURE;
+        }
         break;
     }
     case eCsrCapsChange:
@@ -6568,6 +6574,7 @@ eHalStatus csrRoamIssueReassoc(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoam
         pCommand->u.roamCmd.hBSSList = CSR_INVALID_SCANRESULT_HANDLE;
         pCommand->u.roamCmd.fReleaseBssList = eANI_BOOLEAN_FALSE;
         pCommand->u.roamCmd.fReassoc = eANI_BOOLEAN_TRUE;
+        csrRoamRemoveDuplicateCommand(pMac, sessionId, pCommand, reason);
         status = csrQueueSmeCommand(pMac, pCommand, fImediate);
         if( !HAL_STATUS_SUCCESS( status ) )
     {
