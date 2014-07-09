@@ -837,7 +837,8 @@ htt_rx_amsdu_pop_ll(
     HTT_ASSERT1(htt_rx_ring_elems(pdev) != 0);
     rx_ind_data = adf_nbuf_data(rx_ind_msg);
     msg_word = (u_int32_t *)rx_ind_data;
-    num_msdu_bytes = HTT_RX_IND_FW_RX_DESC_BYTES_GET(*(msg_word + 2));
+    num_msdu_bytes = HTT_RX_IND_FW_RX_DESC_BYTES_GET(
+       *(msg_word + HTT_RX_IND_HDR_PREFIX_SIZE32 + HTT_RX_PPDU_DESC_SIZE32));
 
     msdu = *head_msdu = htt_rx_netbuf_pop(pdev);
     while (1) {
@@ -875,39 +876,40 @@ htt_rx_amsdu_pop_ll(
          */
 
 #ifdef DEBUG_DMA_DONE
-        /* if done bit is not set */
         if (adf_os_unlikely(!((*(u_int32_t *) &rx_desc->attention)
                             & RX_ATTENTION_0_MSDU_DONE_MASK))) {
 
             int dbg_iter = MAX_DONE_BIT_CHECK_ITER;
 
-            htt_rx_print_rx_indication(rx_ind_msg, pdev);
-            htt_print_rx_desc(rx_desc);
 
-            adf_os_print("done bit still not set retrying...\n");
+            adf_os_print("malformed frame\n");
 
             while (dbg_iter &&
                    (!((*(u_int32_t *) &rx_desc->attention) &
                       RX_ATTENTION_0_MSDU_DONE_MASK))) {
                 adf_os_mdelay(1);
 
-            adf_os_invalidate_range((void *)rx_desc,
+                adf_os_invalidate_range((void *)rx_desc,
                                     (void*)((char *)rx_desc +
                                             HTT_RX_STD_DESC_RESERVATION));
+
+                adf_os_print("debug iter %d success %d\n", dbg_iter,
+                     pdev->rx_ring.dbg_sync_success);
+
                 dbg_iter--;
             }
 
-            /* if the done bit is still not set, ASSERT the target */
             if (adf_os_unlikely(!((*(u_int32_t *) &rx_desc->attention)
                                   & RX_ATTENTION_0_MSDU_DONE_MASK)))
             {
-                htt_rx_print_rx_indication(rx_ind_msg, pdev);
-                htt_print_rx_desc(rx_desc);
 
                 process_wma_set_command(0,(int)GEN_PARAM_CRASH_INJECT,
                                         0, GEN_CMD);
                 HTT_ASSERT_ALWAYS(0);
             }
+            pdev->rx_ring.dbg_sync_success++;
+            adf_os_print("debug iter %d success %d\n", dbg_iter,
+                 pdev->rx_ring.dbg_sync_success);
         }
 #else
                 HTT_ASSERT_ALWAYS(
@@ -1836,6 +1838,7 @@ htt_rx_attach(struct htt_pdev_t *pdev)
 #ifdef DEBUG_DMA_DONE
         pdev->rx_ring.dbg_ring_idx = 0;
         pdev->rx_ring.dbg_refill_cnt = 0;
+        pdev->rx_ring.dbg_sync_success = 0;
 #endif
         htt_rx_ring_fill_n(pdev, pdev->rx_ring.fill_level);
 

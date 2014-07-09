@@ -64,7 +64,11 @@
 static v_REGDOMAIN_t cur_reg_domain = REGDOMAIN_COUNT;
 static char linux_reg_cc[2] = {0, 0};
 static v_REGDOMAIN_t temp_reg_domain = REGDOMAIN_COUNT;
-
+/* true if init happens thru init time driver hint */
+static v_BOOL_t init_by_driver = VOS_FALSE;
+/* true if init happens thru init time  callback from regulatory core.
+   this should be set to true during driver reload */
+static v_BOOL_t init_by_reg_core = VOS_FALSE;
 #else
 
 /* Cant access pAdapter in this file so defining a new variable to wait when changing country*/
@@ -3051,13 +3055,15 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
                    (" get country information from kernel db"));
 
 
-        if (COUNTRY_INIT == source)
+        if ((COUNTRY_INIT == source) && (VOS_FALSE == init_by_reg_core))
         {
+            init_by_driver = VOS_TRUE;
+
             INIT_COMPLETION(pHddCtx->linux_reg_req);
             regulatory_hint(wiphy, country_code);
             wait_result = wait_for_completion_timeout(
                 &pHddCtx->linux_reg_req,
-                LINUX_REG_WAIT_TIME);
+                msecs_to_jiffies(LINUX_REG_WAIT_TIME));
 
             /* if the country information does not exist with the kernel,
                then the driver callback would not be called */
@@ -3071,7 +3077,7 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
                    domain */
 
                 VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                           ("runtime country code is found in kernel db"));
+                           ("init time regulatory hint callback got called"));
 
                 *pRegDomain = temp_reg_domain;
                 cur_reg_domain = temp_reg_domain;
@@ -3086,7 +3092,7 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
                    database, return failure */
 
                 VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                           ("runtime country code is not found in kernel db"));
+                           ("init time reg hint callback not called"));
 
                 /* Set to world only if kernel never respnded before*/
                 if ((linux_reg_cc[0] == 0) && (linux_reg_cc[1] == 0))
@@ -3114,6 +3120,10 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
 #else
             regulatory_hint_user(country_code);
 #endif
+            *pRegDomain = temp_reg_domain;
+        }
+        else if (COUNTRY_INIT == source)
+        {
             *pRegDomain = temp_reg_domain;
         }
 
@@ -3217,20 +3227,26 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
             if (0 == err)
 #endif
             {
-                if (!(reg_rule->flags & NL80211_RRF_PASSIVE_SCAN))
-                {
-                    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                              "%s: Remove passive scan restriction for %u",
-                              __func__, wiphy->bands[i]->channels[j].center_freq);
-                    wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
-                }
+                if  (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY) {
 
-                if (!(reg_rule->flags & NL80211_RRF_NO_IBSS))
-                {
-                    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                              "%s: Remove no ibss restriction for %u",
-                              __func__, wiphy->bands[i]->channels[j].center_freq);
-                    wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_NO_IBSS;
+                    if (!(reg_rule->flags & NL80211_RRF_PASSIVE_SCAN))
+                    {
+                        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                                  "%s: Remove passive scan restriction for %u",
+                                  __func__, wiphy->bands[i]->channels[j].center_freq);
+                        wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
+                    }
+
+                    if (!(reg_rule->flags & NL80211_RRF_NO_IBSS))
+                    {
+                        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                                  "%s: Remove no ibss restriction for %u",
+                                  __func__, wiphy->bands[i]->channels[j].center_freq);
+                        wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_NO_IBSS;
+                    }
+
+                    wiphy->bands[i]->channels[j].max_power =
+                        (int) MBM_TO_DBM(reg_rule->power_rule.max_eirp);
                 }
             }
 
@@ -3340,11 +3356,22 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     hdd_context_t *pHddCtx = wiphy_priv(wiphy);
     eCsrBand nBandCapability = eCSR_BAND_ALL;
     v_COUNTRYCODE_t country_code;
-    int i;
+    int i,j;
     v_BOOL_t isVHT80Allowed;
 
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                "cfg80211 reg notifier callback for country for initiator %d", request->initiator);
+
+    if (TRUE == isWDresetInProgress())
+    {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("SSR is in progress") );
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+       return;
+#else
+       return 0;
+#endif
+    }
 
     if (NULL == pHddCtx)
     {
@@ -3357,9 +3384,11 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
 #endif
     }
 
-    if (pHddCtx->isUnloadInProgress) {
+    if (pHddCtx->isUnloadInProgress ||
+        pHddCtx->isLogpInProgress)
+    {
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                  "%s: Unloading in Progress, Ignore!!!", __func__);
+                  "%s: Unloading or SSR in Progress, Ignore!!!", __func__);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
             return;
 #else
@@ -3373,51 +3402,55 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
 
     switch (request->initiator)
     {
-       case NL80211_REGDOM_SET_BY_DRIVER:
+    case NL80211_REGDOM_SET_BY_DRIVER:
 
-          isVHT80Allowed = pHddCtx->isVHT80Allowed;
-          if (create_linux_regulatory_entry(wiphy, nBandCapability) == 0)
-          {
+        if ( VOS_TRUE == init_by_driver)
+        {
+            isVHT80Allowed = pHddCtx->isVHT80Allowed;
+            if (create_linux_regulatory_entry(wiphy, nBandCapability) == 0)
+            {
+                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                          (" regulatory entry created"));
+            }
+            if (pHddCtx->isVHT80Allowed != isVHT80Allowed)
+            {
+                hdd_checkandupdate_phymode( pHddCtx);
+            }
+            complete(&pHddCtx->linux_reg_req);
+            break;
+        }
 
-             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                   (" regulatory entry created"));
-          }
-          if (pHddCtx->isVHT80Allowed != isVHT80Allowed)
-          {
-             hdd_checkandupdate_phymode( pHddCtx);
-          }
+        /* we purposely want to fall thru since the processing is same
+           as other 2 conditions */
 
-          complete(&pHddCtx->linux_reg_req);
-          break;
+    case NL80211_REGDOM_SET_BY_CORE:
+    case NL80211_REGDOM_SET_BY_USER:
 
-       case NL80211_REGDOM_SET_BY_USER:
-       case NL80211_REGDOM_SET_BY_CORE:
+        /* first lookup the country in the local database */
+        country_code[0] = request->alpha2[0];
+        country_code[1] = request->alpha2[1];
 
-          /* first lookup the country in the local database */
-          country_code[0] = request->alpha2[0];
-          country_code[1] = request->alpha2[1];
+        pHddCtx->reg.alpha2[0] = request->alpha2[0];
+        pHddCtx->reg.alpha2[1] = request->alpha2[1];
+        vos_update_reg_info(pHddCtx);
+        vos_reg_apply_world_flags(wiphy, request->initiator, &pHddCtx->reg);
 
-          pHddCtx->reg.alpha2[0] = request->alpha2[0];
-          pHddCtx->reg.alpha2[1] = request->alpha2[1];
-          vos_update_reg_info(pHddCtx);
-          vos_reg_apply_world_flags(wiphy, request->initiator, &pHddCtx->reg);
-
-          temp_reg_domain = REGDOMAIN_COUNT;
-          for (i = 0; i < countryInfoTable.countryCount &&
-                REGDOMAIN_COUNT == temp_reg_domain; i++)
-          {
-             if (memcmp(country_code, countryInfoTable.countryInfo[i].countryCode,
-                      VOS_COUNTRY_CODE_LEN) == 0)
-             {
+        temp_reg_domain = REGDOMAIN_COUNT;
+        for (i = 0; i < countryInfoTable.countryCount &&
+                 REGDOMAIN_COUNT == temp_reg_domain; i++)
+        {
+            if (memcmp(country_code, countryInfoTable.countryInfo[i].countryCode,
+                       VOS_COUNTRY_CODE_LEN) == 0)
+            {
                 /* country code is found */
                 /* record the temporary regulatory_domain as well */
                 temp_reg_domain = countryInfoTable.countryInfo[i].regDomain;
                 break;
-             }
-          }
+            }
+        }
 
-          if (REGDOMAIN_COUNT == temp_reg_domain)
-             temp_reg_domain = REGDOMAIN_WORLD;
+        if (REGDOMAIN_COUNT == temp_reg_domain)
+            temp_reg_domain = REGDOMAIN_WORLD;
 
           nBandCapability = pHddCtx->cfg_ini->nBandCapability;
           isVHT80Allowed = pHddCtx->isVHT80Allowed;
@@ -3427,34 +3460,67 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                    (" regulatory entry created"));
 
-          }
-          if (pHddCtx->isVHT80Allowed != isVHT80Allowed)
-          {
-             hdd_checkandupdate_phymode( pHddCtx);
-          }
+        }
+        if (pHddCtx->isVHT80Allowed != isVHT80Allowed)
+        {
+            hdd_checkandupdate_phymode( pHddCtx);
+        }
 
-          cur_reg_domain = temp_reg_domain;
-          linux_reg_cc[0] = country_code[0];
-          linux_reg_cc[1] = country_code[1];
+        cur_reg_domain = temp_reg_domain;
+        linux_reg_cc[0] = country_code[0];
+        linux_reg_cc[1] = country_code[1];
 
-          /* now pass the new country information to sme */
-          if (request->alpha2[0] == '0' && request->alpha2[1] == '0')
-          {
-             sme_GenericChangeCountryCode(pHddCtx->hHal, country_code,
-                   REGDOMAIN_COUNT);
-          }
-          else
-          {
-             sme_GenericChangeCountryCode(pHddCtx->hHal, country_code,
-                   temp_reg_domain);
-          }
+        if ((VOS_TRUE == init_by_reg_core) || (VOS_TRUE == init_by_driver)) {
+            /* now pass the new country information to sme */
+            if (request->alpha2[0] == '0' && request->alpha2[1] == '0')
+            {
+                sme_GenericChangeCountryCode(pHddCtx->hHal, country_code,
+                                             REGDOMAIN_COUNT);
+            }
+            else
+            {
+                sme_GenericChangeCountryCode(pHddCtx->hHal, country_code,
+                                         temp_reg_domain);
+            }
+        }
+
+        if ((VOS_FALSE == init_by_driver) &&
+            (request->initiator != NL80211_REGDOM_SET_BY_CORE))
+            init_by_reg_core = VOS_TRUE;
+
+
 #ifndef QCA_WIFI_ISOC
-          /* send CTL info to firmware */
-          regdmn_set_regval(&pHddCtx->reg);
+        /* send CTL info to firmware */
+        regdmn_set_regval(&pHddCtx->reg);
 #endif
-       default:
-          break;
+    default:
+        break;
     }
+
+    /* Mark channels 36-48 as passive for US CC */
+
+    if ((request->initiator == NL80211_REGDOM_SET_BY_DRIVER) ||
+        (request->initiator == NL80211_REGDOM_SET_BY_CORE) ||
+        (request->initiator == NL80211_REGDOM_SET_BY_USER))
+    {
+       if (wiphy->bands[IEEE80211_BAND_5GHZ])
+       {
+          for (j=0; j<wiphy->bands[IEEE80211_BAND_5GHZ]->n_channels; j++)
+          {
+              // UNII-1 band channels are passive when domain is FCC.
+             if ((wiphy->bands[IEEE80211_BAND_5GHZ ]->channels[j].center_freq == 5180 ||
+                  wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
+                  wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
+                  wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
+                  ((request->alpha2[0]== 'U'&& request->alpha2[1]=='S') &&
+                                pHddCtx->nEnableStrictRegulatoryForFCC))
+             {
+                 wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
+             }
+          }
+       }
+    }
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
     return;
 #else
@@ -3822,6 +3888,33 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
 
     wiphy_dbg(wiphy, "info: cfg80211 reg_notifier callback for country"
                      " %c%c\n", request->alpha2[0], request->alpha2[1]);
+
+    /* During load and SSR, vos_open (which will lead to WDA_SetRegDomain)
+     * is called before we assign pHddCtx->hHal so we might get it as
+     * NULL here leading to crash.
+     */
+    if (NULL == pHddCtx)
+    {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("%s Invalid pHddCtx pointer"), __func__);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+       return;
+#else
+       return 0;
+#endif
+    }
+    if(pHddCtx->isUnloadInProgress ||
+        pHddCtx->isLogpInProgress)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("%s Unload or SSR is in progress Ignore"), __func__ );
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+       return;
+#else
+       return 0;
+#endif
+    }
+
     if (request->initiator == NL80211_REGDOM_SET_BY_USER)
     {
        int status;
@@ -4004,7 +4097,8 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
                       wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
                       wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
                       wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
-                     ((ccode[0]== 'U'&& ccode[1]=='S') && pHddCtx->nEnableStrictRegulatoryForFCC))
+                     ((domainIdCurrent == REGDOMAIN_FCC) &&
+                                       pHddCtx->nEnableStrictRegulatoryForFCC))
                  {
                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
                  }
@@ -4012,7 +4106,8 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
                            wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
                            wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
                            wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
-                          ((ccode[0]!= 'U'&& ccode[1]!='S') || !pHddCtx->nEnableStrictRegulatoryForFCC))
+                          ((domainIdCurrent != REGDOMAIN_FCC) ||
+                                      !pHddCtx->nEnableStrictRegulatoryForFCC))
                  {
                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
                  }

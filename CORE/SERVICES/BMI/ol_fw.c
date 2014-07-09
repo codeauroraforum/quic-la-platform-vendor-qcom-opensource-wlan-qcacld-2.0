@@ -702,6 +702,7 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 {
 	int ret;
 	u_int32_t host_interest_address;
+	u_int32_t dram_dump_values[4];
 
 	if (!ramdump_scn) {
 		printk("No RAM dump will be collected since ramdump_scn is NULL!\n");
@@ -735,7 +736,7 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 	if (HIFDiagReadMem(ramdump_scn->hif_hdl,
 		host_interest_item_address(ramdump_scn->target_type,
 		offsetof(struct host_interest_s, hi_failure_state)),
-		(A_UCHAR*) &host_interest_address, sizeof(u_int32_t)) != A_OK) {
+		(A_UCHAR *)&host_interest_address, sizeof(u_int32_t)) != A_OK) {
 		printk(KERN_ERR "HifDiagReadiMem FW Dump Area Pointer failed!\n");
 		dump_CE_register(ramdump_scn);
 		dump_CE_debug_register(ramdump_scn->hif_sc);
@@ -743,6 +744,15 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 		goto out_fail;
 	}
 	printk("Host interest item address: 0x%08x\n", host_interest_address);
+
+	if (HIFDiagReadMem(ramdump_scn->hif_hdl, host_interest_address,
+		(A_UCHAR *)&dram_dump_values[0], 4 * sizeof(u_int32_t)) != A_OK)
+	{
+		printk("HifDiagReadiMem FW Dump Area failed!\n");
+		goto out_fail;
+	}
+	printk("FW Assertion at PC: 0x%08x BadVA: 0x%08x TargetID: 0x%08x\n",
+		dram_dump_values[2], dram_dump_values[3], dram_dump_values[0]);
 
 	if (ol_copy_ramdump(ramdump_scn))
 		goto out_fail;
@@ -771,6 +781,18 @@ void ol_schedule_ramdump_work(struct ol_softc *scn)
 	ramdump_scn = scn;
 	schedule_work(&ramdump_work);
 }
+
+static void fw_indication_work_handler(struct work_struct *fw_indication)
+{
+	cnss_device_self_recovery();
+}
+
+static DECLARE_WORK(fw_indication_work, fw_indication_work_handler);
+
+void ol_schedule_fw_indication_work(struct ol_softc *scn)
+{
+	schedule_work(&fw_indication_work);
+}
 #endif
 
 #define REGISTER_DUMP_LEN_MAX   60
@@ -790,6 +812,8 @@ void ol_target_failure(void *instance, A_STATUS status)
 	A_UINT8 *dbglog_data;
 	void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
 	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA, vos_context);
+#else
+	int ret;
 #endif
 
 	if (OL_TRGET_STATUS_RESET == scn->target_status) {
@@ -800,14 +824,29 @@ void ol_target_failure(void *instance, A_STATUS status)
 #ifdef TARGET_RAMDUMP_AFTER_KERNEL_PANIC
 	if (scn->crash_shutdown)
 		printk("XXX TARGET ASSERTED because of Kernel Panic XXX\n");
-	else
 #endif
-		printk("XXX TARGET ASSERTED XXX\n");
 	scn->target_status = OL_TRGET_STATUS_RESET;
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
+		printk("%s: Loading/Unloading is in progress, ignore!\n",
+			__func__);
+		return;
+	}
 	vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 #endif
+
+#ifdef CONFIG_CNSS
+	ret = hif_pci_check_fw_reg(scn->hif_sc);
+	if (0 == ret) {
+		ol_schedule_fw_indication_work(scn);
+		return;
+	} else if (-1 == ret) {
+		return;
+	}
+#endif
+
+	printk("XXX TARGET ASSERTED XXX\n");
 
 #ifndef CONFIG_CNSS
 	if (HIFDiagReadMem(scn->hif_hdl,
@@ -898,6 +937,9 @@ int
 ol_configure_target(struct ol_softc *scn)
 {
 	u_int32_t param;
+#ifdef CONFIG_CNSS
+	struct cnss_platform_cap cap;
+#endif
 
 	/* Tell target which HTC version it is used*/
 	param = HTC_PROTOCOL_VERSION;
@@ -964,6 +1006,35 @@ ol_configure_target(struct ol_softc *scn)
 		}
 	}
 #endif /* CONFIG_CDC_MAX_PERF_WAR */
+
+#ifdef CONFIG_CNSS
+	{
+		int ret;
+
+		ret = cnss_get_platform_cap(&cap);
+		if (ret)
+			pr_err("platform capability info from CNSS not available\n");
+
+		if (!ret && cap.cap_flag & CNSS_HAS_EXTERNAL_SWREG) {
+			if (BMIReadMemory(scn->hif_hdl,
+				host_interest_item_address(scn->target_type,
+					offsetof(struct host_interest_s, hi_option_flag2)),
+						(A_UCHAR *)&param, 4, scn)!= A_OK) {
+				printk("BMIReadMemory for setting external SWREG failed\n");
+				return A_ERROR;
+			}
+
+			param |= HI_OPTION_USE_EXT_LDO;
+			if (BMIWriteMemory(scn->hif_hdl,
+				host_interest_item_address(scn->target_type,
+					offsetof(struct host_interest_s, hi_option_flag2)),
+						(A_UCHAR *)&param, 4, scn) != A_OK) {
+				printk("BMIWriteMemory for setting external SWREG failed\n");
+				return A_ERROR;
+			}
+		}
+	}
+#endif
 
 	/* If host is running on a BE CPU, set the host interest area */
 	{
@@ -1679,16 +1750,16 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 	* START   = 0x00980000
 	* LENGTH  = 0x00038000
 	*
-	* SECTION = REG
-	* START   = 0x00000800
-	* LENGTH  = 0x0007F820
-	*
 	* SECTION = AXI
 	* START   = 0x000a0000
 	* LENGTH  = 0x00018000
+	*
+	* SECTION = REG
+	* START   = 0x00000800
+	* LENGTH  = 0x0007F820
 	*/
 
-	while ((sectionCount < 3) && (amountRead < blockLength)) {
+	while ((sectionCount < 4) && (amountRead < blockLength)) {
 		switch (sectionCount) {
 		case 0:
 			/* DRAM SECTION */
@@ -1701,15 +1772,17 @@ int ol_target_coredump(void *inst, void *memoryBlock, u_int32_t blockLength)
 			readLen = IRAM_SIZE;
 			break;
 		case 2:
-			/* REG SECTION */
-			pos = REGISTER_LOCATION;
-			/*  ol_diag_read_reg_loc checks for buffer overrun */
-			readLen = 0;
-			break;
-		case 3:
 			/* AXI SECTION */
 			pos = AXI_LOCATION;
 			readLen = AXI_SIZE;
+			printk("%s: Dumping AXI section...\n", __func__);
+			break;
+		case 3:
+			/* REG SECTION */
+			pos = REGISTER_LOCATION;
+			/* ol_diag_read_reg_loc checks for buffer overrun */
+			readLen = 0;
+			printk("%s: Dumping Register section...\n", __func__);
 			break;
 		}
 

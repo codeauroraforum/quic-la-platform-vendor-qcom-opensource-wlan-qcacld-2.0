@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,6 +43,9 @@
 #include <ol_htt_api.h>
 
 #include <htt_internal.h>
+#if defined(HIF_PCI)
+#include "if_pci.h"
+#endif
 
 #define HTT_HTC_PKT_POOL_INIT_SIZE 100 /* enough for a large A-MPDU */
 
@@ -392,6 +395,9 @@ htt_htc_attach(struct htt_pdev_t *pdev)
         return 1; /* failure */
     }
     pdev->htc_endpoint = response.Endpoint;
+#if defined(HIF_PCI)
+    hif_pci_save_htc_htt_config_endpoint(pdev->htc_endpoint);
+#endif
 
     return 0; /* success */
 }
@@ -429,3 +435,9 @@ htt_display(htt_pdev_handle pdev, int indent)
         pdev->rx_ring.sw_rd_idx.msdu_payld);
 }
 #endif
+
+/* Disable ASPM : Disable PCIe low power */
+void htt_htc_disable_aspm(void)
+{
+    htc_disable_aspm();
+}

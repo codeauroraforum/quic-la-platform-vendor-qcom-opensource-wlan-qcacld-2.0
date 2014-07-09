@@ -678,6 +678,9 @@ struct hdd_station_ctx
    /*Save the wep/wpa-none keys*/
    tCsrRoamSetKey ibss_enc_key;
    v_BOOL_t hdd_ReassocScenario;
+
+   /* STA ctx debug variables */
+   int staDebugState;
 };
 
 #define BSS_STOP    0
@@ -841,7 +844,7 @@ typedef struct
     /*Channel*/
     tANI_U8  ch;
     /*RSSI or Level*/
-    tANI_U8  rssi;
+    tANI_S8  rssi;
     /*Age*/
     tANI_U32 age;
 }tHDDbatchScanRspApInfo;
@@ -1069,6 +1072,7 @@ struct hdd_adapter_s
     unsigned int tx_flow_low_watermark;
     unsigned int tx_flow_high_watermark_offset;
 #endif /* QCA_LL_TX_FLOW_CT */
+    v_BOOL_t offloads_configured;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1204,6 +1208,7 @@ struct hdd_context_s
 
 
    v_BOOL_t hdd_wlan_suspended;
+   v_BOOL_t suspended;
 
    spinlock_t filter_lock;
 
@@ -1321,7 +1326,6 @@ struct hdd_context_s
     int            sta_cnt;
 #endif
 
-    v_U8_t         drvr_miracast;
     v_U8_t         issplitscan_enabled;
 
     /* VHT80 allowed*/
@@ -1338,6 +1342,8 @@ struct hdd_context_s
 
     /* defining the chip/rom version */
     v_U32_t target_hw_version;
+    /* defining the chip/rom revision */
+    v_U32_t target_hw_revision;
 #endif
     struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -1349,6 +1355,15 @@ struct hdd_context_s
     v_U8_t current_intf_count;
 
     tSirScanType ioctl_scan_mode;
+
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+    vos_timer_t hdd_wlan_shutdown_timer;
+#endif
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    adf_os_work_t  sta_ap_intf_check_work;
+#endif
+
+    v_BOOL_t btCoexModeSet;
 };
 
 
@@ -1501,5 +1516,9 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter);
 #endif /*End of FEATURE_WLAN_BATCH_SCAN*/
 
 void wlan_hdd_send_svc_nlink_msg(int type);
+
+#ifdef WLAN_FEATURE_STATS_EXT
+void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
+#endif
 
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

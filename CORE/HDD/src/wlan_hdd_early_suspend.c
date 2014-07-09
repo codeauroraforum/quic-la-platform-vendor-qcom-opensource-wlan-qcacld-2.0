@@ -97,7 +97,7 @@
 #include <wlan_qct_wda.h>
 #include <if_pci.h>
 #endif
-#define HDD_SSR_BRING_UP_TIME 180000
+#define HDD_SSR_BRING_UP_TIME 10000
 
 static eHalStatus g_full_pwr_status;
 static eHalStatus g_standby_status;
@@ -112,10 +112,8 @@ extern void hdd_wlan_initial_scan(hdd_context_t *pHddCtx);
 extern struct notifier_block hdd_netdev_notifier;
 extern tVOS_CON_MODE hdd_get_conparam ( void );
 
-#ifdef QCA_WIFI_ISOC
 static struct timer_list ssr_timer;
 static bool ssr_timer_started;
-#endif /* QCA_WIFI_ISOC */
 
 //Callback invoked by PMC to report status of standby request
 void hdd_suspend_standby_cbk (void *callbackContext, eHalStatus status)
@@ -158,6 +156,7 @@ void hdd_suspend_full_pwr_callback(void *callbackContext, eHalStatus status)
 eHalStatus hdd_exit_standby(hdd_context_t *pHddCtx)
 {
     eHalStatus status = VOS_STATUS_SUCCESS;
+    long ret;
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: WLAN being resumed from standby",__func__);
     INIT_COMPLETION(pHddCtx->full_pwr_comp_var);
@@ -169,8 +168,14 @@ eHalStatus hdd_exit_standby(hdd_context_t *pHddCtx)
    if(status == eHAL_STATUS_PMC_PENDING)
    {
       //Block on a completion variable. Can't wait forever though
-      wait_for_completion_interruptible_timeout(&pHddCtx->full_pwr_comp_var,
-         msecs_to_jiffies(WLAN_WAIT_TIME_FULL_PWR));
+      ret = wait_for_completion_interruptible_timeout(
+                 &pHddCtx->full_pwr_comp_var,
+                 msecs_to_jiffies(WLAN_WAIT_TIME_FULL_PWR));
+      if (0 >= ret)
+      {
+          hddLog(VOS_TRACE_LEVEL_ERROR,
+                 FL("wait on full_pwr_comp_var failed %ld"), ret);
+      }
       status = g_full_pwr_status;
       if(g_full_pwr_status != eHAL_STATUS_SUCCESS)
       {
@@ -201,6 +206,7 @@ VOS_STATUS hdd_enter_standby(hdd_context_t *pHddCtx)
 {
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
+   long ret;
 
    //Disable IMPS/BMPS as we do not want the device to enter any power
    //save mode on its own during suspend sequence
@@ -223,8 +229,15 @@ VOS_STATUS hdd_enter_standby(hdd_context_t *pHddCtx)
    if(halStatus == eHAL_STATUS_PMC_PENDING)
    {
       //Block on a completion variable. Can't wait forever though
-      wait_for_completion_interruptible_timeout(&pHddCtx->full_pwr_comp_var,
-         msecs_to_jiffies(WLAN_WAIT_TIME_FULL_PWR));
+      ret = wait_for_completion_interruptible_timeout(
+                 &pHddCtx->full_pwr_comp_var,
+                 msecs_to_jiffies(WLAN_WAIT_TIME_FULL_PWR));
+      if (0 >= ret)
+      {
+          hddLog(VOS_TRACE_LEVEL_ERROR,
+                 FL( "wait on full_pwr_comp_var failed %ld"), ret);
+      }
+
       if(g_full_pwr_status != eHAL_STATUS_SUCCESS)
       {
          hddLog(VOS_TRACE_LEVEL_FATAL,"%s: sme_RequestFullPower Failed",__func__);
@@ -259,8 +272,14 @@ VOS_STATUS hdd_enter_standby(hdd_context_t *pHddCtx)
    if (halStatus == eHAL_STATUS_PMC_PENDING)
    {
       //Wait till WLAN device enters standby mode
-      wait_for_completion_timeout(&pHddCtx->standby_comp_var,
+      ret = wait_for_completion_timeout(&pHddCtx->standby_comp_var,
          msecs_to_jiffies(WLAN_WAIT_TIME_STANDBY));
+      if (0 >= ret)
+      {
+          hddLog(VOS_TRACE_LEVEL_ERROR,
+                 FL("wait on standby_comp_var failed %ld"), ret);
+      }
+
       if (g_standby_status != eHAL_STATUS_SUCCESS && g_standby_status != eHAL_STATUS_PMC_NOT_NOW)
       {
          hddLog(VOS_TRACE_LEVEL_FATAL,"%s: sme_RequestStandby failed",__func__);
@@ -298,6 +317,7 @@ VOS_STATUS hdd_enter_deep_sleep(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter)
    eHalStatus halStatus;
    VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
    vos_call_status_type callType;
+   long ret;
 
    //Stop the Interface TX queue.
    netif_tx_disable(pAdapter->dev);
@@ -317,8 +337,15 @@ VOS_STATUS hdd_enter_deep_sleep(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter)
    if(halStatus == eHAL_STATUS_PMC_PENDING)
    {
       //Block on a completion variable. Can't wait forever though
-      wait_for_completion_interruptible_timeout(&pHddCtx->full_pwr_comp_var,
-         msecs_to_jiffies(WLAN_WAIT_TIME_FULL_PWR));
+      ret = wait_for_completion_interruptible_timeout(
+                 &pHddCtx->full_pwr_comp_var,
+                 msecs_to_jiffies(WLAN_WAIT_TIME_FULL_PWR));
+      if (0 >= ret)
+      {
+          hddLog(VOS_TRACE_LEVEL_ERROR,
+                 FL("wait on full_pwr_comp_var failed %ld"), ret);
+      }
+
       if(g_full_pwr_status != eHAL_STATUS_SUCCESS){
          hddLog(VOS_TRACE_LEVEL_FATAL,"%s: sme_RequestFullPower failed",__func__);
          VOS_ASSERT(0);
@@ -339,21 +366,40 @@ VOS_STATUS hdd_enter_deep_sleep(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter)
    if(halStatus == eHAL_STATUS_SUCCESS)
    {
       //Block on a completion variable. Can't wait forever though.
-      wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
-         msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+      ret = wait_for_completion_interruptible_timeout(
+                 &pAdapter->disconnect_comp_var,
+                 msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+      if (0 >= ret)
+      {
+          hddLog(VOS_TRACE_LEVEL_ERROR,
+                 FL("wait on disconnect_comp_var failed %ld"), ret);
+      }
    }
-
-
    //None of the steps should fail after this. Continue even in case of failure
    vosStatus = vos_stop( pHddCtx->pvosContext );
-   VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
+   if (!VOS_IS_STATUS_SUCCESS( vosStatus ))
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR, "%s: vos_stop return failed %d",
+             __func__, vosStatus);
+      VOS_ASSERT(0);
+   }
 
    vosStatus = vos_chipAssertDeepSleep( &callType, NULL, NULL );
-   VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
+   if( VOS_IS_STATUS_SUCCESS( vosStatus ))
+   {
+       hddLog(VOS_TRACE_LEVEL_ERROR,
+              FL("vos_chipAssertDeepSleep return failed %d"), vosStatus);
+       VOS_ASSERT(0);
+   }
 
    //Vote off any PMIC voltage supplies
    vosStatus = vos_chipPowerDown(NULL, NULL, NULL);
-
+   if( !VOS_IS_STATUS_SUCCESS( vosStatus ))
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR, "%s: vos_chipPowerDown return failed %d",
+             __func__, vosStatus);
+      VOS_ASSERT(0);
+   }
    pHddCtx->hdd_ps_state = eHDD_SUSPEND_DEEP_SLEEP;
 
    //Restore IMPS config
@@ -377,8 +423,8 @@ VOS_STATUS hdd_exit_deep_sleep(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter)
    vosStatus = vos_chipPowerUp(NULL,NULL,NULL);
    if (!VOS_IS_STATUS_SUCCESS(vosStatus))
    {
-      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Libra WLAN not Powered Up. "
-          "exiting", __func__);
+      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: WLAN not Powered Up.exiting",
+             __func__);
       goto err_deep_sleep;
    }
 
@@ -528,15 +574,26 @@ void hdd_conf_hostoffload(hdd_adapter_t *pAdapter, v_BOOL_t fenable)
                     pHddCtx->configuredMcastBcastFilter &=
                             ~(HDD_MCASTBCASTFILTER_FILTER_ALL_MULTICAST);
                 }
+
 #endif
+                /*
+                * This variable saves the state if offload were configured
+                * or not. helps in recovering when pcie fails to suspend
+                * because of ongoing scan and state is no longer associated.
+                */
+                pAdapter->offloads_configured = TRUE;
             }
         }
         else
         {
             //Disable ARPOFFLOAD
-            if (eConnectionState_Associated ==
-                    (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
+            if ( (eConnectionState_Associated ==
+                 (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState) ||
+                 (pAdapter->offloads_configured == TRUE)
+               )
             {
+                pAdapter->offloads_configured = FALSE;
+
                 if (pHddCtx->cfg_ini->fhostArpOffload)
                 {
                     vstatus = hdd_conf_arp_offload(pAdapter, fenable);
@@ -781,7 +838,7 @@ VOS_STATUS hdd_conf_arp_offload(hdd_adapter_t *pAdapter, v_BOOL_t fenable)
        }
        else
        {
-           hddLog(VOS_TRACE_LEVEL_INFO, "%s:IP Address is not assigned", __func__);
+           hddLog(VOS_TRACE_LEVEL_ERROR, "%s:IP Address is not assigned ", __func__);
            return VOS_STATUS_E_AGAIN;
        }
    }
@@ -806,7 +863,8 @@ VOS_STATUS hdd_conf_arp_offload(hdd_adapter_t *pAdapter, v_BOOL_t fenable)
 /*
  * This function is called before setting mcbc filters
  * to modify filter value considering Different Offloads
-*/
+ */
+
 void hdd_mcbc_filter_modification(hdd_context_t* pHddCtx,
                                   tANI_U8 *pMcBcFilter)
 {
@@ -877,7 +935,8 @@ void hdd_conf_mcastbcast_filter(hdd_context_t* pHddCtx, v_BOOL_t setfilter)
 
 static void hdd_conf_suspend_ind(hdd_context_t* pHddCtx,
                                  hdd_adapter_t *pAdapter,
-                                 void (*callback)(void *callbackContext),
+                                 void (*callback)(void *callbackContext,
+                                                  boolean suspended),
                                  void *callbackContext)
 {
     eHalStatus halStatus = eHAL_STATUS_FAILURE;
@@ -935,6 +994,9 @@ static void hdd_conf_suspend_ind(hdd_context_t* pHddCtx,
     {
         pHddCtx->hdd_mcastbcast_filter_set = TRUE;
     } else {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("sme_ConfigureSuspendInd returned failure %d"), halStatus);
+
         vos_mem_free(wlanSuspendParam);
     }
 }
@@ -942,14 +1004,11 @@ static void hdd_conf_suspend_ind(hdd_context_t* pHddCtx,
 static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
 {
     hdd_context_t* pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    eHalStatus halStatus = eHAL_STATUS_FAILURE;
 
 #ifndef QCA_WIFI_2_0
 
-    eHalStatus halStatus = eHAL_STATUS_FAILURE;
     tpSirWlanResumeParam wlanResumeParam;
-
-    hddLog(VOS_TRACE_LEVEL_INFO,
-      "%s: send wlan resume indication", __func__);
 
     wlanResumeParam = vos_mem_malloc(sizeof(tSirWlanResumeParam));
 
@@ -962,14 +1021,29 @@ static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
 
     wlanResumeParam->configuredMcstBcstFilterSetting =
                                pHddCtx->configuredMcastBcastFilter;
-    halStatus = sme_ConfigureResumeReq(pHddCtx->hHal, wlanResumeParam);
-    if (eHAL_STATUS_SUCCESS != halStatus)
-    {
-        vos_mem_free(wlanResumeParam);
-    }
 
 #endif
 
+    halStatus = sme_ConfigureResumeReq(pHddCtx->hHal,
+#ifndef QCA_WIFI_2_0
+                                       wlanResumeParam
+#else
+                                       NULL
+#endif
+                                      );
+
+    if (eHAL_STATUS_SUCCESS != halStatus)
+    {
+#ifndef QCA_WIFI_2_0
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               "%s: sme_ConfigureResumeReq return failure %d",
+               __func__, halStatus);
+        vos_mem_free(wlanResumeParam);
+#endif
+    }
+
+    hddLog(VOS_TRACE_LEVEL_INFO,
+      "%s: send wlan resume indication", __func__);
     /* Disable supported OffLoads */
     hdd_conf_hostoffload(pAdapter, FALSE);
     pHddCtx->hdd_mcastbcast_filter_set = FALSE;
@@ -995,7 +1069,7 @@ static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
 }
 
 //Suspend routine registered with Android OS
-void hdd_suspend_wlan(void (*callback)(void *callbackContext),
+void hdd_suspend_wlan(void (*callback)(void *callbackContext, boolean suspended),
                       void *callbackContext)
 {
    hdd_context_t *pHddCtx = NULL;
@@ -1313,7 +1387,8 @@ void hdd_resume_wlan(void)
       return;
    }
 
-   if (pHddCtx->isLogpInProgress) {
+   if (pHddCtx->isLogpInProgress)
+   {
       hddLog(VOS_TRACE_LEVEL_INFO,
              "%s: Ignore resume wlan, LOGP in progress!", __func__);
       return;
@@ -1442,7 +1517,6 @@ void hdd_set_wlan_suspend_mode(bool suspend)
         hdd_resume_wlan();
 }
 
-#ifdef QCA_WIFI_ISOC
 static void hdd_ssr_timer_init(void)
 {
     init_timer(&ssr_timer);
@@ -1456,15 +1530,7 @@ static void hdd_ssr_timer_del(void)
 
 static void hdd_ssr_timer_cb(unsigned long data)
 {
-    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: HDD SSR timer expired", __func__);
-
-#ifndef QCA_WIFI_2_0
-#ifdef WCN_PRONTO
-    if (wcnss_hardware_type() == WCNSS_PRONTO_HW)
-        wcnss_pronto_log_debug_regs();
-#endif
-#endif
-
+    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: HDD SSR timer expired!", __func__);
     VOS_BUG(0);
 }
 
@@ -1472,15 +1538,14 @@ static void hdd_ssr_timer_start(int msec)
 {
     if(ssr_timer_started)
     {
-        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: trying to start SSR timer when it's running"
-                ,__func__);
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Trying to start SSR timer when "
+               "it's running!", __func__);
     }
     ssr_timer.expires = jiffies + msecs_to_jiffies(msec);
     ssr_timer.function = hdd_ssr_timer_cb;
     add_timer(&ssr_timer);
     ssr_timer_started = true;
 }
-#endif /* QCA_WIFI_ISOC */
 
 /* the HDD interface to WLAN driver shutdown,
  * the primary shutdown function in SSR
@@ -1494,11 +1559,9 @@ VOS_STATUS hdd_wlan_shutdown(void)
 
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: WLAN driver shutting down! ",__func__);
 
-#ifdef QCA_WIFI_ISOC
-   /* if re-init never happens, then do SSR1 */
+   /* If SSR never completes, then do kernel panic. */
    hdd_ssr_timer_init();
    hdd_ssr_timer_start(HDD_SSR_BRING_UP_TIME);
-#endif
 
    /* Get the global VOSS context. */
    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
@@ -1514,7 +1577,8 @@ VOS_STATUS hdd_wlan_shutdown(void)
    }
 
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-    pHddCtx->isLogpInProgress = TRUE;
+   pHddCtx->isLogpInProgress = TRUE;
+   vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 #endif
 
    //Stop the traffic monitor timer
@@ -1633,7 +1697,12 @@ VOS_STATUS hdd_wlan_shutdown(void)
    }
 #else
    vosStatus = vos_wda_shutdown(pVosContext);
-   VOS_ASSERT(VOS_IS_STATUS_SUCCESS(vosStatus));
+   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+   {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                 "%s: Failed to stop wda %d", __func__, vosStatus);
+       VOS_ASSERT(0);
+   }
 #endif
 
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Doing SME STOP",__func__);
@@ -1641,17 +1710,32 @@ VOS_STATUS hdd_wlan_shutdown(void)
     * on threads being running to process the SYS Stop
     */
    vosStatus = sme_Stop(pHddCtx->hHal, HAL_STOP_TYPE_SYS_RESET);
-   VOS_ASSERT(VOS_IS_STATUS_SUCCESS(vosStatus));
+   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+   {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Failed to stop sme %d", __func__, vosStatus);
+       VOS_ASSERT(0);
+   }
 
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Doing MAC STOP",__func__);
    /* Stop MAC (PE and HAL) */
    vosStatus = macStop(pHddCtx->hHal, HAL_STOP_TYPE_SYS_RESET);
-   VOS_ASSERT(VOS_IS_STATUS_SUCCESS(vosStatus));
+   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+   {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Failed to stop mac %d", __func__, vosStatus);
+       VOS_ASSERT(0);
+   }
 
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Doing TL STOP",__func__);
    /* Stop TL */
    vosStatus = WLANTL_Stop(pVosContext);
-   VOS_ASSERT(VOS_IS_STATUS_SUCCESS(vosStatus));
+   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+   {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Failed to stop TL %d", __func__, vosStatus);
+       VOS_ASSERT(0);
+   }
 
 #ifndef QCA_WIFI_ISOC
    hif_disable_isr(((VosContextType*)pVosContext)->pHIFContext);
@@ -1710,19 +1794,15 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    hdd_adapter_t *pAdapter;
 #endif
 
-#ifdef QCA_WIFI_ISOC
-   hdd_ssr_timer_del();
-#endif
-
    hdd_prevent_suspend();
 
 #ifdef QCA_WIFI_ISOC
 #ifdef HAVE_WCNSS_CAL_DOWNLOAD
    /* wait until WCNSS driver downloads NV */
-   while (!wcnss_device_ready() && 5 >= ++max_retries) {
+   while (!wcnss_device_ready() && 10 >= ++max_retries) {
        msleep(1000);
    }
-   if (max_retries >= 5) {
+   if (max_retries >= 10) {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: WCNSS driver not ready", __func__);
       goto err_re_init;
    }
@@ -1755,13 +1835,13 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    }
 
    /* Initialize the adf_ctx handle */
-   adf_ctx = vos_mem_malloc(sizeof(adf_os_device_t));
+   adf_ctx = vos_mem_malloc(sizeof(*adf_ctx));
 
    if (!adf_ctx) {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Failed to allocate adf_ctx", __func__);
       goto err_re_init;
    }
-   vos_mem_zero(adf_ctx, sizeof(adf_os_device_t));
+   vos_mem_zero(adf_ctx, sizeof(*adf_ctx));
 
    hif_init_adf_ctx(adf_ctx, hif_sc);
    ((VosContextType*)pVosContext)->pHIFContext = hif_sc;
@@ -1780,6 +1860,22 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
       goto err_re_init;
    }
 #endif
+
+   /* Try to get an adapter from mode ID */
+   pAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_INFRA_STATION);
+   if (!pAdapter)
+   {
+      pAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_SOFTAP);
+      if (!pAdapter)
+      {
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+                   "%s: Failed to get Adapter!", __func__);
+         goto err_re_init;
+      }
+   }
+
+   /* Get WLAN HW/FW version */
+   hdd_wlan_get_version(pAdapter, NULL, NULL);
 
    /* Re-open VOSS, it is a re-open b'se control transport was never closed. */
    vosStatus = vos_open(&pVosContext, 0);
@@ -1880,24 +1976,6 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_start failed",__func__);
       goto err_vosclose;
    }
-#if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-
-   /* Get the Adapter context based on hardware address */
-   pAdapter = hdd_get_adapter_by_macaddr(pHddCtx,
-           pHddCtx->cfg_ini->intfMacAddr[0].bytes);
-
-   if ((NULL == pAdapter))
-   {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-               "invalid adapter ");
-       goto err_vosclose;
-   }
-   /* Get the wlan hw/fw version */
-   hdd_wlan_get_version(pAdapter, NULL, NULL);
-#else
-   /* Exchange capability info between Host and FW and also get versioning info from FW */
-   hdd_exchange_version_and_caps(pHddCtx);
-#endif
 
    vosStatus = hdd_post_voss_start_config( pHddCtx );
    if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
@@ -1934,12 +2012,14 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    vosStatus = WLANBAP_SetConfig(&btAmpConfig);
 #endif //WLAN_BTAMP_FEATURE
 
-    /* Restart all adapters */
+   /* Restart all adapters */
    hdd_start_all_adapters(pHddCtx);
+
    pHddCtx->isLogpInProgress = FALSE;
    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    pHddCtx->hdd_mcastbcast_filter_set = FALSE;
    hdd_register_mcast_bcast_filter(pHddCtx);
+   hdd_ssr_timer_del();
 
 #ifdef QCA_WIFI_ISOC
    /* Register with platform driver as client for Suspend/Resume */

@@ -465,7 +465,8 @@ limProcessMlmJoinCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
      pLimMlmJoinCnf = (tLimMlmJoinCnf*)pMsgBuf;
     if( (psessionEntry = peFindSessionBySessionId(pMac,pLimMlmJoinCnf->sessionId))== NULL)
     {
-        PELOGE(limLog(pMac, LOGE,FL("Session does not exist for given sessionId"));)
+         PELOGE(limLog(pMac, LOGE,FL("SessionId:%d Session does not exist"),
+                       pLimMlmJoinCnf->sessionId);)
         return;
     }
 
@@ -481,7 +482,8 @@ limProcessMlmJoinCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     /// Process Join confirm from MLM
     if (resultCode ==  eSIR_SME_SUCCESS)
     {
-            PELOG1(limLog(pMac, LOG1, FL("*** Joined ESS ***"));)
+        PELOG1(limLog(pMac, LOG1, FL("***SessionId:%d Joined ESS ***"),
+                      pLimMlmJoinCnf->sessionId);)
             //Setup hardware upfront
            //Done: 7-27-2009. JIM_FIX_ME   sessionize the following function
             if(limStaSendAddBssPreAssoc( pMac, false, psessionEntry) == eSIR_SUCCESS)
@@ -537,7 +539,8 @@ limProcessMlmAuthCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     pMlmAuthCnf = (tLimMlmAuthCnf*)pMsgBuf;
     if((psessionEntry = peFindSessionBySessionId(pMac,pMlmAuthCnf->sessionId))== NULL)
     {
-        PELOGE(limLog(pMac, LOGE, FL("session does not exist for given sessionId"));)
+        PELOGE(limLog(pMac, LOGE, FL("SessionId:%d session does not exist"),
+                      pMlmAuthCnf->sessionId);)
         return;
     }
 
@@ -551,8 +554,8 @@ limProcessMlmAuthCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
          * Log error
          */
         PELOGE(limLog(pMac, LOGE,
-               FL("received unexpected MLM_AUTH_CNF in state %X"),
-               psessionEntry->limSmeState);)
+               FL("SessionId:%d received unexpected MLM_AUTH_CNF in state %X"),
+               psessionEntry->peSessionId,psessionEntry->limSmeState);)
         return;
     }
     /// Process AUTH confirm from MLM
@@ -665,7 +668,8 @@ limProcessMlmAuthCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
              * Trigger Association with BSS
              */
             PELOG1(limLog(pMac, LOG1,
-                   FL("*** Authenticated with BSS ***"));)
+                   FL("SessionId:%d Authenticated with BSS"),
+                   psessionEntry->peSessionId);)
             pMlmAssocReq = vos_mem_malloc(sizeof(tLimMlmAssocReq));
             if ( NULL == pMlmAssocReq )
             {
@@ -764,6 +768,8 @@ limProcessMlmAuthCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             psessionEntry->limPrevSmeState = psessionEntry->limSmeState;
             psessionEntry->limSmeState     = eLIM_SME_WT_ASSOC_STATE;
             MTRACE(macTrace(pMac, TRACE_CODE_SME_STATE, psessionEntry->peSessionId, psessionEntry->limSmeState));
+            limLog(pMac,LOG1,"SessionId:%d PostMLMMessage: LIM_MLM_ASSOC_REQ",
+                   psessionEntry->peSessionId);
             limPostMlmMessage(pMac,
                               LIM_MLM_ASSOC_REQ,
                               (tANI_U32 *) pMlmAssocReq);
@@ -818,8 +824,9 @@ limProcessMlmAssocCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     pLimMlmAssocCnf = (tLimMlmAssocCnf*)pMsgBuf;
     if((psessionEntry = peFindSessionBySessionId(pMac,pLimMlmAssocCnf->sessionId)) == NULL)
     {
-         PELOGE(limLog(pMac, LOGE,FL("Session does not exist for given sessionId"));)
-         return;
+       PELOGE(limLog(pMac, LOGE,FL("SessionId:%d Session does not exist"),
+              pLimMlmAssocCnf->sessionId);)
+       return;
     }
     if (psessionEntry->limSmeState != eLIM_SME_WT_ASSOC_STATE ||
         psessionEntry->limSystemRole == eLIM_AP_ROLE || psessionEntry ->limSystemRole == eLIM_BT_AMP_AP_ROLE)
@@ -830,14 +837,15 @@ limProcessMlmAssocCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
          * Log error
          */
         PELOGE(limLog(pMac, LOGE,
-               FL("received unexpected MLM_ASSOC_CNF in state %X"),
-               psessionEntry->limSmeState);)
+               FL("SessionId:%d Received unexpected MLM_ASSOC_CNF in state %X"),
+               psessionEntry->peSessionId,psessionEntry->limSmeState);)
         return;
     }
     if (((tLimMlmAssocCnf *) pMsgBuf)->resultCode != eSIR_SME_SUCCESS)
     {
         // Association failure
-        PELOG1(limLog(pMac, LOG1, FL("*** Association failure ***"));)
+        PELOG1(limLog(pMac, LOG1, FL("SessionId:%d Association failure"),
+                      psessionEntry->peSessionId);)
         psessionEntry->limSmeState = eLIM_SME_JOIN_FAILURE_STATE;
         MTRACE(macTrace(pMac, TRACE_CODE_SME_STATE, psessionEntry->peSessionId, pMac->lim.gLimSmeState));
         /**
@@ -851,7 +859,8 @@ limProcessMlmAssocCnf(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     else
     {
         // Successful Association
-        PELOG1(limLog(pMac, LOG1, FL("*** Associated with BSS ***"));)
+        PELOG1(limLog(pMac, LOG1, FL("SessionId:%d Associated with BSS"),
+                      psessionEntry->peSessionId);)
         psessionEntry->limSmeState = eLIM_SME_LINK_EST_STATE;
         MTRACE(macTrace(pMac, TRACE_CODE_SME_STATE, psessionEntry->peSessionId, psessionEntry->limSmeState));
         /**
@@ -1904,7 +1913,20 @@ void limProcessStaMlmAddStaRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ ,tpPESess
             goto end;
         }
     if (psessionEntry->limSmeState == eLIM_SME_WT_REASSOC_STATE)
-             mesgType = LIM_MLM_REASSOC_CNF;
+    {
+#ifdef WLAN_FEATURE_VOWIFI_11R
+        // Check if we have keys (PTK) to install in case of 11r
+        tpftPEContext pftPECntxt = &pMac->ft.ftPEContext;
+        if (pftPECntxt->pftSessionEntry != NULL &&
+            pftPECntxt->PreAuthKeyInfo.extSetStaKeyParamValid == TRUE)
+        {
+            tpLimMlmSetKeysReq pMlmStaKeys = &pftPECntxt->PreAuthKeyInfo.extSetStaKeyParam;
+            limSendSetStaKeyReq(pMac, pMlmStaKeys, 0, 0, pftPECntxt->pftSessionEntry, FALSE);
+            pftPECntxt->PreAuthKeyInfo.extSetStaKeyParamValid = FALSE;
+        }
+#endif
+        mesgType = LIM_MLM_REASSOC_CNF;
+    }
         //
         // Update the DPH Hash Entry for this STA
         // with proper state info
@@ -2732,7 +2754,11 @@ limProcessStaMlmAddBssRspPreAssoc( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ, tpPES
             // remember staId in case of assoc timeout/failure handling
             psessionEntry->staId = pAddBssParams->staContext.staIdx;
 
-            MTRACE(macTrace(pMac, TRACE_CODE_SME_STATE, psessionEntry->peSessionId, psessionEntry->limSmeState));
+            MTRACE(macTrace(pMac, TRACE_CODE_SME_STATE,
+                   psessionEntry->peSessionId, psessionEntry->limSmeState));
+            limLog(pMac,LOG1,"SessionId:%d limPostMlmMessage LIM_MLM_AUTH_REQ with limSmeState:%d",
+                   psessionEntry->peSessionId,
+                   psessionEntry->limSmeState);
             limPostMlmMessage(pMac,
                               LIM_MLM_AUTH_REQ,
                               (tANI_U32 *) pMlmAuthReq);
@@ -2936,6 +2962,7 @@ limProcessStaMlmAddBssRspFT(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ, tpPESession 
     wlan_cfgGetInt(pMac, WNI_CFG_DOT11_MODE, &selfStaDot11Mode);
     pAddStaParams->supportedRates.opRateMode = limGetStaRateMode((tANI_U8)selfStaDot11Mode);
     pAddStaParams->encryptType = psessionEntry->encryptType;
+    pAddStaParams->maxTxPower = psessionEntry->maxTxPower;
 
     // Lets save this for when we receive the Reassoc Rsp
     pMac->ft.ftPEContext.pAddStaReq = pAddStaParams;
@@ -3015,6 +3042,8 @@ limProcessStaMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,tpPESession ps
     if(eLIM_MLM_WT_ADD_BSS_RSP_PREASSOC_STATE == psessionEntry->limMlmState)
     {
         //Done: 7-28-2009. JIM_FIX_ME:  sessionize the following function
+        limLog(pMac,LOG1,"SessionId:%d limProcessStaMlmAddBssRspPreAssoc",
+               psessionEntry->peSessionId);
         limProcessStaMlmAddBssRspPreAssoc(pMac, limMsgQ, psessionEntry);
         goto end;
     }
@@ -3060,11 +3089,13 @@ limProcessStaMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,tpPESession ps
         MTRACE(macTrace(pMac, TRACE_CODE_MLM_STATE, psessionEntry->peSessionId, psessionEntry->limMlmState));
         psessionEntry->statypeForBss = STA_ENTRY_PEER; //to know the session  started for self or for  peer oct6th
         // Now, send WDA_ADD_STA_REQ
-        limLog( pMac, LOGW, FL( "On STA: ADD_BSS was successful" ));
+        limLog( pMac, LOGW, FL( "SessionId:%d On STA: ADD_BSS was successful"),
+                               psessionEntry->peSessionId);
         pStaDs = dphGetHashEntry(pMac, DPH_STA_HASH_INDEX_PEER, &psessionEntry->dph.dphHashTable);
         if (pStaDs == NULL)
         {
-            PELOGE(limLog(pMac, LOGE, FL("could not Add Self Entry for the station"));)
+            PELOGE(limLog(pMac, LOGE, FL("SessionId:%d could not Add Self Entry for the station"),
+                   psessionEntry->peSessionId);)
             mlmAssocCnf.resultCode = (tSirResultCodes) eSIR_SME_REFUSED;
         }
         else
@@ -3093,14 +3124,16 @@ limProcessStaMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,tpPESession ps
             if (limAddStaSelf(pMac,staIdx, updateSta, psessionEntry) != eSIR_SUCCESS)
             {
                 // Add STA context at HW
-                PELOGE(limLog(pMac, LOGE, FL("could not Add Self Entry for the station"));)
+                PELOGE(limLog(pMac, LOGE, FL("SessionId:%d could not Add Self Entry for the station"),
+                       psessionEntry->peSessionId);)
                 mlmAssocCnf.resultCode = (tSirResultCodes) eSIR_SME_REFUSED;
             }
         }
     }
     else
     {
-        limLog( pMac, LOGP, FL( "ADD_BSS failed!" ));
+        limLog( pMac, LOGP, FL( "SessionId:%d ADD_BSS failed!" ),
+                psessionEntry->peSessionId);
         // Return Assoc confirm to SME with failure
         mlmAssocCnf.resultCode = (tSirResultCodes) eSIR_SME_REFUSED;
     }
@@ -3168,9 +3201,13 @@ void limProcessMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ )
     // Validate MLME state
     if((psessionEntry = peFindSessionBySessionId(pMac,pAddBssParams->sessionId))== NULL)
     {
-        limLog( pMac, LOGE, FL( "Session Does not exist for given sessionId" ));
+        limLog( pMac, LOGE, FL( "SessionId:%d Session Does not exist" ),
+                pAddBssParams->sessionId);
             if( NULL != pAddBssParams )
+            {
                 vos_mem_free(pAddBssParams);
+                limMsgQ->bodyptr = NULL;
+            }           
         return;
     }
     /* update PE session Id*/
@@ -3184,9 +3221,8 @@ void limProcessMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ )
             if( eLIM_MLM_WT_ADD_BSS_RSP_STATE != psessionEntry->limMlmState )
             {
                 // Mesg received from HAL in Invalid state!
-                limLog( pMac, LOGE,
-                  FL( "Received unexpected WDA_ADD_BSS_RSP in state %X" ),
-                  psessionEntry->limMlmState );
+                limLog( pMac, LOGE,FL( "SessionId:%d Received unexpected WDA_ADD_BSS_RSP in state %X" ),
+                        psessionEntry->peSessionId,psessionEntry->limMlmState);
                 mlmStartCnf.resultCode = eSIR_SME_BSS_ALREADY_STARTED_OR_JOINED;
                 if( 0 != limMsgQ->bodyptr )
                     vos_mem_free(pAddBssParams);
@@ -4276,7 +4312,8 @@ void limProcessMlmDelBACnf( tpAniSirGlobal pMac,
     pMlmDelBACnf = (tpLimMlmDelBACnf) pMsgBuf;
     if((psessionEntry = peFindSessionBySessionId(pMac, pMlmDelBACnf->sessionId))== NULL)
    {
-        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        limLog(pMac, LOGP,FL("SessionId:%d Session Does not exist"),
+        pMlmDelBACnf->sessionId);
         vos_mem_free(pMsgBuf);
         return;
    }
@@ -4932,7 +4969,7 @@ void limSendScanOffloadComplete(tpAniSirGlobal pMac,
     pMac->lim.gLimSmeScanResultLength +=
         pMac->lim.gLimMlmScanResultLength;
     pMac->lim.gLimRspReqd = false;
-    if ((pScanEvent->reasonCode == eSIR_SME_SUCCESS) ||
+    if ((pScanEvent->reasonCode == eSIR_SME_SUCCESS) &&
             pMac->lim.gLimSmeScanResultLength) {
         scanRspLen = sizeof(tSirSmeScanRsp) +
             pMac->lim.gLimSmeScanResultLength -

@@ -145,6 +145,10 @@ CONFIG_QCA_SINGLE_BINARY_SUPPORT := 0
 #Enable collecting target RAM dump after kernel panic
 CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC := 1
 
+#Flag to enable Stats Ext implementation
+CONFIG_FEATURE_STATS_EXT := 1
+
+
 ifeq ($(CONFIG_CFG80211),y)
 HAVE_CFG80211 := 1
 else
@@ -259,6 +263,7 @@ HDD_OBJS := 	$(HDD_SRC_DIR)/bap_hdd_main.o \
 		$(HDD_SRC_DIR)/wlan_hdd_scan.o \
 		$(HDD_SRC_DIR)/wlan_hdd_softap_tx_rx.o \
 		$(HDD_SRC_DIR)/wlan_hdd_tx_rx.o \
+		$(HDD_SRC_DIR)/wlan_hdd_trace.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wext.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wmm.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wowl.o
@@ -999,6 +1004,10 @@ ifeq ($(CONFIG_ENABLE_LINUX_REG), y)
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)
 CDEFINES += -DCONFIG_ENABLE_LINUX_REG
 endif
+endif
+
+ifeq ($(CONFIG_FEATURE_STATS_EXT), 1)
+CDEFINES += -DWLAN_FEATURE_STATS_EXT
 endif
 
 ifeq ($(CONFIG_QCA_WIFI_2_0), 1)

@@ -54,6 +54,7 @@
 #include <a_debug.h>
 #include "hif_pci.h"
 #include "vos_trace.h"
+#include "vos_api.h"
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
 #include <net/cnss.h>
 #endif
@@ -498,7 +499,7 @@ HIFPostInit(HIF_DEVICE *hif_device, void *unused, MSG_BASED_HIF_CALLBACKS *callb
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n",__FUNCTION__));
 }
 
-void
+int
 hif_completion_thread_startup(struct HIF_CE_state *hif_state)
 {
     struct CE_handle *ce_diag = hif_state->ce_diag;
@@ -545,7 +546,7 @@ hif_completion_thread_startup(struct HIF_CE_state *hif_state)
                     A_MALLOC(completions_needed * sizeof(struct HIF_CE_completion_state));
             if (!compl_state) {
                 AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("ath ERROR: compl_state has no mem\n"));
-                return;
+                return -1;
             }
             pipe_info->completion_space = compl_state;
 
@@ -565,6 +566,7 @@ hif_completion_thread_startup(struct HIF_CE_state *hif_state)
 
     }
     A_TARGET_ACCESS_UNLIKELY(targid);
+    return 0;
 }
 
 void
@@ -1374,14 +1376,15 @@ void HIFDump(HIF_DEVICE *hif_device, u_int8_t cmd_id, bool start)
     }
 }
 
-void
+A_STATUS
 HIFStart(HIF_DEVICE *hif_device)
 {
     struct HIF_CE_state *hif_state = (struct HIF_CE_state *)hif_device;
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("+%s\n",__FUNCTION__));
 
-    hif_completion_thread_startup(hif_state);
+    if (hif_completion_thread_startup(hif_state))
+        return A_ERROR;
 
     hif_msg_callbacks_install(hif_device);
 
@@ -1391,6 +1394,8 @@ HIFStart(HIF_DEVICE *hif_device)
     hif_state->started = TRUE;
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("-%s\n",__FUNCTION__));
+
+    return A_OK;
 }
 
 void
@@ -1480,6 +1485,16 @@ hif_send_buffer_cleanup_on_pipe(struct HIF_CE_pipe_info *pipe_info)
     {
         if (netbuf != CE_SENDLIST_ITEM_CTXT)
         {
+            /*
+             * Packets enqueued by htt_h2t_ver_req_msg() and
+             * htt_h2t_rx_ring_cfg_msg_ll() have already been freed in
+             * htt_htc_misc_pkt_pool_free() in WLANTL_Close(), so do not
+             * free them here again by checking whether it's the EndPoint
+             * which they are queued in.
+             */
+            if (id == hif_state->sc->htc_endpoint) {
+                return;
+            }
             /* Indicate the completion to higer layer to free the buffer */
             hif_state->msg_callbacks_current.txCompletionHandler(
                 hif_state->msg_callbacks_current.Context, netbuf, id);
@@ -1983,8 +1998,8 @@ HIF_wake_target_cpu(struct hif_pci_softc *sc)
         ASSERT(rv == A_OK);
 }
 
-#define HIF_MIN_SLEEP_INACTIVITY_TIME_MS     10
-#define HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS 20
+#define HIF_MIN_SLEEP_INACTIVITY_TIME_MS     50
+#define HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS 60
 static void
 HIF_sleep_entry(void *arg)
 {
@@ -1998,9 +2013,11 @@ HIF_sleep_entry(void *arg)
 		idle_ms = adf_os_ticks_to_msecs(adf_os_ticks()
 					- hif_state->sleep_ticks);
 		if (idle_ms >= HIF_MIN_SLEEP_INACTIVITY_TIME_MS) {
-			A_PCI_WRITE32(pci_addr + PCIE_LOCAL_BASE_ADDRESS +
+			if (!adf_os_atomic_read(&sc->pci_link_suspended)) {
+				A_PCI_WRITE32(pci_addr + PCIE_LOCAL_BASE_ADDRESS +
 				PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_RESET);
-			hif_state->fake_sleep = FALSE;
+				hif_state->fake_sleep = FALSE;
+			}
 		} else {
 			adf_os_timer_start(&hif_state->sleep_timer,
 				HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS);
@@ -2063,6 +2080,8 @@ HIF_PCIDeviceProbed(hif_handle_t hif_hdl)
     hif_state->sc = sc;
 
     adf_os_spinlock_init(&hif_state->keep_awake_lock);
+
+    adf_os_spinlock_init(&hif_state->suspend_lock);
 
     adf_os_atomic_init(&hif_state->hif_thread_idle);
     adf_os_atomic_inc(&hif_state->hif_thread_idle);
@@ -2234,6 +2253,7 @@ HIF_PCIDeviceProbed(hif_handle_t hif_hdl)
 		  goto done;
 	     }
 	     if (CHIP_ID_VERSION_GET(chip_id) == 0xD) {
+             scn->target_revision = CHIP_ID_REVISION_GET(chip_id);
              switch(CHIP_ID_REVISION_GET(chip_id)) {
              case 0x2: /* ROME 1.3 */
                  /* 2 banks are switched to IRAM */
@@ -2366,10 +2386,8 @@ HIFTargetSleepStateAdjust(A_target_id_t targid,
     struct hif_pci_softc *sc = hif_state->sc;
 
 
-#ifdef TARGET_RECOVERY_AFTER_LINK_DOWN
     if (sc->recovery)
         return -EACCES;
-#endif
 
     if (sleep_ok) {
         adf_os_spin_lock_irqsave(&hif_state->keep_awake_lock);
@@ -2448,14 +2466,11 @@ HIFTargetSleepStateAdjust(A_target_id_t targid,
                            A_PCI_READ32(pci_addr + PCIE_LOCAL_BASE_ADDRESS
                                         + RTC_STATE_ADDRESS));
 
-#ifdef TARGET_RECOVERY_AFTER_LINK_DOWN
                     printk("%s:error, can't wakeup target\n", __func__);
                     sc->recovery = true;
+                    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
                     schedule_work(&recovery_work);
                     return -EACCES;
-#else
-                    VOS_BUG(0);
-#endif
                 }
 
                 OS_DELAY(curr_delay);
@@ -2628,4 +2643,11 @@ void *hif_get_targetdef(HIF_DEVICE *hif_device)
 	struct hif_pci_softc *sc = hif_state->sc;
 
 	return sc->targetdef;
+}
+
+void HIFsuspendwow(HIF_DEVICE *hif_device)
+{
+       struct HIF_CE_state *hif_state = (struct HIF_CE_state *)hif_device;
+       struct hif_pci_softc *sc = hif_state->sc;
+       adf_os_atomic_set(&sc->wow_done, 1);
 }

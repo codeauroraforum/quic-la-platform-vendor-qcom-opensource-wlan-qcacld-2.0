@@ -257,6 +257,7 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
 #endif
     vos_mem_copy(  pChnlParams->bssId, pSessionEntry->bssId, sizeof(tSirMacAddr) );
     pChnlParams->peSessionId = peSessionId;
+    pChnlParams->vhtCapable = pSessionEntry->vhtCapability;
 
     /*Set DFS flag for DFS channel*/
     if (vos_nv_getChannelEnabledState(chnlNumber) == NV_CHANNEL_DFS)
@@ -280,12 +281,14 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
         pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber, pChnlParams->localPowerConstraint);)
 #endif
     MTRACE(macTraceMsgTx(pMac, peSessionId, msgQ.type));
+    limLog(pMac,LOG1,"SessionId:%d WDA_CHNL_SWITCH_REQ for SSID:%s",peSessionId,
+           pSessionEntry->ssId.ssId);
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
         vos_mem_free(pChnlParams);
-        limLog( pMac, LOGP,
-                    FL("Posting  WDA_CHNL_SWITCH_REQ to WDA failed, reason=%X"),
-                    retCode );
+        limLog(pMac, LOGP,
+               FL("Posting  WDA_CHNL_SWITCH_REQ to WDA failed, reason=%X"),
+               retCode );
     }
 returnFailure:
     return retCode;
