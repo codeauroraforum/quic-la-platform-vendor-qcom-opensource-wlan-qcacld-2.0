@@ -1013,6 +1013,9 @@ typedef struct sMacOpenParameters
     /* max offload peer */
     tANI_U8 apMaxOffloadPeers;
 
+    /* dfs radar pri multiplier */
+    tANI_S32 dfsRadarPriMultiplier;
+
 } tMacOpenParameters;
 
 typedef struct sHalMacStartParameters
