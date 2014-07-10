@@ -276,7 +276,7 @@ static inline uint8_t wma_parse_mpdudensity(u_int8_t mpdudensity)
 }
 
 /* Function   : wma_find_vdev_by_id
- * Descriptin : Returns vdev handle for given vdev id.
+ * Description : Returns vdev handle for given vdev id.
  * Args       : @wma - wma handle, @vdev_id - vdev ID
  * Returns    : Returns vdev handle if given vdev id is valid.
  *              Otherwise returns NULL.
@@ -306,7 +306,7 @@ static inline u_int8_t wma_get_vdev_count(tp_wma_handle wma)
 }
 
 /* Function   : wma_is_vdev_in_ap_mode
- * Descriptin : Helper function to know whether given vdev id
+ * Description : Helper function to know whether given vdev id
  *              is in AP mode or not.
  * Args       : @wma - wma handle, @ vdev_id - vdev ID.
  * Returns    : True -  if given vdev id is in AP mode.
@@ -332,7 +332,7 @@ static bool wma_is_vdev_in_ap_mode(tp_wma_handle wma, u_int8_t vdev_id)
 
 #ifdef QCA_IBSS_SUPPORT
 /* Function   : wma_is_vdev_in_ibss_mode
- s_vdev_in_ibss_mode* Descriptin : Helper function to know whether given vdev id
+ s_vdev_in_ibss_mode* Description : Helper function to know whether given vdev id
  *              is in IBSS mode or not.
  * Args       : @wma - wma handle, @ vdev_id - vdev ID.
  * Retruns    : True -  if given vdev id is in IBSS mode.
@@ -400,7 +400,7 @@ static void *wma_find_vdev_by_bssid(tp_wma_handle wma, u_int8_t *bssid,
 /* ############# function definitions ############ */
 
 /* function   : wma_swap_bytes
- * Descriptin :
+ * Description :
  * Args       :
  * Retruns    :
  */
@@ -465,6 +465,119 @@ tSmpsModeValue host_map_smps_mode (A_UINT32 fw_smps_mode)
 
 	return smps_mode;
 }
+
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+/* function   : wma_post_auto_shutdown_msg
+ * Description : function to post auto shutdown event to sme
+ */
+static int wma_post_auto_shutdown_msg(void)
+{
+	tSirAutoShutdownEvtParams *auto_sh_evt;
+	VOS_STATUS vos_status;
+	vos_msg_t sme_msg = {0} ;
+
+	auto_sh_evt = (tSirAutoShutdownEvtParams *)
+			vos_mem_malloc(sizeof(tSirAutoShutdownEvtParams));
+	if (!auto_sh_evt) {
+		WMA_LOGE("%s: No Mem", __func__);
+		return -ENOMEM;
+	}
+
+	auto_sh_evt->shutdown_reason =
+				WMI_HOST_AUTO_SHUTDOWN_REASON_TIMER_EXPIRY;
+	sme_msg.type = eWNI_SME_AUTO_SHUTDOWN_IND;
+	sme_msg.bodyptr = auto_sh_evt;
+	sme_msg.bodyval = 0;
+
+	vos_status = vos_mq_post_message(VOS_MODULE_ID_SME, &sme_msg);
+	if ( !VOS_IS_STATUS_SUCCESS(vos_status) ) {
+		WMA_LOGE("Fail to post eWNI_SME_AUTO_SHUTDOWN_IND msg to SME");
+		vos_mem_free(auto_sh_evt);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/* function   : wma_auto_shutdown_event_handler
+ * Description : function to process auto shutdown timer trigger
+ */
+static int wma_auto_shutdown_event_handler(void *handle, u_int8_t *event,
+					u_int32_t len)
+{
+	wmi_host_auto_shutdown_event_fixed_param *wmi_auto_sh_evt;
+        WMI_HOST_AUTO_SHUTDOWN_EVENTID_param_tlvs *param_buf =
+		(WMI_HOST_AUTO_SHUTDOWN_EVENTID_param_tlvs *)
+		event;
+
+	if (!param_buf) {
+		WMA_LOGE("%s:%d: Invalid Auto shutdown timer evt", __func__,
+								__LINE__);
+		return -EINVAL;
+	}
+
+
+	wmi_auto_sh_evt = param_buf->fixed_param;
+	if (!wmi_auto_sh_evt && wmi_auto_sh_evt->shutdown_reason
+			!= WMI_HOST_AUTO_SHUTDOWN_REASON_TIMER_EXPIRY) {
+		WMA_LOGE("%s:%d: Invalid Auto shutdown timer evt", __func__,
+								 __LINE__);
+		return -EINVAL;
+	}
+
+	WMA_LOGD("%s:%d: Auto Shutdown Evt: %d", __func__, __LINE__,
+					 wmi_auto_sh_evt->shutdown_reason);
+	return(wma_post_auto_shutdown_msg());
+}
+
+/* function   : wma_set_auto_shutdown_timer_req
+ * Description : function sets auto shutdown timer in firmware
+ * Args       : wma handle, auto shutdown timer value
+ * Returns    : status of wmi cmd
+ */
+static VOS_STATUS wma_set_auto_shutdown_timer_req(tp_wma_handle wma_handle,
+			tSirAutoShutdownCmdParams *auto_sh_cmd)
+{
+	int status = 0;
+	wmi_buf_t buf = NULL;
+	u_int8_t *buf_ptr;
+	wmi_host_auto_shutdown_cfg_cmd_fixed_param *wmi_auto_sh_cmd;
+	int len = sizeof(wmi_host_auto_shutdown_cfg_cmd_fixed_param);
+
+	if (auto_sh_cmd == NULL) {
+		WMA_LOGE("%s : Invalid Autoshutdown cfg cmd", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	WMA_LOGD("%s: Set WMI_HOST_AUTO_SHUTDOWN_CFG_CMDID:TIMER_VAL=%d",
+					__func__, auto_sh_cmd->timer_val);
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGE("%s : wmi_buf_alloc failed", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (u_int8_t *) wmi_buf_data(buf);
+	wmi_auto_sh_cmd = (wmi_host_auto_shutdown_cfg_cmd_fixed_param *)buf_ptr;
+	wmi_auto_sh_cmd->timer_value = auto_sh_cmd->timer_val;
+
+	WMITLV_SET_HDR(&wmi_auto_sh_cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_host_auto_shutdown_cfg_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN(wmi_host_auto_shutdown_cfg_cmd_fixed_param));
+
+	status = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
+		len, WMI_HOST_AUTO_SHUTDOWN_CFG_CMDID);
+	if (status != EOK) {
+		WMA_LOGE("%s: WMI_HOST_AUTO_SHUTDOWN_CFG_CMDID Err %d",
+							__func__, status);
+		wmi_buf_free(buf);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	return VOS_STATUS_SUCCESS;
+}
+#endif
 
 static void wma_vdev_start_rsp(tp_wma_handle wma,
 			tpAddBssParams add_bss,
@@ -657,7 +770,7 @@ static int wma_vdev_start_rsp_ind(tp_wma_handle wma, u_int8_t *buf)
 }
 
 /* function   : wma_unified_debug_print_event_handler
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -3366,7 +3479,7 @@ err_wma_handle:
 }
 
 /* function   : wma_pre_start
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -3425,7 +3538,7 @@ end:
 }
 
 /* function   : wma_send_msg
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -3449,7 +3562,7 @@ static void wma_send_msg(tp_wma_handle wma_handle, u_int16_t msg_type,
 }
 
 /* function   : wma_get_txrx_vdev_type
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -3478,7 +3591,7 @@ enum wlan_op_mode wma_get_txrx_vdev_type(u_int32_t type)
 }
 
 /* function   : wma_unified_vdev_create_send
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -3518,7 +3631,7 @@ int wma_unified_vdev_create_send(wmi_unified_t wmi_handle, u_int8_t if_id,
 }
 
 /* function   : wma_unified_vdev_delete_send
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -3591,7 +3704,7 @@ void wma_vdev_detach_callback(void *ctx)
 }
 
 /* function   : wma_vdev_detach
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -4165,7 +4278,7 @@ static VOS_STATUS wma_set_mcc_channel_time_quota
 }
 
 /* function   : wma_vdev_attach
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -4431,7 +4544,7 @@ fail:
 }
 
 /* function   : wma_set_scan_info
- * Descriptin : function to save current ongoing scan info
+ * Description : function to save current ongoing scan info
  * Args       : wma handle, scan id, scan requestor id, vdev id
  * Returns    : None
  */
@@ -4448,7 +4561,7 @@ static inline void wma_set_scan_info(tp_wma_handle wma_handle,
 }
 
 /* function   : wma_reset_scan_info
- * Descriptin : function to reset the current ongoing scan info
+ * Description : function to reset the current ongoing scan info
  * Args       : wma handle, vdev_id
  * Returns    : None
  */
@@ -4535,7 +4648,7 @@ v_BOOL_t wma_is_STA_active(tp_wma_handle wma_handle)
 
 
 /* function   : wma_get_buf_start_scan_cmd
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -4772,7 +4885,7 @@ error:
 }
 
 /* function   : wma_get_buf_stop_scan_cmd
- * Descriptin : function to fill the args for wmi_stop_scan_cmd
+ * Description : function to fill the args for wmi_stop_scan_cmd
  * Args       : wma handle, wmi command buffer, buffer length, vdev_id
  * Returns    : failure or success
  */
@@ -4866,7 +4979,7 @@ VOS_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq,
 }
 
 /* function   : wma_start_scan
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -4983,7 +5096,7 @@ error1:
 }
 
 /* function   : wma_stop_scan
- * Descriptin : function to send the stop scan command
+ * Description : function to send the stop scan command
  * Args       : wma_handle
  * Returns    : failure or success
  */
@@ -5029,7 +5142,7 @@ error1:
 }
 
 /* function   : wma_update_channel_list
- * Descriptin : Function is used to update the support channel list
+ * Description : Function is used to update the support channel list
  * Args       : wma_handle, list of supported channels and power
  * Returns    : SUCCESS or FAILURE
  */
@@ -5118,7 +5231,7 @@ end:
 }
 
 /* function   : wma_roam_scan_offload_mode
- * Descriptin : send WMI_ROAM_SCAN_MODE TLV to firmware. It has a piggyback
+ * Description : send WMI_ROAM_SCAN_MODE TLV to firmware. It has a piggyback
  *            : of WMI_ROAM_SCAN_MODE.
  * Args       : scan_cmd_fp contains the scan parameters.
  *            : mode controls rssi based and periodic scans by roam engine.
@@ -5176,7 +5289,7 @@ error:
 }
 
 /* function   : wma_roam_scan_offload_rssi_threshold
- * Descriptin : Send WMI_ROAM_SCAN_RSSI_THRESHOLD TLV to firmware
+ * Description : Send WMI_ROAM_SCAN_RSSI_THRESHOLD TLV to firmware
  * Args       :
  * Returns    :
  */
@@ -5228,7 +5341,7 @@ error:
 }
 
 /* function   : wma_roam_scan_offload_scan_period
- * Descriptin : Send WMI_ROAM_SCAN_PERIOD TLV to firmware
+ * Description : Send WMI_ROAM_SCAN_PERIOD TLV to firmware
  * Args       :
  * Returns    :
  */
@@ -5279,7 +5392,7 @@ error:
     return vos_status;
 }
 /* function   : wma_roam_scan_offload_rssi_change
- * Descriptin : Send WMI_ROAM_SCAN_RSSI_CHANGE_THRESHOLD TLV to firmware
+ * Description : Send WMI_ROAM_SCAN_RSSI_CHANGE_THRESHOLD TLV to firmware
  * Args       :
  * Returns    :
  */
@@ -5331,7 +5444,7 @@ error:
 }
 
 /* function   : wma_roam_scan_offload_chan_list
- * Descriptin : Send WMI_ROAM_CHAN_LIST TLV to firmware
+ * Description : Send WMI_ROAM_CHAN_LIST TLV to firmware
  * Args       :
  * Returns    :
  */
@@ -5405,7 +5518,7 @@ error:
 }
 
 /* function   : eCsrAuthType_to_rsn_authmode
- * Descriptin : Map CSR's authentication type into RSN auth mode used by firmware
+ * Description : Map CSR's authentication type into RSN auth mode used by firmware
  * Args       :
  * Returns    :
  */
@@ -5462,7 +5575,7 @@ A_UINT32 eCsrAuthType_to_rsn_authmode (eCsrAuthType authtype, eCsrEncryptionType
 }
 
 /* function   : eCsrEncryptionType_to_rsn_cipherset
- * Descriptin : Map CSR's encryption type into RSN cipher types used by firmware
+ * Description : Map CSR's encryption type into RSN cipher types used by firmware
  * Args       :
  * Returns    :
  */
@@ -5492,7 +5605,7 @@ A_UINT32 eCsrEncryptionType_to_rsn_cipherset (eCsrEncryptionType encr) {
 }
 
 /* function   : wma_roam_scan_fill_ap_profile
- * Descriptin : Fill ap_profile structure from configured parameters
+ * Description : Fill ap_profile structure from configured parameters
  * Args       :
  * Returns    :
  */
@@ -5525,7 +5638,7 @@ v_VOID_t wma_roam_scan_fill_ap_profile(tp_wma_handle wma_handle, tpAniSirGlobal 
 }
 
 /* function   : wma_roam_scan_scan_params
- * Descriptin : Fill scan_params structure from configured parameters
+ * Description : Fill scan_params structure from configured parameters
  * Args       : roam_req pointer = NULL if this routine is called before connect
  *            : It will be non-NULL if called after assoc.
  * Returns    :
@@ -5671,7 +5784,7 @@ v_VOID_t wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
 }
 
 /* function   : wma_roam_scan_offload_ap_profile
- * Descriptin : Send WMI_ROAM_AP_PROFILE TLV to firmware
+ * Description : Send WMI_ROAM_AP_PROFILE TLV to firmware
  * Args       : AP profile parameters are passed in as the structure used in TLV
  * Returns    :
  */
@@ -5754,7 +5867,7 @@ VOS_STATUS wma_roam_scan_bmiss_cnt(tp_wma_handle wma_handle,
 }
 
 /* function   : wma_roam_scan_offload_init_connect
- * Descriptin : Rome firmware requires that roam scan engine is configured prior to
+ * Description : Rome firmware requires that roam scan engine is configured prior to
  *            : sending VDEV_UP command to firmware. This routine configures it
  *            : to default values with only periodic scan mode. Rssi triggerred scan
  *            : is not enabled, preventing unnecessary off-channel scans while EAPOL
@@ -5798,7 +5911,7 @@ VOS_STATUS wma_roam_scan_offload_init_connect(tp_wma_handle wma_handle)
 }
 
 /* function   : wma_roam_scan_offload_end_connect
- * Descriptin : Stop the roam scan by setting scan mode to 0.
+ * Description : Stop the roam scan by setting scan mode to 0.
  * Args       :
  * Returns    :
  */
@@ -5826,7 +5939,7 @@ VOS_STATUS wma_roam_scan_offload_end_connect(tp_wma_handle wma_handle)
 }
 
 /* function   : wma_process_roam_scan_req
- * Descriptin : Main routine to handle ROAM commands coming from CSR module.
+ * Description : Main routine to handle ROAM commands coming from CSR module.
  * Args       :
  * Returns    :
  */
@@ -6038,7 +6151,7 @@ VOS_STATUS wma_process_roam_scan_req(tp_wma_handle wma_handle,
 
 #ifdef FEATURE_WLAN_LPHB
 /* function   : wma_lphb_conf_hbenable
- * Descriptin : handles the enable command of LPHB configuration requests
+ * Description : handles the enable command of LPHB configuration requests
  * Args       :
  * Returns    :
  */
@@ -6100,7 +6213,7 @@ error:
 }
 
 /* function   : wma_lphb_conf_tcp_params
- * Descriptin : handles the tcp params command of LPHB configuration requests
+ * Description : handles the tcp params command of LPHB configuration requests
  * Args       :
  * Returns    :
  */
@@ -6177,7 +6290,7 @@ error:
 }
 
 /* function   : wma_lphb_conf_tcp_pkt_filter
- * Descriptin : handles the tcp packet filter command of LPHB configuration requests
+ * Description : handles the tcp packet filter command of LPHB configuration requests
  * Args       :
  * Returns    :
  */
@@ -6248,7 +6361,7 @@ error:
 }
 
 /* function   : wma_lphb_conf_udp_params
- * Descriptin : handles the udp params command of LPHB configuration requests
+ * Description : handles the udp params command of LPHB configuration requests
  * Args       :
  * Returns    :
  */
@@ -6323,7 +6436,7 @@ error:
 }
 
 /* function   : wma_lphb_conf_udp_pkt_filter
- * Descriptin : handles the udp packet filter command of LPHB configuration requests
+ * Description : handles the udp packet filter command of LPHB configuration requests
  * Args       :
  * Returns    :
  */
@@ -6394,7 +6507,7 @@ error:
 }
 
 /* function   : wma_process_lphb_conf_req
- * Descriptin : handles LPHB configuration requests
+ * Description : handles LPHB configuration requests
  * Args       :
  * Returns    :
  */
@@ -13031,6 +13144,10 @@ static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "ASSOC_REQ_RECV";
 	case WOW_REASON_HTT_EVENT:
 		return "WOW_REASON_HTT_EVENT";
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+	case  WOW_REASON_HOST_AUTO_SHUTDOWN:
+		return "WOW_REASON_HOST_AUTO_SHUTDOWN";
+#endif
 	}
 	return "unknown";
 }
@@ -13150,7 +13267,14 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 			 wake_info->vdev_id);
 		wma_beacon_miss_handler(wma, wake_info->vdev_id);
 		break;
-
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+	case WOW_REASON_HOST_AUTO_SHUTDOWN:
+		wake_lock_duration = WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION;
+		WMA_LOGA("Received WOW Auto Shutdown trigger in suspend");
+		if (wma_post_auto_shutdown_msg())
+			return -EINVAL;
+		break;
+#endif
 #ifdef FEATURE_WLAN_SCAN_PNO
 	case WOW_REASON_NLOD:
 		wake_lock_duration = WMA_PNO_WAKE_LOCK_TIMEOUT;
@@ -13983,6 +14107,15 @@ static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
 		goto end;
 	} else
 		WMA_LOGD("Successfully Configured WOW_HTT_EVENT to FW");
+
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+	ret = wma_add_wow_wakeup_event(wma, WOW_HOST_AUTO_SHUTDOWN_EVENT, TRUE);
+	if (ret != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to Configure auto shutdown WOW event to FW");
+		goto end;
+	} else
+		WMA_LOGE("Configure auto shutdown WOW event to FW: success");
+#endif
 
 	/* WOW is enabled in pcie suspend callback */
 	wma->wow.wow_enable = TRUE;
@@ -15999,7 +16132,7 @@ static void wma_process_update_userpos(tp_wma_handle wma_handle,
 #ifdef FEATURE_WLAN_BATCH_SCAN
 
 /* function   : wma_batch_scan_enable
- * Descriptin : This function handles WDA_SET_BATCH_SCAN_REQ from UMAC
+ * Description : This function handles WDA_SET_BATCH_SCAN_REQ from UMAC
                 and sends WMI_BATCH_SCAN_ENABLE_CMDID to target
  * Args       :
                 handle  : Pointer to WMA handle
@@ -16052,7 +16185,7 @@ VOS_STATUS wma_batch_scan_enable
 }
 
 /* function   : wma_batch_scan_disable
- * Descriptin : This function handles WDA_STOP_BATCH_SCAN_REQ from UMAC
+ * Description : This function handles WDA_STOP_BATCH_SCAN_REQ from UMAC
                 and sends WMI_BATCH_SCAN_DISABLE_CMDID to target
  * Args       :
                 handle  : Pointer to WMA handle
@@ -16098,7 +16231,7 @@ VOS_STATUS wma_batch_scan_disable
 }
 
 /* function   : wma_batch_scan_trigger_result
- * Descriptin : This function handles WDA_TRIGGER_BATCH_SCAN_RESULT_IND from
+ * Description : This function handles WDA_TRIGGER_BATCH_SCAN_RESULT_IND from
                 UMAC and sends WMI_BATCH_SCAN_TRIGGER_RESULT_CMDID to target
  * Args       :
                 handle  : Pointer to WMA handle
@@ -16145,7 +16278,7 @@ VOS_STATUS wma_batch_scan_trigger_result
 #endif
 
 /* function   : wma_process_init_thermal_info
- * Descriptin : This function initializes the thermal management table in WMA,
+ * Description : This function initializes the thermal management table in WMA,
                 sends down the initial temperature thresholds to the firmware and
                 configures the throttle period in the tx rx module
  * Args       :
@@ -16234,7 +16367,7 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 
 
 /* function   : wma_process_set_thermal_level
- * Descriptin : This function set the new thermal throttle level in the
+ * Description : This function set the new thermal throttle level in the
                 txrx module and sends down the corresponding temperature
                 thresholds to the firmware
  * Args       :
@@ -16588,7 +16721,7 @@ static void wma_process_set_p2pgo_noa_Req(tp_wma_handle wma,
 }
 
 /* function   : wma_process_set_mimops_req
- * Descriptin : Set the received MiMo PS state to firmware.
+ * Description : Set the received MiMo PS state to firmware.
  * Args       :
                 wma_handle  : Pointer to WMA handle
  *              tSetMIMOPS  : Pointer to MiMo PS struct
@@ -16617,7 +16750,7 @@ static void wma_process_set_mimops_req(tp_wma_handle wma_handle,
 }
 
 /* function   : wma_set_vdev_intrabss_fwd
- * Descriptin : Set intra_fwd value to wni_in.
+ * Description : Set intra_fwd value to wni_in.
  * Args       :
  *             wma_handle  : Pointer to WMA handle
  *             pdis_intra_fwd  : Pointer to DisableIntraBssFwd struct
@@ -16732,7 +16865,7 @@ void wma_hidden_ssid_vdev_restart(tp_wma_handle wma_handle,
 
 /*
  * function   : wma_mc_process_msg
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -17102,7 +17235,13 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			vos_mem_free(msg->bodyptr);
 			break;
 #endif
-
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+		case WDA_SET_AUTO_SHUTDOWN_TIMER_REQ:
+			wma_set_auto_shutdown_timer_req(wma_handle,
+							msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+#endif
 		case WDA_DHCP_START_IND:
 		case WDA_DHCP_STOP_IND:
 			wma_process_dhcp_ind(wma_handle,
@@ -17344,7 +17483,7 @@ static void wma_mgmt_tx_ack_work_handler(struct work_struct *ack_work)
 }
 
 /* function   : wma_mgmt_tx_comp_conf_ind
- * Descriptin : Post mgmt tx complete indication to PE.
+ * Description : Post mgmt tx complete indication to PE.
  * Args       :
                 wma_handle  : Pointer to WMA handle
  *              sub_type    : Tx mgmt frame sub type
@@ -17515,7 +17654,7 @@ static VOS_STATUS wma_tx_detach(tp_wma_handle wma_handle)
 }
 
 /* function   : wma_roam_better_ap_handler
- * Descriptin : Handler for WMI_ROAM_REASON_BETTER_AP event from roam firmware in Rome.
+ * Description : Handler for WMI_ROAM_REASON_BETTER_AP event from roam firmware in Rome.
  *            : This event means roam algorithm in Rome has found a better matching
  *            : candidate AP. The indication is sent through tl_shim as by repeating
  *            : the last beacon. Hence this routine calls a tlshim routine.
@@ -17529,7 +17668,7 @@ static void wma_roam_better_ap_handler(tp_wma_handle wma, u_int32_t vdev_id)
 }
 
 /* function   : wma_roam_event_callback
- * Descriptin : Handler for all events from roam engine in firmware
+ * Description : Handler for all events from roam engine in firmware
  * Args       :
  * Returns    :
  */
@@ -17742,7 +17881,7 @@ static int wma_mcc_vdev_tx_pause_evt_handler(void *handle, u_int8_t *event,
 #endif /* QCA_SUPPORT_TXRX_VDEV_PAUSE_LL */
 
 /* function   : wma_set_thermal_mgmt
- * Descriptin : This function sends the thermal management command to the firmware
+ * Description : This function sends the thermal management command to the firmware
  * Args       :
                 wma_handle     : Pointer to WMA handle
  *              thermal_info   : Thermal command information
@@ -17790,7 +17929,7 @@ static VOS_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
 }
 
 /* function   : wma_thermal_mgmt_get_level
- * Descriptin : This function returns the thermal(throttle) level given the temperature
+ * Description : This function returns the thermal(throttle) level given the temperature
  * Args       :
                 handle     : Pointer to WMA handle
  *              temp       : temperature
@@ -17824,7 +17963,7 @@ u_int8_t wma_thermal_mgmt_get_level(void *handle, u_int32_t temp)
 }
 
 /* function   : wma_thermal_mgmt_evt_handler
- * Descriptin : This function handles the thermal mgmt event from the firmware
+ * Description : This function handles the thermal mgmt event from the firmware
  * Args       :
                 wma_handle     : Pointer to WMA handle
  *              event          : Thermal event information
@@ -17906,7 +18045,7 @@ static int wma_thermal_mgmt_evt_handler(void *handle, u_int8_t *event,
 #ifdef FEATURE_WLAN_BATCH_SCAN
 
 /* function   : wma_batch_scan_result_event_handler
- * Descriptin : Batch scan result event handler from target. This function
+ * Description : Batch scan result event handler from target. This function
  *              converts target batch scan response into HDD readable format
  *              and calls HDD supplied callback
  * Args       :
@@ -18091,7 +18230,7 @@ done:
 }
 
 /* function   : wma_batch_scan_enable_event_handler
- * Descriptin : Batch scan enable event handler from target. This function
+ * Description : Batch scan enable event handler from target. This function
  *              gets minimum no of supported batch scan info from target
  *              and calls HDD supplied callback
  * Args       :
@@ -18217,7 +18356,7 @@ static int wma_channel_avoid_evt_handler(void *handle, u_int8_t *event,
 }
 
 /* function   : wma_process_ch_avoid_update_req
- * Descriptin : handles channel avoid update request
+ * Description : handles channel avoid update request
  * Args       :
  * Returns    :
  */
@@ -18270,7 +18409,7 @@ VOS_STATUS wma_process_ch_avoid_update_req(tp_wma_handle wma_handle,
 #endif /* FEATURE_WLAN_CH_AVOID */
 
 /* function   :  wma_scan_completion_timeout
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -18314,7 +18453,7 @@ void wma_scan_completion_timeout(void *data)
 }
 
 /* function   : wma_start
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -18460,6 +18599,16 @@ VOS_STATUS wma_start(v_VOID_t *vos_ctx)
 		goto end;
 	}
 #endif /* FEATURE_WLAN_CH_AVOID */
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+	WMA_LOGD("Registering auto shutdown handler");
+	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
+	   WMI_HOST_AUTO_SHUTDOWN_EVENTID, wma_auto_shutdown_event_handler);
+	if (status) {
+		WMA_LOGE("Failed to register WMI Auto shutdown event handler");
+		vos_status = VOS_STATUS_E_FAILURE;
+		goto end;
+	}
+#endif
 
 	status = wmi_unified_register_event_handler(
 	   wma_handle->wmi_handle,
@@ -18505,7 +18654,7 @@ end:
 }
 
 /* function   : wma_stop
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -18632,7 +18781,7 @@ static void wma_dfs_detach(struct ieee80211com *dfs_ic)
 }
 
 /* function   : wma_close
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -19280,7 +19429,7 @@ v_VOID_t wma_rx_service_ready_event(WMA_HANDLE handle, void *cmd_param_info)
 }
 
 /* function   : wma_rx_ready_event
- * Descriptin :
+ * Description :
  * Args       :
  * Retruns    :
  */
@@ -19880,7 +20029,7 @@ error:
 }
 
 /* function   :wma_setneedshutdown
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
@@ -19903,7 +20052,7 @@ v_VOID_t wma_setneedshutdown(v_VOID_t *vos_ctx)
 }
 
 /* function   : wma_rx_ready_event
- * Descriptin :
+ * Description :
  * Args       :
  * Returns    :
  */
