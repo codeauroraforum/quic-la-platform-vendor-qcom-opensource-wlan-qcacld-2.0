@@ -1431,7 +1431,6 @@ V    RW    NP RESTART
 NONE
 0    1    1
 
-
 *
 * Wait for CNF Timeout. CNF include (RE)ASSOC, DISASSOC, AUTH, DEAUTH,
 * DUMMY packet
@@ -4652,3 +4651,15 @@ NONE
 V    RW    NP
 NONE
 0    1    1
+
+*
+* DFS Master capability (11h) enable/disable
+*
+
+WNI_CFG_DFS_MASTER_ENABLED    I    4    7
+V    RW    NP
+NONE
+0    1    0
+V    RW    NP
+NONE
+0    1    0
