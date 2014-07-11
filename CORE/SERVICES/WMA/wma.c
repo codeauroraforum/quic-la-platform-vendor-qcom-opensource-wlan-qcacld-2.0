@@ -17386,6 +17386,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			break;
 		case WDA_VDEV_STOP_IND:
 			wma_vdev_stop_ind(wma_handle, msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_WLAN_RESUME_REQ:
 			wma_resume_req(wma_handle);
