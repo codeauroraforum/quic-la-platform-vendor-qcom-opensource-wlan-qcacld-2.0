@@ -20732,6 +20732,9 @@ static int wma_update_tdls_peer_state(WMA_HANDLE handle,
 		goto end_tdls_peer_state;
 	}
 
+	/* Number of channels will be zero for now */
+	len += WMI_TLV_HDR_SIZE + sizeof(wmi_channel) * 0;
+
 	wmi_buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
 	if (!wmi_buf) {
 		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
@@ -20780,13 +20783,18 @@ static int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	peer_cap->peer_curr_operclass = 0;
 	peer_cap->self_curr_operclass = 0;
 	peer_cap->peer_chan_len = 0;
-	for (i = 0; i < WMI_TDLS_MAX_SUPP_CHANNELS; i++) {
-		peer_cap->peer_chan[i] = 0;
-	}
 	peer_cap->peer_operclass_len = 0;
 	for (i = 0; i < WMI_TDLS_MAX_SUPP_OPER_CLASSES; i++) {
 		peer_cap->peer_operclass[i] = 0;
 	}
+
+	/* next fill variable size array of peer chan info */
+	buf_ptr += sizeof(wmi_tdls_peer_capabilities);
+	WMITLV_SET_HDR(buf_ptr,
+	       WMITLV_TAG_ARRAY_STRUC,
+	       sizeof(wmi_channel) * peer_cap->peer_chan_len);
+
+	/* placeholder to bring in changes related to channnel info */
 
 	if (wmi_unified_cmd_send(wma_handle->wmi_handle, wmi_buf, len,
 	    WMI_TDLS_PEER_UPDATE_CMDID)) {
