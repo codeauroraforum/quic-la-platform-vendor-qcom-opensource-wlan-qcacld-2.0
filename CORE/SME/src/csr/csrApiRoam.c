@@ -6961,6 +6961,13 @@ eHalStatus csrRoamProcessDisassocDeauth( tpAniSirGlobal pMac, tSmeCmd *pCommand,
     eCsrRoamSubState NewSubstate;
     tANI_U32 sessionId = pCommand->sessionId;
 
+    if( CSR_IS_WAIT_FOR_KEY( pMac, sessionId ) )
+    {
+        smsLog(pMac, LOG1, FL(" Stop Wait for key timer and change substate to"
+                              " eCSR_ROAM_SUBSTATE_NONE"));
+        csrRoamStopWaitForKeyTimer( pMac );
+        csrRoamSubstateChange( pMac, eCSR_ROAM_SUBSTATE_NONE, sessionId);
+    }
     // change state to 'Roaming'...
     csrRoamStateChange( pMac, eCSR_ROAMING_STATE_JOINING, sessionId );
 
@@ -9010,6 +9017,13 @@ eHalStatus csrRoamPrepareFilterFromProfile(tpAniSirGlobal pMac, tCsrRoamProfile 
             pScanFilter->MDID.mdiePresent = 1;
             pScanFilter->MDID.mobilityDomain = pProfile->MDID.mobilityDomain;
         }
+#endif
+
+#ifdef WLAN_FEATURE_11W
+        // Management Frame Protection
+        pScanFilter->MFPEnabled = pProfile->MFPEnabled;
+        pScanFilter->MFPRequired = pProfile->MFPRequired;
+        pScanFilter->MFPCapable = pProfile->MFPCapable;
 #endif
 
     }while(0);

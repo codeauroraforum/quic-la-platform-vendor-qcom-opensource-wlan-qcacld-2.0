@@ -173,6 +173,8 @@ typedef enum {
     WMI_GRP_NAN,
     WMI_GRP_COEX,
     WMI_GRP_OBSS_OFL,
+    WMI_GRP_LPI,
+    WMI_GRP_EXTSCAN,
 } WMI_GRP_ID;
 
 #define WMI_CMD_GRP_START_ID(grp_id) (((grp_id) << 12) | 0x1)
@@ -234,6 +236,8 @@ typedef enum {
 
     /* eeprom content dump , the same to bdboard data */
     WMI_PDEV_DUMP_CMDID,
+     /* set LED configuration  */
+    WMI_PDEV_SET_LED_CONFIG_CMDID,
 
     /* VDEV(virtual device) specific commands */
     /** vdev create */
@@ -430,6 +434,14 @@ typedef enum {
     WMI_WOW_ENABLE_CMDID,
     /** host woke up from sleep event to FW. Generated in response to WOW Hardware event */
     WMI_WOW_HOSTWAKEUP_FROM_SLEEP_CMDID,
+    /* Acer IOAC add keep alive cmd. */
+    WMI_WOW_ACER_IOAC_ADD_KEEPALIVE_CMDID,
+    /* Acer IOAC del keep alive cmd. */
+    WMI_WOW_ACER_IOAC_DEL_KEEPALIVE_CMDID,
+    /* Acer IOAC add pattern for awake */
+    WMI_WOW_ACER_IOAC_ADD_WAKE_PATTERN_CMDID,
+    /* Acer IOAC deleta a wake pattern */
+    WMI_WOW_ACER_IOAC_DEL_WAKE_PATTERN_CMDID,
 
     /* RTT measurement related cmd */
     /** reques to make an RTT measurement */
@@ -450,6 +462,14 @@ typedef enum {
     WMI_MCC_SCHED_TRAFFIC_STATS_CMDID,
     /** one time request for txrx stats */
     WMI_REQUEST_STATS_EXT_CMDID,
+
+    /* Link Layer stats */
+    /** Request for link layer stats */
+    WMI_REQUEST_LINK_STATS_CMDID,
+    /** Request for setting params to link layer stats */
+    WMI_START_LINK_STATS_CMDID,
+    /** Request to clear stats*/
+    WMI_CLEAR_LINK_STATS_CMDID,
 
     /** ARP OFFLOAD REQUEST*/
     WMI_SET_ARP_NS_OFFLOAD_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_ARP_NS_OFL),
@@ -526,6 +546,8 @@ typedef enum {
     WMI_SET_MCASTBCAST_FILTER_CMDID,
     /** set thermal management params **/
     WMI_THERMAL_MGMT_CMDID,
+    /** set host auto shutdown params **/
+    WMI_HOST_AUTO_SHUTDOWN_CFG_CMDID,
 
     /* GPIO Configuration */
     WMI_GPIO_CONFIG_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_GPIO),
@@ -603,6 +625,8 @@ typedef enum {
 
     /** Modem power state command */
     WMI_MODEM_POWER_STATE_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_COEX),
+    WMI_CHAN_AVOID_UPDATE_CMDID,
+
     /**
      *  OBSS scan offload enable/disable commands
      *  OBSS scan enable CMD will send to FW after VDEV UP, if these conditions are true:
@@ -614,6 +638,24 @@ typedef enum {
      */
     WMI_OBSS_SCAN_ENABLE_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_OBSS_OFL),
     WMI_OBSS_SCAN_DISABLE_CMDID,
+
+    /**LPI commands*/
+    /**LPI mgmt snooping config command*/
+    WMI_LPI_MGMT_SNOOPING_CONFIG_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_LPI),
+    /**LPI scan start command*/
+    WMI_LPI_START_SCAN_CMDID,
+    /**LPI scan stop command*/
+    WMI_LPI_STOP_SCAN_CMDID,
+
+     /** ExtScan commands */
+    WMI_EXTSCAN_START_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_EXTSCAN),
+    WMI_EXTSCAN_STOP_CMDID,
+    WMI_EXTSCAN_CONFIGURE_WLAN_CHANGE_MONITOR_CMDID,
+    WMI_EXTSCAN_CONFIGURE_HOTLIST_MONITOR_CMDID,
+    WMI_EXTSCAN_GET_CACHED_RESULTS_CMDID,
+    WMI_EXTSCAN_GET_WLAN_CHANGE_RESULTS_CMDID,
+    WMI_EXTSCAN_SET_CAPABILITIES_CMDID,
+    WMI_EXTSCAN_GET_CAPABILITIES_CMDID,
 } WMI_CMD_ID;
 
 typedef enum {
@@ -674,6 +716,10 @@ typedef enum {
      * WMI_PEER_GET_ESTIMATED_LINKSPEED_CMDID command.
      */
     WMI_PEER_ESTIMATED_LINKSPEED_EVENTID,
+    /* Return the peer state
+     * WMI_PEER_SET_PARAM_CMDID, WMI_PEER_AUTHORIZE
+     */
+    WMI_PEER_STATE_EVENTID,
 
     /* beacon/mgmt specific events */
     /** RX management frame. the entire frame is carried along with the event.  */
@@ -733,6 +779,12 @@ typedef enum {
     /*STATS specific events*/
     /** txrx stats event requested by host */
     WMI_STATS_EXT_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_STATS),
+    /** FW iface link stats Event  */
+    WMI_IFACE_LINK_STATS_EVENTID,
+    /** FW iface peer link stats Event  */
+    WMI_PEER_LINK_STATS_EVENTID,
+    /** FW Update radio stats Event  */
+    WMI_RADIO_LINK_STATS_EVENTID,
 
     /*NLO specific events*/
     /** NLO match event after the first match */
@@ -792,6 +844,12 @@ typedef enum {
     /* Container for QXDM/DIAG events */
     WMI_DIAG_DATA_CONTAINER_EVENTID,
 
+     /* host auto shutdown event */
+    WMI_HOST_AUTO_SHUTDOWN_EVENTID,
+
+    /*update mib counters together with WMI_UPDATE_STATS_EVENTID*/
+    WMI_UPDATE_WHAL_MIB_STATS_EVENTID,
+
     /* GPIO Event */
     WMI_GPIO_INPUT_EVENTID=WMI_EVT_GRP_START_ID(WMI_GRP_GPIO),
     /** upload H_CV info WMI event
@@ -821,6 +879,18 @@ typedef enum {
 
     /* NAN Event */
     WMI_NAN_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_NAN),
+
+    /* LPI Event */
+    WMI_LPI_RESULT_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_LPI),
+
+     /* ExtScan events */
+    WMI_EXTSCAN_START_STOP_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_EXTSCAN),
+    WMI_EXTSCAN_OPERATION_EVENTID,
+    WMI_EXTSCAN_TABLE_USAGE_EVENTID,
+    WMI_EXTSCAN_CACHED_RESULTS_EVENTID,
+    WMI_EXTSCAN_WLAN_CHANGE_RESULTS_EVENTID,
+    WMI_EXTSCAN_HOTLIST_MATCH_EVENTID,
+    WMI_EXTSCAN_CAPABILITIES_EVENTID,
 } WMI_EVT_ID;
 
 /* defines for OEM message sub-types */
@@ -1382,6 +1452,22 @@ typedef struct {
      * @brief keep_alive_pattern_size - keep alive pattern size.
      */
     A_UINT32 keep_alive_pattern_size;
+
+    /**
+     * @brief max_tdls_concurrent_sleep_sta - Number of tdls sleep sta supported
+     * @details
+     *      Each TDLS STA can become a sleep STA independently. This parameter
+     *      mentions how many such sleep STAs can be supported concurrently.
+     */
+    A_UINT32 max_tdls_concurrent_sleep_sta;
+
+    /**
+     * @brief max_tdls_concurrent_buffer_sta - Number of tdls buffer sta supported
+     * @details
+     *      Each TDLS STA can become a buffer STA independently. This parameter
+     *      mentions how many such buffer STAs can be supported concurrently.
+     */
+    A_UINT32 max_tdls_concurrent_buffer_sta;
 } wmi_resource_config;
 
 
@@ -1551,6 +1637,8 @@ typedef struct {
 /**When set, certain errors are ignored and scan continues.
 * Different FW scan engine may use its own logic to decide what errors to ignore*/
 #define WMI_SCAN_CONTINUE_ON_ERROR 0x80
+/* Enable promiscous mode for CCXv4 */
+#define WMI_SCAN_FILTER_PROMISCOUS 0x100
 /** allow to send probe req on DFS channel */
 #define WMI_SCAN_FLAG_FORCE_ACTIVE_ON_DFS 0x200
 
@@ -1698,6 +1786,25 @@ typedef struct {
     /**id of VDEV that requested the scan */
     A_UINT32 vdev_id;
 } wmi_scan_event_fixed_param;
+
+
+/*
+* If FW has multiple active channels due to MCC(multi channel concurrency),
+* then these stats are combined stats for all the active channels.
+*/
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_update_whal_mib_stats_event_fixed_param */
+    /** ack count, it is an incremental number, not accumulated number */
+    A_UINT32 ackRcvBad;
+    /** bad rts count, it is an incremental number, not accumulated number */
+    A_UINT32 rtsBad;
+    /** good rts, it is an incremental number, not accumulated number */
+    A_UINT32 rtsGood;
+    /** fcs count, it is an incremental number, not accumulated number */
+    A_UINT32 fcsBad;
+    /** beacon count, it is an incremental number, not accumulated number */
+    A_UINT32 noBeacons;
+} wmi_update_whal_mib_stats_event_fixed_param;
 
 /*
  * This defines how much headroom is kept in the
@@ -2198,6 +2305,10 @@ typedef enum {
     WMI_PDEV_PARAM_HYST_EN,
     /** Enable/ Disable POWER COLLAPSE */
     WMI_PDEV_PARAM_POWER_COLLAPSE_ENABLE,
+    /** configure LED system state */
+    WMI_PDEV_PARAM_LED_SYS_STATE,
+   /** Enable/Disable LED */
+    WMI_PDEV_PARAM_LED_ENABLE,
 } WMI_PDEV_PARAM;
 
 typedef enum {
@@ -2249,6 +2360,7 @@ typedef enum {
     PAUSE_TYPE_P2P_GO_PS =      0x5, /** only vdev_map is valid, actually only one vdev id is set at one time */
     PAUSE_TYPE_STA_ADD_BA =     0x6, /** only peer_id and tid_map are valid, actually only one tid is set at one time */
     PAUSE_TYPE_AP_PS =          0x7, /** for pausing AP vdev when all the connected clients are in PS. only vdev_map is valid */
+    PAUSE_TYPE_IBSS_PS =        0x8, /** for pausing IBSS vdev when all the peers are in PS. only vdev_map is valid */
     PAUSE_TYPE_HOST =           0x15,/** host is requesting vdev pause */
 } wmi_tx_pause_type;
 
@@ -2529,6 +2641,324 @@ typedef struct {
     /** peer MAC address */
     wmi_mac_addr peer_macaddr;
 } wmi_request_stats_cmd_fixed_param;
+
+/* stats type bitmap  */
+#define WMI_LINK_STATS_RADIO         0x00000001
+#define WMI_LINK_STATS_IFACE         0x00000002
+#define WMI_LINK_STATS_ALL_PEER      0x00000004
+#define WMI_LINK_STATS_PER_PEER      0x00000008
+
+
+/* wifi clear statistics bitmap  */
+#define WIFI_STATS_RADIO              0x00000001 /** all radio statistics */
+#define WIFI_STATS_RADIO_CCA          0x00000002 /** cca_busy_time (within radio statistics) */
+#define WIFI_STATS_RADIO_CHANNELS     0x00000004 /** all channel statistics (within radio statistics) */
+#define WIFI_STATS_RADIO_SCAN         0x00000008 /** all scan statistics (within radio statistics) */
+#define WIFI_STATS_IFACE              0x00000010 /** all interface statistics */
+#define WIFI_STATS_IFACE_TXRATE       0x00000020 /** all tx rate statistics (within interface statistics) */
+#define WIFI_STATS_IFACE_AC           0x00000040 /** all ac statistics (within interface statistics) */
+#define WIFI_STATS_IFACE_CONTENTION   0x00000080 /** all contention (min, max, avg) statistics (within ac statisctics) */
+#define WMI_STATS_IFACE_ALL_PEER      0x00000100 /** All peer stats on this interface */
+#define WMI_STATS_IFACE_PER_PEER      0x00000200 /** Clear particular peer stats depending on the peer_mac */
+
+/** Default value for stats if the stats collection has not started */
+#define WMI_STATS_VALUE_INVALID       0xffffffff
+
+typedef enum {
+    WMI_ROAMING_IDLE = 0,
+    WMI_ROAMING_ACTIVE = 1,
+} wmi_roam_state;
+
+/* access categories */
+typedef enum {
+   WMI_AC_VO  = 0,
+   WMI_AC_VI  = 1,
+   WMI_AC_BE  = 2,
+   WMI_AC_BK  = 3,
+   WMI_AC_MAX = 4,
+} wmi_traffic_ac;
+
+typedef enum {
+    WMI_STA_STATS = 0,
+    WMI_SOFTAP_STATS = 1,
+    WMI_IBSS_STATS = 2,
+    WMI_P2P_CLIENT_STATS = 3,
+    WMI_P2P_GO_STATS = 4,
+    WMI_NAN_STATS = 5,
+    WMI_MESH_STATS = 6,
+} wmi_link_iface_type;
+
+/* channel operating width */
+typedef enum {
+    WMI_CHAN_WIDTH_20    = 0,
+    WMI_CHAN_WIDTH_40    = 1,
+    WMI_CHAN_WIDTH_80    = 2,
+    WMI_CHAN_WIDTH_160   = 3,
+    WMI_CHAN_WIDTH_80P80 = 4,
+    WMI_CHAN_WIDTH_5     = 5,
+    WMI_CHAN_WIDTH_10    = 6,
+} wmi_channel_width;
+
+/* wifi peer type */
+typedef enum {
+   WMI_PEER_STA,
+   WMI_PEER_AP,
+   WMI_PEER_P2P_GO,
+   WMI_PEER_P2P_CLIENT,
+   WMI_PEER_NAN,
+   WMI_PEER_TDLS,
+   WMI_PEER_INVALID,
+} wmi_peer_type;
+
+/*Clear stats*/
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_clear_link_stats_cmd_fixed_param */
+    /** unique id identifying the VDEV, generated by the caller */
+    A_UINT32 vdev_id;
+    /** stop_stats_collection_req = 1 will imply stop the statistics collection */
+    A_UINT32 stop_stats_collection_req;
+    /** identifies what stats to be cleared */
+    A_UINT32 stats_clear_req_mask;
+    /** identifies which peer stats to be cleared. Valid only while clearing PER_REER */
+    wmi_mac_addr peer_macaddr;
+} wmi_clear_link_stats_cmd_fixed_param;
+
+/* Link Stats configuration params. Trigger the link layer statistics collection*/
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_start_link_stats_cmd_fixed_param */
+    /** threshold to classify the pkts as short or long */
+    A_UINT32 mpdu_size_threshold;
+    /** set for field debug mode. Driver should collect all statistics regardless of performance impact.*/
+    A_UINT32 aggressive_statistics_gathering;
+} wmi_start_link_stats_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_request_link_stats_cmd_fixed_param */
+    /** Type of stats required. This is a bitmask WMI_LINK_STATS_RADIO, WMI_LINK_STATS_IFACE */
+    A_UINT32 stats_type;
+    /** unique id identifying the VDEV, generated by the caller */
+    A_UINT32 vdev_id;
+    /** unique id identifying the request, generated by the caller */
+    A_UINT32 request_id;
+    /** peer MAC address */
+    wmi_mac_addr peer_macaddr;
+} wmi_request_link_stats_cmd_fixed_param;
+
+/* channel statistics */
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_channel_stats */
+    /** Channel width (20, 40, 80, 80+80, 160) enum wmi_channel_width*/
+    A_UINT32 channel_width;
+    /** Primary 20 MHz channel */
+    A_UINT32 center_freq;
+    /** center frequency (MHz) first segment */
+    A_UINT32 center_freq0;
+    /** center frequency (MHz) second segment */
+    A_UINT32 center_freq1;
+    /** msecs the radio is awake (32 bits number accruing over time) */
+    A_UINT32 radio_awake_time;
+    /** msecs the CCA register is busy (32 bits number accruing over time) */
+    A_UINT32 cca_busy_time;
+} wmi_channel_stats;
+
+/* radio statistics */
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_radio_link_stats */
+    /** Wifi radio (if multiple radio supported) */
+    A_UINT32 radio_id;
+    /** msecs the radio is awake (32 bits number accruing over time) */
+    A_UINT32 on_time;
+    /** msecs the radio is transmitting (32 bits number accruing over time) */
+    A_UINT32 tx_time;
+    /** msecs the radio is in active receive (32 bits number accruing over time) */
+    A_UINT32 rx_time;
+    /** msecs the radio is awake due to all scan (32 bits number accruing over time) */
+    A_UINT32 on_time_scan;
+    /** msecs the radio is awake due to NAN (32 bits number accruing over time) */
+    A_UINT32 on_time_nbd;
+    /** msecs the radio is awake due to G?scan (32 bits number accruing over time) */
+    A_UINT32 on_time_gscan;
+    /** msecs the radio is awake due to roam?scan (32 bits number accruing over time) */
+    A_UINT32 on_time_roam_scan;
+    /** msecs the radio is awake due to PNO scan (32 bits number accruing over time) */
+    A_UINT32 on_time_pno_scan;
+    /** msecs the radio is awake due to HS2.0 scans and GAS exchange (32 bits number accruing over time) */
+    A_UINT32 on_time_hs20;
+    /** number of channels */
+    A_UINT32 num_channels;
+} wmi_radio_link_stats;
+
+/** Radio statistics (once started) do not stop or get reset unless wifi_clear_link_stats is invoked */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_stats_event_fixed_param */
+    /** unique id identifying the request, given in the request stats command */
+    A_UINT32 request_id;
+    /** Number of radios*/
+    A_UINT32 num_radio;
+    /** more_data will be set depending on the number of radios */
+    A_UINT32 more_radio_events;
+/*
+ * This TLV is followed by another TLV of array of bytes
+ *   size of(struct wmi_radio_link_stats);
+ *
+ * This TLV is followed by another TLV of array of bytes
+ *   num_channels * size of(struct wmi_channel_stats)
+ */
+
+} wmi_radio_link_stats_event_fixed_param;
+
+/* per rate statistics */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_rate_stats */
+    /** rate information
+     * The rate-code is a 1-byte field in which:for given rate, nss and preamble
+     * b'7-b-6 indicate the preamble (0 OFDM, 1 CCK, 2, HT, 3 VHT)
+     * b'5-b'4 indicate the NSS (0 - 1x1, 1 - 2x2, 2 - 3x3)
+     * b'3-b'0 indicate the rate, which is indicated as follows:
+     *          OFDM :     0: OFDM 48 Mbps
+     *                     1: OFDM 24 Mbps
+     *                     2: OFDM 12 Mbps
+     *                     3: OFDM 6 Mbps
+     *                     4: OFDM 54 Mbps
+     *                     5: OFDM 36 Mbps
+     *                     6: OFDM 18 Mbps
+     *                     7: OFDM 9 Mbps
+     *         CCK (pream == 1)
+     *                     0: CCK 11 Mbps Long
+     *                     1: CCK 5.5 Mbps Long
+     *                     2: CCK 2 Mbps Long
+     *                     3: CCK 1 Mbps Long
+     *                     4: CCK 11 Mbps Short
+     *                     5: CCK 5.5 Mbps Short
+     *                     6: CCK 2 Mbps Short
+     *         HT/VHT (pream == 2/3)
+     *                     0..7: MCS0..MCS7 (HT)
+     *                     0..9: MCS0..MCS9 (VHT)
+     */
+    A_UINT32 rate;
+    /** units of 100 Kbps */
+    A_UINT32 bitrate;
+    /** number of successfully transmitted data pkts (ACK rcvd) */
+    A_UINT32 tx_mpdu;
+    /** number of received data pkts */
+    A_UINT32 rx_mpdu;
+    /** number of data packet losses (no ACK) */
+    A_UINT32 mpdu_lost;
+    /** total number of data pkt retries */
+    A_UINT32 retries;
+    /** number of short data pkt retries */
+    A_UINT32 retries_short;
+    /** number of long data pkt retries */
+    A_UINT32 retries_long;
+} wmi_rate_stats;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_peer_link_stats */
+    /** peer type (AP, TDLS, GO etc.) enum wmi_peer_type*/
+    A_UINT32 peer_type;
+    /** mac address */
+    wmi_mac_addr peer_mac_address;
+    /** peer wmi_CAPABILITY_XXX */
+    A_UINT32 capabilities;
+    /** number of rates */
+    A_UINT32 num_rates;
+} wmi_peer_link_stats;
+
+/** PEER statistics (once started) reset and start afresh after each connection */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_peer_stats_event_fixed_param */
+    /** unique id identifying the request, given in the request stats command */
+    A_UINT32 request_id;
+    /** number of peers accomidated in this particular event  */
+    A_UINT32 num_peers;
+    /** Indicates the fragment number  */
+    A_UINT32 peer_event_number;
+    /** Indicates if there are more peers which will be sent as seperate peer_stats event */
+    A_UINT32 more_data;
+
+/**
+ * This TLV is followed by another TLV
+ * num_peers * size of(struct wmi_peer_stats)
+ * num_rates * size of(struct wmi_rate_stats). num_rates is the sum of the rates of all the peers.
+ */
+} wmi_peer_stats_event_fixed_param;
+
+/* per access category statistics */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_wmm_ac_stats */
+    /** access category (VI, VO, BE, BK) enum wmi_traffic_ac*/
+    A_UINT32 ac_type;
+    /** number of successfully transmitted unicast data pkts (ACK rcvd) */
+    A_UINT32 tx_mpdu;
+    /** number of received unicast mpdus */
+    A_UINT32 rx_mpdu;
+    /** number of succesfully transmitted multicast data packets */
+    /** STA case: implies ACK received from AP for the unicast packet in which mcast pkt was sent */
+    A_UINT32 tx_mcast;
+    /** number of received multicast data packets */
+    A_UINT32 rx_mcast;
+    /** number of received unicast a-mpdus */
+    A_UINT32 rx_ampdu;
+    /** number of transmitted unicast a-mpdus */
+    A_UINT32 tx_ampdu;
+    /** number of data pkt losses (no ACK) */
+    A_UINT32 mpdu_lost;
+    /** total number of data pkt retries */
+    A_UINT32 retries;
+    /** number of short data pkt retries */
+    A_UINT32 retries_short;
+    /** number of long data pkt retries */
+    A_UINT32 retries_long;
+    /** data pkt min contention time (usecs) */
+    A_UINT32 contention_time_min;
+    /** data pkt max contention time (usecs) */
+    A_UINT32 contention_time_max;
+    /** data pkt avg contention time (usecs) */
+    A_UINT32 contention_time_avg;
+    /** num of data pkts used for contention statistics */
+    A_UINT32 contention_num_samples;
+} wmi_wmm_ac_stats;
+
+/* interface statistics */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_iface_link_stats */
+    /** access point beacon received count from connected AP */
+    A_UINT32 beacon_rx;
+    /** access point mgmt frames received count from connected AP (including Beacon) */
+    A_UINT32 mgmt_rx;
+    /** action frames received count */
+    A_UINT32 mgmt_action_rx;
+    /** action frames transmit count */
+    A_UINT32 mgmt_action_tx;
+    /** access Point Beacon and Management frames RSSI (averaged) */
+    A_UINT32 rssi_mgmt;
+    /** access Point Data Frames RSSI (averaged) from connected AP */
+    A_UINT32 rssi_data;
+    /** access Point ACK RSSI (averaged) from connected AP */
+    A_UINT32 rssi_ack;
+    /** number of peers */
+    A_UINT32 num_peers;
+    /** Indicates how many peer_stats events will be sent depending on the num_peers. */
+    A_UINT32 num_peer_events;
+    /** number of ac */
+    A_UINT32 num_ac;
+    /** Roaming Stat */
+    A_UINT32 roam_state;
+} wmi_iface_link_stats;
+
+/** Interface statistics (once started) reset and start afresh after each connection */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_iface_link_stats_event_fixed_param */
+    /** unique id identifying the request, given in the request stats command */
+    A_UINT32 request_id;
+    /** unique id identifying the VDEV, generated by the caller */
+    A_UINT32 vdev_id;
+/*
+ * This TLV is followed by another TLV
+ *   wmi_iface_link_stats iface_link_stats;
+ *   num_ac * size of(struct wmi_wmm_ac_stats)
+ */
+} wmi_iface_link_stats_event_fixed_param;
 
 /** Suspend option */
 enum {
@@ -3053,10 +3483,47 @@ typedef enum {
     /* Enable Aggregation State Trigger Event */
     WMI_VDEV_PARAM_AGGR_TRIG_EVENT_ENABLE,
 
+    /* This parameter indicates whether IBSS station can enter into power save
+    * mode by sending Null frame (with PM=1). When not allowed, IBSS station has to stay
+    * awake all the time and should never set PM=1 in its transmitted frames.
+    * This parameter is meaningful/valid only when WMI_VDEV_PARAM_ATIM_WINDOW_LENGTH
+    * is non-zero. */
+    WMI_VDEV_PARAM_IS_IBSS_POWER_SAVE_ALLOWED,
+
+    /* This parameter indicates if this station can enter into power collapse
+    * for the remaining beacon interval after the ATIM window.
+    * This parameter is meaningful/valid only when WMI_VDEV_PARAM_IS_IBSS_POWER_SAVE_ALLOWED
+    * is set to TRUE. */
+    WMI_VDEV_PARAM_IS_POWER_COLLAPSE_ALLOWED,
+
+    /* This parameter indicates whether IBSS station exit power save mode and
+    * enter power active state (by sending Null frame with PM=0 in the immediate ATIM Window)
+    * whenever there is a TX/RX activity. */
+    WMI_VDEV_PARAM_IS_AWAKE_ON_TXRX_ENABLED,
+
+    /* If Awake on TX/RX activity is enabled, this parameter indicates
+    * the data inactivity time in number of beacon intervals after which
+    * IBSS station reenters power save by sending Null frame with PM=1. */
+    WMI_VDEV_PARAM_INACTIVITY_CNT,
+
+    /* Inactivity time in msec after which TX Service Period (SP) is
+    * terminated by sending a Qos Null frame with EOSP.
+    * If value is 0, TX SP is terminated with the last buffered packet itself
+    * instead of waiting for the inactivity timeout. */
+    WMI_VDEV_PARAM_TXSP_END_INACTIVITY_TIME_MS,
+
     /** DTIM policy */
     WMI_VDEV_PARAM_DTIM_POLICY,
 
+    /* When IBSS network is initialized, PS-supporting device
+    * does not enter protocol sleep state during first
+    * WMI_VDEV_PARAM_IBSS_PS_WARMUP_TIME_SECS seconds. */
+    WMI_VDEV_PARAM_IBSS_PS_WARMUP_TIME_SECS,
+
 } WMI_VDEV_PARAM;
+
+/* Length of ATIM Window in TU */
+#define WMI_VDEV_PARAM_ATIM_WINDOW_LENGTH WMI_VDEV_PARAM_ATIM_WINDOW
 
 enum wmi_pkt_type {
     WMI_PKT_TYPE_RAW = 0,
@@ -3913,6 +4380,11 @@ typedef struct {
 #define WMI_PEER_CRIT_PROTO_HINT_ENABLED                0x9
 /* set Tx failure count threshold for the peer - Currently unused */
 #define WMI_PEER_TX_FAIL_CNT_THR                        0xA
+/* Enable H/W retry and Enable H/W Send CTS2S before Data */
+#define WMI_PEER_SET_HW_RETRY_CTS2S                     0xB
+
+/* Set peer advertised IBSS atim window length */
+#define WMI_PEER_IBSS_ATIM_WINDOW_LENGTH                0xC
 
 /** mimo ps values for the parameter WMI_PEER_MIMO_PS_STATE  */
 #define WMI_PEER_MIMO_PS_NONE                          0x0
@@ -4733,8 +5205,17 @@ when comparing wifi header.*/
 #define WOW_DEFAULT_BITMASK_SIZE_DWORD        37
 #define WOW_MAX_BITMAP_FILTERS               32
 #define WOW_DEFAULT_MAGIG_PATTERN_MATCH_CNT  16
+#define WOW_ACER_EXTEND_PATTERN_MATCH_CNT    16
+#define WOW_ACER_SHORT_PATTERN_MATCH_CNT     8
 #define WOW_DEFAULT_EVT_BUF_SIZE             148  /* Maximum 148 bytes of the data is copied starting from header incase if the match is found.
                                                                                     The 148 comes from (128 - 14 )  payload size  + 8bytes LLC + 26bytes MAC header*/
+#define WOW_DEFAULT_ACER_IOAC_PATTERN_SIZE  6
+#define WOW_DEFAULT_ACER_IOAC_PATTERN_SIZE_DWORD 2
+#define WOW_DEFAULT_ACER_IOAC_RANDOM_SIZE  6
+#define WOW_DEFAULT_ACER_IOAC_RANDOM_SIZE_DWORD 2
+#define WOW_DEFAULT_ACER_IOAC_KEEP_ALIVE_PKT_SIZE   120
+#define WOW_DEFAULT_ACER_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD 30
+
 typedef enum pattern_type_e {
     WOW_PATTERN_MIN = 0,
     WOW_BITMAP_PATTERN = WOW_PATTERN_MIN,
@@ -4743,6 +5224,9 @@ typedef enum pattern_type_e {
     WOW_WILD_CARD_PATTERN,
     WOW_TIMER_PATTERN,
     WOW_MAGIC_PATTERN,
+    WOW_IPV6_RA_PATTERN,
+    WOW_ACER_IOAC_PKT_PATTERN,
+    WOW_ACER_IOAC_TMR_PATTERN,
     WOW_PATTERN_MAX
 }WOW_PATTERN_TYPE;
 
@@ -4762,6 +5246,12 @@ typedef enum event_type_e {
     WOW_AUTH_REQ_EVENT,
     WOW_ASSOC_REQ_EVENT,
     WOW_HTT_EVENT,
+    WOW_RA_MATCH_EVENT,
+    WOW_HOST_AUTO_SHUTDOWN_EVENT,
+    WOW_ACER_IOAC_MAGIC_EVENT,
+    WOW_ACER_IOAC_SHORT_EVENT,
+    WOW_ACER_IOAC_EXTEND_EVENT,
+    WOW_ACER_IOAC_TIMER_EVENT,
 }WOW_WAKE_EVENT_TYPE;
 
 typedef enum wake_reason_e {
@@ -4784,6 +5274,12 @@ typedef enum wake_reason_e {
     WOW_REASON_AUTH_REQ_RECV,
     WOW_REASON_ASSOC_REQ_RECV,
     WOW_REASON_HTT_EVENT,
+    WOW_REASON_RA_MATCH,
+    WOW_REASON_HOST_AUTO_SHUTDOWN,
+    WOW_REASON_ACER_IOAC_MAGIC_EVENT,
+    WOW_REASON_ACER_IOAC_SHORT_EVENT,
+    WOW_REASON_ACER_IOAC_EXTEND_EVENT,
+    WOW_REASON_ACER_IOAC_TIMER_EVENT,
     WOW_REASON_DEBUG_TEST = 0xFF,
 }WOW_WAKE_REASON_TYPE;
 
@@ -4830,6 +5326,64 @@ typedef struct WOW_MAGIC_PATTERN_CMD
 	wmi_mac_addr macaddr;
 }WOW_MAGIC_PATTERN_CMD;
 
+typedef enum wow_ioac_pattern_type {
+    WOW_IOAC_MAGIC_PATTERN = 1,
+    WOW_IOAC_SHORT_PATTERN,
+    WOW_IOAC_EXTEND_PATTERN,
+} WOW_IOAC_PATTERN_TYPE;
+
+typedef struct acer_ioac_pkt_pattern_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_ACER_IOAC_PKT_PATTERN_T */
+    A_UINT32 pattern_type;
+    A_UINT32 pattern[WOW_DEFAULT_ACER_IOAC_PATTERN_SIZE_DWORD];
+    A_UINT32 random[WOW_DEFAULT_ACER_IOAC_RANDOM_SIZE_DWORD];
+    A_UINT32 pattern_len;
+    A_UINT32 random_len;
+} WOW_ACER_IOAC_PKT_PATTERN_T;
+
+typedef struct acer_ioac_tmr_pattern_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_ACER_IOAC_TMR_PATTERN_T */
+    A_UINT32 wake_in_s;
+    A_UINT32 vdev_id;
+} WOW_ACER_IOAC_TMR_PATTERN_T;
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_KEEPALIVE_CMD_fixed_param */
+    A_UINT32 nID;
+} WMI_WOW_IOAC_ADD_KEEPALIVE_CMD_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_KEEPALIVE_CMD_fixed_param */
+    A_UINT32 nID;
+} WMI_WOW_IOAC_DEL_KEEPALIVE_CMD_fixed_param;
+
+typedef struct acer_ioac_keepalive_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_IOAC_KEEPALIVE_T */
+    A_UINT32 keepalive_pkt_buf[WOW_DEFAULT_ACER_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD];
+    A_UINT32 keepalive_pkt_len;
+    A_UINT32 period_in_ms;
+    A_UINT32 vdev_id;
+} WOW_IOAC_KEEPALIVE_T;
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param */
+    A_UINT32 vdev_id;
+    A_UINT32 pattern_type;
+/*
+ * Following this struct are these TLVs. Note that they are all array of structures
+ * but can have at most one element. Which TLV is empty or has one element depends
+ * on the field pattern_type. This is to emulate an union.
+ *     WOW_ACER_IOAC_PKT_PATTERN_T pattern_info_acer_pkt[];
+ *     WOW_ACER_IOAC_TMR_PATTERN_T pattern_info_acer_tmr[];
+ */
+} WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param */
+    A_UINT32 vdev_id;
+    A_UINT32 pattern_type;
+} WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param;
+
 typedef struct {
     A_UINT32        tlv_header;     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_ADD_PATTERN_CMD_fixed_param */
     A_UINT32        vdev_id;
@@ -4844,6 +5398,7 @@ typedef struct {
      *     WOW_IPV6_SYNC_PATTERN_T    pattern_info_ipv6[];
      *     WOW_MAGIC_PATTERN_CMD      pattern_info_magic_pattern[];
      *     A_UINT32                   pattern_info_timeout[];
+     *     A_UINT32                   ra_ratelimit_interval;
      */
 }WMI_WOW_ADD_PATTERN_CMD_fixed_param;
 
@@ -5773,6 +6328,16 @@ typedef struct {
     /** TDLS Option Control
      * Off-Channel, Buffer STA, (later)Sleep STA support */
     A_UINT32 tdls_options;
+    /* Buffering time in number of beacon intervals */
+    A_UINT32 tdls_peer_traffic_ind_window;
+    /* Wait time for PTR frame */
+    A_UINT32 tdls_peer_traffic_response_timeout_ms;
+    /* Self PUAPSD mask */
+    A_UINT32 tdls_puapsd_mask;
+    /* Inactivity timeout */
+    A_UINT32 tdls_puapsd_inactivity_time_ms;
+    /* Max of rx frame during SP */
+    A_UINT32 tdls_puapsd_rx_frame_threshold;
 } wmi_tdls_set_state_cmd_fixed_param;
 
 /* WMI_TDLS_PEER_UPDATE_CMDID */
@@ -5790,7 +6355,6 @@ enum wmi_tdls_peer_state {
 };
 
 /* NB: These defines are fixed, and cannot be changed without breaking WMI compatibility */
-#define WMI_TDLS_MAX_SUPP_CHANNELS 128
 #define WMI_TDLS_MAX_SUPP_OPER_CLASSES 32
 typedef struct {
     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_tdls_peer_capabilities  */
@@ -5805,10 +6369,25 @@ typedef struct {
     A_UINT32 off_chan_support;
     A_UINT32 peer_curr_operclass;
     A_UINT32 self_curr_operclass;
+    /* Number of channels available for off channel operation */
     A_UINT32 peer_chan_len;
-    A_UINT8  peer_chan[WMI_TDLS_MAX_SUPP_CHANNELS];
     A_UINT32 peer_operclass_len;
     A_UINT8  peer_operclass[WMI_TDLS_MAX_SUPP_OPER_CLASSES];
+    /* Is peer initiator or responder of TDLS setup request */
+    A_UINT32 is_peer_responder;
+    /* Preferred off channel number as configured by user */
+    A_UINT32 pref_offchan_num;
+    /* Preferred off channel bandwidth as configured by user */
+    A_UINT32 pref_offchan_bw;
+
+    /** Followed by the variable length TLV peer_chan_list:
+     *  wmi_channel peer_chan_list[].
+     *  Array size would be peer_chan_len.
+     *  This array is intersected channels which is supported by both peer
+     *  and DUT. freq1 in chan_info shall be same as mhz, freq2 shall be 0.
+     *  FW shall compute BW for an offchan based on peer's ht/vht cap
+     *  received in peer_assoc cmd during change STA operation
+     */
 } wmi_tdls_peer_capabilities;
 
 #define WMI_TDLS_QOS_VO_FLAG           0
@@ -5819,44 +6398,82 @@ typedef struct {
 #define WMI_TDLS_QOS_SP_FLAG           5
 #define WMI_TDLS_QOS_MOREDATA_FLAG     7
 
-#define WMI_TDLS_SET_QOS_FLAG(ppeer_caps,flag) do { \
+#define WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps,flag) do { \
         (ppeer_caps)->peer_qos |=  (1 << flag);      \
      } while(0)
-#define WMI_TDLS_GET_QOS_FLAG(ppeer_caps,flag)   \
+#define WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps,flag)   \
         (((ppeer_caps)->peer_qos & (1 << flag)) >> flag)
 
-#define WMI_SET_TDLS_VO_UAPSD(ppeer_caps) \
-    WMI_TDLS_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VO_FLAG)
-#define WMI_GET_TDLS_VO_UAPSD(ppeer_caps) \
-    WMI_TDLS_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VO_FLAG)
-#define WMI_SET_TDLS_VI_UAPSD(ppeer_caps) \
-    WMI_TDLS_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VI_FLAG)
-#define WMI_GET_TDLS_VI_UAPSD(ppeer_caps) \
-    WMI_TDLS_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VI_FLAG)
-#define WMI_SET_TDLS_BK_UAPSD(ppeer_caps) \
-    WMI_TDLS_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BK_FLAG)
-#define WMI_GET_TDLS_BK_UAPSD(ppeer_caps) \
-    WMI_TDLS_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BK_FLAG)
-#define WMI_SET_TDLS_BE_UAPSD(ppeer_caps) \
-    WMI_TDLS_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BE_FLAG)
-#define WMI_GET_TDLS_BE_UAPSD(ppeer_caps) \
-    WMI_TDLS_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BE_FLAG)
-#define WMI_SET_TDLS_ACK_UAPSD(ppeer_caps) \
-    WMI_TDLS_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_ACK_FLAG)
-#define WMI_GET_TDLS_ACK_UAPSD(ppeer_caps) \
-    WMI_TDLS_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_ACK_FLAG)
+#define WMI_SET_TDLS_PEER_VO_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VO_FLAG)
+#define WMI_GET_TDLS_PEER_VO_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VO_FLAG)
+#define WMI_SET_TDLS_PEER_VI_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VI_FLAG)
+#define WMI_GET_TDLS_PEER_VI_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_VI_FLAG)
+#define WMI_SET_TDLS_PEER_BK_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BK_FLAG)
+#define WMI_GET_TDLS_PEER_BK_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BK_FLAG)
+#define WMI_SET_TDLS_PEER_BE_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BE_FLAG)
+#define WMI_GET_TDLS_PEER_BE_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_BE_FLAG)
+#define WMI_SET_TDLS_PEER_ACK_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_ACK_FLAG)
+#define WMI_GET_TDLS_PEER_ACK_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_ACK_FLAG)
 /* SP has 2 bits */
-#define WMI_SET_TDLS_SP_UAPSD(ppeer_caps,val) do { \
+#define WMI_SET_TDLS_PEER_SP_UAPSD(ppeer_caps,val) do { \
      (ppeer_caps)->peer_qos |=  (((val)&0x3) << WMI_TDLS_QOS_SP_FLAG); \
      } while(0)
-#define WMI_GET_TDLS_SP_UAPSD(ppeer_caps) \
+#define WMI_GET_TDLS_PEER_SP_UAPSD(ppeer_caps) \
     (((ppeer_caps)->peer_qos & (0x3 << WMI_TDLS_QOS_SP_FLAG)) >> WMI_TDLS_QOS_SP_FLAG)
 
-#define WMI_SET_TDLS_MORE_DATA_ACK_UAPSD(ppeer_caps) \
-    WMI_TDLS_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_MOREDATA_FLAG)
-#define WMI_GET_TDLS_MORE_DATA_ACK_UAPSD(ppeer_caps) \
-    WMI_TDLS_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_MOREDATA_FLAG)
+#define WMI_SET_TDLS_PEER_MORE_DATA_ACK_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_SET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_MOREDATA_FLAG)
+#define WMI_GET_TDLS_PEER_MORE_DATA_ACK_UAPSD(ppeer_caps) \
+    WMI_TDLS_PEER_GET_QOS_FLAG(ppeer_caps, WMI_TDLS_QOS_MOREDATA_FLAG)
 
+
+#define WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd,flag) do { \
+        (pset_cmd)->tdls_puapsd_mask |=  (1 << flag);      \
+    } while(0)
+#define WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd,flag)   \
+        (((pset_cmd)->tdls_puapsd_mask & (1 << flag)) >> flag)
+
+#define WMI_SET_TDLS_SELF_VO_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_VO_FLAG)
+#define WMI_GET_TDLS_SELF_VO_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_VO_FLAG)
+#define WMI_SET_TDLS_SELF_VI_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_VI_FLAG)
+#define WMI_GET_TDLS_SELF_VI_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_VI_FLAG)
+#define WMI_SET_TDLS_SELF_BK_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_BK_FLAG)
+#define WMI_GET_TDLS_SELF__BK_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_BK_FLAG)
+#define WMI_SET_TDLS_SELF_BE_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_BE_FLAG)
+#define WMI_GET_TDLS_SELF_BE_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_BE_FLAG)
+#define WMI_SET_TDLS_SELF_ACK_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_ACK_FLAG)
+#define WMI_GET_TDLS_SELF_ACK_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_ACK_FLAG)
+/* SP has 2 bits */
+#define WMI_SET_TDLS_SELF_SP_UAPSD(pset_cmd,val) do { \
+     (pset_cmd)->tdls_puapsd_mask |=  (((val)&0x3) << WMI_TDLS_QOS_SP_FLAG); \
+    } while(0)
+#define WMI_GET_TDLS_SELF_SP_UAPSD(pset_cmd) \
+    (((pset_cmd)->tdls_puapsd_mask & (0x3 << WMI_TDLS_QOS_SP_FLAG)) >> WMI_TDLS_QOS_SP_FLAG)
+
+#define WMI_SET_TDLS_SELF_MORE_DATA_ACK_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_SET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_MOREDATA_FLAG)
+#define WMI_GET_TDLS_SELF_MORE_DATA_ACK_UAPSD(pset_cmd) \
+    WMI_TDLS_SELF_GET_QOS_FLAG(pset_cmd, WMI_TDLS_QOS_MOREDATA_FLAG)
 
 typedef struct {
     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_tdls_peer_update_cmd_fixed_param  */
@@ -5870,6 +6487,8 @@ typedef struct {
     /* The TLV for wmi_tdls_peer_capabilities will follow.
      *     wmi_tdls_peer_capabilities  peer_caps;
      */
+    /** Followed by the variable length TLV chan_info:
+     *  wmi_channel chan_info[] */
 } wmi_tdls_peer_update_cmd_fixed_param;
 
 /** TDLS EVENTS */
@@ -5894,6 +6513,12 @@ enum wmi_tdls_peer_reason {
     WMI_TDLS_TEARDOWN_REASON_SCAN,
     /** tdls peer disconnected due to peer deletion */
     WMI_TDLS_DISCONNECTED_REASON_PEER_DELETE,
+    /** tdls peer disconnected due to PTR timeout */
+    WMI_TDLS_TEARDOWN_REASON_PTR_TIMEOUT,
+    /** tdls peer disconnected due wrong PTR format */
+    WMI_TDLS_TEARDOWN_REASON_BAD_PTR,
+    /** tdls peer not responding */
+    WMI_TDLS_TEARDOWN_REASON_NO_RESPONSE,
 };
 
 /* WMI_TDLS_PEER_EVENTID */
@@ -6188,6 +6813,115 @@ typedef struct
     A_UINT32 netWorkStartIndex;  /* indicate the start index of network info*/
 } wmi_batch_scan_result_scan_list;
 
+#define LPI_IE_BITMAP_BSSID              0x0001
+#define LPI_IE_BITMAP_SSID               0x0002
+#define LPI_IE_BITMAP_RSSI               0x0004
+#define LPI_IE_BITMAP_CHAN               0x0008
+
+typedef struct {
+    A_UINT32 tlv_header;
+    /**A_BOOL indicates LPI mgmt snooping enable/disable*/
+    A_UINT32 enable;
+    /**LPI snooping mode*/
+    A_UINT32 snooping_mode;
+    /** LPI interested IEs in snooping context */
+    A_UINT32 ie_bitmap;
+} wmi_lpi_mgmt_snooping_config_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_start_scan_cmd_fixed_param */
+    /** Scan ID */
+    A_UINT32 scan_id;
+    /** Scan requestor ID */
+    A_UINT32 scan_req_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32 vdev_id;
+    /** LPI interested IEs in scan context */
+    A_UINT32 ie_bitmap;
+    /** Scan Priority, input to scan scheduler */
+    A_UINT32 scan_priority;
+    /** dwell time in msec on active channels */
+    A_UINT32 dwell_time_active;
+    /** dwell time in msec on passive channels */
+    A_UINT32 dwell_time_passive;
+    /** min time in msec on the BSS channel,only valid if atleast one VDEV is active*/
+    A_UINT32 min_rest_time;
+    /** max rest time in msec on the BSS channel,only valid if at least one VDEV is active*/
+    /** the scanner will rest on the bss channel at least min_rest_time. after min_rest_time the scanner
+     *  will start checking for tx/rx activity on all VDEVs. if there is no activity the scanner will
+     *  switch to off channel. if there is activity the scanner will let the radio on the bss channel
+     *  until max_rest_time expires.at max_rest_time scanner will switch to off channel
+     *  irrespective of activity. activity is determined by the idle_time parameter.
+     */
+    A_UINT32 max_rest_time;
+    /** time before sending next set of probe requests.
+     *   The scanner keeps repeating probe requests transmission with period specified by repeat_probe_time.
+     *   The number of probe requests specified depends on the ssid_list and bssid_list
+     */
+    A_UINT32 repeat_probe_time;
+    /** time in msec between 2 consequetive probe requests with in a set. */
+    A_UINT32 probe_spacing_time;
+    /** data inactivity time in msec on bss channel that will be used by scanner for measuring the inactivity  */
+    A_UINT32 idle_time;
+    /** maximum time in msec allowed for scan  */
+    A_UINT32 max_scan_time;
+    /** delay in msec before sending first probe request after switching to a channel */
+    A_UINT32 probe_delay;
+    /** Scan control flags */
+    A_UINT32 scan_ctrl_flags;
+    /** Burst duration time in msec*/
+    A_UINT32 burst_duration;
+
+    /** # if channels to scan. In the TLV channel_list[] */
+    A_UINT32 num_chan;
+    /** number of bssids. In the TLV bssid_list[] */
+    A_UINT32 num_bssid;
+    /** number of ssid. In the TLV ssid_list[] */
+    A_UINT32 num_ssids;
+    /** number of bytes in ie data. In the TLV ie_data[] */
+    A_UINT32 ie_len;
+
+/**
+ * TLV (tag length value ) parameters follow the scan_cmd
+ * structure. The TLV's are:
+ *     A_UINT32 channel_list[];
+ *     wmi_ssid ssid_list[];
+ *     wmi_mac_addr bssid_list[];
+ *     A_UINT8 ie_data[];
+ */
+} wmi_lpi_start_scan_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_stop_scan_cmd_fixed_param */
+    /** requestor requesting cancel  */
+    A_UINT32 requestor;
+    /** Scan ID */
+    A_UINT32 scan_id;
+    /**
+     * Req Type
+     * req_type should be WMI_SCAN_STOP_ONE, WMI_SCN_STOP_VAP_ALL or WMI_SCAN_STOP_ALL
+     * WMI_SCAN_STOP_ONE indicates to stop a specific scan with scan_id
+     * WMI_SCN_STOP_VAP_ALL indicates to stop all scan requests on a specific vDev with vdev_id
+     * WMI_SCAN_STOP_ALL indicates to stop all scan requests in both Scheduler's queue and Scan Engine
+     */
+    A_UINT32 req_type;
+    /**
+     * vDev ID
+     * used when req_type equals to WMI_SCN_STOP_VAP_ALL, it indexed the vDev on which to stop the scan
+     */
+    A_UINT32 vdev_id;
+} wmi_lpi_stop_scan_cmd_fixed_param;
+
+typedef struct
+{
+    A_UINT32 tlv_header;
+    A_UINT32 ie_bitmap;
+    A_UINT32 data_len;
+    /* This buffer is used to send lpi scan result data
+      *  A_UINT8 data[];	 // length in byte given by field data_len.
+      */
+} wmi_lpi_result_event_fixed_param;
+
 typedef struct
 {
     A_UINT32 tlv_header;
@@ -6224,6 +6958,45 @@ typedef struct {
     /** RF radio status */
     A_UINT32 radio_state;
 } wmi_rfkill_mode_param;
+
+typedef enum {
+    WMI_SET_LED_SYS_POWEROFF,
+    WMI_SET_LED_SYS_S3_SUSPEND,
+    WMI_SET_LED_SYS_S4_S5,
+    WMI_SET_LED_SYS_DRIVER_DISABLE,
+    WMI_SET_LED_SYS_WAKEUP,
+    WMI_SET_LED_SYS_ALWAYS_ON, //just for test!
+    WMI_SET_LED_SYS_POWERON,
+} wmi_led_sys_state_param;
+
+typedef enum {
+    WMI_CONFIG_LED_TO_VDD = 0,
+    WMI_CONFIG_LED_TO_GND = 1,
+} wmi_config_led_connect_type;
+
+typedef enum {
+   WMI_CONFIG_LED_NOT_WITH_BT = 0,
+   WMI_CONFIG_LED_WITH_BT = 1,
+} wmi_config_led_with_bt_flag;
+
+typedef enum {
+   WMI_CONFIG_LED_DISABLE = 0,
+   WMI_CONFIG_LED_ENABLE  = 1,
+} wmi_config_led_enable_flag;
+
+typedef struct {
+    /** TLV tag and len; tag equals
+     *  WMITLV_TAG_STRUC_wmi_peer_info_req_cmd_fixed_param   */
+    A_UINT32 tlv_header;
+    /* Set GPIO pin */
+    A_UINT32 led_gpio_pin;
+    /* Set connect type defined in wmi_config_led_connect_type */
+    A_UINT32 connect_type;
+    /* Set flag defined in wmi_config_led_with_bt_flag*/
+    A_UINT32 with_bt;
+    /* Set LED enablement defined in wmi_config_led_enable_flag */
+    A_UINT32 led_enable;
+} wmi_pdev_set_led_config_cmd_fixed_param;
 
 /** WMI_PEER_INFO_REQ_CMDID
  *   Request FW to provide peer info */
@@ -6380,6 +7153,8 @@ typedef struct {
     /** TLV tag and len; tag equals
      *  WMITLV_TAG_STRUC_wmi_mhf_offload_plumb_routing_table_cmd_fixed_param */
     A_UINT32 tlv_header;
+    /** vdev id*/
+    A_UINT32 vdev_id;
     /** action corresponds to values from enum
      *  wmi_mhf_ofl_table_action */
     A_UINT32 action;
@@ -6464,6 +7239,29 @@ typedef struct {
 
     A_UINT32 temperature_degreeC;/* temperature in degree C*/
 } wmi_thermal_mgmt_event_fixed_param;
+
+/**
+ * This command is sent from WLAN host driver to firmware to
+ * request firmware to configure auto shutdown timer in fw
+ * 0 - Disable <1-19600>-Enabled and timer value is seconds (86400 seconds = 1 day maximum>
+ */
+typedef struct {
+    A_UINT32 tlv_header;    /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_host_auto_shutdown_cfg_cmd_param  */
+    A_UINT32 timer_value;   /** timer value; 0=disable */
+} wmi_host_auto_shutdown_cfg_cmd_fixed_param;
+
+enum wmi_host_auto_shutdown_reason {
+    WMI_HOST_AUTO_SHUTDOWN_REASON_UNKNOWN = 0,
+    WMI_HOST_AUTO_SHUTDOWN_REASON_TIMER_EXPIRY = 1,
+    WMI_HOST_AUTO_SHUTDOWN_REASON_MAX,
+};
+
+/* WMI_HOST_AUTO_SHUTDOWN_EVENTID  */
+typedef struct{
+    A_UINT32    tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_host_auto_shutdown_event_fixed_param  */
+    A_UINT32    shutdown_reason; /* value: wmi_host_auto_shutdown_reason */
+} wmi_host_auto_shutdown_event_fixed_param;
+
 
 typedef struct {
     A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_nan_cmd_param */
@@ -6587,6 +7385,15 @@ typedef struct {
      */
 } wmi_stats_ext_event_fixed_param;
 
+typedef struct {
+    /* TLV tag and len; tag equals WMITLV_TAG_STRUC_ wmi_peer_state_event_fixed_param */
+    A_UINT32 tlv_header;
+    A_UINT32 vdev_id; /* vdev ID */
+    /* MAC address of the peer for which the estimated link speed is required.*/
+    wmi_mac_addr peer_macaddr;
+    A_UINT32 state; /* peer state */
+} wmi_peer_state_event_fixed_param;
+
 enum {
     WMI_2G4_HT40_OBSS_SCAN_PASSIVE = 0,    /** scan_type: passive */
     WMI_2G4_HT40_OBSS_SCAN_ACTIVE, /** scan_type: active */
@@ -6663,6 +7470,656 @@ typedef enum {
     WMI_FRAME_TX_DROP,          /* frame dropped by FW due to resources */
     WMI_FRAME_TX_FILTERED,      /* frame filtered by hardware */
 } WMI_FRAME_TX_STATUS;
+
+/**
+ * This command is sent from WLAN host driver to firmware to
+ * request firmware to send the latest channel avoidance range
+ * to host.
+ *
+ * This command is only applicable for APQ platform which has
+ * modem on the platform. If firmware doesn't support MWS Coex,
+ * this command can be dropped by firmware.
+ *
+ * Host would send this command to firmware to request a channel
+ * avoidance information update.
+ */
+typedef struct {
+    /** TLV tag and len; tag equals
+     *  WMITLV_TAG_STRUC_wmi_chan_avoid_update_cmd_param */
+    A_UINT32 tlv_header;
+} wmi_chan_avoid_update_cmd_param;
+
+/* ExtScan operation mode */
+typedef enum {
+   WMI_EXTSCAN_MODE_NONE          = 0x0000,
+   WMI_EXTSCAN_MODE_START         = 0x0001,    // ExtScan/TableMonitoring operation started
+   WMI_EXTSCAN_MODE_STOP          = 0x0002,    // ExtScan/TableMonitoring operation stopped
+   WMI_EXTSCAN_MODE_IGNORED       = 0x0003,    // ExtScan command ignored due to error
+} wmi_extscan_operation_mode;
+
+/* Channel Mask */
+typedef enum {
+   WMI_CHANNEL_BAND_UNSPECIFIED = 0x0000,
+   WMI_CHANNEL_BAND_24          = 0x0001,    // 2.4 channel
+   WMI_CHANNEL_BAND_5_NON_DFS   = 0x0002,    // 5G Channels (No DFS channels)
+   WMI_CHANNEL_BAND_DFS         = 0x0004,    // DFS channels
+} wmi_channel_band_mask;
+
+typedef enum {
+    WMI_EXTSCAN_CYCLE_STARTED_EVENT     = 0x0001,
+    WMI_EXTSCAN_CYCLE_COMPLETED_EVENT   = 0x0002,
+    WMI_EXTSCAN_BUCKET_STARTED_EVENT    = 0x0004,
+    WMI_EXTSCAN_BUCKET_COMPLETED_EVENT  = 0x0008,
+    WMI_EXTSCAN_BUCKET_FAILED_EVENT     = 0x0010,
+    WMI_EXTSCAN_BUCKET_OVERRUN_EVENT    = 0x0020,
+
+    WMI_EXTSCAN_EVENT_MAX               = 0x8000
+} wmi_extscan_event_type;
+
+#define WMI_EXTSCAN_CYCLE_EVENTS_MASK    (WMI_EXTSCAN_CYCLE_STARTED_EVENT   | \
+                                          WMI_EXTSCAN_CYCLE_COMPLETED_EVENT)
+
+#define WMI_EXTSCAN_BUCKET_EVENTS_MASK   (WMI_EXTSCAN_BUCKET_STARTED_EVENT   | \
+                                          WMI_EXTSCAN_BUCKET_COMPLETED_EVENT | \
+                                          WMI_EXTSCAN_BUCKET_FAILED_EVENT    | \
+                                          WMI_EXTSCAN_BUCKET_OVERRUN_EVENT)
+
+typedef enum {
+    WMI_EXTSCAN_NO_FORWARDING         = 0x0000,
+    WMI_EXTSCAN_FORWARD_FRAME_TO_HOST = 0x0001
+} wmi_extscan_forwarding_flags;
+
+typedef enum {
+    WMI_EXTSCAN_USE_MSD = 0x0001,    // Use Motion Sensor Detection */
+} wmi_extscan_configuration_flags;
+
+typedef enum {
+    WMI_EXTSCAN_STATUS_OK    = 0,
+    WMI_EXTSCAN_STATUS_ERROR = 0x80000000,
+    WMI_EXTSCAN_STATUS_INVALID_PARAMETERS,
+    WMI_EXTSCAN_STATUS_INTERNAL_ERROR
+} wmi_extscan_start_stop_status;
+
+typedef struct {
+    /** Request ID - to identify command. Cannot be 0 */
+    A_UINT32     request_id;
+    /** Requestor ID - client requesting ExtScan */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32     vdev_id;
+} wmi_extscan_command_id;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /** channel number */
+    A_UINT32    channel;
+
+    /** dwell time in msec - use defaults if 0 */
+    A_UINT32    min_dwell_time;
+    A_UINT32    max_dwell_time;
+    /** passive/active channel and other flags */
+    A_UINT32    control_flags;                        // 0 => active, 1 => passive scan; ignored for DFS
+} wmi_extscan_bucket_channel;
+
+/* Scan Bucket specification */
+typedef struct {
+    A_UINT32        tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /** Bucket ID  - 0-based */
+    A_UINT32        bucket_id;
+    /** ExtScan events subscription - events to be reported to client (see wmi_extscan_event_type) */
+    A_UINT32        notify_extscan_events;
+    /** Options to forward scan results - see wmi_extscan_forwarding_flags */
+    A_UINT32        forwarding_flags;
+    /** ExtScan configuration flags - wmi_extscan_configuration_flags */
+    A_UINT32        configuration_flags;
+    /** multiplier to be applied to the periodic scan's base period */
+    A_UINT32        base_period_multiplier;
+    /** dwell time in msec on active channels - use defaults if 0 */
+    A_UINT32        min_dwell_time_active;
+    A_UINT32        max_dwell_time_active;
+    /** dwell time in msec on passive channels - use defaults if 0 */
+    A_UINT32        min_dwell_time_passive;
+    A_UINT32        max_dwell_time_passive;
+    /** see wmi_channel_band_mask; when equal to WMI_CHANNEL_UNSPECIFIED, use channel list */
+    A_UINT32        channel_band;
+    /** number of channels (if channel_band is WMI_CHANNEL_UNSPECIFIED) */
+    A_UINT32        num_channels;
+/** Followed by the variable length TLV chan_list:
+ *  wmi_extscan_bucket_channel chan_list[] */
+} wmi_extscan_bucket;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_start_cmd_fixed_param */
+    /** Request ID - to identify command. Cannot be 0 */
+    A_UINT32     request_id;
+    /** Requestor ID - client requesting ExtScan */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32     vdev_id;
+    /** table ID - to allow support for multiple simultaneous requests */
+    A_UINT32     table_id;
+    /** Base period (milliseconds) used by scan buckets to define periodicity of the scans */
+    A_UINT32     base_period;
+    /** Maximum number of iterations to run - one iteration is the scanning of the least frequent bucket */
+    A_UINT32     max_iterations;
+    /** Options to forward scan results - see wmi_extscan_forwarding_flags */
+    A_UINT32     forwarding_flags;
+    /** ExtScan configuration flags - wmi_extscan_configuration_flags */
+    A_UINT32     configuration_flags;
+    /** ExtScan events subscription - bitmask indicating which events should be send to client (see wmi_extscan_event_type) */
+    A_UINT32     notify_extscan_events;
+    /** Scan Priority, input to scan scheduler */
+    A_UINT32     scan_priority;
+    /** Maximum number of BSSIDs to cache on each scan cycle */
+    A_UINT32     max_bssids_per_scan_cycle;
+    /** Minimum RSSI value to report */
+    A_UINT32     min_rssi;
+    /** Maximum table usage in percentage */
+    A_UINT32     max_table_usage;
+    /** default dwell time in msec on active channels */
+    A_UINT32     min_dwell_time_active;
+    A_UINT32     max_dwell_time_active;
+    /** default dwell time in msec on passive channels */
+    A_UINT32     min_dwell_time_passive;
+    A_UINT32     max_dwell_time_passive;
+    /** min time in msec on the BSS channel,only valid if atleast one VDEV is active*/
+    A_UINT32     min_rest_time;
+    /** max rest time in msec on the BSS channel,only valid if at least one VDEV is active*/
+    /** the scanner will rest on the bss channel at least min_rest_time. after min_rest_time the scanner
+     *  will start checking for tx/rx activity on all VDEVs. if there is no activity the scanner will
+     *  switch to off channel. if there is activity the scanner will let the radio on the bss channel
+     *  until max_rest_time expires.at max_rest_time scanner will switch to off channel
+     *  irrespective of activity. activity is determined by the idle_time parameter.
+     */
+    A_UINT32     max_rest_time;
+    /** time before sending next set of probe requests.
+     *   The scanner keeps repeating probe requests transmission with period specified by repeat_probe_time.
+     *   The number of probe requests specified depends on the ssid_list and bssid_list
+     */
+    /** Max number of probes to be sent */
+    A_UINT32     n_probes;
+    /** time in msec between 2 sets of probe requests. */
+    A_UINT32     repeat_probe_time;
+    /** time in msec between 2 consequetive probe requests with in a set. */
+    A_UINT32     probe_spacing_time;
+    /** data inactivity time in msec on bss channel that will be used by scanner for measuring the inactivity  */
+    A_UINT32     idle_time;
+    /** maximum time in msec allowed for scan  */
+    A_UINT32     max_scan_time;
+    /** delay in msec before sending first probe request after switching to a channel */
+    A_UINT32     probe_delay;
+    /** Scan control flags */
+    A_UINT32     scan_ctrl_flags;
+    /** Burst duration time in msec*/
+    A_UINT32     burst_duration;
+
+    /** number of bssids in the TLV bssid_list[] */
+    A_UINT32     num_bssid;
+    /** number of ssid in the TLV ssid_list[] */
+    A_UINT32     num_ssids;
+    /** number of bytes in TLV ie_data[] */
+    A_UINT32     ie_len;
+    /** number of buckets in the TLV bucket_list[] */
+    A_UINT32     num_buckets;
+    /** number of channels in channel_list[] determined by the
+        sum of wmi_extscan_bucket.num_channels in array  */
+
+/**
+ * TLV (tag length value ) parameters follow the extscan_cmd
+ * structure. The TLV's are:
+ *     wmi_ssid                   ssid_list[];
+ *     wmi_mac_addr               bssid_list[];
+ *     A_UINT8                    ie_data[];
+ *     wmi_extscan_bucket         bucket_list[];
+ *     wmi_extscan_bucket_channel channel_list[];
+ */
+} wmi_extscan_start_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_stop_cmd_fixed_param */
+    /** Request ID - to match running command. 0 matches any request */
+    A_UINT32     request_id;
+    /** Requestor ID - client requesting stop */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32     vdev_id;
+    /** table ID - to allow support for multiple simultaneous requests */
+    A_UINT32     table_id;
+} wmi_extscan_stop_cmd_fixed_param;
+
+enum wmi_extscan_get_cached_results_flags {
+    WMI_EXTSCAN_GET_CACHED_RESULTS_FLAG_NONE        = 0x0000,
+    WMI_EXTSCAN_GET_CACHED_RESULTS_FLAG_FLUSH_TABLE = 0x0001
+};
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_get_cached_results_cmd_fixed_param */
+    /** request ID - used to correlate command with events */
+    A_UINT32    request_id;
+    /** Requestor ID - client that requested results */
+    A_UINT32    requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32    vdev_id;
+    /** table ID - to allow support for multiple simultaneous requests */
+    A_UINT32    table_id;
+    /** maximum number of results to be returned  */
+    A_UINT32    max_results;
+    /** flush BSSID list - wmi_extscan_get_cached_results_flags */
+    A_UINT32    control_flags;    // enum wmi_extscan_get_cached_results_flags
+} wmi_extscan_get_cached_results_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_get_wlan_change_results_cmd_fixed_param */
+    /** request ID - used to correlate command with events */
+    A_UINT32    request_id;
+    /** Requestor ID - client that requested results */
+    A_UINT32    requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32    vdev_id;
+    /** table ID - to allow support for multiple simultaneous requests */
+    A_UINT32    table_id;
+} wmi_extscan_get_wlan_change_results_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32        tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /**bssid */
+    wmi_mac_addr    bssid;
+    /**channel number */
+    A_UINT32        channel;
+    /**upper RSSI limit */
+    A_UINT32        upper_rssi_limit;
+    /**lower RSSI limit */
+    A_UINT32        lower_rssi_limit;
+} wmi_extscan_wlan_change_bssid_param;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_configure_wlan_change_monitor_cmd_fixed_param */
+    /** Request ID - to identify command. Cannot be 0 */
+    A_UINT32    request_id;
+    /** Requestor ID - client requesting wlan change monitoring */
+    A_UINT32    requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32    vdev_id;
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32    table_id;
+    /** operation mode: start/stop */
+    A_UINT32    mode;    // wmi_extscan_operation_mode
+    /** number of rssi samples to store */
+    A_UINT32    max_rssi_samples;
+    /** number of samples to use to calculate RSSI average */
+    A_UINT32    rssi_averaging_samples;
+    /** number of scans to confirm loss of contact with RSSI */
+    A_UINT32    lost_ap_scan_count;
+    /** number of out-of-range BSSIDs necessary to send event */
+    A_UINT32    max_out_of_range_count;
+    /** total number of bssid signal descriptors (in all pages) */
+    A_UINT32    total_entries;
+    /** index of the first bssid entry found in the TLV wlan_change_descriptor_list*/
+    A_UINT32    first_entry_index;
+    /** number of bssid signal descriptors in this page */
+    A_UINT32    num_entries_in_page;
+    /* Following this structure is the TLV:
+     *     wmi_extscan_wlan_change_bssid_param wlan_change_descriptor_list[];    // number of elements given by field num_page_entries.
+     */
+} wmi_extscan_configure_wlan_change_monitor_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32        tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /**bssid */
+    wmi_mac_addr    bssid;
+    /**RSSI threshold for reporting */
+    A_UINT32        min_rssi;
+    /**channel number */
+    A_UINT32        channel;
+} wmi_extscan_hotlist_entry;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_configure_hotlist_monitor_cmd_fixed_param */
+    /** Request ID - to identify command. Cannot be 0 */
+    A_UINT32    request_id;
+    /** Requestor ID - client requesting hotlist monitoring */
+    A_UINT32    requestor_id;
+    /** VDEV id(interface) that is requesting scan */
+    A_UINT32    vdev_id;
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32    table_id;
+    /** operation mode: start/stop */
+    A_UINT32    mode;    // wmi_extscan_operation_mode
+    /**total number of bssids (in all pages) */
+    A_UINT32    total_entries;
+    /**index of the first bssid entry found in the TLV wmi_extscan_hotlist_entry*/
+    A_UINT32    first_entry_index;
+    /**number of bssids in this page */
+    A_UINT32    num_entries_in_page;
+    /* Following this structure is the TLV:
+     *     wmi_extscan_hotlist_entry hotlist[];    // number of elements given by field num_page_entries.
+     */
+} wmi_extscan_configure_hotlist_monitor_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32    table_id;
+    /** size in bytes of scan cache entry */
+    A_UINT32    scan_cache_entry_size;
+    /** maximum number of scan cache entries */
+    A_UINT32    max_scan_cache_entries;
+    /** maximum number of buckets per extscan request */
+    A_UINT32    max_buckets;
+    /** maximum number of BSSIDs that will be stored in each scan (best n/w as per RSSI) */
+    A_UINT32    max_bssid_per_scan;
+    /** table usage level at which indication must be sent to host */
+    A_UINT32    max_table_usage_threshold;
+} wmi_extscan_cache_capabilities;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32    table_id;
+    /** size in bytes of wlan change entry */
+    A_UINT32    wlan_change_entry_size;
+    /** maximum number of entries in wlan change table */
+    A_UINT32    max_wlan_change_entries;
+    /** number of RSSI samples used for averaging RSSI */
+    A_UINT32    max_rssi_averaging_samples;
+    /** number of BSSID/RSSI entries (BSSID pointer, RSSI, timestamp) that device can hold */
+    A_UINT32    max_rssi_history_entries;
+} wmi_extscan_wlan_change_monitor_capabilities;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32    table_id;
+    /** size in bytes of hotlist entry */
+    A_UINT32    wlan_hotlist_entry_size;
+    /** maximum number of entries in wlan change table */
+    A_UINT32    max_hotlist_entries;
+} wmi_extscan_hotlist_monitor_capabilities;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_set_capabilities_cmd_fixed_param */
+    /** Request ID - matches request ID used to start hot list monitoring */
+    A_UINT32    request_id;
+    /** Requestor ID - client requesting stop */
+    A_UINT32    requestor_id;
+    /** number of extscan caches */
+    A_UINT32    num_extscan_cache_tables;
+    /** number of wlan change lists */
+    A_UINT32    num_wlan_change_monitor_tables;
+    /** number of hotlists */
+    A_UINT32    num_hotlist_monitor_tables;
+    /** if one sided rtt data collection is supported */
+    A_UINT32    rtt_one_sided_supported;
+    /** if 11v data collection is supported */
+    A_UINT32    rtt_11v_supported;
+    /** if 11mc data collection is supported */
+    A_UINT32    rtt_ftm_supported;
+    /** number of extscan cache capabilities (one per table)  */
+    A_UINT32    num_extscan_cache_capabilities;
+    /** number of wlan change  capabilities (one per table)  */
+    A_UINT32    num_extscan_wlan_change_capabilities;
+    /** number of extscan hotlist capabilities (one per table)  */
+    A_UINT32    num_extscan_hotlist_capabilities;
+    /* Following this structure is the TLV:
+     *     wmi_extscan_cache_capabilities               extscan_cache_capabilities; // number of capabilities given by num_extscan_caches
+     *     wmi_extscan_wlan_change_monitor_capabilities wlan_change_capabilities;   // number of capabilities given by num_wlan_change_monitor_tables
+     *     wmi_extscan_hotlist_monitor_capabilities     hotlist_capabilities;       // number of capabilities given by num_hotlist_monitor_tables
+     */
+} wmi_extscan_set_capabilities_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_get_capabilities_cmd_fixed_param */
+    /** Request ID - matches request ID used to start hot list monitoring */
+    A_UINT32    request_id;
+    /** Requestor ID - client requesting capabilities */
+    A_UINT32    requestor_id;
+} wmi_extscan_get_capabilities_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_start_stop_event_fixed_param */
+    /** Request ID of the operation that was started/stopped */
+    A_UINT32     request_id;
+    /** Requestor ID of the operation that was started/stopped */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) of the operation that was started/stopped */
+    A_UINT32     vdev_id;
+    /** extscan WMI command */
+    A_UINT32     command;
+    /** operation mode: start/stop */
+    A_UINT32     mode;      // wmi_extscan_operation_mode
+    /**success/failure */
+    A_UINT32     status;    // enum wmi_extscan_start_stop_status
+    /** table ID - to allow support for multiple simultaneous requests */
+    A_UINT32     table_id;
+} wmi_extscan_start_stop_event_fixed_param;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_operation_event_fixed_param */
+    /** Request ID of the extscan operation that is currently running */
+    A_UINT32     request_id;
+    /** Requestor ID of the extscan operation that is currently running */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) of the extscan operation that is currently running */
+    A_UINT32     vdev_id;
+    /** scan event (wmi_scan_event_type) */
+    A_UINT32     event;    // wmi_extscan_event_type
+    /** table ID - to allow support for multiple simultaneous requests */
+    A_UINT32     table_id;
+    /**number of buckets */
+    A_UINT32     num_buckets;
+    /* Following this structure is the TLV:
+     *     A_UINT32    bucket_id[];    // number of elements given by field num_buckets.
+     */
+} wmi_extscan_operation_event_fixed_param;
+
+/* Types of extscan tables */
+typedef enum {
+    EXTSCAN_TABLE_NONE    = 0,
+    EXTSCAN_TABLE_BSSID   = 1,
+    EXTSCAN_TABLE_RSSI    = 2,
+} wmi_extscan_table_type;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_table_usage_event_fixed_param */
+    /** Request ID of the extscan operation that is currently running */
+    A_UINT32     request_id;
+    /** Requestor ID of the extscan operation that is currently running */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) of the extscan operation that is currently running */
+    A_UINT32     vdev_id;
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32     table_id;
+    /**see wmi_extscan_table_type for table reporting usage */
+    A_UINT32     table_type;
+    /**number of entries in use */
+    A_UINT32     entries_in_use;
+    /**maximum number of entries in table */
+    A_UINT32     maximum_entries;
+} wmi_extscan_table_usage_event_fixed_param;
+
+typedef struct {
+    A_UINT32    tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /**RSSI */
+    A_UINT32    rssi;
+    /**time stamp in seconds */
+    A_UINT32    tstamp;
+} wmi_extscan_rssi_info;
+
+typedef struct {
+    A_UINT32        tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /**bssid */
+    wmi_mac_addr    bssid;
+    /**ssid */
+    wmi_ssid        ssid;
+    /**channel number */
+    A_UINT32        channel;
+    /* capabilities */
+    A_UINT32        capabilities;
+    /* beacon interval in TUs */
+    A_UINT32        beacon_interval;
+    /**time stamp in seconds - time last seen */
+    A_UINT32        tstamp;
+    /**flags - _tExtScanEntryFlags */
+    A_UINT32        flags;
+    /**RTT in ns */
+    A_UINT32        rtt;
+    /**rtt standard deviation */
+    A_UINT32        rtt_sd;
+    /* rssi information */
+    A_UINT32        number_rssi_samples;
+    /** IE length */
+    A_UINT32        ie_length;             // length of IE data
+} wmi_extscan_wlan_descriptor;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_cached_results_event_fixed_param */
+    /** Request ID of the WMI_EXTSCAN_GET_CACHED_RESULTS_CMDID */
+    A_UINT32     request_id;
+    /** Requestor ID of the WMI_EXTSCAN_GET_CACHED_RESULTS_CMDID */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) of the WMI_EXTSCAN_GET_CACHED_RESULTS_CMDID */
+    A_UINT32     vdev_id;
+    /** Request ID of the extscan operation that is currently running */
+    A_UINT32     extscan_request_id;
+    /** Requestor ID of the extscan operation that is currently running */
+    A_UINT32     extscan_requestor_id;
+    /** VDEV id(interface) of the extscan operation that is currently running */
+    A_UINT32     extscan_vdev_id;
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32     table_id;
+    /**current time stamp in seconds. Used to provide a baseline for the relative timestamps returned for each block and entry */
+    A_UINT32     current_tstamp;
+    /**total number of bssids (in all pages) */
+    A_UINT32     total_entries;
+    /**index of the first bssid entry found in the TLV wmi_extscan_wlan_descriptor*/
+    A_UINT32     first_entry_index;
+    /**number of bssids in this page */
+    A_UINT32     num_entries_in_page;
+    /* Followed by the variable length TLVs
+     *     wmi_extscan_wlan_descriptor    bssid_list[]
+     *     wmi_extscan_rssi_info          rssi_list[]
+     *     A_UINT8                        ie_list[]
+     */
+} wmi_extscan_cached_results_event_fixed_param;
+
+typedef enum {
+    EXTSCAN_WLAN_CHANGE_FLAG_NONE         = 0x00,
+    EXTSCAN_WLAN_CHANGE_FLAG_OUT_OF_RANGE = 0x01,
+    EXTSCAN_WLAN_CHANGE_FLAG_AP_LOST      = 0x02,
+} wmi_extscan_wlan_change_flags;
+
+typedef struct {
+    A_UINT32        tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_ARRAY_STRUC */
+    /**bssid */
+    wmi_mac_addr    bssid;
+    /**time stamp in seconds */
+    A_UINT32        tstamp;
+    /**upper RSSI limit */
+    A_UINT32        upper_rssi_limit;
+    /**lower RSSI limit */
+    A_UINT32        lower_rssi_limit;
+    /** channel */
+    A_UINT32        channel;    /* in MHz */
+    /**current RSSI average */
+    A_UINT32        rssi_average;
+    /**flags - wmi_extscan_wlan_change_flags */
+    A_UINT32        flags;
+    /**legnth of RSSI history to follow (number of values) */
+    A_UINT32        num_rssi_samples;
+} wmi_extscan_wlan_change_result_bssid;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_wlan_change_results_event_fixed_param */
+    /** Request ID of the WMI_EXTSCAN_GET_WLAN_CHANGE_RESULTS_CMDID command that requested the results */
+    A_UINT32     request_id;
+    /** Requestor ID of the WMI_EXTSCAN_GET_WLAN_CHANGE_RESULTS_CMDID command that requested the results */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) of the WMI_EXTSCAN_GET_WLAN_CHANGE_RESULTS_CMDID command that requested the results */
+    A_UINT32     vdev_id;
+    /** Request ID of the WMI_EXTSCAN_CONFIGURE_WLAN_CHANGE_MONITOR_CMDID command that configured the table */
+    A_UINT32     config_request_id;
+    /** Requestor ID of the WMI_EXTSCAN_CONFIGURE_WLAN_CHANGE_MONITOR_CMDID command that configured the table */
+    A_UINT32     config_requestor_id;
+    /** VDEV id(interface) of the WMI_EXTSCAN_CONFIGURE_WLAN_CHANGE_MONITOR_CMDID command that configured the table */
+    A_UINT32     config_vdev_id;
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32     table_id;
+    /**number of entries with RSSI out of range or BSSID not detected */
+    A_UINT32     change_count;
+    /**total number of bssid signal descriptors (in all pages) */
+    A_UINT32     total_entries;
+    /**index of the first bssid signal descriptor entry found in the TLV wmi_extscan_wlan_descriptor*/
+    A_UINT32     first_entry_index;
+    /**number of bssids signal descriptors in this page */
+    A_UINT32     num_entries_in_page;
+    /* Following this structure is the TLV:
+     *     wmi_extscan_wlan_change_result_bssid bssid_signal_descriptor_list[];    // number of descriptors given by field num_entries_in_page.
+     * Following this structure is the list of RSSI values (each is an A_UINT8):
+     *     A_UINT8 rssi_list[];    // last N RSSI values.
+     */
+} wmi_extscan_wlan_change_results_event_fixed_param;
+
+enum _tExtScanEntryFlags
+{
+    WMI_HOTLIST_FLAG_NONE     = 0x00,
+    WMI_HOTLIST_FLAG_PRESENCE = 0x01
+};
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_hotlist_match_event_fixed_param */
+    /** Request ID of the WMI_EXTSCAN_CONFIGURE_HOTLIST_MONITOR_CMDID that configured the table */
+    A_UINT32     config_request_id;
+    /** Requestor ID of the WMI_EXTSCAN_CONFIGURE_HOTLIST_MONITOR_CMDID that configured the table */
+    A_UINT32     config_requestor_id;
+    /** VDEV id(interface) of the WMI_EXTSCAN_CONFIGURE_HOTLIST_MONITOR_CMDID that configured the table */
+    A_UINT32     config_vdev_id;
+    /** table ID - to allow support for multiple simultaneous tables */
+    A_UINT32     table_id;
+    /**total number of bssids (in all pages) */
+    A_UINT32     total_entries;
+    /**index of the first bssid entry found in the TLV wmi_extscan_wlan_descriptor*/
+    A_UINT32     first_entry_index;
+    /**number of bssids in this page */
+    A_UINT32     num_entries_in_page;
+    /* Following this structure is the TLV:
+     *     wmi_extscan_wlan_descriptor hotlist_match[];    // number of descriptors given by field num_entries_in_page.
+     */
+} wmi_extscan_hotlist_match_event_fixed_param;
+
+typedef struct {
+    A_UINT32     tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_extscan_capabilities_event_fixed_param */
+    /** Request ID of the WMI_EXTSCAN_GET_CAPABILITIES_CMDID */
+    A_UINT32     request_id;
+    /** Requestor ID of the WMI_EXTSCAN_GET_CAPABILITIES_CMDID */
+    A_UINT32     requestor_id;
+    /** VDEV id(interface) of the WMI_EXTSCAN_GET_CAPABILITIES_CMDID */
+    A_UINT32     vdev_id;
+    /** number of extscan caches */
+    A_UINT32     num_extscan_cache_tables;
+    /** number of wlan change lists */
+    A_UINT32     num_wlan_change_monitor_tables;
+    /** number of hotlists */
+    A_UINT32     num_hotlist_monitor_tables;
+    /** if one sided rtt data collection is supported */
+    A_UINT32     rtt_one_sided_supported;
+    /** if 11v data collection is supported */
+    A_UINT32     rtt_11v_supported;
+    /** if 11mc data collection is supported */
+    A_UINT32     rtt_ftm_supported;
+    /** number of extscan cache capabilities (one per table)  */
+    A_UINT32     num_extscan_cache_capabilities;
+    /** number of wlan change  capabilities (one per table)  */
+    A_UINT32     num_extscan_wlan_change_capabilities;
+    /** number of extscan hotlist capabilities (one per table)  */
+    A_UINT32     num_extscan_hotlist_capabilities;
+    /* Following this structure are the TLVs describing the capabilities of of the various types of lists. The FW theoretically
+     * supports multiple lists of each type.
+     *
+     *     wmi_extscan_cache_capabilities               extscan_cache_capabilities[] // capabilities of extscan cache (BSSID/RSSI lists)
+     *     wmi_extscan_wlan_change_monitor_capabilities wlan_change_capabilities[]   // capabilities of wlan_change_monitor_tables
+     *     wmi_extscan_hotlist_monitor_capabilities     hotlist_capabilities[]       // capabilities of hotlist_monitor_tables
+     */
+} wmi_extscan_capabilities_event_fixed_param;
 
 #ifdef __cplusplus
 }

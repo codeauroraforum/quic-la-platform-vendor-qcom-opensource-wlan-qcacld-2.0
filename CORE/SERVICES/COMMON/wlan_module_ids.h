@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -79,6 +79,10 @@ typedef enum {
   WLAN_MODULE_RMC,
   WLAN_MODULE_STATS,
   WLAN_MODULE_NAN,
+  WLAN_MODULE_IBSS_PWRSAVE,
+  WLAN_MODULE_HIF_UART,
+  WLAN_MODULE_LPI,
+  WLAN_MODULE_EXTSCAN,
   WLAN_MODULE_ID_MAX,
   WLAN_MODULE_ID_INVALID = WLAN_MODULE_ID_MAX,
 } WLAN_MODULE_ID;

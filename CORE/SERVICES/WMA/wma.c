@@ -106,6 +106,12 @@
 #include "dfs.h"
 #include "radar_filters.h"
 /* ################### defines ################### */
+/*
+ * TODO: Following constant should be shared by firwmare in
+ * wmi_unified.h. This will be done once wmi_unified.h is updated.
+ */
+#define WMI_PEER_STATE_AUTHORIZED 0x2
+
 #define WMA_2_4_GHZ_MAX_FREQ  3000
 #define WOW_CSA_EVENT_OFFSET 12
 
@@ -1653,14 +1659,38 @@ static int wma_stats_event_handler(void *handle, u_int8_t *cmd_param_info,
 	return 0;
 }
 
+static VOS_STATUS wma_send_link_speed(u_int32_t link_speed)
+{
+	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+	vos_msg_t sme_msg = {0} ;
+	tSirLinkSpeedInfo *ls_ind =
+		(tSirLinkSpeedInfo *) vos_mem_malloc(sizeof(tSirLinkSpeedInfo));
+	if (!ls_ind) {
+		WMA_LOGE("%s: Memory allocation failed.", __func__);
+		vos_status = VOS_STATUS_E_NOMEM;
+	}
+	else
+	{
+		ls_ind->estLinkSpeed = link_speed;
+		sme_msg.type = eWNI_SME_LINK_SPEED_IND;
+		sme_msg.bodyptr = ls_ind;
+		sme_msg.bodyval = 0;
+
+		vos_status = vos_mq_post_message(VOS_MODULE_ID_SME, &sme_msg);
+		if (!VOS_IS_STATUS_SUCCESS(vos_status) ) {
+		    WMA_LOGE("%s: Fail to post linkspeed ind  msg", __func__);
+		    vos_mem_free(ls_ind);
+		}
+	}
+	return vos_status;
+}
+
 static int wma_link_speed_event_handler(void *handle, u_int8_t *cmd_param_info,
 					u_int32_t len)
 {
 	WMI_PEER_ESTIMATED_LINKSPEED_EVENTID_param_tlvs *param_buf;
 	wmi_peer_estimated_linkspeed_event_fixed_param *event;
-	tSirLinkSpeedInfo *ls_ind;
 	VOS_STATUS vos_status;
-	vos_msg_t sme_msg = {0} ;
 
 	param_buf = (WMI_PEER_ESTIMATED_LINKSPEED_EVENTID_param_tlvs *)cmd_param_info;
 	if (!param_buf) {
@@ -1668,20 +1698,8 @@ static int wma_link_speed_event_handler(void *handle, u_int8_t *cmd_param_info,
 		return -EINVAL;
 	}
 	event = param_buf->fixed_param;
-	ls_ind = (tSirLinkSpeedInfo *) vos_mem_malloc(sizeof(tSirLinkSpeedInfo));
-	if (!ls_ind) {
-		WMA_LOGE("%s: Invalid link speed buffer", __func__);
-		return -EINVAL;
-	}
-	ls_ind->estLinkSpeed = event->est_linkspeed_kbps;
-	sme_msg.type = eWNI_SME_LINK_SPEED_IND;
-	sme_msg.bodyptr = ls_ind;
-	sme_msg.bodyval = 0;
-
-	vos_status = vos_mq_post_message(VOS_MODULE_ID_SME, &sme_msg);
-	if (!VOS_IS_STATUS_SUCCESS(vos_status) ) {
-		WMA_LOGE("%s: Fail to post linkspeed ind  msg", __func__);
-		vos_mem_free(ls_ind);
+	vos_status = wma_send_link_speed(event->est_linkspeed_kbps);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
 		return -EINVAL;
 	}
 	return 0;
@@ -2880,6 +2898,42 @@ wma_register_dfs_event_handler(tp_wma_handle wma_handle)
 	return;
 }
 
+static int wma_peer_state_change_event_handler(void *handle,
+					       u_int8_t *event_buff,
+					       u_int32_t len)
+{
+	WMI_PEER_STATE_EVENTID_param_tlvs *param_buf;
+	wmi_peer_state_event_fixed_param *event;
+	ol_txrx_vdev_handle vdev;
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+
+	param_buf = (WMI_PEER_STATE_EVENTID_param_tlvs *)event_buff;
+	if (!param_buf) {
+		WMA_LOGE("%s: Received NULL buf ptr from FW", __func__);
+		return -ENOMEM;
+	}
+
+	event = param_buf->fixed_param;
+	vdev = wma_find_vdev_by_id( wma_handle, event->vdev_id);
+	if (NULL == vdev) {
+		WMA_LOGP("%s: Couldn't find vdev for vdev_id: %d",
+		__func__, event->vdev_id);
+		return -EINVAL;
+	}
+
+	if (vdev->opmode == wlan_op_mode_sta
+		&& event->state == WMI_PEER_STATE_AUTHORIZED) {
+		/*
+		 * set event so that WLANTL_ChangeSTAState
+		 * can procced and unpause tx queue
+		 */
+		tl_shim_set_peer_authorized_event(wma_handle->vos_context,
+						  event->vdev_id);
+	}
+
+	return 0;
+}
+
 /*
  * Send WMI_DFS_PHYERR_FILTER_ENA_CMDID or
  * WMI_DFS_PHYERR_FILTER_DIS_CMDID command
@@ -3355,6 +3409,12 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 	 * offload enable and disable cases.
 	 */
 	wma_register_dfs_event_handler(wma_handle);
+
+	/* Register peer change event handler */
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   WMI_PEER_STATE_EVENTID,
+					   wma_peer_state_change_event_handler);
+
 
    /* Register beacon tx complete event id. The event is required
     * for sending channel switch announcement frames
@@ -8047,8 +8107,10 @@ VOS_STATUS wma_get_link_speed(WMA_HANDLE handle,
 	}
 	if (!WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
 				WMI_SERVICE_ESTIMATE_LINKSPEED)) {
-		WMA_LOGE("%s: Linkspeed feature bit not enabled",
+		WMA_LOGE("%s: Linkspeed feature bit not enabled"
+			 " Sending value 0 as link speed.",
 			__func__);
+		wma_send_link_speed(0);
 		return VOS_STATUS_E_FAILURE;
 	}
 	len  = sizeof(wmi_peer_get_estimated_linkspeed_cmd_fixed_param);
@@ -13541,7 +13603,9 @@ static VOS_STATUS wma_send_wow_patterns_to_fw(tp_wma_handle wma,
 		     WMI_TLV_HDR_SIZE +
 		     0 * sizeof(WOW_MAGIC_PATTERN_CMD) +
 		     WMI_TLV_HDR_SIZE +
-		     0 * sizeof(A_UINT32);
+		     0 * sizeof(A_UINT32) +
+		     WMI_TLV_HDR_SIZE +
+		     1 * sizeof(A_UINT32);
 
 	buf = wmi_buf_alloc(wma->wmi_handle, len);
 	if (!buf) {
@@ -13618,6 +13682,11 @@ static VOS_STATUS wma_send_wow_patterns_to_fw(tp_wma_handle wma,
 	/* Fill TLV for pattern_info_timeout but no data. */
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, 0);
 	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* Fill TLV for ra_ratelimit_interval with dummy data as this fix elem*/
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, 1 * sizeof(A_UINT32));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	*(A_UINT32 *)buf_ptr = 0;
 
 	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
 				   WMI_WOW_ADD_WAKE_PATTERN_CMDID);
@@ -20946,6 +21015,9 @@ static int wma_update_tdls_peer_state(WMA_HANDLE handle,
 		goto end_tdls_peer_state;
 	}
 
+	/* Number of channels will be zero for now */
+	len += WMI_TLV_HDR_SIZE + sizeof(wmi_channel) * 0;
+
 	wmi_buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
 	if (!wmi_buf) {
 		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
@@ -20994,13 +21066,18 @@ static int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	peer_cap->peer_curr_operclass = 0;
 	peer_cap->self_curr_operclass = 0;
 	peer_cap->peer_chan_len = 0;
-	for (i = 0; i < WMI_TDLS_MAX_SUPP_CHANNELS; i++) {
-		peer_cap->peer_chan[i] = 0;
-	}
 	peer_cap->peer_operclass_len = 0;
 	for (i = 0; i < WMI_TDLS_MAX_SUPP_OPER_CLASSES; i++) {
 		peer_cap->peer_operclass[i] = 0;
 	}
+
+	/* next fill variable size array of peer chan info */
+	buf_ptr += sizeof(wmi_tdls_peer_capabilities);
+	WMITLV_SET_HDR(buf_ptr,
+	       WMITLV_TAG_ARRAY_STRUC,
+	       sizeof(wmi_channel) * peer_cap->peer_chan_len);
+
+	/* placeholder to bring in changes related to channnel info */
 
 	if (wmi_unified_cmd_send(wma_handle->wmi_handle, wmi_buf, len,
 	    WMI_TDLS_PEER_UPDATE_CMDID)) {

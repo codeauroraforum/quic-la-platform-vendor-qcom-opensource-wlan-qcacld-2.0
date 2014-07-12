@@ -2176,8 +2176,23 @@ eHalStatus csrScanGetResult(tpAniSirGlobal pMac, tCsrScanResultFilter *pFilter, 
                     }
 
                     smsLog(pMac, LOG1, FL("SSID Matched"));
-                    fMatch = csrIsSecurityMatch( pMac, &pFilter->authType, &pFilter->EncryptionType, &pFilter->mcEncryptionType,
-                                 &pBssDesc->Result.BssDescriptor, pIes, NULL, NULL, NULL );
+#ifdef WLAN_FEATURE_11W
+                    fMatch = csrIsSecurityMatch(pMac, &pFilter->authType,
+                                                &pFilter->EncryptionType,
+                                                &pFilter->mcEncryptionType,
+                                                &pFilter->MFPEnabled,
+                                                &pFilter->MFPRequired,
+                                                &pFilter->MFPCapable,
+                                                &pBssDesc->Result.BssDescriptor,
+                                                pIes, NULL, NULL, NULL );
+#else
+                    fMatch = csrIsSecurityMatch(pMac, &pFilter->authType,
+                                                &pFilter->EncryptionType,
+                                                &pFilter->mcEncryptionType,
+                                                NULL, NULL, NULL,
+                                                &pBssDesc->Result.BssDescriptor,
+                                                pIes, NULL, NULL, NULL );
+#endif
                     if ((pBssDesc->Result.pvIes == NULL) && pIes)
                         vos_mem_free(pIes);
 
