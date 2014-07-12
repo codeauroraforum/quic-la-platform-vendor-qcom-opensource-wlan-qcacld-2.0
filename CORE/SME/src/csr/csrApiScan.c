@@ -2176,8 +2176,14 @@ eHalStatus csrScanGetResult(tpAniSirGlobal pMac, tCsrScanResultFilter *pFilter, 
                     }
 
                     smsLog(pMac, LOG1, FL("SSID Matched"));
-                    fMatch = csrIsSecurityMatch( pMac, &pFilter->authType, &pFilter->EncryptionType, &pFilter->mcEncryptionType,
-                                 &pBssDesc->Result.BssDescriptor, pIes, NULL, NULL, NULL );
+                    fMatch = csrIsSecurityMatch(pMac, &pFilter->authType,
+                                                &pFilter->EncryptionType,
+                                                &pFilter->mcEncryptionType,
+                                                &pFilter->MFPEnabled,
+                                                &pFilter->MFPRequired,
+                                                &pFilter->MFPCapable,
+                                                &pBssDesc->Result.BssDescriptor,
+                                                pIes, NULL, NULL, NULL );
                     if ((pBssDesc->Result.pvIes == NULL) && pIes)
                         vos_mem_free(pIes);
 
