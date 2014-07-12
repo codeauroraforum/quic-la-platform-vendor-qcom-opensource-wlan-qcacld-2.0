@@ -556,6 +556,79 @@ done:
 
 #endif /* FEATURE_GREEN_AP */
 
+#if defined (FEATURE_WLAN_MCC_TO_SCC_SWITCH) || defined (FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE)
+/**---------------------------------------------------------------------------
+
+  \brief wlan_hdd_restart_sap() - This function is used to restart SAP in
+                                  driver internally
+
+  \param  - ap_adapter - Pointer to SAP hdd_adapter_t structure
+
+  \return - void
+
+  --------------------------------------------------------------------------*/
+
+static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
+{
+    hdd_ap_ctx_t *pHddApCtx;
+    hdd_hostapd_state_t *pHostapdState;
+    VOS_STATUS vos_status;
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(ap_adapter);
+
+    pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+
+    mutex_lock(&pHddCtx->sap_lock);
+    if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+        wlan_hdd_cfg80211_del_station(ap_adapter->wdev.wiphy, ap_adapter->dev,
+                                                                          NULL);
+        hdd_cleanup_actionframe(pHddCtx, ap_adapter);
+
+        pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+        if ( VOS_STATUS_SUCCESS == WLANSAP_StopBss(
+#ifdef WLAN_FEATURE_MBSSID
+            pHddApCtx->sapContext
+#else
+            (WLAN_HDD_GET_CTX(ap_adapter))->pvosContext
+#endif
+        )) {
+            vos_status = vos_wait_single_event(&pHostapdState->vosEvent, 10000);
+
+            if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+                hddLog(LOGE, FL("SAP Stop Failed"));
+                goto end;
+            }
+        }
+        clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+        hddLog(LOGE, FL("SAP Stop Success"));
+
+        if (WLANSAP_StartBss(
+#ifdef WLAN_FEATURE_MBSSID
+            pHddApCtx->sapContext,
+#else
+            pHddCtx->pvosContext,
+#endif
+            hdd_hostapd_SAPEventCB, &pHddApCtx->sapConfig,
+            (v_PVOID_t)ap_adapter->dev) != VOS_STATUS_SUCCESS) {
+            hddLog(LOGE, FL("SAP Start Bss fail"));
+            goto end;
+        }
+
+        hddLog(LOG1, FL("Waiting for SAP to start"));
+        vos_status = vos_wait_single_event(&pHostapdState->vosEvent, 10000);
+        if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+            hddLog(LOGE, FL("SAP Start failed"));
+            goto end;
+        }
+        hddLog(LOGE, FL("SAP Start Success"));
+        set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+        pHostapdState->bCommit = TRUE;
+    }
+end:
+    mutex_unlock(&pHddCtx->sap_lock);
+    return;
+}
+#endif
+
 static int hdd_netdev_notifier_call(struct notifier_block * nb,
                                          unsigned long state,
                                          void *ndev)
@@ -5995,6 +6068,10 @@ static void hdd_update_tgt_services(hdd_context_t *hdd_ctx,
     }
 #endif
     pMac->beacon_offload = cfg->beacon_offload;
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+    cfg_ini->isRoamOffloadEnabled &= cfg->en_roam_offload;
+#endif
+
 }
 
 static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
@@ -7748,6 +7825,7 @@ static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMac
       pAdapter->wdev.netdev =  pWlanDev;
       /* set pWlanDev's parent to underlying device */
       SET_NETDEV_DEV(pWlanDev, pHddCtx->parent_dev);
+      hdd_wmm_init( pAdapter );
    }
 
    return pAdapter;
@@ -7890,6 +7968,9 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    //Set the Connection State to Not Connected
+   hddLog(VOS_TRACE_LEVEL_INFO,
+            "%s: Set HDD connState to eConnectionState_NotConnected",
+                   __func__);
    pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
 
    //Set the default operation channel
@@ -8612,6 +8693,23 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
 
       hddLog(VOS_TRACE_LEVEL_DEBUG,"%s: current_intf_count=%d", __func__,
                                     pHddCtx->current_intf_count);
+#ifdef FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
+      if (vos_get_concurrency_mode() == VOS_STA_SAP) {
+          hdd_adapter_t *ap_adapter;
+
+          ap_adapter = hdd_get_adapter(pHddCtx, WLAN_HDD_SOFTAP);
+          if (ap_adapter != NULL &&
+              test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags) &&
+              VOS_IS_DFS_CH(ap_adapter->sessionCtx.ap.operatingChannel)) {
+
+              hddLog(VOS_TRACE_LEVEL_WARN,
+                  "STA-AP Mode DFS not supported. Restart SAP with Non DFS ACS"
+                  );
+              ap_adapter->sessionCtx.ap.sapConfig.channel = AUTO_CHANNEL_SELECT;
+              wlan_hdd_restart_sap(ap_adapter);
+          }
+      }
+#endif
    }
 
 #ifdef QCA_WIFI_2_0
@@ -8849,6 +8947,7 @@ VOS_STATUS hdd_close_all_adapters( hdd_context_t *pHddCtx )
 void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter)
 {
     tANI_U8 *bssid = NULL;
+    tSirUpdateIE updateIE;
     switch (pHostapdAdapter->device_mode)
     {
     case WLAN_HDD_INFRA_STATION:
@@ -8878,14 +8977,16 @@ void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter)
                pHostapdAdapter->device_mode);
         return;
     }
+
+    vos_mem_copy(updateIE.bssid, bssid, sizeof(tSirMacAddr));
+        updateIE.smeSessionId =  pHostapdAdapter->sessionId;
+        updateIE.ieBufferlength = 0;
+        updateIE.pAdditionIEBuffer = NULL;
+        updateIE.append = VOS_TRUE;
+        updateIE.notify = VOS_FALSE;
     if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pHostapdAdapter),
-                      pHostapdAdapter->sessionId,
-                      bssid,
-                      NULL,
-                      0,
-                      VOS_TRUE) == eHAL_STATUS_FAILURE)
-    {
-        hddLog(LOGE, "Could not pass on Additional IE data to PE");
+            &updateIE, eUPDATE_IE_PROBE_RESP) == eHAL_STATUS_FAILURE) {
+        hddLog(LOGE, FL("Could not pass on PROBE_RSP_BCN data to PE"));
     }
 }
 
@@ -8895,6 +8996,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
    union iwreq_data wrqu;
+   tSirUpdateIE updateIE ;
    long ret;
 
    ENTER();
@@ -9053,21 +9155,23 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
             clear_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags);
             wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
 
-            if (eHAL_STATUS_FAILURE ==
-                ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_PROBE_RSP_BCN_ADDNIE_FLAG,
-                             0, NULL, eANI_BOOLEAN_FALSE))
-            {
-               hddLog(LOGE,
-                      "%s: Failed to set WNI_CFG_PROBE_RSP_BCN_ADDNIE_FLAG",
-                      __func__);
+            vos_mem_copy(updateIE.bssid, pAdapter->macAddressCurrent.bytes,
+                   sizeof(tSirMacAddr));
+            updateIE.smeSessionId = pAdapter->sessionId;
+            updateIE.ieBufferlength = 0;
+            updateIE.pAdditionIEBuffer = NULL;
+            updateIE.append = VOS_FALSE;
+            updateIE.notify = VOS_FALSE;
+            /* Probe bcn reset */
+            if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pAdapter),
+                              &updateIE, eUPDATE_IE_PROBE_BCN)
+                              == eHAL_STATUS_FAILURE) {
+                hddLog(LOGE, FL("Could not pass on PROBE_RSP_BCN data to PE"));
             }
-
-            if ( eHAL_STATUS_FAILURE == ccmCfgSetInt((WLAN_HDD_GET_CTX(pAdapter))->hHal,
-                     WNI_CFG_ASSOC_RSP_ADDNIE_FLAG, 0, NULL,
-                     eANI_BOOLEAN_FALSE) )
-            {
-               hddLog(LOGE,
-                     "Could not pass on WNI_CFG_ASSOC_RSP_ADDNIE_FLAG to CCM");
+            /* Assoc resp reset */
+            if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pAdapter),
+                    &updateIE, eUPDATE_IE_ASSOC_RESP) == eHAL_STATUS_FAILURE) {
+                hddLog(LOGE, FL("Could not pass on ASSOC_RSP data to PE"));
             }
 
             // Reset WNI_CFG_PROBE_RSP Flags
@@ -9215,6 +9319,8 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
    {
       pAdapter = pAdapterNode->pAdapter;
 
+      hdd_wmm_init( pAdapter );
+
       switch(pAdapter->device_mode)
       {
          case WLAN_HDD_INFRA_STATION:
@@ -9319,6 +9425,9 @@ VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx )
          hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
          hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
 
+         hddLog(VOS_TRACE_LEVEL_INFO,
+            "%s: Set HDD connState to eConnectionState_NotConnected",
+                   __func__);
          pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
          init_completion(&pAdapter->disconnect_comp_var);
          sme_RoamDisconnect(pHddCtx->hHal, pAdapter->sessionId,
@@ -11483,15 +11592,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_wiphy_unregister;
    }
 
-   //Initialize the WMM module
-   status = hdd_wmm_init(pHddCtx, hddWmmDscpToUpMapInfra);
-   status = hdd_wmm_init(pHddCtx, hddWmmDscpToUpMapP2p);
-   if (!VOS_IS_STATUS_SUCCESS(status))
-   {
-      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: hdd_wmm_init failed", __func__);
-      goto err_wiphy_unregister;
-   }
-
    /* In the integrated architecture we update the configuration from
       the INI file and from NV before vOSS has been started so that
       the final contents are available to send down to the cCPU   */
@@ -12040,6 +12140,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
     sme_ExtScanRegisterCallback(pHddCtx->hHal,
                                 wlan_hdd_cfg80211_extscan_callback);
 #endif /* FEATURE_WLAN_EXTSCAN */
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+   wlan_hdd_cfg80211_link_layer_stats_init(pHddCtx);
+#endif
 
 #ifdef WLAN_FEATURE_LPSS
    wlan_hdd_send_status_pkg(pAdapter, NULL, 1, 0);
@@ -13521,6 +13624,35 @@ void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_BOOL_t enable)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MBSSID
+hdd_adapter_t * hdd_get_con_sap_adapter(hdd_adapter_t *this_sap_adapter)
+{
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(this_sap_adapter);
+    hdd_adapter_t *pAdapter, *con_sap_adapter;
+    VOS_STATUS status = VOS_STATUS_SUCCESS;
+    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
+
+    con_sap_adapter = NULL;
+
+    status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
+    while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status ) {
+        pAdapter = pAdapterNode->pAdapter;
+        if (pAdapter && pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+            if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags)) {
+                if (pAdapter != this_sap_adapter) {
+                    con_sap_adapter = pAdapter;
+                    break;
+                }
+            }
+        }
+        status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext );
+        pAdapterNode = pNext;
+    }
+
+    return con_sap_adapter;
+}
+#endif
+
 #ifdef MSM_PLATFORM
 void hdd_start_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
 {
@@ -13579,73 +13711,10 @@ void hdd_stop_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
 
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-void wlan_hdd_restart_sap(hdd_adapter_t *ap_pAdapter)
-{
-    hdd_ap_ctx_t *pHddApCtx;
-    hdd_hostapd_state_t *pHostapdState;
-    VOS_STATUS vos_status;
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(ap_pAdapter);
-
-    pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_pAdapter);
-
-    mutex_lock(&pHddCtx->sap_lock);
-    if(test_bit(SOFTAP_BSS_STARTED, &ap_pAdapter->event_flags))
-    {
-        wlan_hdd_cfg80211_del_station(ap_pAdapter->wdev.wiphy, ap_pAdapter->dev,
-                                                                          NULL);
-        hdd_cleanup_actionframe(pHddCtx, ap_pAdapter);
-
-        pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_pAdapter);
-        if ( VOS_STATUS_SUCCESS == (vos_status = WLANSAP_StopBss(
-#ifdef WLAN_FEATURE_MBSSID
-            pHddApCtx->sapContext
-#else
-            (WLAN_HDD_GET_CTX(ap_pAdapter))->pvosContext
-#endif
-        ))) {
-            vos_status = vos_wait_single_event(&pHostapdState->vosEvent, 10000);
-
-            if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
-                hddLog(LOGE,FL("%s: SAP Stop Failed"), __func__);
-                goto end;
-            }
-        }
-        clear_bit(SOFTAP_BSS_STARTED, &ap_pAdapter->event_flags);
-        wlan_hdd_decr_active_session(pHddCtx, ap_pAdapter->device_mode);
-        hddLog(LOGE,FL("%s: SAP Stop Success"), __func__);
-
-        if (WLANSAP_StartBss(
-#ifdef WLAN_FEATURE_MBSSID
-            pHddApCtx->sapContext,
-#else
-            pHddCtx->pvosContext,
-#endif
-            hdd_hostapd_SAPEventCB, &pHddApCtx->sapConfig,
-            (v_PVOID_t)ap_pAdapter->dev) != VOS_STATUS_SUCCESS) {
-            hddLog(LOGE,FL("%s: SAP Start Bss fail"), __func__);
-            goto end;
-        }
-
-        hddLog(LOG1, FL("%s: Waiting for SAP to start"), __func__);
-        vos_status = vos_wait_single_event(&pHostapdState->vosEvent, 10000);
-        if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
-            hddLog(LOGE,FL("%s: SAP Start failed"), __func__);
-            goto end;
-        }
-        hddLog(LOGE,FL("%s: SAP Start Success"), __func__);
-        set_bit(SOFTAP_BSS_STARTED, &ap_pAdapter->event_flags);
-        wlan_hdd_incr_active_session(pHddCtx, ap_pAdapter->device_mode);
-        pHostapdState->bCommit = TRUE;
-    }
-end:
-    mutex_unlock(&pHddCtx->sap_lock);
-    return;
-}
-
 void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
 {
-    hdd_adapter_t *ap_pAdapter = NULL, *sta_pAdapter = (hdd_adapter_t *)data;
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(sta_pAdapter);
+    hdd_adapter_t *ap_adapter = NULL, *sta_adapter = (hdd_adapter_t *)data;
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(sta_adapter);
     tHalHandle hHal;
     hdd_ap_ctx_t *pHddApCtx;
     v_U16_t intf_ch = 0;
@@ -13655,11 +13724,15 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
        || !(vos_get_concurrency_mode() == VOS_STA_SAP)))
         return;
 
-    ap_pAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_SOFTAP);
-    if (ap_pAdapter == NULL)
+    ap_adapter = hdd_get_adapter(pHddCtx, WLAN_HDD_SOFTAP);
+    if (ap_adapter == NULL)
         return;
-    pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_pAdapter);
-    hHal = WLAN_HDD_GET_HAL_CTX(ap_pAdapter);
+
+    if (!test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags))
+        return;
+
+    pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+    hHal = WLAN_HDD_GET_HAL_CTX(ap_adapter);
 
     if (hHal == NULL)
         return;
@@ -13676,7 +13749,7 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     sme_SelectCBMode(hHal,
             sapConvertSapPhyModeToCsrPhyMode(pHddApCtx->sapConfig.SapHw_mode),
                                              pHddApCtx->sapConfig.channel);
-    wlan_hdd_restart_sap(ap_pAdapter);
+    wlan_hdd_restart_sap(ap_adapter);
 }
 
 #endif

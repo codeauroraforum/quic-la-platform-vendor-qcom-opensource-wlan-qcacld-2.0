@@ -1115,6 +1115,13 @@ struct hdd_adapter_s
     unsigned int tx_flow_high_watermark_offset;
 #endif /* QCA_LL_TX_FLOW_CT */
     v_BOOL_t offloads_configured;
+
+    /* DSCP to UP QoS Mapping */
+    sme_QosWmmUpType hddWmmDscpToUpMap[WLAN_HDD_MAX_DSCP+1];
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+   v_BOOL_t isLinkLayerStatsSet;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1487,14 +1494,14 @@ struct hdd_context_s
     adf_os_work_t  sta_ap_intf_check_work;
 #endif
 
+    v_U8_t dev_dfs_cac_status;
+
     v_BOOL_t btCoexModeSet;
 #ifdef FEATURE_GREEN_AP
     hdd_green_ap_ctx_t *green_ap_ctx;
 #endif
     fw_log_info fw_log_settings;
 };
-
-
 
 /*---------------------------------------------------------------------------
   Function declarations and documenation
@@ -1683,6 +1690,10 @@ void wlan_hdd_send_svc_nlink_msg(int type, void *data, int len);
 void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_U8_t enable);
 #endif
 
+#ifdef WLAN_FEATURE_MBSSID
+hdd_adapter_t *hdd_get_con_sap_adapter(hdd_adapter_t *this_sap_adapter);
+#endif
+
 boolean hdd_is_5g_supported(hdd_context_t * pHddCtx);
 
 #ifdef FEATURE_GREEN_AP
@@ -1695,6 +1706,10 @@ void hdd_wlan_green_ap_mc(hdd_context_t *pHddCtx,
 
 #ifdef WLAN_FEATURE_STATS_EXT
 void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
+#endif
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+void wlan_hdd_cfg80211_link_layer_stats_init(hdd_context_t *pHddCtx);
 #endif
 
 void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr);

@@ -396,10 +396,17 @@ enum eWniMsgTypes
     eWNI_SME_LINK_SPEED_IND,//Indicate linkspeed response from WMA
     eWNI_SME_CSA_OFFLOAD_EVENT,
     eWNI_SME_UPDATE_ADDITIONAL_IES,  // indicates Additional IE from hdd to PE
+    eWNI_SME_MODIFY_ADDITIONAL_IES, /* To indicate IE modify from hdd to PE */
 #ifdef QCA_HT_2040_COEX
     eWNI_SME_SET_HT_2040_MODE,
 #endif
-
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+    eWNI_SME_ROAM_OFFLOAD_SYNCH_IND, /* Roam Synch Indication from WMA to SME*/
+    eWNI_SME_FT_ROAM_OFFLOAD_SYNCH_IND,/* Hand over the Roam Synch Indication
+                                          from SME to PE*/
+    eWNI_SME_FT_ROAM_OFFLOAD_SYNCH_RSP,/* Roam Synch Indication Rsp
+                                         from PE toSME */
+#endif
     eWNI_SME_MSG_TYPES_END
 };
 

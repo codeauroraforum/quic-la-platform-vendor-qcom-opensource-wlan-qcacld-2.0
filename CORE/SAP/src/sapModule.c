@@ -735,7 +735,6 @@ WLANSAP_StartBss
         vos_mem_copy(pSapCtx->denyMacList, pConfig->deny_mac, sizeof(pConfig->deny_mac));
         pSapCtx->nDenyMac = pConfig->num_deny_mac;
         sapSortMacList(pSapCtx->denyMacList, pSapCtx->nDenyMac);
-
         /* Fill in the event structure for FSM */
         sapEvent.event = eSAP_HDD_START_INFRA_BSS;
         sapEvent.params = 0;//pSapPhysLinkCreate
@@ -875,11 +874,6 @@ WLANSAP_StopBss
         Sanity check
         Extract SAP control block
     ------------------------------------------------------------------------*/
-#ifdef WLAN_FEATURE_MBSSID
-    VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                 "WLANSAP_StopBss: sapContext=%p", pSapCtx);
-#endif
-
     if ( NULL == pCtx )
     {
         VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
@@ -3094,49 +3088,134 @@ VOS_STATUS WLANSAP_Set_Dfs_Target_Chnl(tHalHandle hHal, v_U8_t target_channel)
     return VOS_STATUS_SUCCESS;
 }
 
-VOS_STATUS WLANSAP_UpdateSapConfigAddIE(tsap_Config_t *pConfig,
+VOS_STATUS
+WLANSAP_UpdateSapConfigAddIE(tsap_Config_t *pConfig,
                          const tANI_U8 *pAdditionIEBuffer,
-                         tANI_U16 additionIELength)
+                         tANI_U16 additionIELength,
+                         eUpdateIEsType updateType)
 {
     VOS_STATUS status = VOS_STATUS_SUCCESS;
+    tANI_U8  bufferValid = VOS_FALSE;
+    tANI_U16 bufferLength = 0;
+    tANI_U8 *pBuffer = NULL;
 
-    if (NULL == pConfig) {
+    if (NULL == pConfig)
+    {
         return VOS_STATUS_E_FAULT;
     }
-    if ( (pAdditionIEBuffer != NULL) && (additionIELength != 0) ) {
-        /* initialize the buffer pointer so that pe can copy*/
-        if (additionIELength > 0) {
-            pConfig->addnIEsBufferLen = additionIELength;
-            pConfig->addnIEsBuffer = vos_mem_malloc(additionIELength);
-            if (NULL == pConfig->addnIEsBuffer) {
+
+    if ( (pAdditionIEBuffer != NULL) && (additionIELength != 0) )
+    {
+           /* initialize the buffer pointer so that pe can copy*/
+       if (additionIELength > 0)
+       {
+           bufferLength = additionIELength;
+           pBuffer = vos_mem_malloc(bufferLength);
+           if (NULL == pBuffer)
+           {
                 VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                     "%s: Could not copy PROBE_RSP_ADDNIE", __func__);
+                    FL("Could not allocate the buffer "));
                 return VOS_STATUS_E_NOMEM;
             }
-            vos_mem_copy(pConfig->addnIEsBuffer,
-                         pAdditionIEBuffer, additionIELength);
-        }
-    } else {
-        vos_mem_free(pConfig->addnIEsBuffer);
-        pConfig->addnIEsBufferLen = 0;
-        pConfig->addnIEsBuffer = NULL;
+            vos_mem_copy(pBuffer, pAdditionIEBuffer, bufferLength);
+            bufferValid = VOS_TRUE;
+       }
+    }
 
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-            "%s: No Probe Response IE received in set beacon", __func__);
+    switch(updateType)
+    {
+    case eUPDATE_IE_PROBE_BCN:
+        if (bufferValid)
+        {
+            pConfig->probeRespBcnIEsLen = bufferLength;
+            pConfig->pProbeRespBcnIEsBuffer = pBuffer;
+        }
+        else
+        {
+            vos_mem_free(pConfig->pProbeRespBcnIEsBuffer);
+            pConfig->probeRespBcnIEsLen = 0;
+            pConfig->pProbeRespBcnIEsBuffer = NULL;
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                FL("No Probe Resp beacone IE received in set beacon"));
+        }
+        break;
+    case eUPDATE_IE_PROBE_RESP:
+        if (bufferValid)
+        {
+            pConfig->probeRespIEsBufferLen= bufferLength;
+            pConfig->pProbeRespIEsBuffer = pBuffer;
+        }
+        else
+        {
+            vos_mem_free(pConfig->pProbeRespIEsBuffer);
+            pConfig->probeRespIEsBufferLen = 0;
+            pConfig->pProbeRespIEsBuffer = NULL;
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                FL("No Probe Response IE received in set beacon"));
+        }
+        break;
+    case eUPDATE_IE_ASSOC_RESP:
+        if (bufferValid)
+        {
+            pConfig->assocRespIEsLen = bufferLength;
+            pConfig->pAssocRespIEsBuffer = pBuffer;
+        }
+        else
+        {
+            vos_mem_free(pConfig->pAssocRespIEsBuffer);
+            pConfig->assocRespIEsLen = 0;
+            pConfig->pAssocRespIEsBuffer = NULL;
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                FL("No Assoc Response IE received in set beacon"));
+        }
+        break;
+    default:
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                FL("No matching buffer type %d"), updateType);
+        break;
     }
 
     return (status);
 }
 
 
-VOS_STATUS WLANSAP_ResetSapConfigAddIE(tsap_Config_t *pConfig )
+VOS_STATUS
+WLANSAP_ResetSapConfigAddIE(tsap_Config_t *pConfig,
+                            eUpdateIEsType updateType)
 {
     if (NULL == pConfig) {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                   "%s: Invalid Config pointer", __func__);
         return VOS_STATUS_E_FAULT;
     }
-    vos_mem_free( pConfig->addnIEsBuffer);
-    pConfig->addnIEsBufferLen = 0;
-    pConfig->addnIEsBuffer = NULL;
+
+    switch (updateType)
+    {
+    case eUPDATE_IE_ALL:  /*only used to reset*/
+    case eUPDATE_IE_PROBE_RESP:
+        vos_mem_free( pConfig->pProbeRespIEsBuffer);
+        pConfig->probeRespIEsBufferLen = 0;
+        pConfig->pProbeRespIEsBuffer = NULL;
+        if(eUPDATE_IE_ALL != updateType)  break;
+
+    case eUPDATE_IE_ASSOC_RESP:
+        vos_mem_free( pConfig->pAssocRespIEsBuffer);
+        pConfig->assocRespIEsLen = 0;
+        pConfig->pAssocRespIEsBuffer = NULL;
+        if(eUPDATE_IE_ALL != updateType)  break;
+
+    case eUPDATE_IE_PROBE_BCN:
+        vos_mem_free(pConfig->pProbeRespBcnIEsBuffer );
+        pConfig->probeRespBcnIEsLen = 0;
+        pConfig->pProbeRespBcnIEsBuffer = NULL;
+        if(eUPDATE_IE_ALL != updateType)  break;
+
+    default:
+        if(eUPDATE_IE_ALL != updateType)
+            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                   FL("Invalid buffer type %d"), updateType);
+        break;
+    }
     return VOS_STATUS_SUCCESS;
 }
 
@@ -3166,6 +3245,8 @@ WLANSAP_Get_DfsNol(v_PVOID_t pSapCtx)
     ptSapContext sapContext = (ptSapContext)pSapCtx;
     v_PVOID_t hHal = NULL;
     tpAniSirGlobal pMac = NULL;
+    unsigned long current_time, elapsed_time, found_time, left_time;
+    tSapDfsNolInfo *dfs_nol = NULL;
 
     if (NULL == sapContext)
     {
@@ -3188,19 +3269,46 @@ WLANSAP_Get_DfsNol(v_PVOID_t pSapCtx)
         return VOS_STATUS_SUCCESS;
     }
 
+    dfs_nol = pMac->sap.SapDfsInfo.sapDfsChannelNolList;
+
+    if (!dfs_nol) {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+                "%s: DFS NOL context is null", __func__);
+        return VOS_STATUS_E_FAULT;
+    }
+
     for (i = 0; i < pMac->sap.SapDfsInfo.numCurrentRegDomainDfsChannels; i++)
     {
-        if (!pMac->sap.SapDfsInfo.sapDfsChannelNolList[i].dfs_channel_number)
+        if (!dfs_nol[i].dfs_channel_number)
             continue;
 
-        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
-                "%s: Channel[%d] is %s",
+        current_time = vos_timer_get_system_time();
+        found_time = dfs_nol[i].radar_found_timestamp;
+
+        elapsed_time = abs(current_time - found_time);
+
+        /* check if it is out of non occupancy period */
+        if (elapsed_time >= SAP_DFS_NON_OCCUPANCY_PERIOD)
+        {
+            dfs_nol[i].radar_status_flag = eSAP_DFS_CHANNEL_AVAILABLE;
+            dfs_nol[i].radar_found_timestamp  = 0;
+
+            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                "%s: Channel[%d] is AVAILABLE",
                 __func__,
-                pMac->sap.SapDfsInfo.sapDfsChannelNolList[i].
-                    dfs_channel_number,
-                (pMac->sap.SapDfsInfo.sapDfsChannelNolList[i].
-                    radar_status_flag > eSAP_DFS_CHANNEL_AVAILABLE) ?
-                        "UNAVAILABLE" : "AVAILABLE");
+                dfs_nol[i].dfs_channel_number);
+        } else {
+
+            /* the time left in min */
+            left_time = SAP_DFS_NON_OCCUPANCY_PERIOD - elapsed_time;
+            left_time = left_time / (60 * 1000);
+
+            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                "%s: Channel[%d] is UNAVAILABLE [%ld min left]",
+                __func__,
+                dfs_nol[i].dfs_channel_number,
+                left_time);
+        }
     }
 
     return VOS_STATUS_SUCCESS;
