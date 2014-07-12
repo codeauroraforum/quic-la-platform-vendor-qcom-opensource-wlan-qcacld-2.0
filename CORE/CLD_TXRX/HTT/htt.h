@@ -1913,7 +1913,6 @@ PREPACK struct htt_rx_ind_hdr_t
 #define HTT_RX_IND_FW_RX_DESC_BYTES_GET(word) \
     (((word) & HTT_RX_IND_FW_RX_DESC_BYTES_M) >> HTT_RX_IND_FW_RX_DESC_BYTES_S)
 
-
 #define HTT_RX_IND_FLUSH_SEQ_NUM_START_SET(word, value)              \
     do {                                                             \
         HTT_CHECK_SET_VAL(HTT_RX_IND_FLUSH_SEQ_NUM_START, value);    \
@@ -3142,6 +3141,10 @@ typedef struct {
  *         FW Rx descriptors
  *     Value: 1
  */
+#define HTT_RX_FRAG_IND_HDR_PREFIX_SIZE32         2
+
+#define HTT_RX_FRAG_IND_FW_DESC_BYTE_OFFSET       3
+
 #define HTT_RX_FRAG_IND_EXT_TID_SET     HTT_RX_IND_EXT_TID_SET
 #define HTT_RX_FRAG_IND_EXT_TID_GET     HTT_RX_IND_EXT_TID_GET
 
@@ -3160,6 +3163,8 @@ typedef struct {
     HTT_RX_IND_FLUSH_SEQ_NUM_END_SET
 #define HTT_RX_FRAG_IND_FLUSH_SEQ_NUM_END_GET \
     HTT_RX_IND_FLUSH_SEQ_NUM_END_GET
+
+#define HTT_RX_FRAG_IND_FW_RX_DESC_BYTES_GET  HTT_RX_IND_FW_RX_DESC_BYTES_GET
 
 #define HTT_RX_FRAG_IND_BYTES                 \
     (4 /* msg hdr */ +                        \
