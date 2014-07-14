@@ -346,4 +346,5 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"RMC_ACTION_PERIOD_FREQUENCY",
     (unsigned char *)"CURRENT_RSSI",
     (unsigned char *)"RTT3_ENABLE",
+    (unsigned char *)"DFS_MASTER_ENABLED",
 };
