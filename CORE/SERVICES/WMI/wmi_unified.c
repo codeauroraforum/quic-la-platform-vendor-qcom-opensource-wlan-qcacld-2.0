@@ -44,7 +44,6 @@
 #include "wma_api.h"
 #include "wma.h"
 #include "macTrace.h"
-#include "vos_api.h"
 #include "if_pci.h"
 
 #define WMI_MIN_HEAD_ROOM 64
@@ -63,7 +62,7 @@ struct wmi_event_debug wmi_event_log_buffer[WMI_EVENT_DEBUG_MAX_ENTRY];
 	wmi_command_log_buffer[g_wmi_command_buf_idx].command = a;	\
 	adf_os_mem_copy(wmi_command_log_buffer[g_wmi_command_buf_idx].data, b , 16);\
 	wmi_command_log_buffer[g_wmi_command_buf_idx].time =		\
-		vos_get_monotonic_boottime();				\
+		adf_get_boottime();					\
 	g_wmi_command_buf_idx++;					\
 }
 
@@ -73,7 +72,7 @@ struct wmi_event_debug wmi_event_log_buffer[WMI_EVENT_DEBUG_MAX_ENTRY];
 	wmi_event_log_buffer[g_wmi_event_buf_idx].event = a;		\
 	adf_os_mem_copy(wmi_event_log_buffer[g_wmi_event_buf_idx].data, b , 16);\
 	wmi_event_log_buffer[g_wmi_event_buf_idx].time =		\
-		vos_get_monotonic_boottime();				\
+		adf_get_boottime();					\
 	g_wmi_event_buf_idx++;						\
 }
 
