@@ -140,4 +140,7 @@ tVOS_CONCURRENCY_MODE vos_get_concurrency_mode( void );
 v_BOOL_t vos_concurrent_open_sessions_running(void);
 v_BOOL_t vos_max_concurrent_connections_reached(void);
 
+#ifdef WLAN_FEATURE_MBSSID
+v_BOOL_t vos_concurrent_sap_sessions_running(v_VOID_t);
+#endif
 #endif // !defined __VOS_GETBIN_H
