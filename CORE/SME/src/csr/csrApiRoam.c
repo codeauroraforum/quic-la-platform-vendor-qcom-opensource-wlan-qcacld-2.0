@@ -1826,6 +1826,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         pMac->roam.configParam.cc_switch_mode = pParam->cc_switch_mode;
 #endif
         pMac->roam.configParam.allowDFSChannelRoam = pParam->allowDFSChannelRoam;
+        pMac->roam.configParam.obssEnabled = pParam->obssEnabled;
     }
 
     return status;
@@ -1969,6 +1970,8 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
         pParam->nInitialDwellTime =
                                 pMac->roam.configParam.nInitialDwellTime;
         csrSetChannels(pMac, pParam);
+
+        pParam->obssEnabled = pMac->roam.configParam.obssEnabled;
 
         status = eHAL_STATUS_SUCCESS;
     }
@@ -14283,6 +14286,8 @@ eHalStatus csrSendMBStartBssReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, eCs
 
         vos_mem_copy(pBuf, &pParam->addIeParams, sizeof( pParam->addIeParams ));
         pBuf += sizeof(pParam->addIeParams);
+
+        *pBuf++ = (tANI_U8)pMac->roam.configParam.obssEnabled;
 
         msgLen = (tANI_U16)(sizeof(tANI_U32 ) + (pBuf - wTmpBuf)); //msg_header + msg
         pMsg->length = pal_cpu_to_be16(msgLen);

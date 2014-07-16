@@ -687,6 +687,7 @@ typedef struct tagCsrConfig
     tANI_U8 cc_switch_mode;
 #endif
     tANI_BOOLEAN allowDFSChannelRoam;
+    tANI_BOOLEAN obssEnabled;
 }tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo
