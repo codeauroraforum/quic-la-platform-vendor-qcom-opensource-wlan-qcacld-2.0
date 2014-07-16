@@ -2503,6 +2503,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_DFS_RADAR_PRI_MULTIPLIER_MIN           ( 0 )
 #define CFG_DFS_RADAR_PRI_MULTIPLIER_MAX           ( 10 )
 
+#define CFG_MAX_CONCURRENT_CONNECTIONS_NAME       "gMaxConcurrentActiveSessions"
+#define CFG_MAX_CONCURRENT_CONNECTIONS_DEFAULT    ( 2 )
+#define CFG_MAX_CONCURRENT_CONNECTIONS_MIN        ( 1 )
+#define CFG_MAX_CONCURRENT_CONNECTIONS_MAX        ( 4 )
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3042,6 +3047,7 @@ typedef struct
 #endif
 
    v_S31_t                     dfsRadarPriMultiplier;
+   v_U8_t                      gMaxConcurrentActiveSessions;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

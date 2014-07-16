@@ -8643,9 +8643,9 @@ VOS_STATUS hdd_close_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
           return VOS_STATUS_SUCCESS;
 
       /* If there is a single session of STA/P2P client, re-enable BMPS */
-      if ((!vos_concurrent_sessions_running()) &&
-           ((pHddCtx->no_of_sessions[VOS_STA_MODE] >= 1) ||
-           (pHddCtx->no_of_sessions[VOS_P2P_CLIENT_MODE] >= 1)))
+      if ((!vos_concurrent_open_sessions_running()) &&
+           ((pHddCtx->no_of_open_sessions[VOS_STA_MODE] >= 1) ||
+           (pHddCtx->no_of_open_sessions[VOS_P2P_CLIENT_MODE] >= 1)))
       {
           if (pHddCtx->hdd_wlan_suspended)
           {
@@ -8901,6 +8901,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
                hddLog(LOGE, "%s: failure in WLANSAP_StopBss", __func__);
             }
             clear_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags);
+            wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
 
             vos_mem_copy(updateIE.bssid, pAdapter->macAddressCurrent.bytes,
                    sizeof(tSirMacAddr));
@@ -12604,42 +12605,107 @@ v_BOOL_t hdd_is_suspend_notify_allowed(hdd_context_t* pHddCtx)
 
 void wlan_hdd_set_concurrency_mode(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
 {
-   switch(mode)
-   {
+   switch (mode) {
        case VOS_STA_MODE:
        case VOS_P2P_CLIENT_MODE:
        case VOS_P2P_GO_MODE:
        case VOS_STA_SAP_MODE:
             pHddCtx->concurrency_mode |= (1 << mode);
-            pHddCtx->no_of_sessions[mode]++;
+            pHddCtx->no_of_open_sessions[mode]++;
             break;
        default:
             break;
-
    }
-   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: concurrency_mode = 0x%x NumberofSessions for mode %d = %d",
-    __func__,pHddCtx->concurrency_mode,mode,pHddCtx->no_of_sessions[mode]);
+   hddLog(VOS_TRACE_LEVEL_INFO, FL("concurrency_mode = 0x%x "
+          "Number of open sessions for mode %d = %d"),
+           pHddCtx->concurrency_mode, mode,
+           pHddCtx->no_of_open_sessions[mode]);
 }
 
 
 void wlan_hdd_clear_concurrency_mode(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
-{
-   switch(mode)
    {
+   switch (mode)  {
        case VOS_STA_MODE:
        case VOS_P2P_CLIENT_MODE:
        case VOS_P2P_GO_MODE:
        case VOS_STA_SAP_MODE:
-    pHddCtx->no_of_sessions[mode]--;
-    if (!(pHddCtx->no_of_sessions[mode]))
-            pHddCtx->concurrency_mode &= (~(1 << mode));
+            pHddCtx->no_of_open_sessions[mode]--;
+            if (!(pHddCtx->no_of_open_sessions[mode]))
+                pHddCtx->concurrency_mode &= (~(1 << mode));
             break;
        default:
             break;
    }
-   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: concurrency_mode = 0x%x NumberofSessions for mode %d = %d",
-    __func__,pHddCtx->concurrency_mode,mode,pHddCtx->no_of_sessions[mode]);
+   hddLog(VOS_TRACE_LEVEL_INFO, FL("concurrency_mode = 0x%x "
+          "Number of open sessions for mode %d = %d"),
+          pHddCtx->concurrency_mode, mode, pHddCtx->no_of_open_sessions[mode]);
+   }
+
+/**---------------------------------------------------------------------------
+ *
+ *   \brief wlan_hdd_incr_active_session()
+ *
+ *   This function increments the number of active sessions
+ *   maintained per device mode
+ *   Incase of STA/P2P CLI/IBSS upon connection indication it is incremented
+ *   Incase of SAP/P2P GO upon bss start it is incremented
+ *
+ *   \param  pHddCtx - HDD Context
+ *   \param  mode    - device mode
+ *
+ *   \return - None
+ *
+ * --------------------------------------------------------------------------*/
+void wlan_hdd_incr_active_session(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
+{
+   switch (mode) {
+   case VOS_STA_MODE:
+   case VOS_P2P_CLIENT_MODE:
+   case VOS_P2P_GO_MODE:
+   case VOS_STA_SAP_MODE:
+        pHddCtx->no_of_active_sessions[mode]++;
+        break;
+   default:
+        break;
+   }
+   hddLog(VOS_TRACE_LEVEL_INFO, FL("No.# of active sessions for mode %d = %d"),
+                                mode,
+                                pHddCtx->no_of_active_sessions[mode]);
 }
+
+/**---------------------------------------------------------------------------
+ *
+ *   \brief wlan_hdd_decr_active_session()
+ *
+ *   This function decrements the number of active sessions
+ *   maintained per device mode
+ *   Incase of STA/P2P CLI/IBSS upon disconnection it is decremented
+ *   Incase of SAP/P2P GO upon bss stop it is decremented
+ *
+ *   \param  pHddCtx - HDD Context
+ *   \param  mode    - device mode
+ *
+ *   \return - None
+ *
+ * --------------------------------------------------------------------------*/
+void wlan_hdd_decr_active_session(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
+{
+   switch (mode) {
+   case VOS_STA_MODE:
+   case VOS_P2P_CLIENT_MODE:
+   case VOS_P2P_GO_MODE:
+   case VOS_STA_SAP_MODE:
+        pHddCtx->no_of_active_sessions[mode]--;
+        break;
+   default:
+        break;
+   }
+   hddLog(VOS_TRACE_LEVEL_INFO, FL("No.# of active sessions for mode %d = %d"),
+                                mode,
+                                pHddCtx->no_of_active_sessions[mode]);
+}
+
 
 /**---------------------------------------------------------------------------
  *
@@ -13247,7 +13313,7 @@ void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_BOOL_t enable)
     }
 
     /* To enable shutdown timer check conncurrency */
-    if (vos_concurrent_sessions_running()) {
+    if (vos_concurrent_open_sessions_running()) {
         status = hdd_get_front_adapter ( hdd_ctx, &pAdapterNode );
 
         while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status ) {
@@ -13317,7 +13383,7 @@ void hdd_stop_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
         return;
     }
 
-    if (vos_concurrent_sessions_running()) {
+    if (vos_concurrent_open_sessions_running()) {
         status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
 
         while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status ) {
@@ -13356,7 +13422,7 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     v_U16_t intf_ch = 0;
 
    if ((pHddCtx->cfg_ini->WlanMccToSccSwitchMode == VOS_MCC_TO_SCC_SWITCH_DISABLE)
-       || !(vos_concurrent_sessions_running()
+       || !(vos_concurrent_open_sessions_running()
        || !(vos_get_concurrency_mode() == VOS_STA_SAP)))
         return;
 
