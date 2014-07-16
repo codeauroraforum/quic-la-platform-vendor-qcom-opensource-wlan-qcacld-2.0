@@ -1812,7 +1812,7 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
         updateIE.ieBufferlength = total_ielen;
         updateIE.pAdditionIEBuffer = genie;
         updateIE.append = VOS_FALSE;
-        updateIE.notify = VOS_TRUE;
+        updateIE.notify = VOS_FALSE;
 
         if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pHostapdAdapter),
             &updateIE, eUPDATE_IE_PROBE_BCN) == eHAL_STATUS_FAILURE) {
