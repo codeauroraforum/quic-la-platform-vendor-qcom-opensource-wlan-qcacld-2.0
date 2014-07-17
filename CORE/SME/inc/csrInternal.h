@@ -693,6 +693,7 @@ typedef struct tagCsrConfig
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
     tANI_BOOLEAN  isRoamOffloadEnabled;
 #endif
+    tANI_BOOLEAN obssEnabled;
 }tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo
@@ -1018,7 +1019,7 @@ typedef struct tagCsrRoamSession
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
     tCsrRoamOffloadSynchStruct roamOffloadSynchParams;
-    tANI_U8 psk[SIR_ROAM_SCAN_PSK_SIZE];
+    tANI_U8 psk_pmk[SIR_ROAM_SCAN_PSK_SIZE];
 #endif
 } tCsrRoamSession;
 

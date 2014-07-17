@@ -842,15 +842,15 @@ eHalStatus sme_RoamSetPMKIDCache( tHalHandle hHal, tANI_U8 sessionId, tPmkidCach
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /* ---------------------------------------------------------------------------
- * \fn sme_RoamSetPSK
- * \brief a wrapper function to request CSR to save PSK
+ * \fn sme_RoamSetPSK_PMK
+ * \brief a wrapper function to request CSR to save PSK/PMK
  *  This is a synchronous call.
  * \param hHal - Global structure
  * \param sessionId - SME sessionId
- * \param pPSK - pointer to an array of Psk[]
- *\return eHalStatus -status whether PSK is set or not
+ * \param pPSK_PMK - pointer to an array of Psk[]/Pmk[]
+ *\return eHalStatus -status whether PSK/PMK is set or not
  * ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamSetPSK ( tHalHandle hHal, tANI_U8 sessionId, tANI_U8 *pPSK );
+eHalStatus sme_RoamSetPSK_PMK ( tHalHandle hHal, tANI_U8 sessionId, tANI_U8 *pPSK_PMK );
 #endif
 /* ---------------------------------------------------------------------------
     \fn sme_RoamGetSecurityReqIE
@@ -3512,6 +3512,7 @@ tANI_S16 sme_GetHTConfig(tHalHandle hHal, tANI_U8 session_id, tANI_U16 ht_capab)
 VOS_STATUS sme_notify_ht2040_mode(tHalHandle hHal, tANI_U16 staId,
              v_MACADDR_t macAddrSTA, v_U8_t sessionId, tANI_U8 channel_type);
 eHalStatus sme_SetHT2040Mode(tHalHandle hHal, tANI_U8 sessionId, tANI_U8 channel_type);
+eHalStatus sme_SetPhyCBMode24G(tHalHandle hHal, ePhyChanBondState phyCBMode);
 #endif
 
 #ifdef QCA_WIFI_2_0

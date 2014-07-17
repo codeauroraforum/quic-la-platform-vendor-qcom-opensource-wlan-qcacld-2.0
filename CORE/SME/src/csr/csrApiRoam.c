@@ -1866,6 +1866,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         pMac->roam.configParam.isRoamOffloadEnabled =
                                pParam->isRoamOffloadEnabled;
 #endif
+        pMac->roam.configParam.obssEnabled = pParam->obssEnabled;
     }
 
     return status;
@@ -2013,6 +2014,8 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
                                 pMac->roam.configParam.isRoamOffloadEnabled;
 #endif
         csrSetChannels(pMac, pParam);
+
+        pParam->obssEnabled = pMac->roam.configParam.obssEnabled;
 
         status = eHAL_STATUS_SUCCESS;
     }
@@ -12406,15 +12409,15 @@ tANI_U32 csrRoamGetNumBKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId)
 }
 #endif /* FEATURE_WLAN_WAPI */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-eHalStatus csrRoamSetPSK (tpAniSirGlobal pMac, tANI_U32 sessionId,
-                                                        tANI_U8 *pPSK)
+eHalStatus csrRoamSetPSK_PMK (tpAniSirGlobal pMac, tANI_U32 sessionId,
+                                                        tANI_U8 *pPSK_PMK)
 {
     tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, sessionId);
     if (!pSession) {
         smsLog(pMac, LOGE, FL("session %d not found"), sessionId);
         return eHAL_STATUS_FAILURE;
     }
-    vos_mem_copy(pSession->psk, pPSK, sizeof(pSession->psk));
+    vos_mem_copy(pSession->psk_pmk, pPSK_PMK, sizeof(pSession->psk_pmk));
     return eHAL_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
@@ -14487,6 +14490,8 @@ eHalStatus csrSendMBStartBssReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, eCs
         vos_mem_copy(pBuf, &pParam->addIeParams, sizeof( pParam->addIeParams ));
         pBuf += sizeof(pParam->addIeParams);
 
+        *pBuf++ = (tANI_U8)pMac->roam.configParam.obssEnabled;
+
         msgLen = (tANI_U16)(sizeof(tANI_U32 ) + (pBuf - wTmpBuf)); //msg_header + msg
         pMsg->length = pal_cpu_to_be16(msgLen);
 
@@ -16372,7 +16377,7 @@ csrRoamScanOffloadPrepareProbeReqTemplate(tpAniSirGlobal pMac,
 void csrRoamOffload(tpAniSirGlobal pMac, tSirRoamOffloadScanReq *pRequestBuf,
                                                    tCsrRoamSession *pSession)
 {
-        vos_mem_copy(pRequestBuf->PSK, pSession->psk, sizeof(pRequestBuf->PSK));
+        vos_mem_copy(pRequestBuf->PSK_PMK, pSession->psk_pmk, sizeof(pRequestBuf->PSK_PMK));
         pRequestBuf->Prefer5GHz = pMac->roam.configParam.nRoamPrefer5GHz;
         pRequestBuf->RoamRssiCatGap = pMac->roam.configParam.bCatRssiOffset;
         pRequestBuf->Select5GHzMargin = pMac->roam.configParam.nSelect5GHzMargin;
@@ -18248,26 +18253,31 @@ csrRoamUpdateAddIEs(tpAniSirGlobal pMac,
     tANI_U8 *pLocalBuffer = NULL;
     eHalStatus status;
 
-    /* following buffer will be freed by consumer (PE) */
-    pLocalBuffer = vos_mem_malloc(pUpdateIE->ieBufferlength);
-
-    if (NULL == pLocalBuffer)
+    if (pUpdateIE->ieBufferlength != 0)
     {
-       smsLog(pMac, LOGE, FL("Memory Allocation Failure!!!"));
-       return eHAL_STATUS_FAILED_ALLOC;
+        /* Following buffer will be freed by consumer (PE) */
+        pLocalBuffer = vos_mem_malloc(pUpdateIE->ieBufferlength);
+        if (NULL == pLocalBuffer)
+        {
+           smsLog(pMac, LOGE, FL("Memory Allocation Failure!!!"));
+           return eHAL_STATUS_FAILED_ALLOC;
+        }
+        vos_mem_copy(pLocalBuffer, pUpdateIE->pAdditionIEBuffer,
+                pUpdateIE->ieBufferlength);
     }
 
-    pUpdateAddIEs = vos_mem_malloc(sizeof(tpSirUpdateIEsInd));
+    pUpdateAddIEs = vos_mem_malloc( sizeof(tSirUpdateIEsInd) );
     if (NULL == pUpdateAddIEs)
     {
-       smsLog(pMac, LOGE, FL("Memory Allocation Failure!!!"));
-       vos_mem_free(pLocalBuffer);
+        smsLog(pMac, LOGE, FL("Memory Allocation Failure!!!"));
+        if (pLocalBuffer != NULL)
+        {
+            vos_mem_free(pLocalBuffer);
+        }
        return eHAL_STATUS_FAILED_ALLOC;
     }
 
-    vos_mem_copy(pLocalBuffer, pUpdateIE->pAdditionIEBuffer,
-            pUpdateIE->ieBufferlength);
-    vos_mem_zero(pUpdateAddIEs, sizeof(tpSirUpdateIEsInd));
+    vos_mem_zero(pUpdateAddIEs, sizeof(tSirUpdateIEsInd));
 
     pUpdateAddIEs->msgType =
         pal_cpu_to_be16((tANI_U16)eWNI_SME_UPDATE_ADDITIONAL_IES);
