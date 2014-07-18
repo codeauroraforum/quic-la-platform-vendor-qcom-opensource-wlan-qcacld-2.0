@@ -2429,6 +2429,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_INITIAL_DWELL_TIME_MIN             (0)
 #define CFG_INITIAL_DWELL_TIME_MAX             (100)
 
+#define CFG_ENABLE_SIFS_BURST                      "gEnableSifsBurst"
+#define CFG_ENABLE_SIFS_BURST_MIN                  ( 0 )
+#define CFG_ENABLE_SIFS_BURST_MAX                  ( 1 )
+#define CFG_ENABLE_SIFS_BURST_DEFAULT              ( 0 )
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2939,6 +2944,7 @@ typedef struct
    v_U32_t                     pmfSaQueryRetryInterval;
 #endif
    v_BOOL_t                    advertiseConcurrentOperation;
+   v_BOOL_t                    enableSifsBurst;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------

@@ -7319,6 +7319,7 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    tANI_U32 type, subType;
    long rc = 0;
+   int ret_val;
 
    INIT_COMPLETION(pAdapter->session_open_comp_var);
    sme_SetCurrDeviceMode(pHddCtx->hHal, pAdapter->device_mode);
@@ -7401,6 +7402,17 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    set_bit(WMM_INIT_DONE, &pAdapter->event_flags);
+
+   ret_val = process_wma_set_command((int)pAdapter->sessionId,
+                         (int)WMI_PDEV_PARAM_BURST_ENABLE,
+                         (int)pHddCtx->cfg_ini->enableSifsBurst,
+                         PDEV_CMD);
+
+   if (0 != ret_val) {
+       hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
+                   __func__, ret_val);
+   }
 
 #ifdef FEATURE_WLAN_TDLS
    if(0 != wlan_hdd_tdls_init(pAdapter))
@@ -9591,19 +9603,18 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
        hddLog(VOS_TRACE_LEVEL_ERROR,
            "%s: pAdapter is NULL, cannot Abort scan", __func__);
 
-   //Stop the traffic monitor timer
-   if ( VOS_TIMER_STATE_RUNNING ==
-                        vos_timer_getCurrentState(&pHddCtx->tx_rx_trafficTmr))
-   {
-        vos_timer_stop(&pHddCtx->tx_rx_trafficTmr);
-   }
+   /* Stop the traffic monitor timer */
+   if ((NULL != pHddCtx->cfg_ini) && (pHddCtx->cfg_ini->dynSplitscan)) {
+       if (VOS_TIMER_STATE_RUNNING ==
+                    vos_timer_getCurrentState(&pHddCtx->tx_rx_trafficTmr)) {
+            vos_timer_stop(&pHddCtx->tx_rx_trafficTmr);
+       }
 
-   // Destroy the traffic monitor timer
-   if (!VOS_IS_STATUS_SUCCESS(vos_timer_destroy(
-                         &pHddCtx->tx_rx_trafficTmr)))
-   {
-       hddLog(VOS_TRACE_LEVEL_ERROR,
-           "%s: Cannot deallocate Traffic monitor timer", __func__);
+       /* Destroy the traffic monitor timer */
+       if (!VOS_IS_STATUS_SUCCESS(vos_timer_destroy(
+                                 &pHddCtx->tx_rx_trafficTmr))) {
+            hddLog(LOGE, FL("Cannot de-allocate Traffic monitor timer"));
+       }
    }
 
 #ifdef MSM_PLATFORM
@@ -10170,7 +10181,8 @@ void hdd_exchange_version_and_caps(hdd_context_t *pHddCtx)
 /* Initialize channel list in sme based on the country code */
 VOS_STATUS hdd_set_sme_chan_list(hdd_context_t *hdd_ctx)
 {
-  return sme_init_chan_list(hdd_ctx->hHal, hdd_ctx->reg.alpha2);
+    return sme_init_chan_list(hdd_ctx->hHal, hdd_ctx->reg.alpha2,
+                              hdd_ctx->reg.cc_src);
 }
 
 /**---------------------------------------------------------------------------
@@ -10665,12 +10677,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_vosclose;
    }
 #endif
-   status = hdd_set_sme_chan_list(pHddCtx);
-   if (status != VOS_STATUS_SUCCESS) {
-      hddLog(VOS_TRACE_LEVEL_FATAL,
-             "%s: Failed to init channel list", __func__);
-      goto err_wiphy_unregister;
-   }
 
    if (0 == enable_dfs_chan_scan || 1 == enable_dfs_chan_scan)
    {
@@ -10704,6 +10710,12 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_wiphy_unregister;
    }
 
+   status = hdd_set_sme_chan_list(pHddCtx);
+   if (status != VOS_STATUS_SUCCESS) {
+      hddLog(VOS_TRACE_LEVEL_FATAL,
+             "%s: Failed to init channel list", __func__);
+      goto err_wiphy_unregister;
+   }
    /* In the integrated architecture we update the configuration from
       the INI file and from NV before vOSS has been started so that
       the final contents are available to send down to the cCPU   */
