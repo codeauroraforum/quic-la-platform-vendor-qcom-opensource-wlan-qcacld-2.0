@@ -119,11 +119,19 @@ int wlan_hdd_ftm_start(hdd_context_t *pAdapter);
 #include "wlan_hdd_tdls.h"
 #endif
 #ifdef FEATURE_WLAN_CH_AVOID
+#ifdef CONFIG_CNSS
 #include <net/cnss.h>
+#endif
 extern int hdd_hostapd_stop (struct net_device *dev);
 void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #endif /* FEATURE_WLAN_CH_AVOID */
+
+#ifdef WLAN_FEATURE_NAN
+#include "wlan_hdd_nan.h"
+#endif /* WLAN_FEATURE_NAN */
+
 #include "wlan_hdd_debugfs.h"
+#include "epping_main.h"
 
 #ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
@@ -600,6 +608,7 @@ static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
             }
         }
         clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+        wlan_hdd_decr_active_session(pHddCtx, ap_adapter->device_mode);
         hddLog(LOGE, FL("SAP Stop Success"));
 
         if (WLANSAP_StartBss(
@@ -622,6 +631,7 @@ static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
         }
         hddLog(LOGE, FL("SAP Start Success"));
         set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+        wlan_hdd_incr_active_session(pHddCtx, ap_adapter->device_mode);
         pHostapdState->bCommit = TRUE;
     }
 end:
@@ -5408,8 +5418,14 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            status = sme_SetEseBeaconRequest((tHalHandle)(pHddCtx->hHal),
                                             pAdapter->sessionId,
                                             &eseBcnReq);
-           if (eHAL_STATUS_SUCCESS != status)
-           {
+
+           if (eHAL_STATUS_RESOURCES == status) {
+               hddLog(VOS_TRACE_LEVEL_INFO,
+                      FL("sme_SetEseBeaconRequest failed (%d),"
+                      " a request already in progress"), status);
+               ret = -EBUSY;
+               goto exit;
+           } else if (eHAL_STATUS_SUCCESS != status) {
                VOS_TRACE( VOS_MODULE_ID_HDD,
                           VOS_TRACE_LEVEL_ERROR,
                           "%s: sme_SetEseBeaconRequest failed (%d)",
@@ -10533,6 +10549,12 @@ void __hdd_wlan_exit(void)
 
    //Get the global vos context
    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+   if (!pVosContext)
+      return;
+   if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+      epping_exit(pVosContext);
+      return;
+   }
 
    if(NULL == pVosContext) {
       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
@@ -10770,7 +10792,7 @@ void hdd_allow_suspend(void)
     vos_wake_lock_release(&wlan_wake_lock);
 }
 
-void hdd_allow_suspend_timeout(v_U32_t timeout)
+void hdd_prevent_suspend_timeout(v_U32_t timeout)
 {
     vos_wake_lock_timeout_acquire(&wlan_wake_lock, timeout);
 }
@@ -11232,6 +11254,13 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 #endif
 
    ENTER();
+
+   if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+       /* if epping enabled redirect start to epping module */
+      ret = epping_wlan_startup(dev, hif_sc);
+      EXIT();
+      return ret;
+   }
    /*
     * cfg80211: wiphy allocation
     */
@@ -11659,6 +11688,11 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       }
    }
 
+#ifdef IPA_OFFLOAD
+   if (hdd_ipa_init(pHddCtx) == VOS_STATUS_E_FAILURE)
+	goto err_wiphy_unregister;
+#endif
+
    /*Start VOSS which starts up the SME/MAC/HAL modules and everything else */
    status = vos_start( pHddCtx->pvosContext );
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
@@ -12030,10 +12064,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    {
       hdd_set_idle_ps_config(pHddCtx, TRUE);
    }
-#ifdef IPA_OFFLOAD
-   if (hdd_ipa_init(pHddCtx) == VOS_STATUS_E_FAILURE)
-	goto err_nl_srv;
-#endif
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
     if (pHddCtx->cfg_ini->WlanAutoShutdown != 0) {
@@ -12050,6 +12080,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
              hdd_wlan_green_ap_attach(pHddCtx))) {
        hddLog(LOGE, FL("Failed to allocate Green-AP resource"));
     }
+#endif
+
+#ifdef WLAN_FEATURE_NAN
+    wlan_hdd_cfg80211_nan_init(pHddCtx);
 #endif
 
 #ifndef QCA_WIFI_ISOC
@@ -12313,6 +12347,24 @@ static int hdd_driver_init( void)
       }
 #endif
 
+#ifndef MODULE
+      if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+         ret_status =  epping_driver_init(con_mode, &wlan_wake_lock,
+                          WLAN_MODULE_NAME);
+         if (ret_status < 0)
+            vos_wake_lock_destroy(&wlan_wake_lock);
+         return ret_status;
+      }
+#else
+      if (WLAN_IS_EPPING_ENABLED(hdd_get_conparam())) {
+         ret_status = epping_driver_init(hdd_get_conparam(),
+                         &wlan_wake_lock, WLAN_MODULE_NAME);
+         if (ret_status < 0)
+            vos_wake_lock_destroy(&wlan_wake_lock);
+         return ret_status;
+      }
+#endif
+
 #ifdef TIMER_MANAGER
       vos_timer_manager_init();
 #endif
@@ -12467,6 +12519,11 @@ static void hdd_driver_exit(void)
    if(!pVosContext)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
+      goto done;
+   }
+
+   if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+      epping_driver_exit(pVosContext);
       goto done;
    }
 

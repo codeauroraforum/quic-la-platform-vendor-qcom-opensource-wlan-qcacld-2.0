@@ -657,18 +657,18 @@ static int wma_vdev_start_rsp_ind(tp_wma_handle wma, u_int8_t *buf)
 		params->status = resp_event->status;
 		if (resp_event->resp_type == WMI_VDEV_RESTART_RESP_EVENT &&
 			(iface->type == WMI_VDEV_TYPE_STA)) {
-			wmi_unified_vdev_up_send(wma->wmi_handle,
-				resp_event->vdev_id,
-				iface->aid,
-				iface->bssid);
-		}
-		/*
-		* Marking the VDEV UP STATUS to FALSE
-		* since, VDEV RESTART will do a VDEV DOWN
-		* in the firmware.
-		*/
-		else
-			iface->vdev_up = FALSE;
+			if (wmi_unified_vdev_up_send(wma->wmi_handle,
+				resp_event->vdev_id, iface->aid,
+				iface->bssid)) {
+				WMA_LOGE("%s:vdev_up failed vdev_id %d",
+				__func__, resp_event->vdev_id);
+				wma->interfaces[resp_event->vdev_id].vdev_up =
+									FALSE;
+			} else {
+				wma->interfaces[resp_event->vdev_id].vdev_up =
+									TRUE;
+			}
+                }
 
 		wma_send_msg(wma, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
 	} else if (req_msg->msg_type == WDA_ADD_BSS_REQ) {
@@ -2353,7 +2353,7 @@ static int wma_unified_link_iface_stats_event_handler(void *handle,
 	link_stats_results->paramId            = WMI_LINK_STATS_IFACE;
 	link_stats_results->rspId              = fixed_param->request_id;
 	link_stats_results->ifaceId            = fixed_param->vdev_id;
-	link_stats_results->num_peers          = 0;
+	link_stats_results->num_peers          = link_stats->num_peers;
 	link_stats_results->peer_event_number  = 0;
 	link_stats_results->moreResultToFollow = 0;
 
@@ -2515,7 +2515,6 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 		WMA_LOGD("peer_type %u capabilities %u num_rates %u",
 				peer_stats->peer_type, peer_stats->capabilities,
 				peer_stats->num_rates);
-		peer_stats++;
 
 		vos_mem_copy(results + next_res_offset,
 				t_peer_stats + next_peer_offset,
@@ -2541,6 +2540,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 			next_rate_offset += sizeof(*rate_stats);
 		}
 		next_peer_offset += sizeof(*peer_stats);
+		peer_stats++;
 	}
 
 	/* call hdd callback with Link Layer Statistics
@@ -3643,6 +3643,70 @@ static int wma_unified_phyerr_rx_event_handler(void * handle,
     }
 }
 
+#ifdef WLAN_FEATURE_NAN
+/* function   : wma_nan_rsp_event_handler
+ * Descriptin : Function is used to handle nan response
+ * Args       : wma_handle, event buffer and its length
+ * Returns    : SUCCESS or FAILURE
+ */
+static int wma_nan_rsp_event_handler(void *handle, u_int8_t *event_buf,
+                                     u_int32_t len)
+{
+	WMI_NAN_EVENTID_param_tlvs *param_buf;
+	tSirNanEvent *nan_rsp_event;
+	wmi_nan_event_hdr *nan_rsp_event_hdr;
+	VOS_STATUS status;
+	vos_msg_t vos_msg;
+	u_int8_t *buf_ptr;
+	u_int8_t alloc_len;
+
+	/*
+	 * This is how received event_buf looks like
+	 *
+	 * <-------------------- event_buf ----------------------------------->
+	 *
+	 * <--wmi_nan_event_hdr--><---WMI_TLV_HDR_SIZE---><----- data -------->
+	 *
+	 * +-----------+---------+-----------------------+--------------------+
+	 * | tlv_header| data_len| WMITLV_TAG_ARRAY_BYTE | nan_rsp_event_data |
+	 * +-----------+---------+-----------------------+--------------------+
+	 */
+
+	WMA_LOGD("%s: Posting NaN response event to SME", __func__);
+	param_buf = (WMI_NAN_EVENTID_param_tlvs *)event_buf;
+	if (!param_buf) {
+	    WMA_LOGE("%s: Invalid nan response event buf", __func__);
+	    return -EINVAL;
+	}
+	nan_rsp_event_hdr = param_buf->fixed_param;
+	buf_ptr = (u_int8_t *)nan_rsp_event_hdr;
+	alloc_len = sizeof(tSirNanEvent);
+	alloc_len += nan_rsp_event_hdr->data_len;
+	nan_rsp_event = (tSirNanEvent *) vos_mem_malloc(alloc_len);
+	if (NULL == nan_rsp_event) {
+	    WMA_LOGE("%s: Memory allocation failure", __func__);
+	    return -ENOMEM;
+	}
+
+	nan_rsp_event->event_data_len = nan_rsp_event_hdr->data_len;
+	vos_mem_copy(nan_rsp_event->event_data, buf_ptr +
+	        sizeof(wmi_nan_event_hdr) + WMI_TLV_HDR_SIZE,
+	        nan_rsp_event->event_data_len);
+	vos_msg.type = eWNI_SME_NAN_EVENT;
+	vos_msg.bodyptr = (void *)nan_rsp_event;
+	vos_msg.bodyval = 0;
+
+	status = vos_mq_post_message(VOS_MQ_ID_SME, &vos_msg);
+	if (status != VOS_STATUS_SUCCESS) {
+	    WMA_LOGE("%s: Failed to post NaN response event to SME", __func__);
+	    vos_mem_free(nan_rsp_event);
+	    return -1;
+	}
+	WMA_LOGD("%s: NaN response event Posted to SME", __func__);
+	return 0;
+}
+#endif
+
 /*
  * WMI handler for WMI_DFS_RADAR_EVENTID
  * This handler is registered for handling
@@ -4571,6 +4635,12 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
     wmi_unified_register_event_handler(wma_handle->wmi_handle,
                                       WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID,
                                       wma_vdev_install_key_complete_event_handler);
+#ifdef WLAN_FEATURE_NAN
+	/* register for nan response event */
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+			WMI_NAN_EVENTID,
+			wma_nan_rsp_event_handler);
+#endif
 
 #ifdef WLAN_FEATURE_STATS_EXT
         /* register for extended stats event */
@@ -8559,17 +8629,28 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 		 chan->mhz, req->chan, chanmode, req->is_dfs,
 		 req->beacon_intval, cmd->dtim_period, chan->band_center_freq1);
 
-   if (isRestart)
-      ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
-				         WMI_VDEV_RESTART_REQUEST_CMDID);
-   else
-      ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
-				         WMI_VDEV_START_REQUEST_CMDID);
-   if (ret < 0) {
-      WMA_LOGP("%s: Failed to send vdev start command", __func__);
-      adf_nbuf_free(buf);
-      return VOS_STATUS_E_FAILURE;
-   }
+
+	if (isRestart) {
+		/*
+		* Marking the VDEV UP STATUS to FALSE
+		* since, VDEV RESTART will do a VDEV DOWN
+		* in the firmware.
+		*/
+		intr[cmd->vdev_id].vdev_up = FALSE;
+
+		ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
+					WMI_VDEV_RESTART_REQUEST_CMDID);
+
+	} else {
+		ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
+				WMI_VDEV_START_REQUEST_CMDID);
+	}
+
+	if (ret < 0) {
+		WMA_LOGP("%s: Failed to send vdev start command", __func__);
+		adf_nbuf_free(buf);
+		return VOS_STATUS_E_FAILURE;
+	}
 
 	/* Store vdev params in SAP mode which can be used in vdev restart */
 	if (intr[req->vdev_id].type == WMI_VDEV_TYPE_AP &&
@@ -20225,6 +20306,66 @@ VOS_STATUS  wma_extscan_get_capabilities(tp_wma_handle wma,
 }
 #endif
 
+#ifdef WLAN_FEATURE_NAN
+/* function   : wma_nan_req
+ * Descriptin : Function is used to send nan request down
+ * Args       : wma_handle, request data which will be non-null
+ * Returns    : SUCCESS or FAILURE
+ */
+static VOS_STATUS wma_nan_req(void *wda_handle, tpNanRequest nan_req)
+{
+	int ret;
+	tp_wma_handle wma_handle = (tp_wma_handle)wda_handle;
+	wmi_nan_cmd_param *cmd;
+	wmi_buf_t buf;
+	u_int16_t len = sizeof(*cmd);
+        u_int16_t nan_data_len, nan_data_len_aligned;
+	u_int8_t *buf_ptr;
+
+	/*
+	 *    <----- cmd ------------><-- WMI_TLV_HDR_SIZE --><--- data ---->
+	 *    +------------+----------+-----------------------+--------------+
+	 *    | tlv_header | data_len | WMITLV_TAG_ARRAY_BYTE | nan_req_data |
+	 *    +------------+----------+-----------------------+--------------+
+	 */
+	if (!nan_req) {
+		WMA_LOGE("%s:nan req is not valid", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+	nan_data_len = nan_req->request_data_len;
+	nan_data_len_aligned = roundup(nan_req->request_data_len,
+				sizeof(u_int32_t));
+	len += WMI_TLV_HDR_SIZE + nan_data_len_aligned;
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGE("%s:wmi_buf_alloc failed", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+	buf_ptr = (u_int8_t *) wmi_buf_data(buf);
+	cmd = (wmi_nan_cmd_param *) buf_ptr;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_nan_cmd_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+		wmi_nan_cmd_param));
+	cmd->data_len = nan_req->request_data_len;
+	WMA_LOGD("%s: The data len value is %u",
+		__func__, nan_req->request_data_len);
+	buf_ptr += sizeof(wmi_nan_cmd_param);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, nan_data_len_aligned);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	vos_mem_copy(buf_ptr, nan_req->request_data,
+		cmd->data_len);
+
+	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
+			WMI_NAN_CMDID);
+	if (ret != EOK) {
+	WMA_LOGE("%s Failed to send set param command ret = %d", __func__, ret);
+	wmi_buf_free(buf);
+	}
+	return ret;
+}
+#endif
+
 /*
  * function   : wma_mc_process_msg
  * Descriptin :
@@ -20736,6 +20877,13 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 		case WDA_ROAM_OFFLOAD_SYNCH_CNF:
 			wma_process_roam_synch_complete(wma_handle,
 					(tSirSmeRoamOffloadSynchCnf *)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+#endif
+#ifdef WLAN_FEATURE_NAN
+		case WDA_NAN_REQUEST:
+			wma_nan_req(wma_handle,
+				(tNanRequest *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
 #endif
@@ -22426,6 +22574,9 @@ static inline void wma_update_target_services(tp_wma_handle wh,
 
 	/* Proactive ARP response */
 	gFwWlanFeatCaps |= (1 << WLAN_PERIODIC_TX_PTRN);
+
+	/* Enable WOW */
+	gFwWlanFeatCaps |= (1 << WOW);
 
 	/* ARP offload */
 	cfg->arp_offload = WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap,
