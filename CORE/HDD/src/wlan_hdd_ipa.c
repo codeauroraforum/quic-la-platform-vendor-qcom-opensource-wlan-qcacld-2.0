@@ -888,7 +888,8 @@ drop_pkts:
 		adf_nbuf_free(buf);
 		buf = next_buf;
 		hdd_ipa->stats.num_rx_drop++;
-		adapter->stats.rx_dropped++;
+		if (adapter)
+			adapter->stats.rx_dropped++;
 	}
 
 	return VOS_STATUS_E_FAILURE;
@@ -925,6 +926,8 @@ static void hdd_ipa_set_adapter_ip_filter(hdd_adapter_t *adapter)
 #ifdef WLAN_OPEN_SOURCE
 		rcu_read_unlock();
 #endif
+		if (!dev)
+			return;
 	}
 	if ((in_dev = __in_dev_get_rtnl(dev)) != NULL) {
 	   for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
