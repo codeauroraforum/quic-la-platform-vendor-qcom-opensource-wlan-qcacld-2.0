@@ -1223,6 +1223,10 @@ adf_nbuf_t WLANTL_SendIPA_DataFrame(void *vos_ctx, void *vdev,
 	adf_nbuf_t ret;
 
 	ENTER();
+	if (NULL == tl_shim) {
+		TLSHIM_LOGW("INVALID TL SHIM CONTEXT");
+		return skb;
+	}
 
 	if (!adf_os_atomic_read(&tl_shim->vdev_active[interface_id])) {
 		TLSHIM_LOGW("INACTIVE VDEV");
