@@ -2731,8 +2731,11 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 #ifdef WLAN_FEATURE_MBSSID
     pConfig->acsBandSwitchThreshold =
                         pHostapdAdapter->sap_dyn_ini_cfg.acsBandSwitchThreshold;
+    pConfig->apAutoChannelSelection =
+                        pHostapdAdapter->sap_dyn_ini_cfg.apAutoChannelSelection;
 #else
     pConfig->acsBandSwitchThreshold = iniConfig->acsBandSwitchThreshold;
+    pConfig->apAutoChannelSelection = iniConfig->apAutoChannelSelection;
 #endif
     pSapEventCallback = hdd_hostapd_SAPEventCB;
 
