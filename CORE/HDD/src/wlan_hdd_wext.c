@@ -373,6 +373,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_DUMP_PCIE_LOG           17
 #endif
 #endif
+#define WE_GET_RECOVERY_STAT       18
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_VAR_INT_GET_NONE   (SIOCIWFIRSTPRIV + 7)
@@ -7153,6 +7154,14 @@ static int iw_setnone_getnone(struct net_device *dev, struct iw_request_info *in
             memset(&pAdapter->hdd_stats, 0, sizeof(pAdapter->hdd_stats));
             break;
         }
+
+        case WE_GET_RECOVERY_STAT:
+        {
+            tHalHandle hal = WLAN_HDD_GET_HAL_CTX(pAdapter);
+            sme_getRecoveryStats(hal);
+            break;
+        }
+
         case WE_INIT_AP:
         {
 #ifndef WLAN_FEATURE_MBSSID
@@ -10698,6 +10707,10 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         0,
         "initAP" },
+    {   WE_GET_RECOVERY_STAT,
+        0,
+        0,
+        "getRecoverStat" },
     {   WE_STOP_AP,
         0,
         0,
