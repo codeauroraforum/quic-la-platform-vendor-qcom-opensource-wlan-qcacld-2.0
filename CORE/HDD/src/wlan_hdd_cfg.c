@@ -3400,6 +3400,13 @@ REG_VARIABLE( CFG_ADVERTISE_CONCURRENT_OPERATION_NAME , WLAN_PARAM_Integer,
               CFG_ADVERTISE_CONCURRENT_OPERATION_DEFAULT,
               CFG_ADVERTISE_CONCURRENT_OPERATION_MIN,
               CFG_ADVERTISE_CONCURRENT_OPERATION_MAX ),
+
+   REG_VARIABLE( CFG_ENABLE_SELF_RECOVERY, WLAN_PARAM_Integer,
+              hdd_config_t, enableSelfRecovery,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_ENABLE_SELF_RECOVERY_DEFAULT,
+              CFG_ENABLE_SELF_RECOVERY_MIN,
+              CFG_ENABLE_SELF_RECOVERY_MAX ),
 };
 
 /*
@@ -3813,6 +3820,10 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
            "Name = [gEnableSifsBurst] Value = [%u]",
                    pHddCtx->cfg_ini->enableSifsBurst);
+
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+           "Name = [gEnableSelfRecovery] Value = [%u]",
+                   pHddCtx->cfg_ini->enableSelfRecovery);
 }
 
 #define CFG_VALUE_MAX_LEN 256
@@ -5549,6 +5560,8 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig.fEnableDebugLog = pHddCtx->cfg_ini->gEnableDebugLog;
 
    smeConfig.enable5gEBT = pHddCtx->cfg_ini->enable5gEBT;
+
+   smeConfig.enableSelfRecovery = pHddCtx->cfg_ini->enableSelfRecovery;
 
    halStatus = sme_UpdateConfig( pHddCtx->hHal, &smeConfig);
    if ( !HAL_STATUS_SUCCESS( halStatus ) )

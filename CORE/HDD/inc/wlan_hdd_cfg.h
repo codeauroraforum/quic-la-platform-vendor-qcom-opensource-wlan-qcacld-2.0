@@ -2430,6 +2430,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_SIFS_BURST_MAX                  ( 1 )
 #define CFG_ENABLE_SIFS_BURST_DEFAULT              ( 0 )
 
+#define CFG_ENABLE_SELF_RECOVERY                   "gEnableSelfRecovery"
+#define CFG_ENABLE_SELF_RECOVERY_MIN               ( 0 )
+#define CFG_ENABLE_SELF_RECOVERY_MAX               ( 1 )
+#define CFG_ENABLE_SELF_RECOVERY_DEFAULT           ( 0 )
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2941,6 +2946,7 @@ typedef struct
 #endif
    v_BOOL_t                    advertiseConcurrentOperation;
    v_BOOL_t                    enableSifsBurst;
+   v_BOOL_t                    enableSelfRecovery;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
