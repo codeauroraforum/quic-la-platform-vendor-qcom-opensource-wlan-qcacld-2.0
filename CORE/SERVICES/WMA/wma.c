@@ -642,18 +642,18 @@ static int wma_vdev_start_rsp_ind(tp_wma_handle wma, u_int8_t *buf)
 		params->status = resp_event->status;
 		if (resp_event->resp_type == WMI_VDEV_RESTART_RESP_EVENT &&
 			(iface->type == WMI_VDEV_TYPE_STA)) {
-			wmi_unified_vdev_up_send(wma->wmi_handle,
-				resp_event->vdev_id,
-				iface->aid,
-				iface->bssid);
-		}
-		/*
-		* Marking the VDEV UP STATUS to FALSE
-		* since, VDEV RESTART will do a VDEV DOWN
-		* in the firmware.
-		*/
-		else
-			iface->vdev_up = FALSE;
+			if (wmi_unified_vdev_up_send(wma->wmi_handle,
+				resp_event->vdev_id, iface->aid,
+				iface->bssid)) {
+				WMA_LOGE("%s:vdev_up failed vdev_id %d",
+				__func__, resp_event->vdev_id);
+				wma->interfaces[resp_event->vdev_id].vdev_up =
+									FALSE;
+			} else {
+				wma->interfaces[resp_event->vdev_id].vdev_up =
+									TRUE;
+			}
+                }
 
 		wma_send_msg(wma, WDA_SWITCH_CHANNEL_RSP, (void *)params, 0);
 	} else if (req_msg->msg_type == WDA_ADD_BSS_REQ) {
@@ -4932,13 +4932,25 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 			cmd->scan_ctrl_flags |= WMI_SCAN_FILTER_PROBE_REQ;
 			/* Default P2P burst duration of 120 ms will cover
 			 * 3 channels with default max dwell time 40 ms.
+			 * Cap limit will be set by
+			 * WMA_P2P_SCAN_MAX_BURST_DURATION. Burst duration
+			 * should be such that no channel is scanned less
+			 * than the dwell time in normal scenarios.
 			 */
-			cmd->burst_duration = WMA_P2P_SCAN_MAX_BURST_DURATION;
 			if (scan_req->channelList.numChannels == P2P_SOCIAL_CHANNELS
 			 && (!IS_MIRACAST_SESSION_PRESENT(pMac)))
 				cmd->repeat_probe_time = scan_req->maxChannelTime/5;
 			else
 				cmd->repeat_probe_time = scan_req->maxChannelTime/3;
+
+			cmd->burst_duration = WMA_BURST_SCAN_MAX_NUM_OFFCHANNELS * scan_req->maxChannelTime;
+			if (cmd->burst_duration > WMA_P2P_SCAN_MAX_BURST_DURATION) {
+				u_int8_t channels = WMA_P2P_SCAN_MAX_BURST_DURATION / scan_req->maxChannelTime;
+				if (channels)
+					cmd->burst_duration = channels * scan_req->maxChannelTime;
+				else
+					cmd->burst_duration = WMA_P2P_SCAN_MAX_BURST_DURATION;
+			}
 			break;
 		default:
 			WMA_LOGE("Invalid scan type");
@@ -7054,17 +7066,27 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 		 chan->mhz, req->chan, chanmode, req->is_dfs,
 		 req->beacon_intval, cmd->dtim_period, chan->band_center_freq1);
 
-   if (isRestart)
-      ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
-				         WMI_VDEV_RESTART_REQUEST_CMDID);
-   else
-      ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
-				         WMI_VDEV_START_REQUEST_CMDID);
-   if (ret < 0) {
-      WMA_LOGP("%s: Failed to send vdev start command", __func__);
-      adf_nbuf_free(buf);
-      return VOS_STATUS_E_FAILURE;
-   }
+	if (isRestart) {
+		/*
+		* Marking the VDEV UP STATUS to FALSE
+		* since, VDEV RESTART will do a VDEV DOWN
+		* in the firmware.
+		*/
+		intr[cmd->vdev_id].vdev_up = FALSE;
+
+		ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
+					WMI_VDEV_RESTART_REQUEST_CMDID);
+
+	} else {
+		ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
+				WMI_VDEV_START_REQUEST_CMDID);
+	}
+
+	if (ret < 0) {
+		WMA_LOGP("%s: Failed to send vdev start command", __func__);
+		adf_nbuf_free(buf);
+		return VOS_STATUS_E_FAILURE;
+	}
 
 	/* Store vdev params in SAP mode which can be used in vdev restart */
 	if (intr[req->vdev_id].type == WMI_VDEV_TYPE_AP &&
