@@ -513,6 +513,12 @@ is_ccmp_pn_replay_attack(void *vos_ctx, struct ieee80211_frame *wh,
 	peer = ol_txrx_find_peer_by_addr_and_vdev(pdev, vdev, wh->i_addr2,
 							&peer_id);
 
+	if (NULL == peer) {
+		TLSHIM_LOGE(
+		"%s: Failed to find peer, Not able to validate PN", __func__);
+		return true;
+	}
+
 	new_pn = tl_shim_extract_ccmp_pn(ccmp_ptr);
 	last_pn_valid = &peer->last_rmf_pn_valid;
 	last_pn = &peer->last_rmf_pn;
@@ -1231,6 +1237,10 @@ adf_nbuf_t WLANTL_SendIPA_DataFrame(void *vos_ctx, void *vdev,
 	adf_nbuf_t ret;
 
 	ENTER();
+	if (NULL == tl_shim) {
+		TLSHIM_LOGW("INVALID TL SHIM CONTEXT");
+		return skb;
+	}
 
 	if (!adf_os_atomic_read(&tl_shim->vdev_active[interface_id])) {
 		TLSHIM_LOGW("INACTIVE VDEV");
