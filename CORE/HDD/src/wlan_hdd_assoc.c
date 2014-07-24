@@ -1297,7 +1297,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 #if  defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR) || defined (WLAN_FEATURE_VOWIFI_11R)
     int ft_carrier_on = FALSE;
 #endif
-    int status;
+    unsigned long rc;
 
     if ( eCSR_ROAM_RESULT_ASSOCIATED == roamResult )
     {
@@ -1347,10 +1347,9 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
             netif_carrier_on(dev);
 
             // Wait for the Link to up to ensure all the queues are set properly by the kernel
-            status = wait_for_completion_interruptible_timeout(&pAdapter->linkup_event_var,
+            rc = wait_for_completion_timeout(&pAdapter->linkup_event_var,
                                                    msecs_to_jiffies(ASSOC_LINKUP_TIMEOUT));
-            if(!status)
-            {
+            if (!rc) {
                 hddLog(VOS_TRACE_LEVEL_WARN, "%s: Warning:ASSOC_LINKUP_TIMEOUT", __func__);
             }
 
@@ -3612,6 +3611,7 @@ int iw_set_essid(struct net_device *dev,
                         struct iw_request_info *info,
                         union iwreq_data *wrqu, char *extra)
 {
+    unsigned long rc;
     v_U32_t status = 0;
     hdd_wext_state_t *pWextState;
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -3650,9 +3650,13 @@ int iw_set_essid(struct net_device *dev,
             INIT_COMPLETION(pAdapter->disconnect_comp_var);
             vosStatus = sme_RoamDisconnect( hHal, pAdapter->sessionId, eCSR_DISCONNECT_REASON_UNSPECIFIED );
 
-            if(VOS_STATUS_SUCCESS == vosStatus)
-               wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
-                     msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+            if (VOS_STATUS_SUCCESS == vosStatus) {
+                rc = wait_for_completion_timeout(&pAdapter->disconnect_comp_var,
+                          msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
+                if (!rc) {
+                    hddLog( LOGE, FL("Disconnect event timed out"));
+                }
+             }
         }
     }
     /** wpa_supplicant 0.8.x, wext driver uses */
