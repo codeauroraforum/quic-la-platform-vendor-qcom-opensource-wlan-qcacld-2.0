@@ -5030,5 +5030,16 @@ typedef struct
 } tSirStatsExtEvent, *tpSirStatsExtEvent;
 
 #endif
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+typedef struct
+{
+    tANI_U32    timer_val;
+} tSirAutoShutdownCmdParams;
+
+typedef struct
+{
+    tANI_U32    shutdown_reason;
+} tSirAutoShutdownEvtParams;
+#endif
 
 #endif /* __SIR_API_H */
