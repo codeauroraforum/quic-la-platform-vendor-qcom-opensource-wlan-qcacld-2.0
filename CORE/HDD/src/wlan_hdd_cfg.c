@@ -3380,13 +3380,6 @@ REG_VARIABLE( CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD, WLAN_PARAM_Integer,
                  CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN,
                  CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX ),
 
-   REG_VARIABLE( CFG_SAP_DOT11_MODE_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, sapDot11Mode,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
-                 CFG_SAP_DOT11_MODE_DEFAULT,
-                 CFG_SAP_DOT11_MODE_MIN,
-                 CFG_SAP_DOT11_MODE_MAX ),
-
    REG_VARIABLE( CFG_ENABLE_PACKET_LOG, WLAN_PARAM_Integer,
                  hdd_config_t, enablePacketLog,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
