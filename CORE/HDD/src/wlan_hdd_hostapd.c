@@ -1736,7 +1736,7 @@ static VOS_STATUS hdd_print_acl(hdd_adapter_t *pHostapdAdapter)
     if (VOS_STATUS_SUCCESS == WLANSAP_GetACLAcceptList(pvosGCtx,
                                                        &MacList[0], &listnum)) {
         pr_info("******* WHITE LIST ***********\n");
-        if (listnum < MAX_ACL_MAC_ADDRESS)
+        if (listnum <= MAX_ACL_MAC_ADDRESS)
             print_mac_list(&MacList[0], listnum);
     } else {
         return VOS_STATUS_E_FAILURE;
@@ -1745,7 +1745,7 @@ static VOS_STATUS hdd_print_acl(hdd_adapter_t *pHostapdAdapter)
     if (VOS_STATUS_SUCCESS == WLANSAP_GetACLDenyList(pvosGCtx,
                                                      &MacList[0], &listnum)) {
         pr_info("******* BLACK LIST ***********\n");
-        if (listnum < MAX_ACL_MAC_ADDRESS)
+        if (listnum <= MAX_ACL_MAC_ADDRESS)
             print_mac_list(&MacList[0], listnum);
     } else {
         return VOS_STATUS_E_FAILURE;
