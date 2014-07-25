@@ -1642,18 +1642,26 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         if (pParam->nActiveMaxChnTime)
         {
             pMac->roam.configParam.nActiveMaxChnTime = pParam->nActiveMaxChnTime;
+            cfgSetInt(pMac, WNI_CFG_ACTIVE_MAXIMUM_CHANNEL_TIME,
+                      pParam->nActiveMaxChnTime);
         }
         if (pParam->nActiveMinChnTime)
         {
             pMac->roam.configParam.nActiveMinChnTime = pParam->nActiveMinChnTime;
+            cfgSetInt(pMac, WNI_CFG_ACTIVE_MINIMUM_CHANNEL_TIME,
+                      pParam->nActiveMinChnTime);
         }
         if (pParam->nPassiveMaxChnTime)
         {
             pMac->roam.configParam.nPassiveMaxChnTime = pParam->nPassiveMaxChnTime;
+            cfgSetInt(pMac, WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME,
+                      pParam->nPassiveMaxChnTime);
         }
         if (pParam->nPassiveMinChnTime)
         {
             pMac->roam.configParam.nPassiveMinChnTime = pParam->nPassiveMinChnTime;
+            cfgSetInt(pMac, WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME,
+                      pParam->nPassiveMinChnTime);
         }
         if (pParam->nActiveMaxChnTimeBtc)
         {
@@ -4860,8 +4868,6 @@ eHalStatus csrRoamProcessCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand )
         break;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
     case eCsrPerformRoamOffloadSynch:
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
-             "LFR3:%s: Attempting Roam Offload Sync", __func__);
         status = csrRoamIssueFTRoamOffloadSynch(pMac, sessionId,
                                             pCommand->u.roamCmd.pLastRoamBss);
         break;
@@ -5690,6 +5696,7 @@ static tANI_BOOLEAN csrRoamProcessResults( tpAniSirGlobal pMac, tSmeCmd *pComman
                     roamInfo.staId = ( tANI_U8 )pJoinRsp->staId;
                     roamInfo.ucastSig = ( tANI_U8 )pJoinRsp->ucastSig;
                     roamInfo.bcastSig = ( tANI_U8 )pJoinRsp->bcastSig;
+                    roamInfo.maxRateFlags = pJoinRsp->maxRateFlags;
                     roamInfo.timingMeasCap = pJoinRsp->timingMeasCap;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
                     if (pMac->roam.configParam.cc_switch_mode
@@ -6797,7 +6804,7 @@ eHalStatus csrRoamEnqueuePreauth(tpAniSirGlobal pMac, tANI_U32 sessionId, tpSirB
     return (status);
 }
 
-eHalStatus csrRoamDequeuePreauth(tpAniSirGlobal pMac)
+eHalStatus csrDequeueRoamCommand(tpAniSirGlobal pMac, eCsrRoamReason reason)
 {
     tListElem *pEntry;
     tSmeCmd *pCommand;
@@ -6806,14 +6813,24 @@ eHalStatus csrRoamDequeuePreauth(tpAniSirGlobal pMac)
     {
         pCommand = GET_BASE_ADDR( pEntry, tSmeCmd, Link );
         if ( (eSmeCommandRoam == pCommand->command) &&
-                (eCsrPerformPreauth == pCommand->u.roamCmd.roamReason))
+                (eCsrPerformPreauth == reason))
         {
             smsLog( pMac, LOG1, FL("DQ-Command = %d, Reason = %d"),
                     pCommand->command, pCommand->u.roamCmd.roamReason);
             if (csrLLRemoveEntry( &pMac->sme.smeCmdActiveList, pEntry, LL_ACCESS_LOCK )) {
                 csrReleaseCommandPreauth( pMac, pCommand );
             }
-        } else  {
+        }
+        else if ((eSmeCommandRoam == pCommand->command) &&
+                (eCsrSmeIssuedFTReassoc == reason))
+        {
+            smsLog( pMac, LOG1, FL("DQ-Command = %d, Reason = %d"),
+                    pCommand->command, pCommand->u.roamCmd.roamReason);
+            if (csrLLRemoveEntry( &pMac->sme.smeCmdActiveList, pEntry, LL_ACCESS_LOCK )) {
+                csrReleaseCommandRoam( pMac, pCommand );
+            }
+        }
+        else  {
             smsLog( pMac, LOGE, FL("Command = %d, Reason = %d "),
                     pCommand->command, pCommand->u.roamCmd.roamReason);
         }
@@ -8940,9 +8957,9 @@ static eHalStatus csrRoamIssueSetKeyCommand( tpAniSirGlobal pMac, tANI_U32 sessi
          ( (!HAL_STATUS_SUCCESS( status ) )
 #ifdef FEATURE_WLAN_ESE
             || ( eCSR_ENCRYPT_TYPE_KRK == pSetKey->encType )
-#ifdef WLAN_FEATURE_WLAN_ROAM
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
             || ( eCSR_ENCRYPT_TYPE_BTK == pSetKey->encType )
-#endif /* WLAN_FEATURE_WLAN_ROAM */
+#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 #endif /* FEATURE_WLAN_ESE */
            ) )
     {
@@ -16427,7 +16444,6 @@ void csrRoamOffload(tpAniSirGlobal pMac, tSirRoamOffloadScanReq *pRequestBuf,
         if (csrIsAuthTypeESE(pRequestBuf->ConnectedNetwork.authentication)) {
                 vos_mem_copy(pRequestBuf->KRK,pSession->eseCckmInfo.krk, SIR_KRK_KEY_LEN);
                 vos_mem_copy(pRequestBuf->BTK,pSession->eseCckmInfo.btk, SIR_BTK_KEY_LEN);
-                pRequestBuf->IsESEConnection = eANI_BOOLEAN_TRUE;
         }
 #endif
         pRequestBuf->AcUapsd.acbe_uapsd =
@@ -18424,8 +18440,9 @@ eHalStatus csrRoamDequeueRoamOffloadSynch(tpAniSirGlobal pMac)
         if ( (eSmeCommandRoam == pCommand->command) &&
                 (eCsrPerformRoamOffloadSynch == pCommand->u.roamCmd.roamReason))
         {
-            smsLog( pMac, LOGE, FL("DQ-Command = %d, Reason = %d"),
-                    pCommand->command, pCommand->u.roamCmd.roamReason);
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+                      "LFR3:DQ-Command = %d, Reason = %d",
+                       pCommand->command, pCommand->u.roamCmd.roamReason);
             if (csrLLRemoveEntry( &pMac->sme.smeCmdActiveList, pEntry, LL_ACCESS_LOCK )) {
                 csrReleaseCommand( pMac, pCommand );
             }
@@ -18525,9 +18542,9 @@ void csrProcessRoamOffloadSynchInd(tpAniSirGlobal pMac, void *pMsgBuf)
                 smeRoamOffloadSynchInd->reassocRespOffset,
                 pMac->roam.reassocRespLen);
 
-   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
              "LFR3:%s: the reassoc resp frame data:", __func__);
-   VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+   VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
               pMac->roam.pReassocResp,
               pMac->roam.reassocRespLen);
 

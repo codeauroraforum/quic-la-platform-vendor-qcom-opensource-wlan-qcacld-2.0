@@ -69,6 +69,8 @@ typedef enum
     PHY_CHANNEL_BONDING_STATE_MAX   = 11
 }ePhyChanBondState;
 
+#define MAX_BONDED_CHANNELS 4
+
 #define SIR_MIN(a,b)   (((a) < (b)) ? (a) : (b))
 #define SIR_MAX(a,b)   (((a) > (b)) ? (a) : (b))
 
@@ -714,6 +716,9 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_NAN_REQUEST                (SIR_HAL_ITC_MSG_TYPES_BEGIN + 280)
 #endif /* WLAN_FEATURE_NAN */
 
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+#define SIR_HAL_SET_AUTO_SHUTDOWN_TIMER_REQ  (SIR_HAL_ITC_MSG_TYPES_BEGIN + 281)
+#endif
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types

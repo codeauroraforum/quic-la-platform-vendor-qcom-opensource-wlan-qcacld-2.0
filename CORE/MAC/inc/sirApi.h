@@ -1233,6 +1233,9 @@ typedef struct sSirSmeJoinRsp
     /*Broadcast DPU signature*/
     tANI_U8            bcastSig;
 
+    /*to report MAX link-speed populate rate-flags from ASSOC RSP frame*/
+    tANI_U32            maxRateFlags;
+
     /*Timing measurement capability*/
     tANI_U8            timingMeasCap;
 
@@ -5487,6 +5490,18 @@ typedef struct
     tANI_U32    numResultsAvailable;
 } tSirExtScanResultsAvailableIndParams,
   *tpSirExtScanResultsAvailableIndParams;
+
+#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+typedef struct
+{
+    tANI_U32    timer_val;
+} tSirAutoShutdownCmdParams;
+
+typedef struct
+{
+    tANI_U32    shutdown_reason;
+} tSirAutoShutdownEvtParams;
+#endif
 
 typedef struct
 {

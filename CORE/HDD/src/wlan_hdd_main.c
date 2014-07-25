@@ -291,7 +291,7 @@ extern int hdd_ftm_stop(hdd_context_t *pHddCtx);
 #endif
 #endif
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-v_VOID_t wlan_hdd_auto_shutdown_cb(v_PVOID_t data);
+v_VOID_t wlan_hdd_auto_shutdown_cb(v_VOID_t);
 #endif
 
 /* Store WLAN driver version info in a global variable such that crash debugger
@@ -3514,6 +3514,164 @@ static int hdd_parse_setmaxtxpower_command(tANI_U8 *pValue, int *pTxPower)
 } /*End of hdd_parse_setmaxtxpower_command*/
 
 
+static int hdd_get_dwell_time(hdd_config_t *pCfg, tANI_U8 *command, char *extra, tANI_U8 n, tANI_U8 *len)
+{
+    int ret = 0;
+
+    if (!pCfg || !command || !extra || !len)
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s: argument passed for GETDWELLTIME is incorrect", __func__);
+        ret = -EINVAL;
+        return ret;
+    }
+
+    if (strncmp(command, "GETDWELLTIME ACTIVE MAX", 23) == 0)
+    {
+        *len = scnprintf(extra, n, "GETDWELLTIME ACTIVE MAX %u\n",
+                (int)pCfg->nActiveMaxChnTime);
+        return ret;
+    }
+    else if (strncmp(command, "GETDWELLTIME ACTIVE MIN", 23) == 0)
+    {
+        *len = scnprintf(extra, n, "GETDWELLTIME ACTIVE MIN %u\n",
+                (int)pCfg->nActiveMinChnTime);
+        return ret;
+    }
+    else if (strncmp(command, "GETDWELLTIME PASSIVE MAX", 24) == 0)
+    {
+        *len = scnprintf(extra, n, "GETDWELLTIME PASSIVE MAX %u\n",
+                (int)pCfg->nPassiveMaxChnTime);
+        return ret;
+    }
+    else if (strncmp(command, "GETDWELLTIME PASSIVE MIN", 24) == 0)
+    {
+        *len = scnprintf(extra, n, "GETDWELLTIME PASSIVE MIN %u\n",
+                (int)pCfg->nPassiveMinChnTime);
+        return ret;
+    }
+    else if (strncmp(command, "GETDWELLTIME", 12) == 0)
+    {
+        *len = scnprintf(extra, n, "GETDWELLTIME %u \n",
+                (int)pCfg->nActiveMaxChnTime);
+        return ret;
+    }
+    else
+    {
+        ret = -EINVAL;
+    }
+
+    return ret;
+}
+
+static int hdd_set_dwell_time(hdd_adapter_t *pAdapter, tANI_U8 *command)
+{
+    tHalHandle hHal;
+    hdd_config_t *pCfg;
+    tANI_U8 *value = command;
+    tSmeConfigParams smeConfig;
+    int val = 0, ret = 0, temp = 0;
+
+    if (!pAdapter || !command || !(pCfg = (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini)
+        || !(hHal = (WLAN_HDD_GET_HAL_CTX(pAdapter))))
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+         "%s: argument passed for SETDWELLTIME is incorrect", __func__);
+        ret = -EINVAL;
+        return ret;
+    }
+
+    vos_mem_zero(&smeConfig, sizeof(smeConfig));
+    sme_GetConfigParam(hHal, &smeConfig);
+
+    if (strncmp(command, "SETDWELLTIME ACTIVE MAX", 23) == 0 )
+    {
+        value = value + 24;
+        temp = kstrtou32(value, 10, &val);
+        if (temp != 0 || val < CFG_ACTIVE_MAX_CHANNEL_TIME_MIN ||
+                         val > CFG_ACTIVE_MAX_CHANNEL_TIME_MAX )
+        {
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s: argument passed for SETDWELLTIME ACTIVE MAX is incorrect", __func__);
+            ret = -EFAULT;
+            return ret;
+        }
+        pCfg->nActiveMaxChnTime = val;
+        smeConfig.csrConfig.nActiveMaxChnTime = val;
+        sme_UpdateConfig(hHal, &smeConfig);
+    }
+    else if (strncmp(command, "SETDWELLTIME ACTIVE MIN", 23) == 0)
+    {
+        value = value + 24;
+        temp = kstrtou32(value, 10, &val);
+        if (temp !=0 || val < CFG_ACTIVE_MIN_CHANNEL_TIME_MIN  ||
+                        val > CFG_ACTIVE_MIN_CHANNEL_TIME_MAX )
+        {
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s: argument passed for SETDWELLTIME ACTIVE MIN is incorrect", __func__);
+            ret = -EFAULT;
+            return ret;
+        }
+        pCfg->nActiveMinChnTime = val;
+        smeConfig.csrConfig.nActiveMinChnTime = val;
+        sme_UpdateConfig(hHal, &smeConfig);
+    }
+    else if (strncmp(command, "SETDWELLTIME PASSIVE MAX", 24) == 0)
+    {
+        value = value + 25;
+        temp = kstrtou32(value, 10, &val);
+        if (temp != 0 || val < CFG_PASSIVE_MAX_CHANNEL_TIME_MIN ||
+                         val > CFG_PASSIVE_MAX_CHANNEL_TIME_MAX )
+        {
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s: argument passed for SETDWELLTIME PASSIVE MAX is incorrect", __func__);
+            ret = -EFAULT;
+            return ret;
+        }
+        pCfg->nPassiveMaxChnTime = val;
+        smeConfig.csrConfig.nPassiveMaxChnTime = val;
+        sme_UpdateConfig(hHal, &smeConfig);
+    }
+    else if (strncmp(command, "SETDWELLTIME PASSIVE MIN", 24) == 0)
+    {
+        value = value + 25;
+        temp = kstrtou32(value, 10, &val);
+        if (temp != 0 || val < CFG_PASSIVE_MIN_CHANNEL_TIME_MIN ||
+                         val > CFG_PASSIVE_MIN_CHANNEL_TIME_MAX )
+        {
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s: argument passed for SETDWELLTIME PASSIVE MIN is incorrect", __func__);
+            ret = -EFAULT;
+            return ret;
+        }
+        pCfg->nPassiveMinChnTime = val;
+        smeConfig.csrConfig.nPassiveMinChnTime = val;
+        sme_UpdateConfig(hHal, &smeConfig);
+    }
+    else if (strncmp(command, "SETDWELLTIME", 12) == 0)
+    {
+        value = value + 13;
+        temp = kstrtou32(value, 10, &val);
+        if (temp != 0 || val < CFG_ACTIVE_MAX_CHANNEL_TIME_MIN ||
+                         val > CFG_ACTIVE_MAX_CHANNEL_TIME_MAX )
+        {
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s: argument passed for SETDWELLTIME is incorrect", __func__);
+            ret = -EFAULT;
+            return ret;
+        }
+        pCfg->nActiveMaxChnTime = val;
+        smeConfig.csrConfig.nActiveMaxChnTime = val;
+        sme_UpdateConfig(hHal, &smeConfig);
+    }
+    else
+    {
+        ret = -EINVAL;
+    }
+
+    return ret;
+}
+
 static int hdd_driver_command(hdd_adapter_t *pAdapter,
                               hdd_priv_data_t *ppriv_data)
 {
@@ -5083,9 +5241,9 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            char extra[32];
            tANI_U8 len = 0;
 
-           len = scnprintf(extra, sizeof(extra), "GETDWELLTIME %u\n",
-                  (int)pCfg->nActiveMaxChnTime);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
+           memset(extra, 0, sizeof(extra));
+           ret = hdd_get_dwell_time(pCfg, command, extra, sizeof(extra), &len);
+           if (ret != 0 || copy_to_user(priv_data.buf, &extra, len + 1))
            {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
@@ -5096,21 +5254,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
        }
        else if (strncmp(command, "SETDWELLTIME", 12) == 0)
        {
-           tANI_U8 *value = command;
-           hdd_config_t *pCfg = (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini;
-           int val = 0, temp;
-
-           value = value + 13;
-           temp = kstrtou32(value, 10, &val);
-           if ( temp != 0 || val < CFG_ACTIVE_MAX_CHANNEL_TIME_MIN ||
-                             val > CFG_ACTIVE_MAX_CHANNEL_TIME_MAX )
-           {
-               VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                "%s: argument passed for SETDWELLTIME is incorrect", __func__);
-               ret = -EFAULT;
-               goto exit;
-           }
-           pCfg->nActiveMaxChnTime = val;
+           ret = hdd_set_dwell_time(pAdapter, command);
        }
        else if ( strncasecmp(command, "MIRACAST", 8) == 0 )
        {
@@ -6048,6 +6192,8 @@ static void hdd_update_tgt_services(hdd_context_t *hdd_ctx,
 
 #ifdef FEATURE_WLAN_SCAN_PNO
     /* PNO offload */
+    hddLog(VOS_TRACE_LEVEL_INFO_HIGH, "%s: PNO Capability in f/w = %d",
+           __func__,cfg->pno_offload);
     if (cfg->pno_offload)
         cfg_ini->PnoOffload = TRUE;
 #endif
@@ -7889,7 +8035,7 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    tANI_U32 type, subType;
-   long rc = 0;
+   unsigned long rc = 0;
    int ret_val;
 
    INIT_COMPLETION(pAdapter->session_open_comp_var);
@@ -7914,11 +8060,10 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    //Block on a completion variable. Can't wait forever though.
-   rc = wait_for_completion_interruptible_timeout(
+   rc = wait_for_completion_timeout(
                         &pAdapter->session_open_comp_var,
                         msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-   if (rc <= 0)
-   {
+   if (!rc) {
       hddLog(VOS_TRACE_LEVEL_FATAL,
              FL("Session is not opened within timeout period code %ld"),
              rc );
@@ -10489,13 +10634,6 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 #ifdef IPA_OFFLOAD
    hdd_ipa_cleanup(pHddCtx);
 #endif
-#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-    if (pHddCtx->cfg_ini->WlanAutoShutdown != 0) {
-        vosStatus = vos_timer_destroy(&pHddCtx->hdd_wlan_shutdown_timer);
-        if (!VOS_IS_STATUS_SUCCESS(vosStatus))
-            hddLog(LOGE, FL("Failed to Destroy wlan auto shutdown timer"));
-    }
-#endif
    //Free up dynamically allocated members inside HDD Adapter
    kfree(pHddCtx->cfg_ini);
    pHddCtx->cfg_ini= NULL;
@@ -11472,6 +11610,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    hdd_wdi_trace_enable(eWLAN_MODULE_PAL,
                         pHddCtx->cfg_ini->wdiTraceEnablePAL);
 
+   print_hdd_cfg(pHddCtx);
 
    if (VOS_FTM_MODE == hdd_get_conparam())
        goto ftm_processing;
@@ -12066,13 +12205,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    }
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-    if (pHddCtx->cfg_ini->WlanAutoShutdown != 0) {
-        status = vos_timer_init( &pHddCtx->hdd_wlan_shutdown_timer,
-                                VOS_TIMER_TYPE_SW, wlan_hdd_auto_shutdown_cb,
-                                                                        NULL);
-        if (!VOS_IS_STATUS_SUCCESS(status))
-           hddLog(LOGE, FL("Failed to init wlan auto shutdown timer"));
-    }
+   if (pHddCtx->cfg_ini->WlanAutoShutdown != 0)
+       if (sme_set_auto_shutdown_cb(pHddCtx->hHal, wlan_hdd_auto_shutdown_cb)
+           != eHAL_STATUS_SUCCESS)
+           hddLog(LOGE, FL("Auto shutdown feature could not be enabled"));
 #endif
 
 #ifdef FEATURE_GREEN_AP
@@ -13597,7 +13733,7 @@ void wlan_hdd_send_version_pkg(v_U32_t fw_version,
 #endif
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-v_VOID_t wlan_hdd_auto_shutdown_cb(v_PVOID_t data)
+v_VOID_t wlan_hdd_auto_shutdown_cb(v_VOID_t)
 {
     hddLog(LOGE, FL("%s: Wlan Idle. Sending Shutdown event.."),__func__);
     wlan_hdd_send_svc_nlink_msg(WLAN_SVC_WLAN_AUTO_SHUTDOWN_IND, NULL, 0);
@@ -13605,19 +13741,21 @@ v_VOID_t wlan_hdd_auto_shutdown_cb(v_PVOID_t data)
 
 void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_BOOL_t enable)
 {
-    VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
     hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
     VOS_STATUS status;
     hdd_adapter_t      *pAdapter;
     v_BOOL_t ap_connected = VOS_FALSE, sta_connected = VOS_FALSE;
+    tHalHandle hHal;
+
+    hHal = hdd_ctx->hHal;
+    if (hHal == NULL)
+        return;
 
     if (hdd_ctx->cfg_ini->WlanAutoShutdown == 0)
         return;
 
     if (enable == VOS_FALSE) {
-        if (hdd_ctx->hdd_wlan_shutdown_timer.state == VOS_TIMER_STATE_RUNNING) {
-            vos_status = vos_timer_stop(&hdd_ctx->hdd_wlan_shutdown_timer);
-            if (!VOS_IS_STATUS_SUCCESS(vos_status))
+        if (sme_set_auto_shutdown_timer(hHal, 0) != eHAL_STATUS_SUCCESS) {
                hddLog(LOGE, FL("Failed to stop wlan auto shutdown timer"));
         }
         return;
@@ -13651,16 +13789,13 @@ void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_BOOL_t enable)
             hddLog(LOG1, FL("CC Session active. Shutdown timer not enabled"));
             return;
     } else {
-        if (hdd_ctx->hdd_wlan_shutdown_timer.state == VOS_TIMER_STATE_STOPPED) {
-            vos_status = vos_timer_start( &hdd_ctx->hdd_wlan_shutdown_timer,
-                                   hdd_ctx->cfg_ini->WlanAutoShutdown * 1000);
-
-            if (!VOS_IS_STATUS_SUCCESS(vos_status))
-               hddLog(LOGE, FL("Failed to start wlan auto shutdown timer"));
-            else
-               hddLog(LOG1, FL("CC Session Inactive. Shutdown timer enabled"));
-
-        }
+        if (sme_set_auto_shutdown_timer(hHal,
+                hdd_ctx->cfg_ini->WlanAutoShutdown)
+                != eHAL_STATUS_SUCCESS)
+           hddLog(LOGE, FL("Failed to start wlan auto shutdown timer"));
+        else
+           hddLog(LOG1, FL("Auto Shutdown timer for %d seconds enabled"),
+                                   hdd_ctx->cfg_ini->WlanAutoShutdown);
 
     }
 }

@@ -3521,9 +3521,6 @@ REG_TABLE_ENTRY g_registry_table[] =
 
    REG_VARIABLE( CFG_SAP_DOT11_MODE_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, sapDot11Mode,
-#ifndef WLAN_FEATURE_MBSSID
-                 VAR_FLAGS_DYNAMIC_CFG |
-#endif
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
                  CFG_SAP_DOT11_MODE_DEFAULT,
                  CFG_SAP_DOT11_MODE_MIN,
@@ -3732,6 +3729,15 @@ REG_TABLE_ENTRY g_registry_table[] =
               CFG_ENABLE_SIFS_BURST_DEFAULT,
               CFG_ENABLE_SIFS_BURST_MIN,
               CFG_ENABLE_SIFS_BURST_MAX ),
+
+#ifdef WLAN_FEATURE_LPSS
+   REG_VARIABLE(CFG_ENABLE_LPASS_SUPPORT, WLAN_PARAM_Integer,
+               hdd_config_t, enablelpasssupport,
+               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+               CFG_ENABLE_LPASS_SUPPORT_DEFAULT,
+               CFG_ENABLE_LPASS_SUPPORT_MIN,
+               CFG_ENABLE_LPASS_SUPPORT_MAX),
+#endif
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -3790,14 +3796,6 @@ REG_TABLE_ENTRY mbssid_sap_dyn_ini_reg_table[] =
                  CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT,
                  CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
                  CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
-
-   REG_VARIABLE( CFG_SAP_DOT11_MODE_NAME, WLAN_PARAM_Integer,
-                 mbssid_sap_dyn_ini_config_t, sapDot11Mode,
-                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK
-                 | VAR_FLAGS_DYNAMIC_CFG,
-                 CFG_SAP_DOT11_MODE_DEFAULT,
-                 CFG_SAP_DOT11_MODE_MIN,
-                 CFG_SAP_DOT11_MODE_MAX ),
 
 };
 #endif
@@ -3995,7 +3993,7 @@ config_exit:
 }
 
 
-static void print_hdd_cfg(hdd_context_t *pHddCtx)
+void print_hdd_cfg(hdd_context_t *pHddCtx)
 {
   int i;
 
@@ -4074,6 +4072,17 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
 #endif
 #ifdef FEATURE_WLAN_OKC
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [OkcEnabled] Value = [%u] ",pHddCtx->cfg_ini->isOkcIniFeatureEnabled);
+#endif
+#ifdef FEATURE_WLAN_SCAN_PNO
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [configPNOScanSupport] Value = [%u] ",pHddCtx->cfg_ini->configPNOScanSupport);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [configPNOScanTimerRepeatValue] Value = [%u] ",pHddCtx->cfg_ini->configPNOScanTimerRepeatValue);
+#endif
+#ifdef FEATURE_WLAN_TDLS
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [fEnableTDLSSupport] Value = [%u] ",pHddCtx->cfg_ini->fEnableTDLSSupport);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [fEnableTDLSImplicitTrigger] Value = [%u] ",pHddCtx->cfg_ini->fEnableTDLSImplicitTrigger);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [fTDLSExternalControl] Value = [%u] ",pHddCtx->cfg_ini->fTDLSExternalControl);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [fTDLSUapsdMask] Value = [%u] ",pHddCtx->cfg_ini->fTDLSUapsdMask);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [fEnableTDLSBufferSta] Value = [%u] ",pHddCtx->cfg_ini->fEnableTDLSBufferSta);
 #endif
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraDirAcVo] Value = [%u] ",pHddCtx->cfg_ini->InfraDirAcVo);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraNomMsduSizeAcVo] Value = [0x%x] ",pHddCtx->cfg_ini->InfraNomMsduSizeAcVo);
@@ -4260,6 +4269,12 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
            "Name = [gEnableSifsBurst] Value = [%u]",
                    pHddCtx->cfg_ini->enableSifsBurst);
+
+#ifdef WLAN_FEATURE_LPSS
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+            "Name = [gEnableLpassSupport] Value = [%u] ",
+            pHddCtx->cfg_ini->enablelpasssupport);
+#endif
 }
 
 #define CFG_VALUE_MAX_LEN 256
@@ -4769,7 +4784,6 @@ static VOS_STATUS hdd_apply_cfg_ini( hdd_context_t *pHddCtx, tCfgIniEntry* iniTa
 #ifndef QCA_WIFI_2_0
    pHddCtx->cfg_ini->enablePowersaveOffload = 0;
 #endif
-   print_hdd_cfg(pHddCtx);
 
   return( ret_status );
 }
@@ -4789,8 +4803,6 @@ v_VOID_t hdd_mbssid_apply_def_cfg_ini(hdd_adapter_t *pAdapter)
    sap_ini_cfg->acsBandSwitchThreshold = iniConfig->acsBandSwitchThreshold;
    vos_mem_copy(sap_ini_cfg->acsAllowedChnls, iniConfig->acsAllowedChnls,
                                                               CFG_MAX_STR_LEN);
-
-   sap_ini_cfg->sapDot11Mode = iniConfig->sapDot11Mode;
 
 }
 #endif

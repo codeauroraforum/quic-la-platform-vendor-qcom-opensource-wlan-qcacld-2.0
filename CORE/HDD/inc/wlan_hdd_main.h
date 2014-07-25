@@ -1108,6 +1108,7 @@ struct hdd_adapter_s
     int connection;
 #endif
     v_BOOL_t is_roc_inprogress;
+    v_U32_t maxRateFlags;
 
 #ifdef QCA_LL_TX_FLOW_CT
     vos_timer_t  tx_flow_control_timer;
@@ -1507,9 +1508,6 @@ struct hdd_context_s
 
     tSirScanType ioctl_scan_mode;
 
-#ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-    vos_timer_t hdd_wlan_shutdown_timer;
-#endif
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
     adf_os_work_t  sta_ap_intf_check_work;
 #endif

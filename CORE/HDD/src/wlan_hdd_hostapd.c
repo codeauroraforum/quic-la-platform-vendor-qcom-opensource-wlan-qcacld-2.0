@@ -708,16 +708,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
                 pHddApCtx->uBCStaId = pSapEvent->sapevt.sapStartBssCompleteEvent.staId;
 
-#ifdef QCA_LL_TX_FLOW_CT
-                vos_timer_init(&pHostapdAdapter->tx_flow_control_timer,
-                               VOS_TIMER_TYPE_SW,
-                               hdd_tx_resume_timer_expired_handler,
-                               pHostapdAdapter);
-                WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
-                               hdd_tx_resume_cb,
-                               pHostapdAdapter->sessionId,
-                               (void *)pHostapdAdapter);
-#endif
                 //@@@ need wep logic here to set privacy bit
                 vos_status = hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
@@ -1722,7 +1712,7 @@ static VOS_STATUS hdd_print_acl(hdd_adapter_t *pHostapdAdapter)
     if (VOS_STATUS_SUCCESS == WLANSAP_GetACLAcceptList(pvosGCtx,
                                                        &MacList[0], &listnum)) {
         pr_info("******* WHITE LIST ***********\n");
-        if (listnum < MAX_ACL_MAC_ADDRESS)
+        if (listnum <= MAX_ACL_MAC_ADDRESS)
             print_mac_list(&MacList[0], listnum);
     } else {
         return VOS_STATUS_E_FAILURE;
@@ -1731,7 +1721,7 @@ static VOS_STATUS hdd_print_acl(hdd_adapter_t *pHostapdAdapter)
     if (VOS_STATUS_SUCCESS == WLANSAP_GetACLDenyList(pvosGCtx,
                                                      &MacList[0], &listnum)) {
         pr_info("******* BLACK LIST ***********\n");
-        if (listnum < MAX_ACL_MAC_ADDRESS)
+        if (listnum <= MAX_ACL_MAC_ADDRESS)
             print_mac_list(&MacList[0], listnum);
     } else {
         return VOS_STATUS_E_FAILURE;
