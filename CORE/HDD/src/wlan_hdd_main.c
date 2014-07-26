@@ -4964,8 +4964,14 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
            status = sme_SetEseBeaconRequest((tHalHandle)(pHddCtx->hHal),
                                             pAdapter->sessionId,
                                             &eseBcnReq);
-           if (eHAL_STATUS_SUCCESS != status)
-           {
+
+           if (eHAL_STATUS_RESOURCES == status) {
+               hddLog(VOS_TRACE_LEVEL_INFO,
+                      FL("sme_SetEseBeaconRequest failed (%d),"
+                      " a request already in progress"), status);
+               ret = -EBUSY;
+               goto exit;
+           } else if (eHAL_STATUS_SUCCESS != status) {
                VOS_TRACE( VOS_MODULE_ID_HDD,
                           VOS_TRACE_LEVEL_ERROR,
                           "%s: sme_SetEseBeaconRequest failed (%d)",
@@ -7319,7 +7325,7 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    tANI_U32 type, subType;
-   long rc = 0;
+   unsigned long rc = 0;
    int ret_val;
 
    INIT_COMPLETION(pAdapter->session_open_comp_var);
@@ -7344,11 +7350,10 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    //Block on a completion variable. Can't wait forever though.
-   rc = wait_for_completion_interruptible_timeout(
+   rc = wait_for_completion_timeout(
                         &pAdapter->session_open_comp_var,
                         msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-   if (rc <= 0)
-   {
+   if (!rc) {
       hddLog(VOS_TRACE_LEVEL_FATAL,
              FL("Session is not opened within timeout period code %ld"),
              rc );
