@@ -79,6 +79,9 @@
 #include <wlan_hdd_cfg.h>
 #include <wlan_hdd_cfg80211.h>
 #include <net/addrconf.h>
+#ifdef IPA_OFFLOAD
+#include <wlan_hdd_ipa.h>
+#endif
 
 /**-----------------------------------------------------------------------------
 *   Preprocessor definitions and constants
@@ -1392,6 +1395,7 @@ send_suspend_ind:
        status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
        pAdapterNode = pNext;
    }
+
    pHddCtx->hdd_wlan_suspended = TRUE;
 
 #ifdef SUPPORT_EARLY_SUSPEND_STANDBY_DEEPSLEEP
@@ -1619,6 +1623,7 @@ void hdd_resume_wlan(void)
    }
 
    pHddCtx->hdd_wlan_suspended = FALSE;
+
    /*loop through all adapters. Concurrency */
    status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
 
@@ -1694,6 +1699,10 @@ send_resume_ind:
       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
       pAdapterNode = pNext;
    }
+
+#ifdef IPA_OFFLOAD
+   hdd_ipa_resume(pHddCtx);
+#endif
 
 #ifdef SUPPORT_EARLY_SUSPEND_STANDBY_DEEPSLEEP
    if(pHddCtx->hdd_ps_state == eHDD_SUSPEND_STANDBY)

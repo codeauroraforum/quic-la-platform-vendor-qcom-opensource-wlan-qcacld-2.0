@@ -102,6 +102,9 @@
 #include <net/cnss.h>
 #endif
 #include "wlan_hdd_misc.h"
+#ifdef IPA_OFFLOAD
+#include <wlan_hdd_ipa.h>
+#endif
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -10852,6 +10855,16 @@ int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
         status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
         pAdapterNode = pNext;
     }
+#ifdef IPA_OFFLOAD
+    /*
+     * Suspend IPA early before proceeding to suspend other entities like
+     * firmware to avoid any race conditions.
+     */
+    if (hdd_ipa_suspend(pHddCtx)) {
+        hddLog(VOS_TRACE_LEVEL_DEBUG, FL("IPA not ready to suspend!"));
+        return -EAGAIN;
+    }
+#endif
 
     /* Wait for the target to be ready for suspend */
     INIT_COMPLETION(pHddCtx->ready_to_suspend);
