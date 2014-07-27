@@ -20,12 +20,10 @@
  */
 
 /*
- * Copyright (c) 2012-2014 Qualcomm Atheros, Inc.
- * All Rights Reserved.
- * Qualcomm Atheros Confidential and Proprietary.
- *
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
-
 
 /**========================================================================
 
@@ -4845,7 +4843,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         if (!vos_concurrent_sap_sessions_running()) {
             /* Single AP Mode */
             if (VOS_IS_DFS_CH(pConfig->channel))
-                 pHddCtx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
+                pHddCtx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
         } else {
             /* MBSSID Mode */
             hdd_adapter_t *con_sap_adapter;
@@ -4855,21 +4853,21 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
             if (con_sap_adapter) {
                 /* we have active SAP running */
                 con_ch = con_sap_adapter->sessionCtx.ap.operatingChannel;
-                /* If this SAP is configured for ACS use CC_SAP's DFS channel */
-                if (pConfig->channel == AUTO_CHANNEL_SELECT) {
-                    if (con_ch != 0 && VOS_IS_DFS_CH(con_ch))
-                        pConfig->channel = con_ch;
-                } else if (VOS_IS_DFS_CH(con_ch) &&
-                           (pConfig->channel != con_ch)) {
+                if (con_ch != 0 && VOS_IS_DFS_CH(con_ch)) {
+                    /* AP-AP DFS: secondary AP has to follow primary AP's
+                     * channel */
                     hddLog(VOS_TRACE_LEVEL_ERROR,
-                               "%s: Only SCC AP-AP DFS Permitted (ch=%d, con_ch=%d) !!", __func__, pConfig->channel, con_ch);
-                    return -EINVAL;
+                            "%s: Only SCC AP-AP DFS Permitted (chan=%d, con_ch=%d) !!, overriding guest AP's channel",
+                            __func__,
+                            pConfig->channel,
+                            con_ch);
+                    pConfig->channel = con_ch;
                 }
             } else {
                 /* We have idle AP interface (no active SAP running on it
                  * When one SAP is stopped then also this condition applies */
                 if (VOS_IS_DFS_CH(pConfig->channel))
-                     pHddCtx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
+                    pHddCtx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
             }
         }
 #endif
@@ -5301,11 +5299,18 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 #ifdef WLAN_FEATURE_MBSSID
     pConfig->acsBandSwitchThreshold =
                         pHostapdAdapter->sap_dyn_ini_cfg.acsBandSwitchThreshold;
+    pConfig->apAutoChannelSelection =
+                        pHostapdAdapter->sap_dyn_ini_cfg.apAutoChannelSelection;
+    pConfig->apStartChannelNum =
+                        pHostapdAdapter->sap_dyn_ini_cfg.apStartChannelNum;
+    pConfig->apEndChannelNum =
+                        pHostapdAdapter->sap_dyn_ini_cfg.apEndChannelNum;
 #else
     pConfig->acsBandSwitchThreshold = iniConfig->acsBandSwitchThreshold;
-#endif
-
     pConfig->apAutoChannelSelection = iniConfig->apAutoChannelSelection;
+    pConfig->apStartChannelNum = iniConfig->apStartChannelNum;
+    pConfig->apEndChannelNum = iniConfig->apEndChannelNum;
+#endif
 
     pSapEventCallback = hdd_hostapd_SAPEventCB;
 
@@ -7014,7 +7019,8 @@ static int __wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
         /* The supplicant may attempt to set the PTK once pre-authentication
            is done. Save the key in the UMAC and include it in the ADD BSS
            request */
-        halStatus = sme_FTUpdateKey( WLAN_HDD_GET_HAL_CTX(pAdapter), &setKey);
+        halStatus = sme_FTUpdateKey( WLAN_HDD_GET_HAL_CTX(pAdapter),
+                                     pAdapter->sessionId, &setKey);
         if ( halStatus == eHAL_STATUS_FT_PREAUTH_KEY_SUCCESS )
         {
            hddLog(VOS_TRACE_LEVEL_INFO_MED,
@@ -8089,7 +8095,10 @@ VOS_STATUS wlan_hdd_cfg80211_roam_metrics_handover(hdd_adapter_t * pAdapter,
  *
  */
 static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
-        void *pContext, tANI_U32 scanId, eCsrScanStatus status)
+                                                  void *pContext,
+                                                  tANI_U8 sessionId,
+                                                  tANI_U32 scanId,
+                                                  eCsrScanStatus status)
 {
     struct net_device *dev = (struct net_device *) pContext;
     //struct wireless_dev *wdev = dev->ieee80211_ptr;
@@ -9728,6 +9737,10 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
         return -ECONNREFUSED;
     }
 
+#if defined(FEATURE_WLAN_LFR) && defined(WLAN_FEATURE_ROAM_SCAN_OFFLOAD)
+    wlan_hdd_disable_roaming(pAdapter);
+#endif
+
 #ifdef WLAN_BTAMP_FEATURE
     //Infra connect not supported when AMP traffic is on.
     if (VOS_TRUE == WLANBAP_AmpSessionOn()) {
@@ -9836,6 +9849,7 @@ int wlan_hdd_disconnect( hdd_adapter_t *pAdapter, u16 reason )
     int status;
     hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    long ret;
 
     status = wlan_hdd_validate_context(pHddCtx);
 
@@ -9860,8 +9874,13 @@ int wlan_hdd_disconnect( hdd_adapter_t *pAdapter, u16 reason )
 
     status = sme_RoamDisconnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
                                  pAdapter->sessionId, reason);
-
-    if ( 0 != status )
+    if(eHAL_STATUS_CMD_NOT_QUEUED == status)
+    {
+        hddLog(VOS_TRACE_LEVEL_INFO,
+               FL("status = %d, already disconnected"),
+                      (int)status );
+    }
+    else if ( 0 != status )
     {
         hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s csrRoamDisconnect failure, returned %d",
@@ -9869,23 +9888,25 @@ int wlan_hdd_disconnect( hdd_adapter_t *pAdapter, u16 reason )
         pHddStaCtx->staDebugState = status;
         return -EINVAL;
     }
-    status = wait_for_completion_interruptible_timeout(
+    ret = wait_for_completion_interruptible_timeout(
                 &pAdapter->disconnect_comp_var,
                 msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
 
-    pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
-
-    if (!status)
+    if (!ret && ( eHAL_STATUS_CMD_NOT_QUEUED != status ))
     {
        hddLog(VOS_TRACE_LEVEL_ERROR,
               "%s: Failed to disconnect, timed out", __func__);
        return -ETIMEDOUT;
-    } else if (status == -ERESTARTSYS)
+    }
+    else if (ret == -ERESTARTSYS)
     {
         hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s: Failed to disconnect, wait interrupted", __func__);
-        return status;
+        return ret;
     }
+    VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+             FL("Set HDD connState to eConnectionState_NotConnected"));
+    pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
 
     return 0;
 }
@@ -13731,12 +13752,6 @@ int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
         return -EAGAIN;
     }
 
-    if (sme_staInMiddleOfRoaming(pHddCtx->hHal)) {
-        hddLog(VOS_TRACE_LEVEL_DEBUG, FL("Roaming in progress "
-               "Do not allow suspend"));
-        return -EAGAIN;
-    }
-
     /* If RADAR detection is in progress (HDD), prevent suspend. The flag
      * "dfs_cac_block_tx" is set to TRUE when RADAR is found and stay TRUE until
      * CAC is done for a SoftAP which is in started state.
@@ -13764,6 +13779,10 @@ int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
         pAdapter = pAdapterNode->pAdapter;
         pScanInfo = &pAdapter->scan_info;
 
+        if (sme_staInMiddleOfRoaming(pHddCtx->hHal, pAdapter->sessionId)) {
+            hddLog(LOG1, FL("Roaming in progress, do not allow suspend"));
+            return -EAGAIN;
+        }
         if (pScanInfo->mScanPending && pAdapter->request)
         {
            INIT_COMPLETION(pScanInfo->abortscan_event_var);
@@ -13888,7 +13907,6 @@ int wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
     hdd_context_t *pHddCtx;
     VOS_STATUS status;
     tSmeConfigParams smeConfig;
-    int i;
     bool cbModeChange;
 
     if (NULL == wiphy) {
@@ -13913,16 +13931,24 @@ int wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
     sme_GetConfigParam(pHddCtx->hHal, &smeConfig);
     switch (chandef->width) {
     case NL80211_CHAN_WIDTH_20:
-        if (smeConfig.csrConfig.channelBondingMode24GHz != 0) {
-            smeConfig.csrConfig.channelBondingMode24GHz = 0;
+        if (smeConfig.csrConfig.channelBondingMode24GHz !=
+                      eCSR_INI_SINGLE_CHANNEL_CENTERED) {
+            smeConfig.csrConfig.channelBondingMode24GHz =
+                      eCSR_INI_SINGLE_CHANNEL_CENTERED;
             sme_UpdateConfig(pHddCtx->hHal, &smeConfig);
             cbModeChange = TRUE;
         }
         break;
 
     case NL80211_CHAN_WIDTH_40:
-        if (smeConfig.csrConfig.channelBondingMode24GHz != 1) {
-            smeConfig.csrConfig.channelBondingMode24GHz = 1;
+        if (smeConfig.csrConfig.channelBondingMode24GHz ==
+                      eCSR_INI_SINGLE_CHANNEL_CENTERED) {
+            if ( NL80211_CHAN_HT40MINUS == cfg80211_get_chandef_type(chandef))
+                smeConfig.csrConfig.channelBondingMode24GHz =
+                      eCSR_INI_DOUBLE_CHANNEL_HIGH_PRIMARY;
+            else
+                smeConfig.csrConfig.channelBondingMode24GHz =
+                      eCSR_INI_DOUBLE_CHANNEL_LOW_PRIMARY;
             sme_UpdateConfig(pHddCtx->hHal, &smeConfig);
             cbModeChange = TRUE;
         }
@@ -13952,22 +13978,6 @@ int wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
                "%s:Error!!! Cannot set SAP HT20/40 mode!",
                __func__);
         return -EINVAL;
-    }
-
-    for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
-        if (!pAdapter->aStaInfo[i].isUsed)
-            continue;
-
-        status = hdd_wlan_set_ht2040_mode(pAdapter,
-                                          pAdapter->aStaInfo[i].ucSTAId,
-                                          pAdapter->aStaInfo[i].macAddrSTA,
-                                          cfg80211_get_chandef_type(chandef));
-        if (status != VOS_STATUS_SUCCESS) {
-                    hddLog(VOS_TRACE_LEVEL_ERROR,
-                    "%s:Error!!! Cannot set HT20/40 mode for STA %d!",
-                    __func__, pAdapter->aStaInfo[i].ucSTAId);
-            return -EINVAL;
-        }
     }
 
     return 0;

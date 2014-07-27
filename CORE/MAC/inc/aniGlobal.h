@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright (c) 2012-2014 Qualcomm Atheros, Inc.
- * All Rights Reserved.
- * Qualcomm Atheros Confidential and Proprietary.
- *
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 
@@ -95,7 +94,6 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #if defined WLAN_FEATURE_VOWIFI_11R
 #include <limFTDefs.h>
 #endif
-
 
 #ifdef ANI_DVT_DEBUG
 #include "dvtModule.h"
@@ -954,14 +952,6 @@ typedef struct sRrmContext
 }tRrmContext, *tpRrmContext;
 #endif
 
-#if defined WLAN_FEATURE_VOWIFI_11R
-typedef struct sFTContext
-{
-  tftSMEContext ftSmeContext;
-  tftPEContext  ftPEContext;
-} tftContext, *tpFTContext;
-#endif
-
 //Check if this definition can actually move here even for Volans. In that case
 //this featurization can be removed.
 /** ------------------------------------------------------------------------- *
@@ -1105,10 +1095,6 @@ typedef struct sAniSirGlobal
     tp2pContext p2pContext[MAX_NO_OF_P2P_SESSIONS];
 #else
     tp2pContext p2pContext;
-#endif
-
-#if defined WLAN_FEATURE_VOWIFI_11R
-    tftContext   ft;
 #endif
 
     tANI_U32     gCurrentLogSize;

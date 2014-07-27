@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright (c) 2012-2013 Qualcomm Atheros, Inc.
- * All Rights Reserved.
- * Qualcomm Atheros Confidential and Proprietary.
- *
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 
@@ -97,7 +96,7 @@ void limStopTxAndSwitchChannel(tpAniSirGlobal pMac, tANI_U8 sessionId)
 
     if( NULL == psessionEntry )
     {
-      limLog(pMac, LOGE, FL("Session %d  not active\n "), sessionId);
+      limLog(pMac, LOGE, FL("Session %d not active"), sessionId);
       return;
     }
 

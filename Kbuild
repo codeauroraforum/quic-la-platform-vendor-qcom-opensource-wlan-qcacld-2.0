@@ -1152,6 +1152,7 @@ CDEFINES += -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 CDEFINES += -DQCA_SUPPORT_OL_RX_REORDER_TIMEOUT
 CDEFINES += -DCONFIG_ATH_PCIE_MAX_PERF=0 -DCONFIG_ATH_PCIE_AWAKE_WHILE_DRIVER_LOAD=0 -DCONFIG_DISABLE_CDC_MAX_PERF_WAR=0
 CDEFINES += -DQCA_TX_HTT2_SUPPORT
+CDEFINES += -DUSB_FW_CRASH_RAM_DUMP
 endif
 
 # enable the MAC Address auto-generation feature
@@ -1366,6 +1367,10 @@ CDEFINES += -DWLAN_OPEN_P2P_INTERFACE
 #Enable 2.4 GHz social channels in 5 GHz only mode for p2p usage
 CDEFINES += -DWLAN_ENABLE_SOCIAL_CHANNELS_5G_ONLY
 
+#Enable RX Full re-order OL feature only "LL and NON-MDM platform"
+ifeq ($(CONFIG_HIF_PCI), 1)
+CDEFINES += -DWLAN_FEATURE_RX_FULL_REORDER_OL
+endif
 endif
 
 #Enable Signed firmware support for split binary format

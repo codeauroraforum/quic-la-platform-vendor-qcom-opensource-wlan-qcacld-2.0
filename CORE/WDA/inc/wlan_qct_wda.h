@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright (c) 2012-2014 Qualcomm Atheros, Inc.
- * All Rights Reserved.
- * Qualcomm Atheros Confidential and Proprietary.
- *
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 
@@ -679,6 +678,8 @@ tANI_U8 WDA_MapChannel(tANI_U8);
      (((t_packetmeta *)pRxMeta)->offloadScanLearn)
 #define WDA_GET_ROAMCANDIDATEIND(pRxMeta) \
      (((t_packetmeta *)pRxMeta)->roamCandidateInd)
+#define WDA_GET_SESSIONID(pRxMeta) \
+     (((t_packetmeta *)pRxMeta)->sessionId)
 
 #endif
 
@@ -841,6 +842,8 @@ tANI_U8 WDA_MapChannel(tANI_U8);
 #  define WDA_GET_OFFLOADSCANLEARN(pRxMeta) (((WDI_DS_RxMetaInfoType*)(pRxMeta))->offloadScanLearn)
 /* WDA_GET_ROAMCANDIDATEIND **************************************************/
 #  define WDA_GET_ROAMCANDIDATEIND(pRxMeta) (((WDI_DS_RxMetaInfoType*)(pRxMeta))->roamCandidateInd)
+#  define WDA_GET_SESSIONID(pRxMeta) \
+                              (((WDI_DS_RxMetaInfoType*)(pRxMeta))->sessionId)
 #endif
 /* WDA_GET_RX_RSSI_DB ********************************************************/
 // Volans RF

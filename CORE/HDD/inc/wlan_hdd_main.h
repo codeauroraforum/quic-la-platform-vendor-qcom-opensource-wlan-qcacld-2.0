@@ -20,12 +20,10 @@
  */
 
 /*
- * Copyright (c) 2012-2014 Qualcomm Atheros, Inc.
- * All Rights Reserved.
- * Qualcomm Atheros Confidential and Proprietary.
- *
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
-
 
 #if !defined( WLAN_HDD_MAIN_H )
 #define WLAN_HDD_MAIN_H
@@ -104,7 +102,6 @@
 #define WLAN_WAIT_TIME_STATS       800
 #define WLAN_WAIT_TIME_POWER       800
 #define WLAN_WAIT_TIME_COUNTRY     1000
-#define WLAN_WAIT_TIME_CHANNEL_UPDATE   600
 /* Amount of time to wait for sme close session callback.
    This value should be larger than the timeout used by WDI to wait for
    a response from WCNSS */
@@ -318,6 +315,10 @@ extern spinlock_t hdd_context_lock;
 
 /* Max PMKSAIDS available in cache */
 #define MAX_PMKSAIDS_IN_CACHE 8
+
+#define HDD_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
+#define HDD_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
+
 
 typedef struct hdd_tx_rx_stats_s
 {
@@ -1298,11 +1299,6 @@ struct hdd_context_s
    struct completion driver_crda_req;
 #endif
 
-   /* Completion variable to indicate updation of channel */
-   struct completion wiphy_channel_update_event;
-
-   v_BOOL_t nEnableStrictRegulatoryForFCC;
-
    v_BOOL_t isWlanSuspended;
 
    v_BOOL_t isTxThreadSuspended;
@@ -1320,6 +1316,8 @@ struct hdd_context_s
    v_BOOL_t isLoadInProgress;
 
    v_BOOL_t isUnloadInProgress;
+
+   v_BOOL_t isCleanUpDone;
 
    /**Track whether driver has been suspended.*/
    hdd_ps_state_t hdd_ps_state;
@@ -1731,4 +1729,8 @@ void wlan_hdd_cfg80211_link_layer_stats_init(hdd_context_t *pHddCtx);
 #endif
 
 void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr);
+#if defined(FEATURE_WLAN_LFR) && defined(WLAN_FEATURE_ROAM_SCAN_OFFLOAD)
+void wlan_hdd_disable_roaming(hdd_adapter_t *pAdapter);
+void wlan_hdd_enable_roaming(hdd_adapter_t *pAdapter);
+#endif
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

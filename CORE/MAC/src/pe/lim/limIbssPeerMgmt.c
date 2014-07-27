@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright (c) 2012-2013 Qualcomm Atheros, Inc.
- * All Rights Reserved.
- * Qualcomm Atheros Confidential and Proprietary.
- *
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 
@@ -46,6 +45,9 @@
 #include "schApi.h"          // schSetFixedBeaconFields for IBSS coalesce
 #include "limSecurityUtils.h"
 #include "limSendMessages.h"
+#ifdef WLAN_FEATURE_VOWIFI_11R
+#include "limFTDefs.h"
+#endif
 #include "limSession.h"
 #include "limIbssPeerMgmt.h"
 
