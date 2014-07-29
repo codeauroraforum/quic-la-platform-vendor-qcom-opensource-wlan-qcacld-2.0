@@ -1,4 +1,4 @@
-/*
+/*utomatic merge failed; fix conflicts and then commit the result.
  * Copyright (c) 2012-2013,2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
@@ -43,9 +43,9 @@ BRIEF DESCRIPTION:
 #define QWLAN_VERSION_PATCH            0
 #define QWLAN_VERSION_EXTRA            ""
 
-#define QWLAN_VERSION_BUILD            154
+#define QWLAN_VERSION_BUILD            155
 
-#define QWLAN_VERSIONSTR               "1.0.0.154"
+#define QWLAN_VERSIONSTR               "1.0.0.155"
 
 #ifdef QCA_WIFI_2_0
 
