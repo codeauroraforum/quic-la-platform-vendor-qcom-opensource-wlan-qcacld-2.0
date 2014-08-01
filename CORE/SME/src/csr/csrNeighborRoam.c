@@ -2327,33 +2327,53 @@ static eHalStatus csrNeighborRoamProcessScanComplete (tpAniSirGlobal pMac)
                 return eHAL_STATUS_SUCCESS;
             }
 
-        hstatus = vos_timer_start(&pNeighborRoamInfo->neighborResultsRefreshTimer,
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+            if (!csrRoamIsRoamOffloadScanEnabled(pMac))
+            {
+#endif
+                hstatus = vos_timer_start(
+                            &pNeighborRoamInfo->neighborResultsRefreshTimer,
                     pNeighborRoamInfo->cfgParams.neighborResultsRefreshPeriod);
 
-           /* This timer should be started before registering the Reassoc callback with TL. This is because, it is very likely
-            * that the callback getting called immediately and the timer would never be stopped when pre-auth is in progress */
-        if( hstatus != eHAL_STATUS_SUCCESS)
-            {
-            smsLog(pMac, LOGE, FL("Neighbor results refresh timer failed to start, status = %d"), hstatus);
-                vos_mem_free(pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList);
-                pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList = NULL;
-                pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels = 0;
-                return eHAL_STATUS_FAILURE;
-            }
+                /* This timer should be started before registering the Reassoc
+                * callback with TL. This is because, it is very likely that the
+                * callback getting called immediately and the timer would never
+                * be stopped when pre-auth is in progress */
+                if (hstatus != eHAL_STATUS_SUCCESS)
+                {
+                    smsLog(pMac, LOGE, FL(
+                    "Neighbor results refresh timer failed to start, status = %d"),
+                                hstatus);
+                    vos_mem_free(
+                    pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList);
+                    pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList =
+                                                                         NULL;
+                    pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels =
+                                                                            0;
+                    return eHAL_STATUS_FAILURE;
+                }
 
-            NEIGHBOR_ROAM_DEBUG(pMac, LOG2, FL("Registering DOWN event Reassoc callback with TL. RSSI = %d"), pNeighborRoamInfo->cfgParams.neighborReassocThreshold * (-1));
-            /* Register a reassoc Indication callback */
-            vosStatus = WLANTL_RegRSSIIndicationCB(pMac->roam.gVosContext, (v_S7_t)pNeighborRoamInfo->cfgParams.neighborReassocThreshold * (-1),
+                NEIGHBOR_ROAM_DEBUG(pMac, LOG2, FL(
+                 "Registering DOWN event Reassoc callback with TL. RSSI = %d"),
+                 pNeighborRoamInfo->cfgParams.neighborReassocThreshold * (-1));
+
+                /* Register a reassoc Indication callback */
+                vosStatus = WLANTL_RegRSSIIndicationCB(pMac->roam.gVosContext,
+                             (v_S7_t)pNeighborRoamInfo->cfgParams.neighborReassocThreshold * (-1),
                                             WLANTL_HO_THRESHOLD_DOWN,
                                             csrNeighborRoamReassocIndCallback,
                                             VOS_MODULE_ID_SME, pMac);
 
-            if(!VOS_IS_STATUS_SUCCESS(vosStatus))
-            {
-               //err msg
-               smsLog(pMac, LOGW, FL(" Couldn't register csrNeighborRoamReassocIndCallback with TL: Status = %d"), vosStatus);
+                if (!VOS_IS_STATUS_SUCCESS(vosStatus))
+                {
+                    //err msg
+                    smsLog(pMac, LOGW, FL(
+                     "Couldn't register with TL: Status = %d"),
+                                    vosStatus);
+                }
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
             }
-
+#endif
         }
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
