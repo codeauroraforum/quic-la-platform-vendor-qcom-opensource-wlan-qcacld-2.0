@@ -347,4 +347,5 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"CURRENT_RSSI",
     (unsigned char *)"RTT3_ENABLE",
     (unsigned char *)"DFS_MASTER_ENABLED",
+    (unsigned char *)"VHT_ENABLE_TXBF_20MHZ",
 };
