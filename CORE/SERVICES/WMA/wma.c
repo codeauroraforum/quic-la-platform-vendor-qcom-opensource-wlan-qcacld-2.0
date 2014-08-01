@@ -172,6 +172,91 @@
 #define ENABLE_PCIE_POWER_COLLAPSE  0
 #endif
 
+#define MAX_HT_MCS_IDX 8
+#define MAX_VHT_MCS_IDX 10
+#define INVALID_MCS_IDX 255
+
+/* Data rate 100KBPS based on IE Index */
+struct index_data_rate_type
+{
+	v_U8_t   beacon_rate_index;
+	v_U16_t  supported_rate[4];
+};
+
+#ifdef WLAN_FEATURE_11AC
+struct index_vht_data_rate_type
+{
+	v_U8_t   beacon_rate_index;
+	v_U16_t  supported_VHT80_rate[2];
+	v_U16_t  supported_VHT40_rate[2];
+	v_U16_t  supported_VHT20_rate[2];
+};
+#endif
+
+/* MCS Based rate table */
+/* HT MCS parameters with Nss = 1 */
+static struct index_data_rate_type supported_mcs_rate_nss1[] =
+{
+	/* MCS  L20   L40   S20  S40 */
+	{0,  {65,  135,  72,  150}},
+	{1,  {130, 270,  144, 300}},
+	{2,  {195, 405,  217, 450}},
+	{3,  {260, 540,  289, 600}},
+	{4,  {390, 810,  433, 900}},
+	{5,  {520, 1080, 578, 1200}},
+	{6,  {585, 1215, 650, 1350}},
+	{7,  {650, 1350, 722, 1500}}
+};
+/* HT MCS parameters with Nss = 2 */
+static struct index_data_rate_type supported_mcs_rate_nss2[] =
+{
+	/* MCS  L20    L40   S20   S40 */
+	{0,  {130,  270,  144,  300}},
+	{1,  {260,  540,  289,  600}},
+	{2,  {390,  810,  433,  900}},
+	{3,  {520,  1080, 578,  1200}},
+	{4,  {780,  1620, 867,  1800}},
+	{5,  {1040, 2160, 1156, 2400}},
+	{6,  {1170, 2430, 1300, 2700}},
+	{7,  {1300, 2700, 1444, 3000}}
+};
+
+#ifdef WLAN_FEATURE_11AC
+/* MCS Based VHT rate table */
+/* MCS parameters with Nss = 1*/
+static struct index_vht_data_rate_type supported_vht_mcs_rate_nss1[] =
+{
+	/* MCS  L80    S80     L40   S40    L20   S40*/
+	{0,  {293,  325},  {135,  150},  {65,   72}},
+	{1,  {585,  650},  {270,  300},  {130,  144}},
+	{2,  {878,  975},  {405,  450},  {195,  217}},
+	{3,  {1170, 1300}, {540,  600},  {260,  289}},
+	{4,  {1755, 1950}, {810,  900},  {390,  433}},
+	{5,  {2340, 2600}, {1080, 1200}, {520,  578}},
+	{6,  {2633, 2925}, {1215, 1350}, {585,  650}},
+	{7,  {2925, 3250}, {1350, 1500}, {650,  722}},
+	{8,  {3510, 3900}, {1620, 1800}, {780,  867}},
+	{9,  {3900, 4333}, {1800, 2000}, {780,  867}}
+};
+
+/*MCS parameters with Nss = 2*/
+static struct index_vht_data_rate_type supported_vht_mcs_rate_nss2[] =
+{
+	/* MCS  L80    S80     L40   S40    L20   S40*/
+	{0,  {585,  650},  {270,  300},  {130,  144}},
+	{1,  {1170, 1300}, {540,  600},  {260,  289}},
+	{2,  {1755, 1950}, {810,  900},  {390,  433}},
+	{3,  {2340, 2600}, {1080, 1200}, {520,  578}},
+	{4,  {3510, 3900}, {1620, 1800}, {780,  867}},
+	{5,  {4680, 5200}, {2160, 2400}, {1040, 1156}},
+	{6,  {5265, 5850}, {2430, 2700}, {1170, 1300}},
+	{7,  {5850, 6500}, {2700, 3000}, {1300, 1444}},
+	{8,  {7020, 7800}, {3240, 3600}, {1560, 1733}},
+	{9,  {7800, 8667}, {3600, 4000}, {1560, 1733}}
+};
+#endif
+
+
 static void wma_send_msg(tp_wma_handle wma_handle, u_int16_t msg_type,
 			 void *body_ptr, u_int32_t body_val);
 
@@ -443,6 +528,141 @@ v_VOID_t wma_swap_bytes(v_VOID_t *pv, v_SIZE_t n)
 }
 #define SWAPME(x, len) wma_swap_bytes(&x, len);
 #endif
+
+static tANI_U8 wma_get_mcs_idx(tANI_U16 maxRate, tANI_U8 rate_flags,
+		tANI_U8 nss,
+		tANI_U8 *mcsRateFlag)
+{
+	tANI_U8  rateFlag = 0, curIdx = 0;
+	tANI_U16 curRate;
+	bool found = false;
+#ifdef WLAN_FEATURE_11AC
+	struct index_vht_data_rate_type *supported_vht_mcs_rate;
+#endif
+	struct index_data_rate_type *supported_mcs_rate;
+
+	WMA_LOGD("%s rate:%d rate_flgs:%d", __func__, maxRate,
+			rate_flags);
+#ifdef WLAN_FEATURE_11AC
+	supported_vht_mcs_rate = (struct index_vht_data_rate_type *)
+		((nss == 1)? &supported_vht_mcs_rate_nss1 :
+		 &supported_vht_mcs_rate_nss2);
+#endif
+	supported_mcs_rate = (struct index_data_rate_type *)
+		((nss == 1)? &supported_mcs_rate_nss1 :
+		 &supported_mcs_rate_nss2);
+
+	*mcsRateFlag = rate_flags;
+	*mcsRateFlag &= ~eHAL_TX_RATE_SGI;
+#ifdef WLAN_FEATURE_11AC
+	if (rate_flags &
+			(eHAL_TX_RATE_VHT20 | eHAL_TX_RATE_VHT40 |
+			 eHAL_TX_RATE_VHT80)) {
+
+		if (rate_flags & eHAL_TX_RATE_VHT80) {
+			for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++) {
+				rateFlag = 0;
+				if (curIdx >= 7) {
+					if (rate_flags & eHAL_TX_RATE_SGI)
+						rateFlag |= 0x1;
+				}
+
+				curRate =
+					supported_vht_mcs_rate[curIdx].supported_VHT80_rate[rateFlag];
+				if (curRate == maxRate) {
+					found = true;
+					break;
+				}
+			}
+		}
+
+		if ((found == false) &&
+				((rate_flags & eHAL_TX_RATE_VHT80) ||
+				 (rate_flags & eHAL_TX_RATE_VHT40))) {
+			for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++) {
+				rateFlag = 0;
+				if (curIdx >= 7) {
+					if (rate_flags & eHAL_TX_RATE_SGI)
+						rateFlag |= 0x1;
+				}
+
+				curRate =
+					supported_vht_mcs_rate[curIdx].supported_VHT40_rate[rateFlag];
+				if (curRate == maxRate) {
+					found = true;
+					*mcsRateFlag &= ~eHAL_TX_RATE_VHT80;
+					break;
+				}
+			}
+		}
+
+		if ((found == false) &&
+				((rate_flags & eHAL_TX_RATE_VHT80) ||
+				 (rate_flags & eHAL_TX_RATE_VHT40) ||
+				 (rate_flags & eHAL_TX_RATE_VHT20))) {
+			for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++) {
+				rateFlag = 0;
+				if (curIdx >= 7) {
+					if (rate_flags & eHAL_TX_RATE_SGI)
+						rateFlag |= 0x1;
+				}
+
+				curRate =
+					supported_vht_mcs_rate[curIdx].supported_VHT20_rate[rateFlag];
+				if (curRate == maxRate) {
+					found = true;
+					*mcsRateFlag &= ~(eHAL_TX_RATE_VHT80|eHAL_TX_RATE_VHT40);
+					break;
+				}
+			}
+		}
+	}
+#endif
+	if ((found == false) &&
+			(rate_flags &
+			 (eHAL_TX_RATE_HT40|eHAL_TX_RATE_HT20))) {
+		if (rate_flags & eHAL_TX_RATE_HT40) {
+			rateFlag = 0x1;
+
+			for (curIdx = 0; curIdx < MAX_HT_MCS_IDX; curIdx++) {
+				if (curIdx == 7) {
+					if (rate_flags & eHAL_TX_RATE_SGI)
+						rateFlag |= 0x2;
+				}
+
+				curRate = supported_mcs_rate[curIdx].supported_rate[rateFlag];
+				if (curRate == maxRate) {
+					found = true;
+					*mcsRateFlag = eHAL_TX_RATE_HT40;
+					break;
+				}
+			}
+		}
+
+		if (found == false) {
+			rateFlag = 0;
+			for (curIdx = 0; curIdx < MAX_HT_MCS_IDX; curIdx++) {
+				if (curIdx == 7) {
+					if (rate_flags & eHAL_TX_RATE_SGI)
+						rateFlag |= 0x2;
+				}
+
+				curRate = supported_mcs_rate[curIdx].supported_rate[rateFlag];
+				if (curRate == maxRate) {
+					found = true;
+					*mcsRateFlag = eHAL_TX_RATE_HT20;
+					break;
+				}
+			}
+		}
+	}
+
+	/*SGI rates are used by firmware only for MCS >= 7*/
+	if (found && (curIdx >= 7))
+		*mcsRateFlag |= eHAL_TX_RATE_SGI;
+
+	return (found ? curIdx : INVALID_MCS_IDX);
+}
 
 static struct wma_target_req *wma_find_vdev_req(tp_wma_handle wma,
 						u_int8_t vdev_id,
@@ -1243,7 +1463,6 @@ static void wma_delete_all_ap_remote_peers(tp_wma_handle wma, A_UINT32 vdev_id)
 {
 	ol_txrx_vdev_handle vdev;
 	ol_txrx_peer_handle peer, temp;
-	int32_t is_high_latency;
 
 	if (!wma || vdev_id > wma->max_bssid)
 		return;
@@ -1252,8 +1471,6 @@ static void wma_delete_all_ap_remote_peers(tp_wma_handle wma, A_UINT32 vdev_id)
 	if (!vdev)
 		return;
 
-	is_high_latency = wdi_out_cfg_is_high_latency(
-				vdev->pdev->ctrl_pdev);
 	WMA_LOGE("%s: vdev_id - %d", __func__, vdev_id);
 	/* remove all remote peers of SAP */
 	adf_os_spin_lock_bh(&vdev->pdev->peer_ref_mutex);
@@ -1262,8 +1479,7 @@ static void wma_delete_all_ap_remote_peers(tp_wma_handle wma, A_UINT32 vdev_id)
 	TAILQ_FOREACH_REVERSE(peer, &vdev->peer_list, peer_list_t, peer_list_elem) {
 		if (temp) {
 			adf_os_spin_unlock_bh(&vdev->pdev->peer_ref_mutex);
-			if ((!is_high_latency)
-			   || adf_os_atomic_read(&temp->delete_in_progress) == 0){
+			if (adf_os_atomic_read(&temp->delete_in_progress) == 0){
 				adf_os_atomic_init(&temp->ref_cnt);
 				adf_os_atomic_inc(&temp->ref_cnt);
 				wma_remove_peer(wma, temp->mac_addr.raw,
@@ -1719,7 +1935,7 @@ static void wma_update_peer_stats(tp_wma_handle wma, wmi_peer_stats *peer_stats)
 	tAniGetPEStatsRsp *stats_rsp_params;
 	tCsrGlobalClassAStatsInfo *classa_stats = NULL;
 	struct wma_txrx_node *node;
-	tANI_U8 *stats_buf, vdev_id, macaddr[IEEE80211_ADDR_LEN];
+	tANI_U8 *stats_buf, vdev_id, macaddr[IEEE80211_ADDR_LEN], mcsRateFlags;
 	tANI_U32 temp_mask;
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&peer_stats->peer_macaddr, &macaddr[0]);
@@ -1738,7 +1954,7 @@ static void wma_update_peer_stats(tp_wma_handle wma, wmi_peer_stats *peer_stats)
 
 		if (temp_mask & (1 << eCsrGlobalClassAStats)) {
 			classa_stats = (tCsrGlobalClassAStatsInfo *) stats_buf;
-			WMA_LOGD("peer tx rate:%d", peer_stats->peer_tx_rate);
+			WMA_LOGE("peer tx rate:%d", peer_stats->peer_tx_rate);
 			/*The linkspeed returned by fw is in kbps so convert
 			 *it in to units of 500kbps which is expected by UMAC*/
 			if (peer_stats->peer_tx_rate) {
@@ -1747,15 +1963,27 @@ static void wma_update_peer_stats(tp_wma_handle wma, wmi_peer_stats *peer_stats)
 			}
 
 			classa_stats->tx_rate_flags = node->rate_flags;
-			/*rx_frag_cnt parameter is currently not used.
-			 *lets use the same parameter to hold the nss value*/
-			classa_stats->rx_frag_cnt = node->nss;
-
+                        if (!(node->rate_flags & eHAL_TX_RATE_LEGACY)) {
+				classa_stats->mcs_index =
+					wma_get_mcs_idx((peer_stats->peer_tx_rate/100),
+							node->rate_flags,
+							node->nss,
+							&mcsRateFlags);
+				/* rx_frag_cnt and promiscuous_rx_frag_cnt
+				 * parameter is currently not used. lets use the
+				 * same parameter to hold the nss value and mcs
+				 * rate flags */
+				classa_stats->rx_frag_cnt = node->nss;
+				classa_stats->promiscuous_rx_frag_cnt = mcsRateFlags;
+				WMA_LOGE("Computed mcs_idx:%d mcs_rate_flags:%d",
+						classa_stats->mcs_index,
+						mcsRateFlags);
+			}
 			/* FW returns tx power in intervals of 0.5 dBm
 			   Convert it back to intervals of 1 dBm */
 			classa_stats->max_pwr =
 				 roundup(classa_stats->max_pwr, 2) >> 1;
-			WMA_LOGD("peer tx rate flags:%d nss:%d max_txpwr:%d",
+			WMA_LOGE("peer tx rate flags:%d nss:%d max_txpwr:%d",
 					node->rate_flags, node->nss,
 					classa_stats->max_pwr);
 		}
@@ -9317,7 +9545,8 @@ static void wma_set_channel(tp_wma_handle wma, tpSwitchChannelParams params)
         vos_mem_zero(&req, sizeof(req));
         req.vdev_id = vdev_id;
 	msg = wma_fill_vdev_req(wma, req.vdev_id, WDA_CHNL_SWITCH_REQ,
-				WMA_TARGET_REQ_TYPE_VDEV_START, params, 1000);
+				WMA_TARGET_REQ_TYPE_VDEV_START, params,
+				WMA_VDEV_START_REQUEST_TIMEOUT);
 	if (!msg) {
 		WMA_LOGP("%s: Failed to fill channel switch request for vdev %d",
 			 __func__, req.vdev_id);
@@ -11303,7 +11532,8 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 		goto send_fail_resp;
 	}
 	msg = wma_fill_vdev_req(wma, vdev_id, WDA_ADD_BSS_REQ,
-				WMA_TARGET_REQ_TYPE_VDEV_START, add_bss, 1000);
+				WMA_TARGET_REQ_TYPE_VDEV_START, add_bss,
+				WMA_VDEV_START_REQUEST_TIMEOUT);
 	if (!msg) {
 		WMA_LOGP("%s Failed to allocate vdev request vdev_id %d",
 			 __func__, vdev_id);
@@ -11558,7 +11788,8 @@ static void wma_add_bss_ibss_mode(tp_wma_handle wma, tpAddBssParams add_bss)
         add_bss->operMode = BSS_OPERATIONAL_MODE_IBSS;
 
 	msg = wma_fill_vdev_req(wma, vdev_id, WDA_ADD_BSS_REQ,
-				WMA_TARGET_REQ_TYPE_VDEV_START, add_bss, 1000);
+				WMA_TARGET_REQ_TYPE_VDEV_START, add_bss,
+				WMA_VDEV_START_REQUEST_TIMEOUT);
 	if (!msg) {
 		WMA_LOGP("%s Failed to allocate vdev request vdev_id %d",
 			 __func__, vdev_id);
@@ -11749,7 +11980,8 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 #endif
 			msg = wma_fill_vdev_req(wma, vdev_id, WDA_ADD_BSS_REQ,
 						WMA_TARGET_REQ_TYPE_VDEV_START,
-						add_bss, 2000);
+						add_bss,
+						WMA_VDEV_START_REQUEST_TIMEOUT);
 			if (!msg) {
 				WMA_LOGP("%s Failed to allocate vdev request vdev_id %d",
 					 __func__, vdev_id);
@@ -21171,7 +21403,8 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 		wma_handle->interfaces[vdev_id].scan_info.p2p_scan_type;
 	scan_event->sessionId = vdev_id;
 
-	if (wmi_event->reason == WMI_SCAN_REASON_COMPLETED)
+	if (wmi_event->reason == WMI_SCAN_REASON_COMPLETED ||
+	    wmi_event->reason == WMI_SCAN_REASON_TIMEDOUT)
 		scan_event->reasonCode = eSIR_SME_SUCCESS;
 	else
 		scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
@@ -21199,23 +21432,26 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 		break;
 	}
 
-	if (wmi_event->event & WMI_SCAN_FINISH_EVENTS) {
-		if (wmi_event->scan_id == scan_id)
-			wma_reset_scan_info(wma_handle, vdev_id);
-		else
-			WMA_LOGE("Scan id not matched for SCAN COMPLETE event");
-	}
-
         /* Stop the scan completion timeout if the event is WMI_SCAN_EVENT_COMPLETED */
         if (scan_event->event == (tSirScanEventType)WMI_SCAN_EVENT_COMPLETED) {
                 WMA_LOGE(" scan complete - scan_id %x, vdev_id %x",
 		wmi_event->scan_id, vdev_id);
-		 vos_status = vos_timer_stop(&wma_handle->wma_scan_comp_timer);
+		/*
+		 * first stop the timer then reset scan info, else there is a
+		 * race condition between, timeout handler in host and reset
+		 * operation here. because of that, sometime timeout handler
+		 * triggers and scan ID mismatch messages is printed.
+		 */
+		vos_status = vos_timer_stop(&wma_handle->wma_scan_comp_timer);
                 if (vos_status != VOS_STATUS_SUCCESS) {
 			WMA_LOGE("Failed to stop the scan completion timeout");
 			vos_mem_free(scan_event);
 			return -EPERM;
                 }
+		if (wmi_event->scan_id == scan_id)
+			wma_reset_scan_info(wma_handle, vdev_id);
+		else
+			WMA_LOGE("Scan id not matched for SCAN COMPLETE event");
         }
 
 	wma_send_msg(wma_handle, WDA_RX_SCAN_EVENT, (void *) scan_event, 0) ;
@@ -22221,16 +22457,19 @@ void wma_scan_completion_timeout(void *data)
                 return;
         }
 
-        scan_event->event = WMI_SCAN_EVENT_COMPLETED;
-        scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
-        scan_event->scanId = wma_handle->wma_scan_timer_info.scan_id;
-        scan_event->p2pScanType = wma_handle->interfaces[vdev_id].scan_info.p2p_scan_type;
-        scan_event->sessionId = vdev_id;
+	/*
+	 * To avoid race condition between scan timeout in host and in firmware
+	 * here we should just send abort scan to firmware and do cleanup after
+	 * receiving event from firmware. Since at this moment there will be no
+	 * outstanding scans, aborting should not cause any problem in firmware.
+	 */
+	if (wma_handle->interfaces[vdev_id].scan_info.scan_id != 0) {
+		tAbortScanParams abortScan;
+		abortScan.SessionId = vdev_id;
+		WMA_LOGW("%s: Sending abort for timed out scan", __func__);
+		wma_stop_scan(wma_handle, &abortScan);
+	}
 
-        /* Reset scan info in interfaces table */
-        wma_reset_scan_info(wma_handle, vdev_id);
-
-        wma_send_msg(wma_handle, WDA_RX_SCAN_EVENT, (void *) scan_event, 0) ;
         return;
 }
 
