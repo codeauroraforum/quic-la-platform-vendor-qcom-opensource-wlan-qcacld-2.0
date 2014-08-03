@@ -109,6 +109,7 @@
 #define MAX_PENDING_LOG 5
 #define MAX_HT_MCS_IDX 8
 #define MAX_VHT_MCS_IDX 10
+#define INVALID_MCS_IDX 255
 #define GET_IE_LEN_IN_BSS_DESC(lenInBss) ( lenInBss + sizeof(lenInBss) - \
         ((uintptr_t)OFFSET_OF( tSirBssDescription, ieFields)))
 
@@ -7812,85 +7813,6 @@ static int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
     EXIT();
     return 0;
 }
-#ifdef QCA_WIFI_2_0
-static tANI_U8 wlan_hdd_get_mcs_idx(tANI_U16 maxRate, tANI_U8 rate_flags,
-                                    tANI_U8 nss)
-{
-    tANI_U8  rateFlag = 0, curIdx = 0;
-    tANI_U16 curRate;
-    struct index_vht_data_rate_type *supported_vht_mcs_rate;
-    struct index_data_rate_type *supported_mcs_rate;
-
-    hddLog(VOS_TRACE_LEVEL_DEBUG, "%s rate:%d rate_flgs:%d", __func__, maxRate,
-                                  rate_flags);
-    supported_vht_mcs_rate = (struct index_vht_data_rate_type *)
-                              ((nss == 1)? &supported_vht_mcs_rate_nss1 :
-                                           &supported_vht_mcs_rate_nss2);
-    supported_mcs_rate = (struct index_data_rate_type *)
-                          ((nss == 1)? &supported_mcs_rate_nss1 :
-                                       &supported_mcs_rate_nss2);
-
-    if (rate_flags & (eHAL_TX_RATE_VHT20|eHAL_TX_RATE_VHT40|eHAL_TX_RATE_VHT80))
-    {
-        if (rate_flags & eHAL_TX_RATE_SGI)
-        {
-            rateFlag |= 0x1;
-        }
-
-        if (rate_flags & eHAL_TX_RATE_VHT20)
-        {
-            for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++)
-            {
-                 curRate =
-                  supported_vht_mcs_rate[curIdx].supported_VHT20_rate[rateFlag];
-                 if (curRate > maxRate)
-                     break;
-            }
-        }
-        else if (rate_flags & eHAL_TX_RATE_VHT40)
-        {
-            for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++)
-            {
-                 curRate =
-                  supported_vht_mcs_rate[curIdx].supported_VHT40_rate[rateFlag];
-                 if (curRate > maxRate)
-                     break;
-            }
-        }
-        else if (rate_flags & eHAL_TX_RATE_VHT80)
-        {
-            for (curIdx = 0; curIdx < MAX_VHT_MCS_IDX; curIdx++)
-            {
-                 curRate =
-                  supported_vht_mcs_rate[curIdx].supported_VHT80_rate[rateFlag];
-                 if (curRate > maxRate)
-                     break;
-            }
-        }
-    }
-    else
-    {
-        if (rate_flags & eHAL_TX_RATE_HT40)
-        {
-            rateFlag |= 0x1;
-        }
-
-        if (rate_flags & eHAL_TX_RATE_SGI)
-        {
-            rateFlag |= 0x2;
-        }
-
-        for (curIdx = 0; curIdx < MAX_HT_MCS_IDX; curIdx++)
-        {
-             curRate = supported_mcs_rate[curIdx].supported_rate[rateFlag];
-             if (curRate > maxRate)
-                 break;
-        }
-    }
-
-    return (curIdx ? (curIdx - 1) : curIdx);
-}
-#endif
 static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
                                            struct net_device *dev,
                                            u8* mac, struct station_info *sinfo)
@@ -7955,18 +7877,18 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
     //convert to the UI units of 100kbps
     myRate = pAdapter->hdd_stats.ClassA_stat.tx_rate * 5;
 #ifdef QCA_WIFI_2_0
-    if (!(rate_flags & eHAL_TX_RATE_LEGACY))
-    {
+    if (!(rate_flags & eHAL_TX_RATE_LEGACY)) {
         nss = pAdapter->hdd_stats.ClassA_stat.rx_frag_cnt;
 
-        if(myRate)
-        {
-            pAdapter->hdd_stats.ClassA_stat.mcs_index =
-                wlan_hdd_get_mcs_idx(myRate, rate_flags, nss);
-            hddLog(VOS_TRACE_LEVEL_DEBUG, "computed mcs idx %d from rate:%d",
-                                     pAdapter->hdd_stats.ClassA_stat.mcs_index,
-                                     myRate);
+        if (eHDD_LINK_SPEED_REPORT_ACTUAL == pCfg->reportMaxLinkSpeed) {
+            rate_flags = pAdapter->hdd_stats.ClassA_stat.promiscuous_rx_frag_cnt;
+            if (pAdapter->hdd_stats.ClassA_stat.mcs_index == INVALID_MCS_IDX) {
+                rate_flags = eHAL_TX_RATE_LEGACY;
+                pAdapter->hdd_stats.ClassA_stat.mcs_index = 0;
+            }
         }
+        else
+            pAdapter->hdd_stats.ClassA_stat.mcs_index = 0;
     }
 #endif
 #ifdef LINKSPEED_DEBUG_ENABLED
@@ -8666,7 +8588,7 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 #ifdef FEATURE_WLAN_LFR
 #define MAX_PMKSAIDS_IN_CACHE 8
 
-static tPmkidCacheInfo PMKIDCache[MAX_PMKSAIDS_IN_CACHE]; // HDD local cache
+static tPmkidCacheInfo PMKIDCache[CSR_MAX_PMKID_ALLOWED]; // HDD local cache
 static tANI_U32 PMKIDCacheIndex; // HDD local Cache index
 
 
@@ -8725,7 +8647,7 @@ static int wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *d
     }
 
     /* Check we compared all entries,if then take the first slot now */
-    if(j == MAX_PMKSAIDS_IN_CACHE) PMKIDCacheIndex=0;
+    if(j == CSR_MAX_PMKID_ALLOWED) PMKIDCacheIndex=0;
 
     if (!BSSIDMatched)
     {
@@ -8741,7 +8663,7 @@ static int wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *d
         dump_pmkid(halHandle, pmksa->pmkid);
         // Increment the HDD Local Cache index
         // The "i=0" doesn't work for the call to sme_RoamSetPMKIDCache() - LFR FIXME
-        if (PMKIDCacheIndex <= (MAX_PMKSAIDS_IN_CACHE-1)) PMKIDCacheIndex++; else PMKIDCacheIndex = 0;
+        if (PMKIDCacheIndex <= (CSR_MAX_PMKID_ALLOWED-1)) PMKIDCacheIndex++; else PMKIDCacheIndex = 0;
     }
 
 
@@ -8849,7 +8771,7 @@ static int wlan_hdd_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *d
     }
 
     /* we compare all entries,but cannot find matching entry */
-    if (j == MAX_PMKSAIDS_IN_CACHE && !BSSIDMatched)
+    if (j == CSR_MAX_PMKID_ALLOWED && !BSSIDMatched)
     {
        hddLog(VOS_TRACE_LEVEL_FATAL,
               "%s: No such PMKSA entry existed " MAC_ADDRESS_STR,
