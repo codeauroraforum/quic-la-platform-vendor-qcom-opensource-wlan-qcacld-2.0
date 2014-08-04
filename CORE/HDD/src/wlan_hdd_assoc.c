@@ -1304,6 +1304,11 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                    "%s: Set HDD connState to eConnectionState_Associated",
                    __func__);
+        if (NULL == pRoamInfo) {
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                      FL("pRoamInfo is NULL"));
+            return eHAL_STATUS_FAILURE;
+        }
         hdd_connSetConnectionState( pHddStaCtx, eConnectionState_Associated );
 
         // Save the connection info from CSR...
