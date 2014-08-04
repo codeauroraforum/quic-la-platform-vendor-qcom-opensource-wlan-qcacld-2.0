@@ -690,6 +690,9 @@ struct hdd_station_ctx
    tCsrRoamSetKey ibss_enc_key;
    v_BOOL_t hdd_ReassocScenario;
 
+   /* PMKID Cache */
+   tPmkidCacheInfo PMKIDCache[CSR_MAX_PMKID_ALLOWED];
+
    /* STA ctx debug variables */
    int staDebugState;
 };
