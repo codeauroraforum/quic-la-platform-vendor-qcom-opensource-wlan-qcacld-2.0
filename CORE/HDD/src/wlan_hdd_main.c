@@ -10427,6 +10427,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    tSmeThermalParams thermalParam;
    tSirTxPowerLimit *hddtxlimit;
 #endif
+#ifdef FEATURE_WLAN_CH_AVOID
+   int unsafeChannelIndex;
+#endif
 
    ENTER();
 
@@ -10861,6 +10864,19 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    cnss_get_wlan_unsafe_channel(pHddCtx->unsafe_channel_list,
                                 &(pHddCtx->unsafe_channel_count),
                                 sizeof(v_U16_t) * NUM_20MHZ_RF_CHANNELS);
+
+   hddLog(VOS_TRACE_LEVEL_INFO,"%s: num of unsafe channels is %d. ",
+          __func__,
+          pHddCtx->unsafe_channel_count);
+   for (unsafeChannelIndex = 0;
+        unsafeChannelIndex < pHddCtx->unsafe_channel_count;
+        unsafeChannelIndex++)
+   {
+       hddLog(VOS_TRACE_LEVEL_INFO,"%s: channel %d is not safe. ",
+              __func__, pHddCtx->unsafe_channel_list[unsafeChannelIndex]);
+
+   }
+
    /* Plug in avoid channel notification callback */
    sme_AddChAvoidCallback(pHddCtx->hHal,
                           hdd_ch_avoid_cb);
@@ -12405,7 +12421,21 @@ void hdd_ch_avoid_cb
        }
    }
 
-   cnss_set_wlan_unsafe_channel(hdd_ctxt->unsafe_channel_list, hdd_ctxt->unsafe_channel_count);
+   cnss_set_wlan_unsafe_channel(hdd_ctxt->unsafe_channel_list,
+                                hdd_ctxt->unsafe_channel_count);
+#ifdef CONFIG_CNSS
+   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+             "%s : number of unsafe channels is %d ",
+             __func__,  hdd_ctxt->unsafe_channel_count);
+   for (channel_loop = 0;
+        channel_loop < hdd_ctxt->unsafe_channel_count;
+        channel_loop++)
+   {
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                 "%s: channel %d is not safe ", __func__,
+                 hdd_ctxt->unsafe_channel_list[channel_loop]);
+   }
+#endif
 
    if (hdd_ctxt->unsafe_channel_count) {
        hostapd_adapter = hdd_get_adapter(hdd_ctxt, WLAN_HDD_SOFTAP);

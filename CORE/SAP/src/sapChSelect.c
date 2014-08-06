@@ -2107,6 +2107,10 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
 #endif
     VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, Running SAP Ch Select", __func__);
 
+#ifdef FEATURE_WLAN_CH_AVOID
+    sapUpdateUnsafeChannelList();
+#endif
+
     if (NULL == pScanResult)
     {
         VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
@@ -2122,7 +2126,6 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
         // pick the first channel in configured range
         return startChannelNum;
 #else /* FEATURE_WLAN_CH_AVOID defined */
-        sapUpdateUnsafeChannelList();
 
         // any safe channels in the configured range?
         for (i = 0; i < NUM_20MHZ_RF_CHANNELS; i++)
