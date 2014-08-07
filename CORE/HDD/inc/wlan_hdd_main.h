@@ -1460,6 +1460,9 @@ struct hdd_context_s
 #ifdef FEATURE_GREEN_AP
     hdd_green_ap_ctx_t *green_ap_ctx;
 #endif
+
+    vos_wake_lock_t sap_dfs_wakelock;
+    atomic_t sap_dfs_ref_cnt;
 };
 
 /*---------------------------------------------------------------------------

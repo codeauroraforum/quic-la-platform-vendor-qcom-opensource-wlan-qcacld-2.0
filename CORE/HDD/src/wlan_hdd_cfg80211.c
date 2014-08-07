@@ -2101,6 +2101,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                 case NL80211_CHAN_HT40MINUS:
                     sme_SetPhyCBMode24G(pHddCtx->hHal,
                                         PHY_DOUBLE_CHANNEL_HIGH_PRIMARY);
+                    break;
                 case NL80211_CHAN_HT40PLUS:
                     sme_SetPhyCBMode24G(pHddCtx->hHal,
                                         PHY_DOUBLE_CHANNEL_LOW_PRIMARY);
