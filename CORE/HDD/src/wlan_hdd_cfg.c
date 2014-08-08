@@ -3327,12 +3327,19 @@ REG_VARIABLE( CFG_ACS_BAND_SWITCH_THRESHOLD, WLAN_PARAM_Integer,
               CFG_ACS_BAND_SWITCH_THRESHOLD_MIN,
               CFG_ACS_BAND_SWITCH_THRESHOLD_MAX ),
 
-REG_VARIABLE( CFG_SAP_MAX_OFFLOAD_PEERS, WLAN_PARAM_Integer,
-              hdd_config_t, apMaxOffloadPeers,
-              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
-              CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT,
-              CFG_SAP_MAX_OFFLOAD_PEERS_MIN,
-              CFG_SAP_MAX_OFFLOAD_PEERS_MAX ),
+REG_VARIABLE(CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_NAME, WLAN_PARAM_Integer,
+             hdd_config_t, gEnableStrictRegulatoryForFCC,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+             CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_DEFAULT,
+             CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MIN,
+             CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MAX ),
+
+REG_VARIABLE(CFG_SAP_MAX_OFFLOAD_PEERS, WLAN_PARAM_Integer,
+             hdd_config_t, apMaxOffloadPeers,
+             VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
+             CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT,
+             CFG_SAP_MAX_OFFLOAD_PEERS_MIN,
+             CFG_SAP_MAX_OFFLOAD_PEERS_MAX ),
 
 REG_VARIABLE( CFG_ENABLE_HYSTERETIC_MODE, WLAN_PARAM_Integer,
               hdd_config_t, enableHystereticMode,
@@ -3387,6 +3394,12 @@ REG_VARIABLE( CFG_ENABLE_HYSTERETIC_MODE, WLAN_PARAM_Integer,
                 CFG_PMF_SA_QUERY_RETRY_INTERVAL_MIN,
                 CFG_PMF_SA_QUERY_RETRY_INTERVAL_MAX ),
 #endif
+   REG_VARIABLE( CFG_ENABLE_SIFS_BURST, WLAN_PARAM_Integer,
+              hdd_config_t, enableSifsBurst,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_ENABLE_SIFS_BURST_DEFAULT,
+              CFG_ENABLE_SIFS_BURST_MIN,
+              CFG_ENABLE_SIFS_BURST_MAX ),
 
 REG_VARIABLE( CFG_ADVERTISE_CONCURRENT_OPERATION_NAME , WLAN_PARAM_Integer,
               hdd_config_t, advertiseConcurrentOperation,
@@ -3804,9 +3817,10 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gAcsScanBandPreference] Value = [%u] ",pHddCtx->cfg_ini->acsScanBandPreference);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gMaxOffloadPeers] Value = [%u] ",pHddCtx->cfg_ini->apMaxOffloadPeers);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [gAllowDFSChannelRoam] Value = [%u] ",pHddCtx->cfg_ini->allowDFSChannelRoam);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+           "Name = [gEnableSifsBurst] Value = [%u]",
+                   pHddCtx->cfg_ini->enableSifsBurst);
 }
-
-
 
 #define CFG_VALUE_MAX_LEN 256
 #define CFG_ENTRY_MAX_LEN (32+CFG_VALUE_MAX_LEN)

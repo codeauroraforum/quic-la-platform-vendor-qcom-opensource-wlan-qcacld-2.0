@@ -42,7 +42,7 @@
 #include "fw_one_bin.h"
 #include "bin_sig.h"
 #include "ar6320v2_dbg_regtable.h"
-
+#include "epping_main.h"
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
 #include <net/cnss.h>
 #endif
@@ -353,6 +353,12 @@ static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 #endif
 		break;
 	case ATH_FIRMWARE_FILE:
+		if (WLAN_IS_EPPING_ENABLED(vos_get_conparam())) {
+			filename = QCA_FIRMWARE_EPPING_FILE;
+			printk(KERN_INFO "%s: Loading epping firmware file %s\n",
+				__func__, filename);
+			break;
+		}
 #ifdef QCA_WIFI_FTM
 		if (vos_get_conparam() == VOS_FTM_MODE) {
 #ifdef CONFIG_CNSS
@@ -669,28 +675,16 @@ static struct ol_softc *ramdump_scn;
 
 int ol_copy_ramdump(struct ol_softc *scn)
 {
-	void __iomem *ramdump_base;
-	unsigned long address;
-	unsigned long size;
 	int ret;
 
-	/* Get RAM dump memory address and size */
-	if (cnss_get_ramdump_mem(&address, &size)) {
-		printk("No RAM dump will be collected since failed to get "
-			"memory address or size!\n");
+	if (!scn->ramdump_base || !scn->ramdump_size) {
+		pr_info("%s: No RAM dump will be collected since ramdump_base "
+			"is NULL or ramdump_size is 0!\n", __func__);
 		ret = -EACCES;
 		goto out;
 	}
 
-	ramdump_base = ioremap(address, size);
-	if (!ramdump_base) {
-		printk("No RAM dump will be collected since ramdump_base is NULL!\n");
-		ret = -EACCES;
-		goto out;
-	}
-
-	ret = ol_target_coredump(scn, ramdump_base, size);
-	iounmap(ramdump_base);
+	ret = ol_target_coredump(scn, scn->ramdump_base, scn->ramdump_size);
 
 out:
 	return ret;
@@ -1515,7 +1509,9 @@ int ol_download_firmware(struct ol_softc *scn)
 				(u_int8_t *)&address, 4, scn);
 	}
 
-	if (scn->enableuartprint) {
+	if (scn->enableuartprint ||
+		(WLAN_IS_EPPING_ENABLED(vos_get_conparam()) &&
+		WLAN_IS_EPPING_FW_UART(vos_get_conparam()))) {
 		if ((scn->target_version == AR6320_REV1_VERSION) || (scn->target_version == AR6320_REV1_1_VERSION))
 			param = 6;
 		else

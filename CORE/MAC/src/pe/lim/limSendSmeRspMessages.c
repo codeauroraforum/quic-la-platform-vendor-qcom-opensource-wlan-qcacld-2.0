@@ -889,6 +889,8 @@ limSendSmeLfrScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
     tANI_U8               *pbBuf;
     tSirBssDescription    *pDesc;
     tANI_S16              scanEntriesLeft = 0;
+    tANI_U8               *currentBssid =
+        pMac->roam.roamSession[smesessionId].connectedProfile.bssid;
 
     PELOG1(limLog(pMac, LOG1,
        FL("Sending message SME_SCAN_RSP with length=%d reasonCode %s\n"),
@@ -920,6 +922,14 @@ limSendSmeLfrScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
         ptemp = pMac->lim.gLimCachedLfrScanHashTable[i];
         while(ptemp)
         {
+            if (vos_mem_compare(ptemp->bssDescription.bssId,
+                                currentBssid,
+                                sizeof(tSirMacAddr)))
+            {
+                ptemp = ptemp->next;
+                continue;
+            }
+
             pbBuf = ((tANI_U8 *)pSirSmeScanRsp) + msgLen;
             if(0 == bssCount)
             {
@@ -993,6 +1003,14 @@ limSendSmeLfrScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
                                               (tANI_U8 *) &pSsid->length,
                                               (tANI_U8) (pSsid->length + 1)))
                 {
+                    if (vos_mem_compare(ptemp->bssDescription.bssId,
+                                        currentBssid,
+                                        sizeof(tSirMacAddr)))
+                    {
+                        ptemp = ptemp->next;
+                        continue;
+                    }
+
                     pbBuf = ((tANI_U8 *)pSirSmeScanRsp) + msgLen;
                     if(0 == bssCount)
                     {

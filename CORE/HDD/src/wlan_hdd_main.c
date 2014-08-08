@@ -117,6 +117,7 @@ extern int hdd_hostapd_stop (struct net_device *dev);
 void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #endif /* FEATURE_WLAN_CH_AVOID */
 #include "wlan_hdd_debugfs.h"
+#include "epping_main.h"
 
 #ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
@@ -4963,8 +4964,14 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
            status = sme_SetEseBeaconRequest((tHalHandle)(pHddCtx->hHal),
                                             pAdapter->sessionId,
                                             &eseBcnReq);
-           if (eHAL_STATUS_SUCCESS != status)
-           {
+
+           if (eHAL_STATUS_RESOURCES == status) {
+               hddLog(VOS_TRACE_LEVEL_INFO,
+                      FL("sme_SetEseBeaconRequest failed (%d),"
+                      " a request already in progress"), status);
+               ret = -EBUSY;
+               goto exit;
+           } else if (eHAL_STATUS_SUCCESS != status) {
                VOS_TRACE( VOS_MODULE_ID_HDD,
                           VOS_TRACE_LEVEL_ERROR,
                           "%s: sme_SetEseBeaconRequest failed (%d)",
@@ -5546,6 +5553,26 @@ static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
     else
     {
         pconfig->enable2x2 = 0;
+
+        /* 1x1 */
+        /* Update Rx Highest Long GI data Rate */
+        if (ccmCfgSetInt(hdd_ctx->hHal,
+                    WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE,
+                    HDD_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1, NULL,
+                    eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
+        {
+            hddLog(LOGE, "Could not pass on "
+                    "WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE to CCM");
+        }
+
+        /* Update Tx Highest Long GI data Rate */
+        if (ccmCfgSetInt(hdd_ctx->hHal, WNI_CFG_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE,
+                    HDD_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1, NULL,
+                    eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
+        {
+            hddLog(LOGE, "Could not pass on "
+                    "HDD_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1 to CCM");
+        }
     }
     if (!(cfg->ht_tx_stbc && pconfig->enable2x2))
     {
@@ -7318,7 +7345,8 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    tANI_U32 type, subType;
-   long rc = 0;
+   unsigned long rc = 0;
+   int ret_val;
 
    INIT_COMPLETION(pAdapter->session_open_comp_var);
    sme_SetCurrDeviceMode(pHddCtx->hHal, pAdapter->device_mode);
@@ -7342,11 +7370,10 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    //Block on a completion variable. Can't wait forever though.
-   rc = wait_for_completion_interruptible_timeout(
+   rc = wait_for_completion_timeout(
                         &pAdapter->session_open_comp_var,
                         msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-   if (rc <= 0)
-   {
+   if (!rc) {
       hddLog(VOS_TRACE_LEVEL_FATAL,
              FL("Session is not opened within timeout period code %ld"),
              rc );
@@ -7401,6 +7428,17 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    }
 
    set_bit(WMM_INIT_DONE, &pAdapter->event_flags);
+
+   ret_val = process_wma_set_command((int)pAdapter->sessionId,
+                         (int)WMI_PDEV_PARAM_BURST_ENABLE,
+                         (int)pHddCtx->cfg_ini->enableSifsBurst,
+                         PDEV_CMD);
+
+   if (0 != ret_val) {
+       hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
+                   __func__, ret_val);
+   }
 
 #ifdef FEATURE_WLAN_TDLS
    if(0 != wlan_hdd_tdls_init(pAdapter))
@@ -9591,19 +9629,18 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
        hddLog(VOS_TRACE_LEVEL_ERROR,
            "%s: pAdapter is NULL, cannot Abort scan", __func__);
 
-   //Stop the traffic monitor timer
-   if ( VOS_TIMER_STATE_RUNNING ==
-                        vos_timer_getCurrentState(&pHddCtx->tx_rx_trafficTmr))
-   {
-        vos_timer_stop(&pHddCtx->tx_rx_trafficTmr);
-   }
+   /* Stop the traffic monitor timer */
+   if ((NULL != pHddCtx->cfg_ini) && (pHddCtx->cfg_ini->dynSplitscan)) {
+       if (VOS_TIMER_STATE_RUNNING ==
+                    vos_timer_getCurrentState(&pHddCtx->tx_rx_trafficTmr)) {
+            vos_timer_stop(&pHddCtx->tx_rx_trafficTmr);
+       }
 
-   // Destroy the traffic monitor timer
-   if (!VOS_IS_STATUS_SUCCESS(vos_timer_destroy(
-                         &pHddCtx->tx_rx_trafficTmr)))
-   {
-       hddLog(VOS_TRACE_LEVEL_ERROR,
-           "%s: Cannot deallocate Traffic monitor timer", __func__);
+       /* Destroy the traffic monitor timer */
+       if (!VOS_IS_STATUS_SUCCESS(vos_timer_destroy(
+                                 &pHddCtx->tx_rx_trafficTmr))) {
+            hddLog(LOGE, FL("Cannot de-allocate Traffic monitor timer"));
+       }
    }
 
 #ifdef MSM_PLATFORM
@@ -9831,8 +9868,21 @@ void __hdd_wlan_exit(void)
         hdd_context_t *pHddCtx = NULL;
         v_CONTEXT_t pVosContext = NULL;
 
-        //Get the global vos context
-        pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+   //Get the global vos context
+   pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+   if (!pVosContext)
+      return;
+   if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+      epping_exit(pVosContext);
+      return;
+   }
+
+   if(NULL == pVosContext) {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+            "%s:Invalid global VOSS context", __func__);
+      EXIT();
+      return;
+   }
 
         if(!pVosContext)
                 return;
@@ -10170,7 +10220,8 @@ void hdd_exchange_version_and_caps(hdd_context_t *pHddCtx)
 /* Initialize channel list in sme based on the country code */
 VOS_STATUS hdd_set_sme_chan_list(hdd_context_t *hdd_ctx)
 {
-  return sme_init_chan_list(hdd_ctx->hHal, hdd_ctx->reg.alpha2);
+    return sme_init_chan_list(hdd_ctx->hHal, hdd_ctx->reg.alpha2,
+                              hdd_ctx->reg.cc_src);
 }
 
 /**---------------------------------------------------------------------------
@@ -10382,6 +10433,13 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 #endif
 
    ENTER();
+
+   if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+       /* if epping enabled redirect start to epping module */
+      ret = epping_wlan_startup(dev, hif_sc);
+      EXIT();
+      return ret;
+   }
    /*
     * cfg80211: wiphy allocation
     */
@@ -10425,7 +10483,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    init_completion(&pHddCtx->full_pwr_comp_var);
    init_completion(&pHddCtx->standby_comp_var);
    init_completion(&pHddCtx->req_bmps_comp_var);
-   init_completion(&pHddCtx->wiphy_channel_update_event);
 
 #ifdef CONFIG_ENABLE_LINUX_REG
    init_completion(&pHddCtx->linux_reg_req);
@@ -10466,7 +10523,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    ((VosContextType*)(pVosContext))->adf_ctx = adf_ctx;
 #endif /* QCA_WIFI_2_0 */
 
-   pHddCtx->nEnableStrictRegulatoryForFCC = FALSE;
    // Load all config first as TL config is needed during vos_open
    pHddCtx->cfg_ini = (hdd_config_t*) kmalloc(sizeof(hdd_config_t), GFP_KERNEL);
    if(pHddCtx->cfg_ini == NULL)
@@ -10665,12 +10721,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_vosclose;
    }
 #endif
-   status = hdd_set_sme_chan_list(pHddCtx);
-   if (status != VOS_STATUS_SUCCESS) {
-      hddLog(VOS_TRACE_LEVEL_FATAL,
-             "%s: Failed to init channel list", __func__);
-      goto err_wiphy_unregister;
-   }
 
    if (0 == enable_dfs_chan_scan || 1 == enable_dfs_chan_scan)
    {
@@ -10704,6 +10754,12 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_wiphy_unregister;
    }
 
+   status = hdd_set_sme_chan_list(pHddCtx);
+   if (status != VOS_STATUS_SUCCESS) {
+      hddLog(VOS_TRACE_LEVEL_FATAL,
+             "%s: Failed to init channel list", __func__);
+      goto err_wiphy_unregister;
+   }
    /* In the integrated architecture we update the configuration from
       the INI file and from NV before vOSS has been started so that
       the final contents are available to send down to the cCPU   */
@@ -11414,6 +11470,23 @@ static int hdd_driver_init( void)
 #ifdef MEMORY_DEBUG
       vos_mem_init();
 #endif
+#ifndef MODULE
+      if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+         ret_status =  epping_driver_init(con_mode, &wlan_wake_lock,
+                          WLAN_MODULE_NAME);
+         if (ret_status < 0)
+            vos_wake_lock_destroy(&wlan_wake_lock);
+         return ret_status;
+      }
+#else
+      if (WLAN_IS_EPPING_ENABLED(hdd_get_conparam())) {
+         ret_status = epping_driver_init(hdd_get_conparam(),
+                         &wlan_wake_lock, WLAN_MODULE_NAME);
+         if (ret_status < 0)
+            vos_wake_lock_destroy(&wlan_wake_lock);
+         return ret_status;
+      }
+#endif
 
 #ifdef TIMER_MANAGER
       vos_timer_manager_init();
@@ -11577,6 +11650,11 @@ static void hdd_driver_exit(void)
    if(!pVosContext)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
+      goto done;
+   }
+
+   if (WLAN_IS_EPPING_ENABLED(con_mode)) {
+      epping_driver_exit(pVosContext);
       goto done;
    }
 
