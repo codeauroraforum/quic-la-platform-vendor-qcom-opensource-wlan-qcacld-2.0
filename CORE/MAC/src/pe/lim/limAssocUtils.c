@@ -168,15 +168,6 @@ limCompareCapabilities(tpAniSirGlobal pMac,
         return false;
     }
 
-#if 0    //See CR24696 for analysis
-    // Compare privacy capability
-    if (pAssocReq->capabilityInfo.privacy != pLocalCapabs->privacy)
-    {
-        // AP does not support privacy
-        return false;
-    }
-#endif
-
     // Compare short preamble capability
     if (pAssocReq->capabilityInfo.shortPreamble &&
         (pAssocReq->capabilityInfo.shortPreamble !=
@@ -184,10 +175,6 @@ limCompareCapabilities(tpAniSirGlobal pMac,
     {
         // Allowing a STA requesting short preamble while
         // AP does not support it
-#if 0
-        // AP does not support short preamable
-        return false;
-#endif
     }
 
 
@@ -281,22 +268,6 @@ limCheckRxBasicRates(tpAniSirGlobal pMac, tSirMacRateSet rxRateSet,tpPESession p
 
         return false;
     }
-
-
-    #if 0
-    if (wlan_cfgGetStr(pMac, WNI_CFG_OPERATIONAL_RATE_SET,
-                  (tANI_U8 *) &pRateSet->rate,
-                  (tANI_U32 *) &cfgLen) != eSIR_SUCCESS)
-    {
-        /// Could not get Operational rateset from CFG. Log error.
-        limLog(pMac, LOGP, FL("could not retrieve Operational rateset"));
-
-        // Free up memory allocated for rateset
-        vos_mem_free((tANI_U8 *) pRateSet);
-
-        return false;
-    }
-    #endif //TO SUPPORT BT-AMP
 
     /* Copy operational rate set from session Entry */
     vos_mem_copy(pRateSet->rate, (psessionEntry->rateSet.rate),
@@ -2068,21 +2039,7 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
 
    isArate=0;
 
-   // limGetPhyMode(pMac, &phyMode);
    limGetPhyMode(pMac, &phyMode, psessionEntry);
-
-   // get own rate set
-   // val = WNI_CFG_OPERATIONAL_RATE_SET_LEN;
-   #if 0
-    if (wlan_cfgGetStr(pMac, WNI_CFG_OPERATIONAL_RATE_SET,
-                  (tANI_U8 *) &tempRateSet.rate,
-                  &val) != eSIR_SUCCESS)
-    {
-        /// Could not get rateset from CFG. Log error.
-        limLog(pMac, LOGP, FL("could not retrieve rateset"));
-    }
-
-    #endif // TO SUPPORT BT-AMP
 
     /* copy operational rate set from psessionEntry */
     vos_mem_copy((tempRateSet.rate), (psessionEntry->rateSet.rate),
@@ -2091,14 +2048,6 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
 
     if (phyMode == WNI_CFG_PHY_MODE_11G)
     {
-
-        #if 0
-        // get own extended rate set
-        val = WNI_CFG_EXTENDED_OPERATIONAL_RATE_SET_LEN;
-        if (wlan_cfgGetStr(pMac, WNI_CFG_EXTENDED_OPERATIONAL_RATE_SET,
-                      (tANI_U8 *) &tempRateSet2.rate,
-                      &val) != eSIR_SUCCESS)
-        #endif
         vos_mem_copy((tempRateSet2.rate), (psessionEntry->extRateSet.rate),
                      psessionEntry->extRateSet.numRates);
         tempRateSet2.numRates = (tANI_U8) psessionEntry->extRateSet.numRates;
@@ -2337,12 +2286,6 @@ limAddSta(
     tLimIbssPeerNode *pPeerNode; /* for IBSS mode */
     tDot11fIEVHTCaps vht_caps;   /* for IBSS mode */
     tANI_U8  *p2pIe = NULL;
-    #if 0
-    retCode = wlan_cfgGetStr(pMac, WNI_CFG_STA_ID, staMac, &cfg);
-    if (retCode != eSIR_SUCCESS)
-            limLog(pMac, LOGP, FL("could not retrieve STA MAC"));
-    #endif //To SUPPORT BT-AMP
-
 
     sirCopyMacAddr(staMac,psessionEntry->selfMacAddr);
 
@@ -2814,15 +2757,6 @@ limDelSta(
   //    else
   //      get STA index from DPH
   //
-
-#if 0
-    /* Since we have not created any STA, no need to send msg to delete
-     * STA to HAL */
-    if (psessionEntry->limSmeState == eLIM_SME_JOIN_FAILURE_STATE) {
-        pDelStaParams->staIdx = 1; /* TODO : This is workaround. Need to find right STA Index before sending to HAL */
-        //return retCode;
-    }
-#endif
 
 #ifdef FEATURE_WLAN_TDLS
     if( ((eLIM_STA_ROLE == GET_LIM_SYSTEM_ROLE(psessionEntry)) && (pStaDs->staType !=  STA_ENTRY_TDLS_PEER)) ||(eLIM_BT_AMP_STA_ROLE == GET_LIM_SYSTEM_ROLE(psessionEntry)) )
@@ -3773,6 +3707,9 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
     pAddBssParams->llaCoexist, pAddBssParams->llbCoexist,
     pAddBssParams->llgCoexist, pAddBssParams->ht20Coexist);
 
+    pAddBssParams->dot11_mode = psessionEntry->dot11mode;
+    limLog(pMac, LOG2, FL("dot11_mode:%d"), pAddBssParams->dot11_mode);
+
     // Use the advertised capabilities from the received beacon/PR
 
 
@@ -4392,6 +4329,9 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
         MAC_ADDR_ARRAY(pAddBssParams->staContext.staMac),
         pAddBssParams->staContext.shortPreambleSupported);
 
+        pAddBssParams->dot11_mode = psessionEntry->dot11mode;
+        limLog(pMac, LOG2, FL("dot11_mode:%d"), pAddBssParams->dot11_mode);
+
         if (IS_DOT11_MODE_HT(psessionEntry->dot11mode) && ( pBeaconStruct->HTCaps.present ))
         {
             pAddBssParams->staContext.us32MaxAmpduDuration = 0;
@@ -4595,8 +4535,6 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
 #endif
 
     // Set a new state for MLME
-
-    //pMac->lim.gLimMlmState = eLIM_MLM_WT_ADD_BSS_RSP_PREASSOC_STATE;
     psessionEntry->limMlmState = eLIM_MLM_WT_ADD_BSS_RSP_PREASSOC_STATE;
 
     MTRACE(macTrace(pMac, TRACE_CODE_MLM_STATE, psessionEntry->peSessionId, psessionEntry->limMlmState));

@@ -312,15 +312,6 @@ __limProcessChannelSwitchActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo
                         (tANI_U8 *) &pHdr->sa,
                         sizeof(tSirMacAddr)))
     {
-        #if 0
-        if (wlan_cfgGetInt(pMac, WNI_CFG_BEACON_INTERVAL, &val) != eSIR_SUCCESS)
-        {
-            vos_mem_free(pChannelSwitchFrame);
-            limLog(pMac, LOGP, FL("could not retrieve Beacon interval"));
-            return;
-        }
-        #endif// TO SUPPORT BT-AMP
-
         /* copy the beacon interval from psessionEntry*/
         val = psessionEntry->beaconParams.beaconInterval;
 
@@ -2561,10 +2552,6 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
 #ifdef FEATURE_WLAN_TDLS
            case SIR_MAC_TDLS_DIS_RSP:
            {
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-               //LIM_LOG_TDLS(printk("Public Action TDLS Discovery RSP ..")) ;
-               limProcessTdlsPublicActionFrame(pMac, (tANI_U32*)pRxPacketInfo, psessionEntry) ;
-#else
                tpSirMacMgmtHdr     pHdr;
                tANI_U32            frameLen;
                tANI_S8             rssi;
@@ -2577,7 +2564,6 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType,
                   (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr), 0,
                   WDA_GET_RX_CH( pRxPacketInfo ), psessionEntry, rssi);
-#endif
            }
                break;
 #endif

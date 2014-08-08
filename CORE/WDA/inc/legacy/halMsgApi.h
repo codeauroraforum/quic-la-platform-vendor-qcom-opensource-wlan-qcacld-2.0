@@ -534,6 +534,7 @@ typedef struct
     tANI_U8 reassocReq;    // Set only during roaming reassociation
     tANI_U16 chainMask;
     tANI_U16 smpsMode;
+    tANI_U8 dot11_mode;
 } tAddBssParams, * tpAddBssParams;
 
 typedef struct
@@ -730,18 +731,10 @@ typedef struct {
 #ifdef FEATURE_OEM_DATA_SUPPORT
 
 #ifndef OEM_DATA_REQ_SIZE
-#ifdef QCA_WIFI_2_0
 #define OEM_DATA_REQ_SIZE 280
-#else
-#define OEM_DATA_REQ_SIZE 134
-#endif
 #endif
 #ifndef OEM_DATA_RSP_SIZE
-#ifdef QCA_WIFI_2_0
 #define OEM_DATA_RSP_SIZE 1724
-#else
-#define OEM_DATA_RSP_SIZE 1968
-#endif
 #endif
 
 typedef struct
@@ -1030,6 +1023,8 @@ typedef struct
     tANI_U8  isDfsChannel;
 
     tANI_U8  vhtCapable;
+
+    tANI_U8  dot11_mode;
 }tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef struct CSAOffloadParams {
@@ -1418,7 +1413,6 @@ typedef struct sAddStaSelfParams
 }tAddStaSelfParams, *tpAddStaSelfParams;
 
 #ifdef FEATURE_WLAN_TDLS
-#ifdef QCA_WIFI_2_0
 
 #define HAL_TDLS_MAX_SUPP_CHANNELS       128
 #define HAL_TDLS_MAX_SUPP_OPER_CLASSES   32
@@ -1446,7 +1440,6 @@ typedef struct sTdlsPeerStateParams
    tANI_U32 peerState;
    tTdlsPeerCapParams peerCap;
 }tTdlsPeerStateParams;
-#endif /* QCA_WIFI_2_0 */
 #endif /* FEATURE_WLAN_TDLS */
 
 typedef struct sAbortScanParams
@@ -1493,13 +1486,11 @@ typedef struct sTdlsLinkEstablishParams
    tANI_U32  status;
 }tTdlsLinkEstablishParams, *tpTdlsLinkEstablishParams;
 
-#ifdef QCA_WIFI_2_0
 typedef struct tHalHiddenSsidVdevRestart
 {
    tANI_U8   ssidHidden;
    tANI_U8 sessionId;
 }tHalHiddenSsidVdevRestart,*tpHalHiddenSsidVdevRestart;
-#endif /* QCA_WIFI_2_0 */
 
 static inline void halGetTxTSFtimer(tpAniSirGlobal pMac,
                                                 tSirMacTimeStamp *pTime)

@@ -764,10 +764,6 @@ typedef struct tagCsrScanStruct
     tANI_S8 currentCountryRSSI;     // RSSI for current country code
     tANI_BOOLEAN f11dInfoApplied;
     tANI_BOOLEAN fCancelIdleScan;
-#ifdef FEATURE_WLAN_WAPI
-//    tANI_U16 NumBkidCandidate;
-//    tBkidCandidateInfo BkidCandidateInfo[CSR_MAX_BKID_ALLOWED]; /* Move this as part of SessionEntry */
-#endif /* FEATURE_WLAN_WAPI */
     tANI_U8 numBGScanChannel;   //number of valid channels in the bgScanChannelList
     tANI_U8 bgScanChannelList[WNI_CFG_BG_SCAN_CHANNEL_LIST_LEN];
     //the ChannelInfo member is not used in this structure.
@@ -809,24 +805,6 @@ typedef struct tagCsrScanStruct
     csrScanCompleteCallback callback11dScanDone;
 }tCsrScanStruct;
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-/*
- * struct to carry TDLS discovery info..
- */
-typedef struct sCsrTdlsContext
-{
-    tDblLinkList tdlsPotentialPeerList ;
-    tANI_U16 tdlsCommonFlag ;
-    tANI_U16 tdlsCommonState ;
-    tANI_U16 tdlsPeerCount ;
-}tCsrTdlsCtxStruct;
-
-typedef struct sCsrTdlsPeerLinkInfo
-{
-    tListElem tdlsPeerStaLink ;
-    tSirTdlsPeerInfo tdlsDisPeerInfo ;
-}tCsrTdlsPeerLinkinfo ;
-#endif
 
 
 
@@ -1440,15 +1418,9 @@ eHalStatus csrStop(tpAniSirGlobal pMac, tHalStopType stopType);
 eHalStatus csrReady(tpAniSirGlobal pMac);
 
 #ifdef FEATURE_WLAN_WAPI
-eHalStatus csrRoamGetBKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U32 *pNum,
-                                tBkidCacheInfo *pBkidCache);
-
 
 eHalStatus csrScanGetBKIDCandidateList(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                        tBkidCandidateInfo *pBkidList, tANI_U32 *pNumItems );
-tANI_U32 csrRoamGetNumBKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId);
-eHalStatus csrRoamSetBKIDCache( tpAniSirGlobal pMac, tANI_U32 sessionId, tBkidCacheInfo *pBKIDCache,
-                                 tANI_U32 numItems );
 /* ---------------------------------------------------------------------------
     \fn csrRoamGetWapiReqIE
     \brief return the WAPI IE CSR passes to PE to JOIN request or START_BSS request

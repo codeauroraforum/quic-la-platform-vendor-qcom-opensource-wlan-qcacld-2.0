@@ -616,11 +616,9 @@ typedef enum
     eCSR_ROAM_RESULT_TEARDOWN_TDLS_PEER_IND,
     eCSR_ROAM_RESULT_DELETE_ALL_TDLS_PEER_IND,
     eCSR_ROAM_RESULT_LINK_ESTABLISH_REQ_RSP,
-#ifdef QCA_WIFI_2_0
     eCSR_ROAM_RESULT_TDLS_SHOULD_DISCOVER,
     eCSR_ROAM_RESULT_TDLS_SHOULD_TEARDOWN,
     eCSR_ROAM_RESULT_TDLS_SHOULD_PEER_DISCONNECTED,
-#endif
 #endif
 
     eCSR_ROAM_RESULT_DFS_RADAR_FOUND_IND,
@@ -1513,25 +1511,6 @@ typedef struct tagCsrTdlsSendMgmt
 
 }tCsrTdlsSendMgmt;
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-typedef struct tagCsrTdlsDisRequest
-{
-        tSirMacAddr peerMac;
-            tANI_U8 disType;
-}tCsrTdlsDisRequest;
-
-typedef struct tagCsrTdlsSetupRequest
-{
-        tSirMacAddr peerMac;
-            tANI_U8 linkIndex;
-}tCsrTdlsSetupRequest;
-
-typedef struct tagCsrTdlsTeardownRequest
-{
-        tSirMacAddr peerMac;
-            tANI_U8 linkIndex;
-}tCsrTdlsTeardownRequest ;
-#endif
 #endif
 
 typedef void * tScanResultHandle;
@@ -1539,21 +1518,17 @@ typedef void * tScanResultHandle;
 #define CSR_INVALID_SCANRESULT_HANDLE       (NULL)
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
-#ifndef QCA_WIFI_ISOC
 typedef enum
 {
     REASSOC     = 0,
     FASTREASSOC = 1
 }handoff_src;
-#endif
 
 typedef struct tagCsrHandoffRequest
 {
     tCsrBssid bssid;
     tANI_U8 channel;
-#ifndef QCA_WIFI_ISOC
     tANI_U8 src;     /* To check if its a REASSOC or a FASTREASSOC IOCTL */
-#endif
 }tCsrHandoffRequest;
 #endif
 

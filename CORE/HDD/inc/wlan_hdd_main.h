@@ -227,6 +227,10 @@
 #define HDD_MIN_TX_POWER (-100) // minimum tx power
 #define HDD_MAX_TX_POWER (+100)  // maximum tx power
 
+#ifdef WLAN_FEATURE_LPSS
+#define HDD_RSSI_THRESHOLD  10 /* RSSI threshold set to 10 for temp */
+#endif
+
 typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
 /*
@@ -348,16 +352,6 @@ typedef struct hdd_tx_rx_stats_s
 
 } hdd_tx_rx_stats_t;
 
-typedef struct hdd_chip_reset_stats_s
-{
-   __u32    totalLogpResets;
-   __u32    totalCMD53Failures;
-   __u32    totalMutexReadFailures;
-   __u32    totalMIFErrorFailures;
-   __u32    totalFWHearbeatFailures;
-   __u32    totalUnknownExceptions;
-} hdd_chip_reset_stats_t;
-
 #ifdef WLAN_FEATURE_11W
 typedef struct hdd_pmf_stats_s
 {
@@ -375,7 +369,6 @@ typedef struct hdd_stats_s
    tCsrGlobalClassDStatsInfo  ClassD_stat;
    tCsrPerStaStatsInfo        perStaStats;
    hdd_tx_rx_stats_t          hddTxRxStats;
-   hdd_chip_reset_stats_t     hddChipResetStats;
 #ifdef WLAN_FEATURE_11W
    hdd_pmf_stats_t            hddPmfStats;
 #endif
@@ -1020,6 +1013,9 @@ struct hdd_adapter_s
 #endif
 
    v_S7_t rssi;
+#ifdef WLAN_FEATURE_LPSS
+   v_S7_t last_rssi_send;
+#endif
 
    tANI_U8 snr;
 
@@ -1349,7 +1345,6 @@ struct hdd_context_s
    v_U8_t no_of_open_sessions[VOS_MAX_NO_OF_MODE];
    v_U8_t no_of_active_sessions[VOS_MAX_NO_OF_MODE];
 
-   hdd_chip_reset_stats_t hddChipResetStats;
    /* Number of times riva restarted */
    v_U32_t  hddRivaResetStats;
 
@@ -1682,6 +1677,7 @@ void wlan_hdd_send_status_pkg(hdd_adapter_t *pAdapter,
 void wlan_hdd_send_version_pkg(v_U32_t fw_version,
                                v_U32_t chip_id,
                                const char *chip_name);
+void wlan_hdd_send_all_scan_intf_info(hdd_context_t *pHddCtx);
 #endif
 void wlan_hdd_send_svc_nlink_msg(int type, void *data, int len);
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN

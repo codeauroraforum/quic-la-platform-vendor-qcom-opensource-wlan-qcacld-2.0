@@ -139,11 +139,6 @@ static v_VOID_t wlan_hdd_tdls_start_peer_discover_timer(tdlsCtx_t *pHddTdlsCtx,
     }
 
     pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pHddTdlsCtx->pAdapter);
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-    wlan_hdd_tdls_timer_restart(pHddTdlsCtx->pAdapter,
-                                &pHddTdlsCtx->peerDiscoverTimer,
-                                discoveryExpiry);
-#endif
     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "beacon rssi: %d",
                pHddTdlsCtx->ap_rssi);
 
@@ -1741,11 +1736,6 @@ void wlan_hdd_tdls_connection_callback(hdd_adapter_t *pAdapter)
        pHddTdlsCtx->discovery_sent_cnt = 0;
        wlan_hdd_tdls_check_power_save_prohibited(pHddTdlsCtx->pAdapter);
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-       wlan_hdd_tdls_timer_restart(pHddTdlsCtx->pAdapter,
-                                   &pHddTdlsCtx->peerDiscoverTimer,
-                                   pHddTdlsCtx->threshold_config.discovery_period_t);
-#endif
     }
     mutex_unlock(&pHddCtx->tdls_lock);
 
@@ -2020,11 +2010,6 @@ static void wlan_hdd_tdls_implicit_enable(tdlsCtx_t *pHddTdlsCtx)
     wlan_hdd_tdls_check_power_save_prohibited(pHddTdlsCtx->pAdapter);
 
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-    wlan_hdd_tdls_timer_restart(pHddTdlsCtx->pAdapter,
-                                &pHddTdlsCtx->peerDiscoverTimer,
-                                pHddTdlsCtx->threshold_config.discovery_period_t);
-#endif
 }
 
 void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
@@ -2530,27 +2515,18 @@ void wlan_hdd_tdls_timer_restart(hdd_adapter_t *pAdapter,
 {
     hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 
-    if (NULL == pHddStaCtx)
-    {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                FL("pHddStaCtx is NULL"));
-       return;
-    }
-
     /* Check whether driver load unload is in progress */
-    if(vos_is_load_unload_in_progress( VOS_MODULE_ID_VOSS, NULL))
-    {
-       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                "%s: Driver load/unload is in progress.", __func__);
+    if (vos_is_load_unload_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
+       hddLog(LOGE, FL("Driver load/unload is in progress."));
        return;
     }
 
-    if (hdd_connIsConnected(pHddStaCtx))
-    {
+    if (hdd_connIsConnected(pHddStaCtx)) {
         vos_timer_stop(timer);
         vos_timer_start(timer, expirationTime);
     }
 }
+
 void wlan_hdd_tdls_indicate_teardown(hdd_adapter_t *pAdapter,
                                            hddTdlsPeer_t *curr_peer,
                                            tANI_U16 reason)

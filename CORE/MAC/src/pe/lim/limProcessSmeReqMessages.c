@@ -567,11 +567,6 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             retCode = eSIR_SME_INVALID_PARAMETERS;
             goto free;
         }
-#if 0
-       PELOG3(limLog(pMac, LOG3,
-           FL("Parsed START_BSS_REQ fields are bssType=%d, channelId=%d"),
-           pMac->lim.gpLimStartBssReq->bssType, pMac->lim.gpLimStartBssReq->channelId);)
-#endif
 
         /* This is the place where PE is going to create a session.
          * If session is not existed, then create a new session */
@@ -926,11 +921,6 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             || (pMlmStartReq->bssType == eSIR_INFRA_AP_MODE)
         )
         {
-            //len = sizeof(tSirMacAddr);
-            //retStatus = wlan_cfgGetStr(pMac, WNI_CFG_STA_ID, (tANI_U8 *) pMlmStartReq->bssId, &len);
-            //if (retStatus != eSIR_SUCCESS)
-            //limLog(pMac, LOGP, FL("could not retrive BSSID, retStatus=%d"), retStatus);
-
             /* Copy the BSSId from sessionTable to mlmStartReq struct */
             sirCopyMacAddr(pMlmStartReq->bssId,psessionEntry->bssId);
         }
@@ -1006,7 +996,6 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         pMlmStartReq->dualCTSProtection = pMac->lim.gHTDualCTSProtection; // Unused
         pMlmStartReq->txChannelWidthSet = psessionEntry->htRecommendedTxWidthSet;
 
-        /* sep26 review */
         psessionEntry->limRFBand = limGetRFBand(channelNumber);
 
         // Initialize 11h Enable Flag
@@ -1764,8 +1753,6 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             goto end;
         }
 
-        //pMac->lim.gpLimJoinReq = pSmeJoinReq; TO SUPPORT BT-AMP, review os sep 23
-
         /* check for the existence of start BSS session  */
 #ifdef FIXME_GEN6
         if(pSmeJoinReq->bsstype == eSIR_BTAMP_AP_MODE)
@@ -1852,7 +1839,6 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                      sizeof(psessionEntry->htConfig));
 
         /* Copying of bssId is already done, while creating session */
-        //sirCopyMacAddr(psessionEntry->bssId,pSmeJoinReq->bssId);
         sirCopyMacAddr(psessionEntry->selfMacAddr,pSmeJoinReq->selfMacAddr);
         psessionEntry->bssType = pSmeJoinReq->bsstype;
 
@@ -2396,9 +2382,10 @@ __limProcessSmeReassocReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 #endif
     {
 
+    /* Copy the SSID from session entry to local variable */
     psessionEntry->limReassocSSID.length = pReassocReq->ssId.length;
-    vos_mem_copy(   psessionEntry->limReassocSSID.ssId,
-                    pReassocReq->ssId.ssId, psessionEntry->limReassocSSID.length);
+    vos_mem_copy(psessionEntry->limReassocSSID.ssId,
+                 pReassocReq->ssId.ssId, psessionEntry->limReassocSSID.length);
 
     }
 
@@ -3494,15 +3481,6 @@ void limProcessSmeGetAssocSTAsInfo(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     switch (getAssocSTAsReq.modId)
     {
-/**
-        case VOS_MODULE_ID_HAL:
-            wdaPostCtrlMsg( pMac, &msgQ );
-            return;
-
-        case VOS_MODULE_ID_TL:
-            Post msg TL
-            return;
-*/
         case VOS_MODULE_ID_PE:
         default:
             break;
@@ -3884,7 +3862,6 @@ void limProcessSmeDelBssRsp(
 
     (void) body;
     SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
-    //TBD: get the sessionEntry
     limIbssDelete(pMac,psessionEntry);
     dphHashTableClassInit(pMac, &psessionEntry->dph.dphHashTable);
     limDeletePreAuthList(pMac);
@@ -4473,8 +4450,6 @@ __limProcessSmeGetStatisticsRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     tSirMsgQ msgQ;
 
     pPEStatsReq = (tpAniGetPEStatsReq) pMsgBuf;
-
-    //pPEStatsReq->msgType should be eWNI_SME_GET_STATISTICS_REQ
 
     msgQ.type = WDA_GET_STATISTICS_REQ;
 
@@ -5462,304 +5437,6 @@ void limProcessRegdDefdSmeReqAfterNOAStart(tpAniSirGlobal pMac)
     }
 }
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-/*
- * Process Discovery request recieved from SME and transmit to AP.
- */
-static tSirRetStatus limProcessSmeDisStartReq(tpAniSirGlobal pMac,
-                                                           tANI_U32 *pMsgBuf)
-{
-    /* get all discovery request parameters */
-    tSirTdlsDisReq *disReq = (tSirTdlsDisReq *) pMsgBuf ;
-    tpPESession psessionEntry;
-    tANI_U8      sessionId;
-
-    VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-                                  ("Discovery Req Recieved")) ;
-
-    if((psessionEntry = peFindSessionByBssid(pMac, disReq->bssid, &sessionId))
-                                                                        == NULL)
-    {
-         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
-                    "PE Session does not exist for given sme sessionId %d",
-                                                            disReq->sessionId);
-         goto lim_tdls_dis_start_error;
-    }
-
-    /* check if we are in proper state to work as TDLS client */
-    if (psessionEntry->limSystemRole != eLIM_STA_ROLE)
-    {
-        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
-                         "dis req received in wrong system Role %d",
-                                             psessionEntry->limSystemRole);
-        goto lim_tdls_dis_start_error;
-    }
-
-    /*
-     * if we are still good, go ahead and check if we are in proper state to
-     * do TDLS discovery procedure.
-     */
-     if ((psessionEntry->limSmeState != eLIM_SME_ASSOCIATED_STATE) &&
-                (psessionEntry->limSmeState != eLIM_SME_LINK_EST_STATE))
-     {
-
-         limLog(pMac, LOGE, "dis req received in invalid LIMsme \
-                               state (%d)", psessionEntry->limSmeState);
-         goto lim_tdls_dis_start_error;
-     }
-
-    /*
-     * if we are still good, go ahead and transmit TDLS discovery request,
-     * and save Dis Req info for future reference.
-     */
-
-#if 0 // TDLS_hklee: D13 no need to open Addr2 unknown data packet
-    /*
-     * send message to HAL to set RXP filters to receieve frame on
-     * direct link..
-     */
-     //limSetLinkState(pMac, eSIR_LINK_TDLS_DISCOVERY_STATE,
-     //                                    psessionEntry->bssId) ;
-#endif
-
-     /* save dis request message for matching dialog token */
-     vos_mem_copy((tANI_U8 *) &pMac->lim.gLimTdlsDisReq,
-                  (tANI_U8 *) disReq, sizeof(tSirTdlsDisReq));
-
-     VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-                             "Transmit Discovery Request Frame") ;
-     /* format TDLS discovery request frame and transmit it */
-     limSendTdlsDisReqFrame(pMac, disReq->peerMac, disReq->dialog,
-                                                       psessionEntry) ;
-
-     /* prepare for response */
-     pMac->lim.gLimTdlsDisStaCount = 0 ;
-     pMac->lim.gLimTdlsDisResultList = NULL ;
-
-    /*
-     * start TDLS discovery request timer to wait for discovery responses
-     * from all TDLS enabled clients in BSS.
-     */
-
-    VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-                                ("Start Discovery request Timeout Timer")) ;
-    MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, 0,
-                                             eLIM_TDLS_DISCOVERY_RSP_WAIT));
-
-    /* assign appropriate sessionId to the timer object */
-    pMac->lim.limTimers.gLimTdlsDisRspWaitTimer.sessionId =
-                                            psessionEntry->peSessionId;
-
-    if (tx_timer_activate(&pMac->lim.limTimers.gLimTdlsDisRspWaitTimer)
-                                                               != TX_SUCCESS)
-    {
-        limLog(pMac, LOGP, FL("TDLS discovery response timer \
-                                                  activation failed!"));
-        goto lim_tdls_dis_start_error;
-    }
-    /*
-     * when timer expired, eWNI_SME_TDLS_DISCOVERY_START_RSP is sent
-     *  back to SME
-     */
-    return (eSIR_SUCCESS) ;
-lim_tdls_dis_start_error:
-   /* in error case, PE has to sent the response SME immediately with error code */
-   limSendSmeTdlsDisRsp(pMac, eSIR_FAILURE,
-                                     eWNI_SME_TDLS_DISCOVERY_START_RSP);
-   return eSIR_FAILURE;
-}
-/*
- * Process link start request recieved from SME and transmit to AP.
- */
-eHalStatus limProcessSmeLinkStartReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
-{
-    /* get all discovery request parameters */
-    tSirTdlsSetupReq *setupReq = (tSirTdlsSetupReq *) pMsgBuf ;
-    tLimTdlsLinkSetupInfo *linkSetupInfo;
-    //tLimTdlsLinkSetupPeer *setupPeer;
-    tpPESession psessionEntry;
-    tANI_U8      sessionId;
-    eHalStatus   status;
-
-    if((psessionEntry = peFindSessionByBssid(pMac,
-                                    setupReq->bssid, &sessionId)) == NULL)
-    {
-         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
-                     "PE Session does not exist for given sme sessionId %d",
-                                                          setupReq->sessionId);
-         goto lim_tdls_link_start_error;
-    }
-
-    /* check if we are in proper state to work as TDLS client */
-    if (psessionEntry->limSystemRole != eLIM_STA_ROLE)
-    {
-        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
-                      "TDLS link setup req received in wrong system Role %d",
-                                                psessionEntry->limSystemRole);
-        goto lim_tdls_link_start_error;
-    }
-
-    /*
-     * if we are still good, go ahead and check if we are in proper state to
-     * do TDLS setup procedure.
-     */
-    if ((psessionEntry->limSmeState != eLIM_SME_ASSOCIATED_STATE) &&
-            (psessionEntry->limSmeState != eLIM_SME_LINK_EST_STATE))
-    {
-        limLog(pMac, LOGE, "Setup request in invalid LIMsme \
-                              state (%d)", pMac->lim.gLimSmeState);
-        goto lim_tdls_link_start_error;
-    }
-
-    /*
-     * Now, go ahead and transmit TDLS discovery request, and save setup Req
-     * info for future reference.
-     */
-     /* create node for Link setup */
-    linkSetupInfo = &pMac->lim.gLimTdlsLinkSetupInfo ;
-    //setupPeer = NULL ;
-
-    status = limTdlsPrepareSetupReqFrame(pMac, linkSetupInfo, setupReq->dialog,
-                                          setupReq->peerMac, psessionEntry) ;
-    if(eHAL_STATUS_SUCCESS == status)
-    /* in case of success, eWNI_SME_TDLS_LINK_START_RSP is sent back to SME later when
-    TDLS setup cnf TX complete is successful. */
-        return eSIR_SUCCESS;
-#if 0
-
-    /*
-    * we allocate the TDLS setup Peer Memory here, we will free'd this
-    * memory after teardown, if the link is successfully setup or
-    * free this memory if any timeout is happen in link setup procedure
-    */
-    setupPeer = vos_mem_malloc(sizeof( tLimTdlsLinkSetupPeer ));
-    if ( NULL == setupPeer )
-    {
-     limLog( pMac, LOGP,
-                  FL( "Unable to allocate memory during ADD_STA" ));
-     VOS_ASSERT(0) ;
-     return eSIR_MEM_ALLOC_FAILED;
-    }
-    setupPeer->dialog = setupReq->dialog ;
-    setupPeer->tdls_prev_link_state =  setupPeer->tdls_link_state ;
-    setupPeer->tdls_link_state = TDLS_LINK_SETUP_START_STATE ;
-    /* TDLS_sessionize: remember sessionId for future */
-    setupPeer->tdls_sessionId = psessionEntry->peSessionId;
-    setupPeer->tdls_bIsResponder = 1;
-
-    /*
-    * we only populate peer MAC, so it can assit us to find the
-    * TDLS peer after response/or after response timeout
-    */
-    vos_mem_copy(setupPeer->peerMac, setupReq->peerMac,
-                                              sizeof(tSirMacAddr)) ;
-    /* format TDLS discovery request frame and transmit it */
-    limSendTdlsLinkSetupReqFrame(pMac, setupReq->peerMac,
-                                       setupReq->dialog, psessionEntry, NULL, 0) ;
-
-    limStartTdlsTimer(pMac, psessionEntry->peSessionId,
-                        &setupPeer->gLimTdlsLinkSetupRspTimeoutTimer,
-     (tANI_U32)setupPeer->peerMac, WNI_CFG_TDLS_LINK_SETUP_RSP_TIMEOUT,
-                            SIR_LIM_TDLS_LINK_SETUP_RSP_TIMEOUT) ;
-    /* update setup peer list */
-    setupPeer->next = linkSetupInfo->tdlsLinkSetupList ;
-    linkSetupInfo->tdlsLinkSetupList = setupPeer ;
-    /* in case of success, eWNI_SME_TDLS_LINK_START_RSP is sent back to SME later when
-    TDLS setup cnf TX complete is successful. --> see limTdlsSetupCnfTxComplete() */
-    return eSIR_SUCCESS ;
-#endif
-lim_tdls_link_start_error:
-    /* in case of error, return immediately to SME */
-    limSendSmeTdlsLinkStartRsp(pMac, eSIR_FAILURE, setupReq->peerMac,
-                                         eWNI_SME_TDLS_LINK_START_RSP);
-    return eSIR_FAILURE ;
-}
-
-/*
- * Process link teardown request recieved from SME and transmit to AP.
- */
-eHalStatus limProcessSmeTeardownReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
-{
-    /* get all discovery request parameters */
-    tSirTdlsTeardownReq *teardownReq = (tSirTdlsTeardownReq *) pMsgBuf ;
-    tLimTdlsLinkSetupPeer *setupPeer;
-    tpPESession psessionEntry;
-    tANI_U8      sessionId;
-
-    if((psessionEntry = peFindSessionByBssid(pMac, teardownReq->bssid, &sessionId)) == NULL)
-    {
-         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
-                        "PE Session does not exist for given sme sessionId %d", teardownReq->sessionId);
-         goto lim_tdls_teardown_req_error;
-    }
-
-    /* check if we are in proper state to work as TDLS client */
-    if (psessionEntry->limSystemRole != eLIM_STA_ROLE)
-    {
-        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
-                          "TDLS teardown req received in wrong system Role %d", psessionEntry->limSystemRole);
-        goto lim_tdls_teardown_req_error;
-    }
-
-    /*
-     * if we are still good, go ahead and check if we are in proper state to
-     * do TDLS setup procedure.
-     */
-    if ((psessionEntry->limSmeState != eLIM_SME_ASSOCIATED_STATE) &&
-            (psessionEntry->limSmeState != eLIM_SME_LINK_EST_STATE))
-    {
-        limLog(pMac, LOGE, "TDLS teardwon req received in invalid LIMsme \
-                               state (%d)", psessionEntry->limSmeState);
-        goto lim_tdls_teardown_req_error;
-    }
-
-    VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-            "Teardown for peer = " MAC_ADDRESS_STR, MAC_ADDR_ARRAY(teardownReq->peerMac));
-    /*
-     * Now, go ahead and transmit TDLS teardown request, and save teardown info
-     * info for future reference.
-     */
-     /* Verify if this link is setup */
-    setupPeer = NULL ;
-    limTdlsFindLinkPeer(pMac, teardownReq->peerMac, &setupPeer);
-    if(NULL == setupPeer)
-    {
-        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-                                ("invalid Peer on teardown ")) ;
-        goto lim_tdls_teardown_req_error;
-    }
-
-
-    (setupPeer)->tdls_prev_link_state = (setupPeer)->tdls_link_state ;
-    (setupPeer)->tdls_link_state = TDLS_LINK_TEARDOWN_START_STATE ;
-    /* TDLS_sessionize: check sessionId in case */
-    if((setupPeer)->tdls_sessionId != psessionEntry->peSessionId)
-    {
-        limLog(pMac, LOGE, "TDLS teardown req; stored sessionId (%d) not matched from peSessionId (%d)", \
-            (setupPeer)->tdls_sessionId, psessionEntry->limSmeState);
-        (setupPeer)->tdls_sessionId = psessionEntry->peSessionId;
-    }
-
-    /* format TDLS teardown request frame and transmit it */
-    if(eSIR_SUCCESS != limSendTdlsTeardownFrame(pMac, teardownReq->peerMac,
-                                eSIR_MAC_TDLS_TEARDOWN_UNSPEC_REASON, psessionEntry, NULL, 0 ))
-    {
-        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
-                                ("couldn't send teardown frame ")) ;
-        goto lim_tdls_teardown_req_error;
-    }
-    /* in case of success, eWNI_SME_TDLS_TEARDOWN_RSP is sent back to SME later when
-    TDLS teardown TX complete is successful. --> see limTdlsTeardownTxComplete() */
-    return eSIR_SUCCESS;
-lim_tdls_teardown_req_error:
-    /* in case of error, return immediately to SME */
-    limSendSmeTdlsTeardownRsp(pMac, eSIR_FAILURE, teardownReq->peerMac,
-                                     eWNI_SME_TDLS_TEARDOWN_RSP);
-    return eSIR_FAILURE;
-}
-
-
-#endif
 
 static void
 __limProcessSmeResetApCapsChange(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
@@ -6109,17 +5786,6 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
         case eWNI_SME_TDLS_LINK_ESTABLISH_REQ:
             limProcesSmeTdlsLinkEstablishReq(pMac, pMsgBuf);
             break;
-#endif
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-        case eWNI_SME_TDLS_DISCOVERY_START_REQ:
-            limProcessSmeDisStartReq(pMac,  pMsgBuf);
-            break ;
-        case eWNI_SME_TDLS_LINK_START_REQ:
-            limProcessSmeLinkStartReq(pMac,  pMsgBuf);
-            break ;
-        case eWNI_SME_TDLS_TEARDOWN_REQ:
-            limProcessSmeTeardownReq(pMac,  pMsgBuf);
-            break ;
 #endif
         case eWNI_SME_RESET_AP_CAPS_CHANGED:
             __limProcessSmeResetApCapsChange(pMac, pMsgBuf);
@@ -6478,8 +6144,7 @@ limProcessModifyAddIEs(tpAniSirGlobal pMac, tANI_U32 *pMsg)
 {
     tpSirModifyIEsInd pModifyAddIEs = (tpSirModifyIEsInd)pMsg;
     tANI_U8     sessionId;
-    tANI_U16    bufferLen = 0;
-    tANI_U8     *pBuffer = NULL;
+    tANI_BOOLEAN      ret = FALSE;
 
     /* Incoming message has smeSession, use BSSID to find PE session*/
     tpPESession  psessionEntry = peFindSessionByBssid(pMac,
@@ -6498,41 +6163,27 @@ limProcessModifyAddIEs(tpAniSirGlobal pMac, tANI_U32 *pMsg)
             case eUPDATE_IE_PROBE_RESP:
             {
                 /* Probe resp */
-                if ((bufferLen = psessionEntry->addIeParams.probeRespDataLen)
-                    == 0)
-                {
-                    limLog(pMac, LOGE, FL("probe resp add ie not present %d"),
-                        psessionEntry->addIeParams.probeRespDataLen);
-                    break;
-                }
-                /* vendor IE and  oui 0x00, 0x16, 0x32 */
-                /* search through the buffer and modify the IE */
-                pBuffer = psessionEntry->addIeParams.probeRespData_buff;
                 break;
             }
             case eUPDATE_IE_ASSOC_RESP:
                 /* assoc resp IE */
                 if (psessionEntry->addIeParams.assocRespDataLen == 0)
                 {
-                    limLog(pMac, LOGE, FL("assoc resp add ie not present %d"),
-                        psessionEntry->addIeParams.assocRespDataLen);
+                    VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                              FL("assoc resp add ie not present %d"),
+                              psessionEntry->addIeParams.assocRespDataLen);
                 }
                 /* search through the buffer and modify the IE */
                 break;
             case eUPDATE_IE_PROBE_BCN:
+            {
                 /*probe beacon IE*/
-                if ((bufferLen = psessionEntry->addIeParams.probeRespBCNDataLen)
-                    == 0)
+                if (ret == TRUE && pModifyAddIEs->modifyIE.notify)
                 {
-                    limLog(pMac, LOGE,
-                        FL("probe resp Bcn add ie not present %d"),
-                        psessionEntry->addIeParams.probeRespBCNDataLen);
-                    break;
+                    limHandleParamUpdate(pMac, pModifyAddIEs->updateType);
                 }
-                /* vendor IE and  oui 0x00, 0x16, 0x32 */
-                /* search through the buffer and modify the IE */
-                pBuffer = psessionEntry->addIeParams.probeRespBCNData_buff;
                 break;
+            }
             default:
                 limLog(pMac, LOGE, FL("unhandled buffer type %d."),
                     pModifyAddIEs->updateType);
@@ -6549,7 +6200,6 @@ limProcessModifyAddIEs(tpAniSirGlobal pMac, tANI_U32 *pMsg)
                             pModifyAddIEs->modifyIE.ieIDLen,
                             pModifyAddIEs->updateType);
         }
-
     }
     else
     {

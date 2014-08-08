@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -435,13 +435,6 @@ void ccmCfgCnfMsgHandler(tHalHandle hHal, void *m)
     tANI_U32 result, cfgId ;
     tCfgReq *req, *old ;
 
-#if 0
-    if (pMac->ccm.state != eCCM_STARTED)
-    {
-        return ;
-    }
-#endif
-
     result  = pal_be32_to_cpu(msg->data[0]);
     cfgId   = pal_be32_to_cpu(msg->data[1]);
 
@@ -639,7 +632,14 @@ eHalStatus ccmCfgGetInt(tHalHandle hHal, tANI_U32 cfgId, tANI_U32 *pValue)
 {
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
     eHalStatus status = eHAL_STATUS_SUCCESS ;
-    tCfgReq *req = pMac->ccm.comp[cfgId] ;
+    tCfgReq *req;
+
+    if (cfgId >= CFG_PARAM_MAX_NUM) {
+        smsLog(pMac, LOGE, FL("Invalid cfg id %d"), cfgId);
+        return eHAL_STATUS_INVALID_PARAMETER;
+    }
+
+    req = pMac->ccm.comp[cfgId] ;
 
     if (req && req->state == eCCM_REQ_DONE)
     {
@@ -665,6 +665,12 @@ eHalStatus ccmCfgGetStr(tHalHandle hHal, tANI_U32 cfgId, tANI_U8 *pBuf, tANI_U32
         return eHAL_STATUS_FAILURE;
 
     hHdd = halHandle2HddHandle(hHal);
+
+    if (cfgId >= CFG_PARAM_MAX_NUM) {
+        smsLog(pMac, LOGE, FL("Invalid cfg id %d"), cfgId);
+        return eHAL_STATUS_INVALID_PARAMETER;
+    }
+
     req = pMac->ccm.comp[cfgId] ;
 
     if (req && req->state == eCCM_REQ_DONE && (tANI_U32)req->length <= *pLength)

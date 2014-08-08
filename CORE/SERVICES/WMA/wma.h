@@ -150,6 +150,27 @@
 #define WMA_GO_MIN_ACTIVE_SCAN_BURST_DURATION   (40)
 #define WMA_GO_MAX_ACTIVE_SCAN_BURST_DURATION   (120)
 #define WMA_DWELL_TIME_PASSIVE_DEFAULT          (110)
+#define WMA_DWELL_TIME_PROBE_TIME_MAP_SIZE      (11)
+
+typedef struct probeTime_dwellTime {
+	u_int8_t dwell_time;
+	u_int8_t probe_time;
+} t_probeTime_dwellTime;
+
+static const t_probeTime_dwellTime
+	probeTime_dwellTime_map[WMA_DWELL_TIME_PROBE_TIME_MAP_SIZE] = {
+	{28, 0}, /* 0 SSID */
+	{28, 20}, /* 1 SSID */
+	{28, 20}, /* 2 SSID */
+	{28, 20}, /* 3 SSID */
+	{28, 12}, /* 4 SSID */
+	{28, 12}, /* 5 SSID */
+	{28, 12}, /* 6 SSID */
+	{28, 12}, /* 7 SSID */
+	{28, 12}, /* 8 SSID */
+	{28, 12}, /* 9 SSID */
+	{28, 9}   /* 10 SSID */
+};
 
 /* Roaming default values
  * All time and period values are in milliseconds.
@@ -502,6 +523,7 @@ struct wma_txrx_node {
 #endif
 	v_BOOL_t ps_enabled;
 	u_int32_t dtim_policy;
+	u_int32_t peer_count;
 	v_BOOL_t roam_synch_in_progress;
 };
 
@@ -619,7 +641,6 @@ typedef struct {
 	u_int32_t scan_id;
 	struct wma_txrx_node *interfaces;
 	pdev_cli_config_t pdevconfig;
-	u_int32_t peer_count;
 	struct list_head vdev_resp_queue;
 	adf_os_spinlock_t vdev_respq_lock;
         adf_os_spinlock_t vdev_detach_lock;
@@ -649,7 +670,6 @@ typedef struct {
 	void* pGetRssiReq;
 	v_S7_t first_rssi;
 	t_thermal_mgmt thermal_mgmt_info;
-        u_int32_t roam_offload_vdev_id;
         v_BOOL_t  roam_offload_enabled;
         t_wma_roam_preauth_chan_state_t roam_preauth_scan_state;
         u_int32_t roam_preauth_scan_id;
@@ -1281,6 +1301,7 @@ struct wma_vdev_start_req {
 	u_int8_t vht_capable;
 	u_int8_t ht_capable;
 	int32_t dfs_pri_multiplier;
+	u_int8_t dot11_mode;
 };
 
 struct wma_set_key_params {

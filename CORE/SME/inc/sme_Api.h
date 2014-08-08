@@ -80,7 +80,6 @@
 //Macro to disable split scan
 #define SME_DISABLE_SPLIT_SCAN   255
 
-#ifdef QCA_WIFI_2_0
 #define SME_2_4_GHZ_MAX_FREQ    3000
 #define SME_MODE_11A            0    /* 11a mode */
 #define SME_MODE_11G            1    /* 11b/g mode */
@@ -100,7 +99,6 @@
     (psme_channel)->reg_info_1 &= 0xff00ffff;             \
     (psme_channel)->reg_info_1 |= ((val & 0xff) << 16);   \
 } while(0)
-#endif
 
 /*--------------------------------------------------------------------------
   Type declarations
@@ -117,9 +115,6 @@ typedef struct _smeConfigParams
 #endif
 #if defined FEATURE_WLAN_ESE
     tANI_U8   isEseIniFeatureEnabled;
-#endif
-#if defined WLAN_FEATURE_P2P_INTERNAL
-   tP2PConfigParam  p2pConfig;
 #endif
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
     tANI_U8       isFastTransitionEnabled;
@@ -144,7 +139,6 @@ typedef enum
     eSME_ROAM_TRIGGER_MAX
 } tSmeFastRoamTrigger;
 
-#ifdef QCA_WIFI_2_0
 typedef PACKED_PRE struct PACKED_POST
 {
     /* channel id */
@@ -204,7 +198,6 @@ typedef struct _smeTdlsPeerStateParams
     tSmeTdlsPeerCapParams peerCap;
 } tSmeTdlsPeerStateParams;
 #endif /* FEATURE_WLAN_TDLS */
-#endif /* QCA_WIFI_2_0 */
 
 /* Thermal Mitigation*/
 
@@ -1871,48 +1864,6 @@ eHalStatus sme_RoamRegisterCallback(tHalHandle hHal,
 
 #ifdef FEATURE_WLAN_WAPI
 /* ---------------------------------------------------------------------------
-    \fn sme_RoamSetBKIDCache
-    \brief The SME API exposed to HDD to allow HDD to provde SME the BKID
-    candidate list.
-    \param hHal - Handle to the HAL. The HAL handle is returned by the HAL after
-    it is opened (by calling halOpen).
-    \param pBKIDCache - caller allocated buffer point to an array of tBkidCacheInfo
-    \param numItems - a variable that has the number of tBkidCacheInfo allocated
-    when retruning, this is the number of items put into pBKIDCache
-    \return eHalStatus - when fail, it usually means the buffer allocated is not
-    big enough and pNumItems has the number of tBkidCacheInfo.
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamSetBKIDCache( tHalHandle hHal, tANI_U32 sessionId, tBkidCacheInfo *pBKIDCache,
-                                 tANI_U32 numItems );
-
-/* ---------------------------------------------------------------------------
-    \fn sme_RoamGetBKIDCache
-    \brief The SME API exposed to HDD to allow HDD to request SME to return its
-    BKID cache.
-    \param hHal - Handle to the HAL. The HAL handle is returned by the HAL after
-    it is opened (by calling halOpen).
-    \param pNum - caller allocated memory that has the space of the number of
-    tBkidCacheInfo as input. Upon returned, *pNum has the needed number of entries
-    in SME cache.
-    \param pBkidCache - Caller allocated memory that contains BKID cache, if any,
-    upon return
-    \return eHalStatus - when fail, it usually means the buffer allocated is not
-    big enough.
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamGetBKIDCache(tHalHandle hHal, tANI_U32 *pNum,
-                                tBkidCacheInfo *pBkidCache);
-
-/* ---------------------------------------------------------------------------
-    \fn sme_RoamGetNumBKIDCache
-    \brief The SME API exposed to HDD to allow HDD to request SME to return the
-    number of BKID cache entries.
-    \param hHal - Handle to the HAL. The HAL handle is returned by the HAL after
-    it is opened (by calling halOpen).
-    \return tANI_U32 - the number of BKID cache entries.
-  ---------------------------------------------------------------------------*/
-tANI_U32 sme_RoamGetNumBKIDCache(tHalHandle hHal, tANI_U32 sessionId);
-
-/* ---------------------------------------------------------------------------
     \fn sme_ScanGetBKIDCandidateList
     \brief a wrapper function to return the BKID candidate list
     \param pBkidList - caller allocated buffer point to an array of
@@ -2449,23 +2400,6 @@ tANI_U16 sme_ChnToFreq(tANI_U8 chanNum);
 
 tANI_BOOLEAN sme_IsChannelValid(tHalHandle hHal, tANI_U8 channel);
 
-#if defined WLAN_FEATURE_P2P_INTERNAL
-
-eHalStatus sme_p2pResetSession(tHalHandle hHal, tANI_U8 HDDSessionId);
-
-/* ---------------------------------------------------------------------------
-    \fn sme_p2pFlushDeviceList
-    \brief  Remove cached P2P result from scan results
-    \param  hHal - The handle returned by macOpen.
-    \param  HDDSessionId - HDD's sessionId. Currently unused.
-    \return eHalStatus
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_p2pFlushDeviceList(tHalHandle hHal, tANI_U8 HDDSessionId);
-
-eHalStatus sme_p2pGetResultFilter(tHalHandle hHal, tANI_U8 HDDSessionId,
-                              tCsrScanResultFilter *pFilter);
-
-#endif //#if defined WLAN_FEATURE_P2P_INTERNAL
 /* ---------------------------------------------------------------------------
     \fn sme_SetMaxTxPower
     \brief  Used to set the Maximum Transmit Power dynamically. Note: this
@@ -3428,19 +3362,6 @@ void sme_SetTdlsPowerSaveProhibited(tHalHandle hHal, tANI_U32 sessionId,
     -------------------------------------------------------------------------*/
 v_BOOL_t sme_IsPmcBmps(tHalHandle hHal);
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-typedef struct smeTdlsDisResult
-{
-      tSirMacAddr tdlsPeerMac;
-          v_S7_t tdlsPeerRssi;
-} tSmeTdlsDisResult;
-
-VOS_STATUS sme_StartTdlsDiscoveryReq(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr peerMac);
-v_U8_t sme_GetTdlsDiscoveryResult(tHalHandle hHal,
-                                 tSmeTdlsDisResult *disResult, v_U8_t listType);
-VOS_STATUS sme_StartTdlsLinkSetupReq(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr peerMac);
-VOS_STATUS sme_StartTdlsLinkTeardownReq(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr peerMac);
-#endif /* FEATURE_WLAN_TDLS_INTERNAL */
 eHalStatus sme_UpdateDfsSetting(tHalHandle hHal, tANI_U8 fUpdateEnableDFSChnlScan);
 
 /*
@@ -3644,7 +3565,8 @@ eHalStatus sme_ConfigDisablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMo
 eHalStatus sme_PsOffloadEnablePowerSave (tHalHandle hHal, tANI_U32 sessionId);
 eHalStatus sme_PsOffloadDisablePowerSave (tHalHandle hHal, tANI_U32 sessionId);
 eHalStatus sme_PsOffloadEnableDeferredPowerSave (tHalHandle hHal,
-                                                 tANI_U32 sessionId);
+                                                 tANI_U32 sessionId,
+                                                 tANI_BOOLEAN isReassoc);
 eHalStatus sme_PsOffloadDisableDeferredPowerSave (tHalHandle hHal,
                                                   tANI_U32 sessionId);
 
@@ -3663,7 +3585,6 @@ eHalStatus sme_SetHT2040Mode(tHalHandle hHal, tANI_U8 sessionId, tANI_U8 channel
 eHalStatus sme_SetPhyCBMode24G(tHalHandle hHal, ePhyChanBondState phyCBMode);
 #endif
 
-#ifdef QCA_WIFI_2_0
 eHalStatus sme_getChannelInfo(tHalHandle hHal, tANI_U8 chanId,
                               tSmeChannelInfo *chanInfo);
 #ifdef FEATURE_WLAN_TDLS
@@ -3672,7 +3593,6 @@ eHalStatus sme_UpdateFwTdlsState(tHalHandle hHal, void *psmeTdlsParams,
 eHalStatus sme_UpdateTdlsPeerState(tHalHandle hHal,
                                    tSmeTdlsPeerStateParams *pPeerStateParams);
 #endif /* FEATURE_WLAN_TDLS */
-#endif /* QCA_WIFI_2_0 */
 
 #ifdef FEATURE_WLAN_CH_AVOID
 /* ---------------------------------------------------------------------------
@@ -3740,7 +3660,6 @@ eHalStatus sme_RoamStartBeaconReq( tHalHandle hHal,
 eHalStatus sme_RoamCsaIeRequest(tHalHandle hHal, tCsrBssid bssid,
                   tANI_U8 targetChannel, tANI_U8 csaIeReqd);
 
-#ifndef QCA_WIFI_ISOC
 /* ---------------------------------------------------------------------------
     \fn sme_InitThermalInfo
     \brief  SME API to initialize the thermal mitigation parameters
@@ -3776,7 +3695,6 @@ eHalStatus sme_TxpowerLimit( tHalHandle hHal, tSirTxPowerLimit *psmetx);
  -------------------------------------------------------------------------*/
 eHalStatus sme_GetLinkSpeed(tHalHandle hHal,tSirLinkSpeedInfo *lsReq,void *plsContext,
                             void (*pCallbackfn)(tSirLinkSpeedInfo *indParam, void *pContext) );
-#endif
 
 /*----------------------------------------------------------------------------
  \fn  sme_ModifyAddIE
@@ -3859,6 +3777,15 @@ v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal);
     \- return TRUE or FALSE
     -------------------------------------------------------------------------*/
 tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal, tANI_U8 sessionId);
+
+/* ---------------------------------------------------------------------------
+    \fn sme_PsOffloadIsStaInPowerSave
+    \brief  This function returns TRUE if STA is in power save
+    \param  hHal - HAL handle for device
+    \param  sessionId - Session Identifier
+    \- return TRUE or FALSE
+    -------------------------------------------------------------------------*/
+tANI_BOOLEAN sme_PsOffloadIsStaInPowerSave(tHalHandle hHal, tANI_U8 sessionId);
 
 #ifdef FEATURE_WLAN_EXTSCAN
 /* ---------------------------------------------------------------------------
