@@ -4661,6 +4661,7 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 	u_int32_t *tmp_ptr, ie_len_with_pad;
 	VOS_STATUS vos_status = VOS_STATUS_E_FAILURE;
 	u_int8_t *buf_ptr;
+	u_int8_t SSID_num;
 	int i;
 	int len = sizeof(*cmd);
 
@@ -4856,6 +4857,17 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 	buf_ptr +=  WMI_TLV_HDR_SIZE + (cmd->num_ssids * sizeof(wmi_ssid));
 
 	cmd->num_bssid = 1;
+
+	if (!scan_req->p2pScanType) {
+		if (wma_is_SAP_active(wma_handle)) {
+			SSID_num = cmd->num_ssids * cmd->num_bssid;
+			cmd->repeat_probe_time =
+				probeTime_dwellTime_map[MIN(SSID_num,
+				WMA_DWELL_TIME_PROBE_TIME_MAP_SIZE - 1)].
+				probe_time;
+		}
+	}
+
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_FIXED_STRUC,
 		       (cmd->num_bssid * sizeof(wmi_mac_addr)));
 	bssid = (wmi_mac_addr *) (buf_ptr + WMI_TLV_HDR_SIZE);
