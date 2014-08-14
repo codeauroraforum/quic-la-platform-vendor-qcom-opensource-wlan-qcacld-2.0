@@ -101,6 +101,7 @@ typedef union uPmfSaQueryTimerId
 
 // LIM utility functions
 void limGetBssidFromPkt(tpAniSirGlobal, tANI_U8 *, tANI_U8 *, tANI_U32 *);
+char * limDot11ReasonStr(tANI_U16 reasonCode);
 char * limMlmStateStr(tLimMlmStates state);
 char * limSmeStateStr(tLimSmeStates state);
 char * limMsgStr(tANI_U32 msgType);
