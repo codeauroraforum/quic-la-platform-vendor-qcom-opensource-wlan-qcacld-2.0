@@ -37,6 +37,10 @@
 #include "adf_os_lock.h"
 #include "hif_pci.h"
 #include "regtable.h"
+#include <vos_getBin.h>
+#include "epping_main.h"
+
+#define CE_POLL_TIMEOUT 10 /* ms */
 
 static int war1_allow_sleep;
 extern int hif_pci_war1;
@@ -948,7 +952,8 @@ more_completions:
         while (CE_completed_send_next_nolock(CE_state, &CE_context, &transfer_context,
                     &buf, &nbytes, &id, &sw_idx, &hw_idx) == A_OK){
 
-            if(CE_id != CE_HTT_H2T_MSG){
+            if(CE_id != CE_HTT_H2T_MSG ||
+                    WLAN_IS_EPPING_ENABLED(vos_get_conparam())){
                 adf_os_spin_unlock(&sc->target_lock);
                 CE_state->send_cb((struct CE_handle *)CE_state, CE_context, transfer_context, buf, nbytes, id,
                                   sw_idx, hw_idx);
@@ -1005,7 +1010,8 @@ more_watermarks:
      * we find no more events to process.
      */
     if (CE_state->recv_cb && CE_recv_entries_done_nolock(sc, CE_state)) {
-        if (more_comp_cnt++ < CE_TXRX_COMP_CHECK_THRESHOLD) {
+        if (WLAN_IS_EPPING_ENABLED(vos_get_conparam()) ||
+            more_comp_cnt++ < CE_TXRX_COMP_CHECK_THRESHOLD) {
             goto more_completions;
         } else {
             adf_os_print("%s:Potential infinite loop detected during Rx processing"
@@ -1017,7 +1023,8 @@ more_watermarks:
     }
 
     if (CE_state->send_cb && CE_send_entries_done_nolock(sc, CE_state)) {
-        if (more_snd_comp_cnt++ < CE_TXRX_COMP_CHECK_THRESHOLD) {
+        if (WLAN_IS_EPPING_ENABLED(vos_get_conparam()) ||
+            more_snd_comp_cnt++ < CE_TXRX_COMP_CHECK_THRESHOLD) {
             goto more_completions;
         } else {
             adf_os_print("%s:Potential infinite loop detected during send completion"
@@ -1042,6 +1049,17 @@ more_watermarks:
     adf_os_atomic_set(&CE_state->rx_pending, 0);
     A_TARGET_ACCESS_END(targid);
 }
+
+static void
+CE_poll_timeout(void *arg)
+{
+    struct CE_state *CE_state = (struct CE_state *) arg;
+    if (CE_state->timer_inited) {
+        CE_per_engine_service(CE_state->sc, CE_state->id);
+        adf_os_timer_mod(&CE_state->poll_timer, CE_POLL_TIMEOUT);
+    }
+}
+
 
 /*
  * Handler for per-engine interrupts on ALL active CEs.
@@ -1357,7 +1375,7 @@ CE_init(struct hif_pci_softc *sc,
                       + (nentries * sizeof(void *)); /* per-send context */
             ptr = A_MALLOC(CE_nbytes);
             if (!ptr) {
-                /* cannot allocate src ring. If teh CE_state is allocated
+                /* cannot allocate src ring. If the CE_state is allocated
                  * locally free CE_State and return error. */
                 dev_err(&sc->pdev->dev, "ath ERROR: src ring has no mem\n");
                 if (malloc_CE_state) {
@@ -1394,6 +1412,10 @@ CE_init(struct hif_pci_softc *sc,
                 pci_alloc_consistent(scn->sc_osdev->bdev,
                                     (nentries * sizeof(struct CE_src_desc) + CE_DESC_RING_ALIGN),
                                     &base_addr);
+            if (src_ring->base_addr_owner_space_unaligned == NULL) {
+                dev_err(&sc->pdev->dev, "ath ERROR: src ring has no DMA mem\n");
+                goto error_no_dma_mem;
+            }
             src_ring->base_addr_CE_space_unaligned = base_addr;
 
 
@@ -1414,6 +1436,10 @@ CE_init(struct hif_pci_softc *sc,
              */
             src_ring->shadow_base_unaligned = A_MALLOC(
                 nentries * sizeof(struct CE_src_desc) + CE_DESC_RING_ALIGN);
+            if (src_ring->shadow_base_unaligned == NULL) {
+                dev_err(&sc->pdev->dev, "ath ERROR: src ring has no shadow_base mem\n");
+                goto error_no_dma_mem;
+            }
             src_ring->shadow_base = (struct CE_src_desc *)
                 (((size_t) src_ring->shadow_base_unaligned +
                 CE_DESC_RING_ALIGN-1) & ~(CE_DESC_RING_ALIGN-1));
@@ -1484,6 +1510,10 @@ CE_init(struct hif_pci_softc *sc,
                 pci_alloc_consistent(scn->sc_osdev->bdev,
                                     (nentries * sizeof(struct CE_dest_desc) + CE_DESC_RING_ALIGN),
                                     &base_addr);
+            if (dest_ring->base_addr_owner_space_unaligned == NULL) {
+                dev_err(&sc->pdev->dev, "ath ERROR: dest ring has no DMA mem\n");
+                goto error_no_dma_mem;
+            }
             dest_ring->base_addr_CE_space_unaligned = base_addr;
 
             /* Correctly initialize memory to 0 to prevent garbage data
@@ -1513,6 +1543,15 @@ CE_init(struct hif_pci_softc *sc,
             CE_DEST_RING_LOWMARK_SET(targid, ctrl_addr, 0);
             CE_DEST_RING_HIGHMARK_SET(targid, ctrl_addr, nentries);
             A_TARGET_ACCESS_END_RET_PTR(targid);
+
+            /* epping */
+            /* poll timer */
+            if ((CE_state->attr_flags & CE_ATTR_ENABLE_POLL)) {
+                adf_os_timer_init(scn->adf_dev, &CE_state->poll_timer,
+                        CE_poll_timeout, CE_state);
+                CE_state->timer_inited = true;
+                adf_os_timer_mod(&CE_state->poll_timer, CE_POLL_TIMEOUT);
+            }
         }
     }
 
@@ -1522,6 +1561,10 @@ CE_init(struct hif_pci_softc *sc,
     A_TARGET_ACCESS_END_RET_PTR(targid);
 
     return (struct CE_handle *)CE_state;
+
+error_no_dma_mem:
+    CE_fini((struct CE_handle *)CE_state);
+    return NULL;
 }
 
 void
@@ -1535,17 +1578,26 @@ CE_fini(struct CE_handle *copyeng)
     CE_state->state = CE_UNUSED;
     CE_state->sc->CE_id_to_state[CE_id] = NULL;
     if (CE_state->src_ring) {
-        A_FREE(CE_state->src_ring->shadow_base_unaligned);
-		pci_free_consistent(scn->sc_osdev->bdev,
-                   (CE_state->src_ring->nentries * sizeof(struct CE_dest_desc) + CE_DESC_RING_ALIGN),
-                   CE_state->src_ring->base_addr_owner_space, CE_state->src_ring->base_addr_CE_space);
+        if (CE_state->src_ring->shadow_base_unaligned)
+            A_FREE(CE_state->src_ring->shadow_base_unaligned);
+        if (CE_state->src_ring->base_addr_owner_space_unaligned)
+            pci_free_consistent(scn->sc_osdev->bdev,
+                   (CE_state->src_ring->nentries * sizeof(struct CE_src_desc) + CE_DESC_RING_ALIGN),
+                   CE_state->src_ring->base_addr_owner_space_unaligned, CE_state->src_ring->base_addr_CE_space);
         A_FREE(CE_state->src_ring);
     }
     if (CE_state->dest_ring) {
-		pci_free_consistent(scn->sc_osdev->bdev,
+        if (CE_state->dest_ring->base_addr_owner_space_unaligned)
+            pci_free_consistent(scn->sc_osdev->bdev,
                    (CE_state->dest_ring->nentries * sizeof(struct CE_dest_desc) + CE_DESC_RING_ALIGN),
                    CE_state->dest_ring->base_addr_owner_space, CE_state->dest_ring->base_addr_CE_space);
         A_FREE(CE_state->dest_ring);
+
+        /* epping */
+        if (CE_state->timer_inited) {
+            CE_state->timer_inited = false;
+            adf_os_timer_free(&CE_state->poll_timer);
+        }
     }
     A_FREE(CE_state);
 }

@@ -2077,6 +2077,7 @@ typedef enum
 #define CFG_LIST_OF_NON_DFS_COUNTRY_CODE                    "gListOfNonDfsCountryCode"
 #define CFG_LIST_OF_NON_DFS_COUNTRY_CODE_DEFAULT            "JO,MA"
 
+
 /*
  * IBSS Operating Channels for 2.4G and 5GHz channels
  */
@@ -2383,7 +2384,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_LL_TX_HBW_FLOW_HWM_OFFSET              "TxHbwFlowHighWaterMarkOffset"
 #define CFG_LL_TX_HBW_FLOW_HWM_OFFSET_MIN          ( 0 )
 #define CFG_LL_TX_HBW_FLOW_HWM_OFFSET_MAX          ( 300 )
-#define CFG_LL_TX_HBW_FLOW_HWM_OFFSET_DEFAULT      ( 50 )
+#define CFG_LL_TX_HBW_FLOW_HWM_OFFSET_DEFAULT      ( 94 )
 
 #define CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH             "TxHbwFlowMaxQueueDepth"
 #define CFG_LL_TX_HBW_FLOW_MAX_Q_DEPTH_MIN         ( 400 )
@@ -2428,6 +2429,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_INITIAL_DWELL_TIME_DEFAULT         (0)
 #define CFG_INITIAL_DWELL_TIME_MIN             (0)
 #define CFG_INITIAL_DWELL_TIME_MAX             (100)
+
+#define CFG_ENABLE_SIFS_BURST                      "gEnableSifsBurst"
+#define CFG_ENABLE_SIFS_BURST_MIN                  ( 0 )
+#define CFG_ENABLE_SIFS_BURST_MAX                  ( 1 )
+#define CFG_ENABLE_SIFS_BURST_DEFAULT              ( 0 )
 
 /*---------------------------------------------------------------------------
   Type declarations
@@ -2920,6 +2926,7 @@ typedef struct
    v_BOOL_t                    gEnableOverLapCh;
    char                        acsAllowedChnls[CFG_MAX_STR_LEN];
    v_U16_t                     acsBandSwitchThreshold;
+   v_BOOL_t                    gEnableStrictRegulatoryForFCC;
    v_U8_t                      apMaxOffloadPeers;
    v_BOOL_t                    enableHystereticMode;
 
@@ -2939,6 +2946,7 @@ typedef struct
    v_U32_t                     pmfSaQueryRetryInterval;
 #endif
    v_BOOL_t                    advertiseConcurrentOperation;
+   v_BOOL_t                    enableSifsBurst;
 } hdd_config_t;
 
 /*---------------------------------------------------------------------------
