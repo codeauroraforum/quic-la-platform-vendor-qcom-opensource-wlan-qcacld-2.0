@@ -298,8 +298,8 @@ exit:
 	return status;
 }
 
-static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
-			 u_int32_t address, bool compressed)
+static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
+				u_int32_t address, bool compressed)
 {
 	int status = EOK;
 	const char *filename = NULL;
@@ -615,6 +615,25 @@ end:
 	release_firmware(fw_entry);
 
 	return status;
+}
+
+static int ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
+				u_int32_t address, bool compressed)
+{
+	int ret;
+
+#ifdef CONFIG_CNSS
+	/* Wait until suspend and resume are completed before loading FW */
+	cnss_lock_pm_sem();
+#endif
+
+	ret = __ol_transfer_bin_file(scn, file, address, compressed);
+
+#ifdef CONFIG_CNSS
+	cnss_release_pm_sem();
+#endif
+
+	return ret;
 }
 
 u_int32_t host_interest_item_address(u_int32_t target_type, u_int32_t item_offset)
