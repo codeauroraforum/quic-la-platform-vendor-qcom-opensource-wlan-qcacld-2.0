@@ -2504,6 +2504,32 @@ static iw_softap_setparam(struct net_device *dev,
                 }
                 break;
             }
+        case QCASAP_TX_CHAINMASK_CMD:
+            {
+                hddLog(LOG1, "QCASAP_TX_CHAINMASK_CMD val %d", set_value);
+                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                        (int)WMI_PDEV_PARAM_TX_CHAIN_MASK,
+                        set_value, PDEV_CMD);
+                break;
+            }
+
+        case QCASAP_RX_CHAINMASK_CMD:
+            {
+                hddLog(LOG1, "QCASAP_RX_CHAINMASK_CMD val %d", set_value);
+                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                        (int)WMI_PDEV_PARAM_RX_CHAIN_MASK,
+                        set_value, PDEV_CMD);
+                break;
+            }
+
+        case QCASAP_NSS_CMD:
+            {
+                hddLog(LOG1, "QCASAP_NSS_CMD val %d", set_value);
+                ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                        (int)WMI_VDEV_PARAM_NSS,
+                        set_value, VDEV_CMD);
+                break;
+            }
         default:
             hddLog(LOGE, FL("Invalid setparam command %d value %d"),
                     sub_cmd, set_value);
@@ -2526,6 +2552,15 @@ static iw_softap_getparam(struct net_device *dev,
     int sub_cmd = value[0];
     eHalStatus status;
     int ret = 0; /* success */
+    hdd_context_t *pHddCtx = NULL;
+
+    pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
+    status = wlan_hdd_validate_context(pHddCtx);
+
+    if (0 != status) {
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("HDD context is not valid"));
+        return status;
+    }
 
     switch (sub_cmd)
     {
@@ -2573,9 +2608,7 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_PARAM_RTSCTS:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
-            void *wmapvosContext = wmahddCtxt->pvosContext;
-            *value = wma_cli_get_command(wmapvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                              (int)pHostapdAdapter->sessionId,
                                              (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
                                              VDEV_CMD);
@@ -2592,9 +2625,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_HT_MCS:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_HT_MCS");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_HT_MCS,
                                         GTX_CMD);
@@ -2603,9 +2635,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_VHT_MCS:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_VHT_MCS");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_VHT_MCS,
                                         GTX_CMD);
@@ -2614,9 +2645,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_USRCFG:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_USR_CFG");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_USR_CFG,
                                         GTX_CMD);
@@ -2625,9 +2655,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_THRE:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_THRE");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_THRE,
                                         GTX_CMD);
@@ -2636,9 +2665,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_MARGIN:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_MARGIN");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_MARGIN,
                                         GTX_CMD);
@@ -2647,9 +2675,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_STEP:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_STEP");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_STEP,
                                         GTX_CMD);
@@ -2658,9 +2685,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_MINTPC:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_MINTPC");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_MINTPC,
                                         GTX_CMD);
@@ -2669,9 +2695,8 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCSAP_GTX_BWMASK:
         {
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
             hddLog(LOG1, "GET WMI_VDEV_PARAM_GTX_BW_MASK");
-            *value = wma_cli_get_command(wmahddCtxt->pvosContext,
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
                                         (int)pHostapdAdapter->sessionId,
                                         (int)WMI_VDEV_PARAM_GTX_BW_MASK,
                                         GTX_CMD);
@@ -2680,14 +2705,11 @@ static iw_softap_getparam(struct net_device *dev,
 
     case QCASAP_GET_DFS_NOL:
         {
-#ifndef WLAN_FEATURE_MBSSID
-            hdd_context_t *wmahddCtxt = WLAN_HDD_GET_CTX(pHostapdAdapter);
-#endif
             WLANSAP_Get_DfsNol(
 #ifdef WLAN_FEATURE_MBSSID
                     WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter)
 #else
-                    wmahddCtxt->pvosContext
+                    pHddCtx->pvosContext
 #endif
                     );
         }
@@ -2700,6 +2722,36 @@ static iw_softap_getparam(struct net_device *dev,
                 hddLog(LOGE, FL("QCSAP_GET_ACL returned Error: not completed"));
             }
             *value = 0;
+            break;
+        }
+
+    case QCASAP_TX_CHAINMASK_CMD:
+        {
+            hddLog(LOG1, "QCASAP_TX_CHAINMASK_CMD");
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
+                    (int)pHostapdAdapter->sessionId,
+                    (int)WMI_PDEV_PARAM_TX_CHAIN_MASK,
+                    PDEV_CMD);
+            break;
+        }
+
+    case QCASAP_RX_CHAINMASK_CMD:
+        {
+            hddLog(LOG1, "QCASAP_RX_CHAINMASK_CMD");
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
+                    (int)pHostapdAdapter->sessionId,
+                    (int)WMI_PDEV_PARAM_RX_CHAIN_MASK,
+                    PDEV_CMD);
+            break;
+        }
+
+    case QCASAP_NSS_CMD:
+        {
+            hddLog(LOG1, "QCASAP_NSS_CMD");
+            *value = wma_cli_get_command(pHddCtx->pvosContext,
+                        (int)pHostapdAdapter->sessionId,
+                        (int)WMI_VDEV_PARAM_NSS,
+                        VDEV_CMD);
             break;
         }
 
@@ -4621,6 +4673,20 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
         "setRadar" },
 
+    {   QCASAP_TX_CHAINMASK_CMD,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "set_txchainmask" },
+
+    {   QCASAP_RX_CHAINMASK_CMD,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "set_rxchainmask" },
+
+    {   QCASAP_NSS_CMD,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "set_nss" },
 #endif /* QCA_WIFI_2_0 */
 
   { QCSAP_IOCTL_GETPARAM, 0,
@@ -4659,9 +4725,15 @@ static const struct iw_priv_args hostapd_private_args[] = {
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "getdfsnol" },
   { QCSAP_GET_ACL, 0,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "get_acl_list" },
-
   { QCSAP_IOCTL_SETMLME,
       IW_PRIV_TYPE_BYTE | sizeof(struct sQcSapreq_mlme)| IW_PRIV_SIZE_FIXED, 0, "setmlme" },
+  { QCASAP_TX_CHAINMASK_CMD, 0,
+      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "get_txchainmask" },
+  { QCASAP_RX_CHAINMASK_CMD, 0,
+      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "get_rxchainmask" },
+  { QCASAP_NSS_CMD, 0,
+      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "get_nss" },
+
   { QCSAP_IOCTL_GET_STAWPAIE,
       IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1, 0, "get_staWPAIE" },
   { QCSAP_IOCTL_SETWPAIE,
