@@ -346,17 +346,16 @@ static int hdd_netdev_notifier_call(struct notifier_block * nb,
    case NETDEV_GOING_DOWN:
         if( pAdapter->scan_info.mScanPending != FALSE )
         {
-           long result;
+           unsigned long rc;
            INIT_COMPLETION(pAdapter->scan_info.abortscan_event_var);
            hdd_abort_mac_scan(pAdapter->pHddCtx, pAdapter->sessionId);
-           result = wait_for_completion_interruptible_timeout(
+           rc = wait_for_completion_timeout(
                                &pAdapter->scan_info.abortscan_event_var,
                                msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-           if (result <= 0)
-           {
+           if (!rc) {
               VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                         "%s: Timeout occurred while waiting for abortscan %ld" ,
-                          __func__, result);
+                         "%s: Timeout occurred while waiting for abortscan" ,
+                          __func__);
            }
         }
         else
@@ -603,13 +602,12 @@ void hdd_checkandupdate_phymode( hdd_context_t *pHddCtx)
 
        if (VOS_STATUS_SUCCESS == vosStatus)
        {
-           long ret;
+           unsigned long rc;
 
-           ret = wait_for_completion_interruptible_timeout(&pAdapter->disconnect_comp_var,
+           rc = wait_for_completion_timeout(&pAdapter->disconnect_comp_var,
                       msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
-           if (ret <= 0)
-               hddLog(LOGE, FL("failure waiting for disconnect_comp_var %ld"),
-                               ret);
+           if (!rc)
+               hddLog(LOGE, FL("failure waiting for disconnect_comp_var"));
        }
 
    }
@@ -621,7 +619,7 @@ void hdd_checkandupdate_phymode( hdd_adapter_t *pAdapter, char *country_code)
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     hdd_config_t *cfg_param;
     eCsrPhyMode phyMode;
-    long ret;
+    unsigned long rc;
 
     if (NULL == pHddCtx)
     {
@@ -1622,11 +1620,10 @@ int hdd_return_batch_scan_rsp_to_user
                 rc = wait_for_completion_timeout(
                      &pAdapter->hdd_get_batch_scan_req_var,
                      msecs_to_jiffies(HDD_GET_BATCH_SCAN_RSP_TIME_OUT));
-                if (0 >= rc)
-                {
+                if (!rc) {
                     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                           "%s: wait on hdd_get_batch_scan_req_var failed %ld",
-                             __func__, rc);
+                           "%s: wait on hdd_get_batch_scan_req_var failed",
+                             __func__);
                     return -EFAULT;
                 }
             }
@@ -3158,7 +3155,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
        else if ( strncasecmp(command, "COUNTRY", 7) == 0 )
        {
            eHalStatus status;
-           long rc;
+           unsigned long rc;
            char *country_code;
 
            country_code = command + 8;
@@ -3177,11 +3174,10 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
                                     eSIR_TRUE, eSIR_TRUE);
            if (status == eHAL_STATUS_SUCCESS)
            {
-               rc = wait_for_completion_interruptible_timeout(
+               rc = wait_for_completion_timeout(
                        &pAdapter->change_country_code,
                        msecs_to_jiffies(WLAN_WAIT_TIME_COUNTRY));
-               if (0 >= rc)
-               {
+               if (!rc) {
                    hddLog(VOS_TRACE_LEVEL_ERROR,
                           "%s: SME while setting country code timed out",
                           __func__);
@@ -5321,7 +5317,7 @@ static VOS_STATUS  hdd_get_tsm_stats(hdd_adapter_t *pAdapter,
    hdd_station_ctx_t *pHddStaCtx = NULL;
    eHalStatus         hstatus;
    VOS_STATUS         vstatus = VOS_STATUS_SUCCESS;
-   long               lrc;
+   unsigned long      rc;
    struct statsContext context;
    hdd_context_t     *pHddCtx = NULL;
 
@@ -5354,13 +5350,12 @@ static VOS_STATUS  hdd_get_tsm_stats(hdd_adapter_t *pAdapter,
    else
    {
       /* request was sent -- wait for the response */
-      lrc = wait_for_completion_interruptible_timeout(&context.completion,
+      rc = wait_for_completion_timeout(&context.completion,
                                     msecs_to_jiffies(WLAN_WAIT_TIME_STATS));
-      if (lrc <= 0)
-      {
+      if (!rc) {
          hddLog(VOS_TRACE_LEVEL_ERROR,
-                "%s: SME %s while retrieving statistics",
-                __func__, (0 == lrc) ? "timeout" : "interrupt");
+                "%s: SME timed out while retrieving statistics",
+                __func__);
          vstatus = VOS_STATUS_E_TIMEOUT;
       }
    }
@@ -7345,7 +7340,7 @@ VOS_STATUS hdd_init_station_mode( hdd_adapter_t *pAdapter )
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    VOS_STATUS status = VOS_STATUS_E_FAILURE;
    tANI_U32 type, subType;
-   unsigned long rc = 0;
+   unsigned long rc;
    int ret_val;
 
    INIT_COMPLETION(pAdapter->session_open_comp_var);
@@ -7494,12 +7489,12 @@ void hdd_cleanup_actionframe( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
 
    if( NULL != cfgState->buf )
    {
-      long rc;
+      unsigned long rc;
       INIT_COMPLETION(pAdapter->tx_action_cnf_event);
-      rc = wait_for_completion_interruptible_timeout(
+      rc = wait_for_completion_timeout(
                      &pAdapter->tx_action_cnf_event,
                      msecs_to_jiffies(ACTION_FRAME_TX_TIMEOUT));
-      if (rc <= 0)
+      if (!rc)
       {
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
               "%s ERROR: HDD Wait for Action Confirmation Failed!! %ld",
@@ -7824,16 +7819,16 @@ VOS_STATUS hdd_disable_bmps_imps(hdd_context_t *pHddCtx, tANI_U8 session_type)
               {
                  if(halStatus == eHAL_STATUS_PMC_PENDING)
                  {
-                    long ret;
+                    unsigned long rc;
                     //Block on a completion variable. Can't wait forever though
-                    ret = wait_for_completion_interruptible_timeout(
+                    rc = wait_for_completion_timeout(
                                    &pHddCtx->full_pwr_comp_var,
                                    msecs_to_jiffies(1000));
-                    if (ret <= 0)
+                    if (!rc)
                     {
                         hddLog(VOS_TRACE_LEVEL_ERROR,
-                               "%s: wait on full_pwr_comp_var failed %ld",
-                               __func__, ret);
+                               "%s: wait on full_pwr_comp_var failed",
+                               __func__);
                     }
                  }
                  else
@@ -8381,7 +8376,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
    eHalStatus halStatus = eHAL_STATUS_SUCCESS;
    hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
    union iwreq_data wrqu;
-   long ret;
+   unsigned long rc;
 
    ENTER();
 
@@ -8405,14 +8400,14 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
             //success implies disconnect command got queued up successfully
             if(halStatus == eHAL_STATUS_SUCCESS)
             {
-               ret = wait_for_completion_interruptible_timeout(
+               rc = wait_for_completion_timeout(
                           &pAdapter->disconnect_comp_var,
                           msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
-               if (ret <= 0)
+               if (!rc)
                {
                    hddLog(VOS_TRACE_LEVEL_ERROR,
-                          "%s: wait on disconnect_comp_var failed %ld",
-                          __func__, ret);
+                          "%s: wait on disconnect_comp_var failed",
+                          __func__);
                }
 
             }
@@ -8451,14 +8446,14 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
                                  hdd_smeCloseSessionCallback, pAdapter))
             {
                //Block on a completion variable. Can't wait forever though.
-               ret = wait_for_completion_timeout(
+               rc = wait_for_completion_timeout(
                           &pAdapter->session_close_comp_var,
                           msecs_to_jiffies(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
-               if (0 >= ret)
+               if (!rc)
                {
                   hddLog(LOGE,
-                         "%s: failure waiting for session_close_comp_var %ld",
-                         __func__, ret);
+                         "%s: failure waiting for session_close_comp_var",
+                         __func__);
                }
             }
          }
@@ -8757,7 +8752,7 @@ VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx )
    hdd_adapter_t *pAdapter;
    VOS_STATUS status;
    v_U32_t roamId;
-   long ret;
+   unsigned long rc;
 
    ENTER();
 
@@ -8781,12 +8776,12 @@ VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx )
          sme_RoamDisconnect(pHddCtx->hHal, pAdapter->sessionId,
                              eCSR_DISCONNECT_REASON_UNSPECIFIED);
 
-         ret = wait_for_completion_interruptible_timeout(
+         rc = wait_for_completion_timeout(
                                 &pAdapter->disconnect_comp_var,
                                 msecs_to_jiffies(WLAN_WAIT_TIME_DISCONNECT));
-         if (0 >= ret)
-            hddLog(LOGE, "%s: failure waiting for disconnect_comp_var %ld",
-                   __func__, ret);
+         if (!rc)
+            hddLog(LOGE, "%s: failure waiting for disconnect_comp_var",
+                   __func__);
 
          pWextState->roamProfile.csrPersona = pAdapter->device_mode;
          pHddCtx->isAmpAllowed = VOS_FALSE;
@@ -9527,7 +9522,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    struct wiphy *wiphy = pHddCtx->wiphy;
    hdd_adapter_t* pAdapter;
    struct statsContext powerContext;
-   long lrc;
+   unsigned long rc;
 #if defined (QCA_WIFI_2_0) && \
     defined (QCA_WIFI_ISOC)
    adf_os_device_t adf_ctx;
@@ -9678,14 +9673,14 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
          if (eHAL_STATUS_PMC_PENDING == halStatus)
          {
             /* request was sent -- wait for the response */
-            lrc = wait_for_completion_interruptible_timeout(
+            rc = wait_for_completion_timeout(
                                         &powerContext.completion,
                                         msecs_to_jiffies(WLAN_WAIT_TIME_POWER));
-            if (lrc <= 0)
+            if (!rc)
             {
                hddLog(VOS_TRACE_LEVEL_ERROR,
                       "%s: %s while requesting full power",
-                      __func__, (0 == lrc) ? "timeout" : "interrupt");
+                      __func__, (0 == rc) ? "timeout" : "interrupt");
             }
          }
          else
@@ -10424,6 +10419,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    int ret;
    int i;
    struct wiphy *wiphy;
+   unsigned long rc;
 #ifdef QCA_WIFI_2_0
    adf_os_device_t adf_ctx;
 #endif
@@ -11009,13 +11005,12 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
             country_code, pAdapter, pHddCtx->pvosContext, eSIR_TRUE, eSIR_TRUE);
       if (eHAL_STATUS_SUCCESS == ret)
       {
-          ret = wait_for_completion_interruptible_timeout(
+          rc = wait_for_completion_timeout(
                 &pAdapter->change_country_code,
                 msecs_to_jiffies(WLAN_WAIT_TIME_COUNTRY));
-          if (0 >= ret)
-          {
+          if (!rc) {
               hddLog(VOS_TRACE_LEVEL_ERROR,
-                     "%s: SME while setting country code timed out", __func__);
+                   "%s: SME while setting country code timed out", __func__);
           }
       }
       else
@@ -11410,6 +11405,7 @@ static int hdd_driver_init( void)
 #ifdef HAVE_WCNSS_CAL_DOWNLOAD
    int max_retries = 0;
 #endif
+   unsigned long rc;
 
 #ifdef WCONN_TRACE_KMSG_LOG_BUFF
    vos_wconn_trace_init();
@@ -11514,11 +11510,12 @@ static int hdd_driver_init( void)
    init_completion(&wlan_start_comp);
    ret_status = hif_register_driver();
    if (!ret_status) {
-       ret_status = wait_for_completion_interruptible_timeout(
+       rc = wait_for_completion_timeout(
                            &wlan_start_comp,
                            msecs_to_jiffies(WLAN_WAIT_TIME_WLANSTART));
-       if (!ret_status) {
-           hif_unregister_driver();
+       if (!rc) {
+           hddLog(VOS_TRACE_LEVEL_FATAL,
+            "%s: timed-out waiting for hif_register_driver", __func__);
            ret_status = -1;
        } else
            ret_status = 0;
