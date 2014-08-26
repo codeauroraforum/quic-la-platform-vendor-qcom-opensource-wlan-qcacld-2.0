@@ -332,4 +332,7 @@ v_VOID_t vos_flush_delayed_work(v_VOID_t *dwork);
 v_BOOL_t vos_is_packet_log_enabled(void);
 
 v_U64_t vos_get_monotonic_boottime(void);
+
+void vos_trigger_recovery(void);
+
 #endif // if !defined __VOS_API_H
