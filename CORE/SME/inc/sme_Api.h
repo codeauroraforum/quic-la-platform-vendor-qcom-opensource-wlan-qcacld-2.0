@@ -3460,7 +3460,8 @@ eHalStatus sme_ConfigDisablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMo
 eHalStatus sme_PsOffloadEnablePowerSave (tHalHandle hHal, tANI_U32 sessionId);
 eHalStatus sme_PsOffloadDisablePowerSave (tHalHandle hHal, tANI_U32 sessionId);
 eHalStatus sme_PsOffloadEnableDeferredPowerSave (tHalHandle hHal,
-                                                 tANI_U32 sessionId);
+                                                 tANI_U32 sessionId,
+                                                 tANI_BOOLEAN isReassoc);
 eHalStatus sme_PsOffloadDisableDeferredPowerSave (tHalHandle hHal,
                                                   tANI_U32 sessionId);
 
@@ -3603,6 +3604,15 @@ v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal);
     \- return TRUE or FALSE
     -------------------------------------------------------------------------*/
 tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal);
+
+/* ---------------------------------------------------------------------------
+    \fn sme_PsOffloadIsStaInPowerSave
+    \brief  This function returns TRUE if STA is in power save
+    \param  hHal - HAL handle for device
+    \param  sessionId - Session Identifier
+    \- return TRUE or FALSE
+    -------------------------------------------------------------------------*/
+tANI_BOOLEAN sme_PsOffloadIsStaInPowerSave(tHalHandle hHal, tANI_U8 sessionId);
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 /* ---------------------------------------------------------------------------
