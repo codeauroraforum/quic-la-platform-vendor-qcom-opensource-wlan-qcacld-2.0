@@ -558,10 +558,10 @@ static u_int8_t* get_wmi_cmd_string(WMI_CMD_ID wmi_command)
 		CASE_RETURN_STRING(WMI_PDEV_SET_LED_CONFIG_CMDID);
 		CASE_RETURN_STRING(WMI_HOST_AUTO_SHUTDOWN_CFG_CMDID);
 		CASE_RETURN_STRING(WMI_CHAN_AVOID_UPDATE_CMDID);
-		CASE_RETURN_STRING(WMI_WOW_ACER_IOAC_ADD_KEEPALIVE_CMDID);
-		CASE_RETURN_STRING(WMI_WOW_ACER_IOAC_DEL_KEEPALIVE_CMDID);
-		CASE_RETURN_STRING(WMI_WOW_ACER_IOAC_ADD_WAKE_PATTERN_CMDID);
-		CASE_RETURN_STRING(WMI_WOW_ACER_IOAC_DEL_WAKE_PATTERN_CMDID);
+		CASE_RETURN_STRING(WMI_WOW_IOAC_ADD_KEEPALIVE_CMDID);
+		CASE_RETURN_STRING(WMI_WOW_IOAC_DEL_KEEPALIVE_CMDID);
+		CASE_RETURN_STRING(WMI_WOW_IOAC_ADD_WAKE_PATTERN_CMDID);
+		CASE_RETURN_STRING(WMI_WOW_IOAC_DEL_WAKE_PATTERN_CMDID);
 		CASE_RETURN_STRING(WMI_REQUEST_LINK_STATS_CMDID);
 		CASE_RETURN_STRING(WMI_START_LINK_STATS_CMDID);
 		CASE_RETURN_STRING(WMI_CLEAR_LINK_STATS_CMDID);
@@ -582,6 +582,8 @@ static u_int8_t* get_wmi_cmd_string(WMI_CMD_ID wmi_command)
 		CASE_RETURN_STRING(WMI_EXTWOW_SET_APP_TYPE1_PARAMS_CMDID);
 		CASE_RETURN_STRING(WMI_EXTWOW_SET_APP_TYPE2_PARAMS_CMDID);
 		CASE_RETURN_STRING(WMI_UNIT_TEST_CMDID);
+		CASE_RETURN_STRING(WMI_ROAM_SET_RIC_REQUEST_CMDID);
+		CASE_RETURN_STRING(WMI_PDEV_GET_TEMPERATURE_CMDID);
 	}
 	return "Invalid WMI cmd";
 }
@@ -791,8 +793,7 @@ void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 	int tlv_ok_status = 0;
 #endif /* QCA_CONFIG_SMP */
 
-#if (!defined(QCA_WIFI_ISOC) && defined(WMI_INTERFACE_EVENT_LOGGING)) ||\
-		!defined(QCA_CONFIG_SMP)
+#if  defined(WMI_INTERFACE_EVENT_LOGGING) || !defined(QCA_CONFIG_SMP)
 	u_int32_t id;
 	u_int8_t *data;
 #endif
@@ -833,9 +834,6 @@ void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 	}
 #endif /* QCA_CONFIG_SMP */
 
-#ifdef QCA_WIFI_ISOC
-	__wmi_control_rx(wmi_handle, evt_buf);
-#else
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 	id = WMI_GET_FIELD(adf_nbuf_data(evt_buf), WMI_CMD_HDR, COMMANDID);
 	data = adf_nbuf_data(evt_buf);
@@ -849,7 +847,6 @@ void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 	adf_nbuf_queue_add(&wmi_handle->event_queue, evt_buf);
 	adf_os_spin_unlock_bh(&wmi_handle->eventq_lock);
 	schedule_work(&wmi_handle->rx_event_work);
-#endif
 }
 
 void __wmi_control_rx(struct wmi_unified *wmi_handle, wmi_buf_t evt_buf)
@@ -924,7 +921,6 @@ end:
 	adf_nbuf_free(evt_buf);
 }
 
-#ifndef QCA_WIFI_ISOC
 void wmi_rx_event_work(struct work_struct *work)
 {
 	struct wmi_unified *wmi = container_of(work, struct wmi_unified,
@@ -941,7 +937,6 @@ void wmi_rx_event_work(struct work_struct *work)
 		adf_os_spin_unlock_bh(&wmi->eventq_lock);
 	}
 }
-#endif
 
 /* WMI Initialization functions */
 
@@ -958,14 +953,12 @@ wmi_unified_attach(ol_scn_t scn_handle, wma_wow_tx_complete_cbk func)
     wmi_handle->scn_handle = scn_handle;
     adf_os_atomic_init(&wmi_handle->pending_cmds);
     adf_os_atomic_init(&wmi_handle->is_target_suspended);
-#ifndef QCA_WIFI_ISOC
     adf_os_spinlock_init(&wmi_handle->eventq_lock);
     adf_nbuf_queue_init(&wmi_handle->event_queue);
 #ifdef CONFIG_CNSS
     cnss_init_work(&wmi_handle->rx_event_work, wmi_rx_event_work);
 #else
     INIT_WORK(&wmi_handle->rx_event_work, wmi_rx_event_work);
-#endif
 #endif
 #ifdef WMI_INTERFACE_EVENT_LOGGING
     adf_os_spinlock_init(&wmi_handle->wmi_record_lock);
@@ -977,7 +970,6 @@ wmi_unified_attach(ol_scn_t scn_handle, wma_wow_tx_complete_cbk func)
 void
 wmi_unified_detach(struct wmi_unified* wmi_handle)
 {
-#ifndef QCA_WIFI_ISOC
     wmi_buf_t buf;
 
     vos_flush_work(&wmi_handle->rx_event_work);
@@ -988,7 +980,6 @@ wmi_unified_detach(struct wmi_unified* wmi_handle)
 	buf = adf_nbuf_queue_remove(&wmi_handle->event_queue);
     }
     adf_os_spin_unlock_bh(&wmi_handle->eventq_lock);
-#endif
     if (wmi_handle != NULL) {
         OS_FREE(wmi_handle);
         wmi_handle = NULL;

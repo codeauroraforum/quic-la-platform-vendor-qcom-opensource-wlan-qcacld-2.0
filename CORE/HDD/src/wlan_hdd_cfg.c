@@ -2328,36 +2328,6 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_VOS_TRACE_ENABLE_MIN,
                  CFG_VOS_TRACE_ENABLE_MAX ),
 
-   /* note that since the default value is out of range we cannot
-      enable range check, otherwise we get a system log message */
-   REG_VARIABLE( CFG_WDI_TRACE_ENABLE_DAL_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, wdiTraceEnableDAL,
-                 VAR_FLAGS_OPTIONAL,
-                 CFG_WDI_TRACE_ENABLE_DEFAULT,
-                 CFG_WDI_TRACE_ENABLE_MIN,
-                 CFG_WDI_TRACE_ENABLE_MAX ),
-
-   REG_VARIABLE( CFG_WDI_TRACE_ENABLE_CTL_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, wdiTraceEnableCTL,
-                 VAR_FLAGS_OPTIONAL,
-                 CFG_WDI_TRACE_ENABLE_DEFAULT,
-                 CFG_WDI_TRACE_ENABLE_MIN,
-                 CFG_WDI_TRACE_ENABLE_MAX ),
-
-   REG_VARIABLE( CFG_WDI_TRACE_ENABLE_DAT_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, wdiTraceEnableDAT,
-                 VAR_FLAGS_OPTIONAL,
-                 CFG_WDI_TRACE_ENABLE_DEFAULT,
-                 CFG_WDI_TRACE_ENABLE_MIN,
-                 CFG_WDI_TRACE_ENABLE_MAX ),
-
-   REG_VARIABLE( CFG_WDI_TRACE_ENABLE_PAL_NAME, WLAN_PARAM_Integer,
-                 hdd_config_t, wdiTraceEnablePAL,
-                 VAR_FLAGS_OPTIONAL,
-                 CFG_WDI_TRACE_ENABLE_DEFAULT,
-                 CFG_WDI_TRACE_ENABLE_MIN,
-                 CFG_WDI_TRACE_ENABLE_MAX ),
-
    REG_VARIABLE( CFG_TELE_BCN_TRANS_LI_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nTeleBcnTransListenInterval,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3793,12 +3763,29 @@ REG_TABLE_ENTRY g_registry_table[] =
                CFG_ENABLE_LPASS_SUPPORT_MIN,
                CFG_ENABLE_LPASS_SUPPORT_MAX),
 #endif
+
    REG_VARIABLE( CFG_ENABLE_SELF_RECOVERY, WLAN_PARAM_Integer,
               hdd_config_t, enableSelfRecovery,
               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
               CFG_ENABLE_SELF_RECOVERY_DEFAULT,
               CFG_ENABLE_SELF_RECOVERY_MIN,
               CFG_ENABLE_SELF_RECOVERY_MAX ),
+
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+   REG_VARIABLE(CFG_SAP_SCC_CHAN_AVOIDANCE, WLAN_PARAM_Integer,
+                 hdd_config_t, SapSccChanAvoidance,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_SAP_SCC_CHAN_AVOIDANCE_DEFAULT,
+                 CFG_SAP_SCC_CHAN_AVOIDANCE_MIN,
+                 CFG_SAP_SCC_CHAN_AVOIDANCE_MAX),
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
+
+   REG_VARIABLE( CFG_ENABLE_SAP_SUSPEND, WLAN_PARAM_Integer,
+               hdd_config_t, enableSapSuspend,
+               VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+               CFG_ENABLE_SAP_SUSPEND_DEFAULT,
+               CFG_ENABLE_SAP_SUSPEND_MIN,
+               CFG_ENABLE_SAP_SUSPEND_MAX ),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -4336,9 +4323,14 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
             "Name = [gEnableLpassSupport] Value = [%u] ",
             pHddCtx->cfg_ini->enablelpasssupport);
 #endif
+
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
            "Name = [gEnableSelfRecovery] Value = [%u]",
                    pHddCtx->cfg_ini->enableSelfRecovery);
+
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+            "Name = [gEnableSapSuspend] Value = [%u]",
+            pHddCtx->cfg_ini->enableSapSuspend);
 }
 
 #define CFG_VALUE_MAX_LEN 256

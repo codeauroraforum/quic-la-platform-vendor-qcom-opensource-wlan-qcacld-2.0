@@ -1404,7 +1404,7 @@ typedef enum
 #define CFG_BAND_CAPABILITY_NAME          "BandCapability"
 #define CFG_BAND_CAPABILITY_MIN           (0)
 #define CFG_BAND_CAPABILITY_MAX           (2)
-#define CFG_BAND_CAPABILITY_DEFAULT       (1)
+#define CFG_BAND_CAPABILITY_DEFAULT       (0)
 
 #define CFG_ENABLE_BEACON_EARLY_TERMINATION_NAME          "enableBeaconEarlyTermination"
 #define CFG_ENABLE_BEACON_EARLY_TERMINATION_MIN           ( 0 )
@@ -1607,6 +1607,13 @@ typedef enum
 #define CFG_ENABLE_GREEN_AP_FEATURE_DEFAULT ( 1 )
 #endif
 
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+#define CFG_SAP_SCC_CHAN_AVOIDANCE         "gSapSccChanAvoidance"
+#define CFG_SAP_SCC_CHAN_AVOIDANCE_MIN     ( 0 )
+#define CFG_SAP_SCC_CHAN_AVOIDANCE_MAX     ( 1 )
+#define CFG_SAP_SCC_CHAN_AVOIDANCE_DEFAULT ( 0 )
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
+
 /*
  * VOS Trace Enable Control
  * Notes:
@@ -1644,33 +1651,6 @@ typedef enum
 #define CFG_VOS_TRACE_ENABLE_MIN          (0)
 #define CFG_VOS_TRACE_ENABLE_MAX          (0xff)
 #define CFG_VOS_TRACE_ENABLE_DEFAULT      (0xffff)
-
-/*
- * WDI Trace Enable Control
- * Notes:
- *  the MIN/MAX/DEFAULT values apply for all modules
- *  the DEFAULT value is outside the valid range.  if the DEFAULT
- *    value is not overridden, then no change will be made to the
- *    "built in" default values compiled into the code
- *  values are a bitmap indicating which log levels are to enabled
- *    (must match order of wpt_tracelevel enumerations)
- *    00000001  FATAL
- *    00000010  ERROR
- *    00000100  WARN
- *    00001000  INFO
- *    00010000  INFO HIGH
- *    00100000  INFO MED
- *    01000000  INFO LOW
- *
- *  hence a value of 0x7F would set all bits (enable all logs)
- */
-#define CFG_WDI_TRACE_ENABLE_DAL_NAME     "wdiTraceEnableDAL"
-#define CFG_WDI_TRACE_ENABLE_CTL_NAME     "wdiTraceEnableCTL"
-#define CFG_WDI_TRACE_ENABLE_DAT_NAME     "wdiTraceEnableDAT"
-#define CFG_WDI_TRACE_ENABLE_PAL_NAME     "wdiTraceEnablePAL"
-#define CFG_WDI_TRACE_ENABLE_MIN          (0)
-#define CFG_WDI_TRACE_ENABLE_MAX          (0x7f)
-#define CFG_WDI_TRACE_ENABLE_DEFAULT      (0xffffffff)
 
 #define HDD_MCASTBCASTFILTER_FILTER_NONE                       0x00
 #define HDD_MCASTBCASTFILTER_FILTER_ALL_MULTICAST              0x01
@@ -2089,8 +2069,8 @@ typedef enum
 
 #define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED         "gTxBFCsnValue"
 #define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_MIN     ( WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMIN )
-#define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_MAX     ( WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMAX )
-#define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_DEFAULT ( WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMAX - 1)
+#define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_MAX     ( WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMAX - 1 )
+#define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_DEFAULT ( WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMAX - 1 )
 
 #define CFG_VHT_ENABLE_TXBF_IN_20MHZ               "gEnableTxBFin20MHz"
 #define CFG_VHT_ENABLE_TXBF_IN_20MHZ_MIN           ( 0 )
@@ -2728,6 +2708,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_SELF_RECOVERY_MAX               ( 1 )
 #define CFG_ENABLE_SELF_RECOVERY_DEFAULT           ( 0 )
 
+#define CFG_ENABLE_SAP_SUSPEND                     "gEnableSapSuspend"
+#define CFG_ENABLE_SAP_SUSPEND_MIN                 ( 0 )
+#define CFG_ENABLE_SAP_SUSPEND_MAX                 ( 1 )
+#define CFG_ENABLE_SAP_SUSPEND_DEFAULT             ( 1 )
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3040,11 +3025,6 @@ typedef struct
    v_U16_t                     vosTraceEnableSAP;
    v_U16_t                     vosTraceEnableHDDSAP;
 
-   /* WDI Trace Control */
-   v_U32_t                     wdiTraceEnableDAL;
-   v_U32_t                     wdiTraceEnableCTL;
-   v_U32_t                     wdiTraceEnableDAT;
-   v_U32_t                     wdiTraceEnablePAL;
    v_U16_t                     nTeleBcnTransListenInterval;
    v_U16_t                     nTeleBcnMaxListenInterval;
    v_U16_t                     nTeleBcnTransLiNumIdleBeacons;
@@ -3313,7 +3293,14 @@ typedef struct
 #ifdef WLAN_FEATURE_LPSS
    v_BOOL_t                    enablelpasssupport;
 #endif
+
    v_BOOL_t                    enableSelfRecovery;
+
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+   v_U8_t                      SapSccChanAvoidance;
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
+
+   v_BOOL_t                    enableSapSuspend;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

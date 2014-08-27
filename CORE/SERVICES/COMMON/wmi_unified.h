@@ -238,6 +238,8 @@ typedef enum {
     WMI_PDEV_DUMP_CMDID,
      /* set LED configuration  */
     WMI_PDEV_SET_LED_CONFIG_CMDID,
+    /* Get Current temprature of chip in Celcius degree*/
+    WMI_PDEV_GET_TEMPERATURE_CMDID,
 
     /* VDEV(virtual device) specific commands */
     /** vdev create */
@@ -366,6 +368,8 @@ typedef enum {
     WMI_ROAM_SCAN_CMD,
     /** roaming sme offload sync complete */
     WMI_ROAM_SYNCH_COMPLETE,
+    /** set ric request element for 11r roaming */
+    WMI_ROAM_SET_RIC_REQUEST_CMDID,
 
     /** offload scan specific commands */
     /** set offload scan AP profile   */
@@ -436,14 +440,14 @@ typedef enum {
     WMI_WOW_ENABLE_CMDID,
     /** host woke up from sleep event to FW. Generated in response to WOW Hardware event */
     WMI_WOW_HOSTWAKEUP_FROM_SLEEP_CMDID,
-    /* Acer IOAC add keep alive cmd. */
-    WMI_WOW_ACER_IOAC_ADD_KEEPALIVE_CMDID,
-    /* Acer IOAC del keep alive cmd. */
-    WMI_WOW_ACER_IOAC_DEL_KEEPALIVE_CMDID,
-    /* Acer IOAC add pattern for awake */
-    WMI_WOW_ACER_IOAC_ADD_WAKE_PATTERN_CMDID,
-    /* Acer IOAC deleta a wake pattern */
-    WMI_WOW_ACER_IOAC_DEL_WAKE_PATTERN_CMDID,
+    /* IOAC add keep alive cmd. */
+    WMI_WOW_IOAC_ADD_KEEPALIVE_CMDID,
+    /* IOAC del keep alive cmd. */
+    WMI_WOW_IOAC_DEL_KEEPALIVE_CMDID,
+    /* IOAC add pattern for awake */
+    WMI_WOW_IOAC_ADD_WAKE_PATTERN_CMDID,
+    /* IOAC deleta a wake pattern */
+    WMI_WOW_IOAC_DEL_WAKE_PATTERN_CMDID,
     /* D0-WOW enable or disable cmd */
     WMI_D0_WOW_ENABLE_DISABLE_CMDID,
     /* enable extend WoW */
@@ -700,6 +704,9 @@ typedef enum {
     /** track L1SS entry and residency event */
     WMI_PDEV_L1SS_TRACK_EVENTID,
 
+    /** Report current temprature of the chip in Celcius degree */
+    WMI_PDEV_TEMPERATURE_EVENTID,
+
     /* VDEV specific events */
     /** VDEV started event in response to VDEV_START request */
     WMI_VDEV_START_RESP_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_VDEV),
@@ -864,6 +871,11 @@ typedef enum {
 
     /*update mib counters together with WMI_UPDATE_STATS_EVENTID*/
     WMI_UPDATE_WHAL_MIB_STATS_EVENTID,
+
+    /*update ht/vht info based on vdev (rx and tx NSS and preamble)*/
+    WMI_UPDATE_VDEV_RATE_STATS_EVENTID,
+
+    WMI_DIAG_EVENTID,
 
     /* GPIO Event */
     WMI_GPIO_INPUT_EVENTID=WMI_EVT_GRP_START_ID(WMI_GRP_GPIO),
@@ -1808,6 +1820,14 @@ typedef struct {
     A_UINT32 vdev_id;
 } wmi_scan_event_fixed_param;
 
+/* WMI Diag event */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag is WMITLV_TAG_STRUC_wmi_diag_event_fixed_param */
+    A_UINT32 time_stamp; /* Reference timestamp. diag frame contains diff value */
+    A_UINT32 count;   /* Number of diag frames added to current event */
+    A_UINT32 dropped;
+    /* followed by WMITLV_TAG_ARRAY_BYTE */
+} wmi_diag_event_fixed_param;
 
 /*
 * If FW has multiple active channels due to MCC(multi channel concurrency),
@@ -2334,6 +2354,10 @@ typedef enum {
     WMI_PDEV_PARAM_AUDIO_OVER_WLAN_LATENCY,
     /** set DIRECT AUDIO Feature ENABLE */
     WMI_PDEV_PARAM_AUDIO_OVER_WLAN_ENABLE,
+    /** pdev level whal mib stats update enable */
+    WMI_PDEV_PARAM_WHAL_MIB_STATS_UPDATE_ENABLE,
+    /** ht/vht info based on vdev */
+    WMI_PDEV_PARAM_VDEV_RATE_STATS_UPDATE_PERIOD,
 } WMI_PDEV_PARAM;
 
 typedef enum {
@@ -2656,6 +2680,7 @@ typedef enum {
     WMI_REQUEST_PDEV_STAT = 0x04,
     WMI_REQUEST_VDEV_STAT = 0x08,
     WMI_REQUEST_BCNFLT_STAT = 0x10,
+    WMI_REQUEST_VDEV_RATE_STAT = 0x20,
 } wmi_stats_id;
 
 typedef struct {
@@ -3005,7 +3030,21 @@ typedef struct {
 } wmi_pdev_resume_cmd_fixed_param;
 
 typedef struct {
-    A_UINT32   tlv_header;     /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_stats_event_fixed_param */
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_vdev_rate_stats_event_fixed_param,  */
+    A_UINT32 num_vdev_stats; /* number of vdevs */
+}wmi_vdev_rate_stats_event_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len, tag equals WMITLV_TAG_STRUC_wmi_vdev_rate_ht_info*/
+    A_UINT32 vdevid; /* Id of the wlan vdev*/
+    A_UINT32 tx_nss; /* Bit 28 of tx_rate_kbps has this info - based on last data packet transmitted*/
+    A_UINT32 rx_nss; /* Bit 24 of rx_rate_kbps - same as above*/
+    A_UINT32 tx_preamble; /* Bits 30-29 from tx_rate_kbps */
+    A_UINT32 rx_preamble; /* Bits 26-25 from rx_rate_kbps */
+} wmi_vdev_rate_ht_info;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_stats_event_fixed_param */
     wmi_stats_id stats_id;
     /** number of pdev stats event structures (wmi_pdev_stats) 0 or 1 */
     A_UINT32 num_pdev_stats;
@@ -5036,6 +5075,7 @@ typedef struct {
     A_UINT32 tlv_header;     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_roam_11i_offload_fixed_param */
     A_UINT32 flags;          /** flags. see WMI_ROAM_OFFLOAD_FLAG_ above */
     A_UINT32 pmk[ROAM_OFFLOAD_PMK_BYTES>>2]; /* pmk offload. As this 4 byte aligned, we don't declare it as tlv array */
+    A_UINT32 pmk_len; /**the length of pmk. in normal case it should be 32, but for LEAP, is should be 16*/
 } wmi_roam_11i_offload_tlv_param;
 
 /* This TLV will be  filled only in case of 11R*/
@@ -5046,6 +5086,7 @@ typedef struct {
     A_UINT32 r0kh_id[ROAM_OFFLOAD_R0KH_ID_MAX_LEN>>2];
     A_UINT32 r0kh_id_len;
     A_UINT32 psk_msk[ROAM_OFFLOAD_PSK_MSK_BYTES>>2]; /* psk/msk offload. As this 4 byte aligned, we don't declare it as tlv array */
+    A_UINT32 psk_msk_len; /**length of psk_msk*/
 } wmi_roam_11r_offload_tlv_param;
 
 /* This TLV will be filled only in case of ESE */
@@ -5081,6 +5122,39 @@ typedef struct {
                                           WMI_ROAM_AP_PROFILE, found during scan
                                           triggered upon FINAL_BMISS **/
 #define WMI_ROAM_REASON_HO_FAILED 0x5  /** LFR3.0 roaming failed, indicate the disconnection to host */
+
+/**whenever RIC request information change, host driver should pass all ric related information to firmware (now only support tsepc)
+* Once, 11r roaming happens, firmware can generate RIC request in reassoc request based on these informations
+*/
+typedef struct
+{
+    A_UINT32 tlv_header;      /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_ric_request_fixed_param */
+	A_UINT32 vdev_id;         /**unique id identifying the VDEV, generated by the caller*/
+    A_UINT32 num_ric_request; /**number of ric request ie send to firmware.(max value is 2 now)*/
+}wmi_ric_request_fixed_param;
+
+/**tspec element: refer to 8.4.2.32 of 802.11 2012 spec
+* these elements are used to construct tspec field in RIC request, which allow station to require specific TS when 11r roaming
+*/
+typedef struct{
+    A_UINT32                         tlv_header;
+    A_UINT32                         ts_info; /** bits value of TS Info field.*/
+    A_UINT32                         nominal_msdu_size; /**Nominal MSDU Size field*/
+    A_UINT32                         maximum_msdu_size; /**The Maximum MSDU Size field*/
+    A_UINT32                         min_service_interval; /**The Minimum Service Interval field*/
+    A_UINT32                         max_service_interval; /**The Maximum Service Interval field*/
+    A_UINT32                         inactivity_interval; /**The Inactivity Interval field*/
+    A_UINT32                         suspension_interval; /**The Suspension Interval field*/
+    A_UINT32                         svc_start_time; /**The Service Start Time field*/
+    A_UINT32                         min_data_rate; /**The Minimum Data Rate field*/
+    A_UINT32                         mean_data_rate; /**The Mean Data Rate field*/
+    A_UINT32                         peak_data_rate; /**The Peak Data Rate field*/
+    A_UINT32                         max_burst_size; /**The Burst Size field*/
+    A_UINT32                         delay_bound; /**The Delay Bound field*/
+    A_UINT32                         min_phy_rate; /**The Minimum PHY Rate field*/
+    A_UINT32                         surplus_bw_allowance; /**The Surplus Bandwidth Allowance field*/
+    A_UINT32                         medium_time; /**The Medium Time field,in units of 32 us/s.*/
+} wmi_ric_tspec;
 
 /** WMI_PROFILE_MATCH_EVENT: offload scan
  * generated when ever atleast one of the matching profiles is found
@@ -5309,16 +5383,16 @@ when comparing wifi header.*/
 #define WOW_DEFAULT_BITMASK_SIZE_DWORD        37
 #define WOW_MAX_BITMAP_FILTERS               32
 #define WOW_DEFAULT_MAGIG_PATTERN_MATCH_CNT  16
-#define WOW_ACER_EXTEND_PATTERN_MATCH_CNT    16
-#define WOW_ACER_SHORT_PATTERN_MATCH_CNT     8
+#define WOW_EXTEND_PATTERN_MATCH_CNT         16
+#define WOW_SHORT_PATTERN_MATCH_CNT           8
 #define WOW_DEFAULT_EVT_BUF_SIZE             148  /* Maximum 148 bytes of the data is copied starting from header incase if the match is found.
                                                                                     The 148 comes from (128 - 14 )  payload size  + 8bytes LLC + 26bytes MAC header*/
-#define WOW_DEFAULT_ACER_IOAC_PATTERN_SIZE  6
-#define WOW_DEFAULT_ACER_IOAC_PATTERN_SIZE_DWORD 2
-#define WOW_DEFAULT_ACER_IOAC_RANDOM_SIZE  6
-#define WOW_DEFAULT_ACER_IOAC_RANDOM_SIZE_DWORD 2
-#define WOW_DEFAULT_ACER_IOAC_KEEP_ALIVE_PKT_SIZE   120
-#define WOW_DEFAULT_ACER_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD 30
+#define WOW_DEFAULT_IOAC_PATTERN_SIZE  6
+#define WOW_DEFAULT_IOAC_PATTERN_SIZE_DWORD 2
+#define WOW_DEFAULT_IOAC_RANDOM_SIZE  6
+#define WOW_DEFAULT_IOAC_RANDOM_SIZE_DWORD 2
+#define WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_SIZE   120
+#define WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD 30
 
 typedef enum pattern_type_e {
     WOW_PATTERN_MIN = 0,
@@ -5329,8 +5403,8 @@ typedef enum pattern_type_e {
     WOW_TIMER_PATTERN,
     WOW_MAGIC_PATTERN,
     WOW_IPV6_RA_PATTERN,
-    WOW_ACER_IOAC_PKT_PATTERN,
-    WOW_ACER_IOAC_TMR_PATTERN,
+    WOW_IOAC_PKT_PATTERN,
+    WOW_IOAC_TMR_PATTERN,
     WOW_PATTERN_MAX
 }WOW_PATTERN_TYPE;
 
@@ -5352,10 +5426,10 @@ typedef enum event_type_e {
     WOW_HTT_EVENT,
     WOW_RA_MATCH_EVENT,
     WOW_HOST_AUTO_SHUTDOWN_EVENT,
-    WOW_ACER_IOAC_MAGIC_EVENT,
-    WOW_ACER_IOAC_SHORT_EVENT,
-    WOW_ACER_IOAC_EXTEND_EVENT,
-    WOW_ACER_IOAC_TIMER_EVENT,
+    WOW_IOAC_MAGIC_EVENT,
+    WOW_IOAC_SHORT_EVENT,
+    WOW_IOAC_EXTEND_EVENT,
+    WOW_IOAC_TIMER_EVENT,
     WOW_DFS_PHYERR_RADAR_EVENT,
     WOW_BEACON_EVENT,
 }WOW_WAKE_EVENT_TYPE;
@@ -5382,10 +5456,10 @@ typedef enum wake_reason_e {
     WOW_REASON_HTT_EVENT,
     WOW_REASON_RA_MATCH,
     WOW_REASON_HOST_AUTO_SHUTDOWN,
-    WOW_REASON_ACER_IOAC_MAGIC_EVENT,
-    WOW_REASON_ACER_IOAC_SHORT_EVENT,
-    WOW_REASON_ACER_IOAC_EXTEND_EVENT,
-    WOW_REASON_ACER_IOAC_TIMER_EVENT,
+    WOW_REASON_IOAC_MAGIC_EVENT,
+    WOW_REASON_IOAC_SHORT_EVENT,
+    WOW_REASON_IOAC_EXTEND_EVENT,
+    WOW_REASON_IOAC_TIMER_EVENT,
     WOW_REASON_ROAM_HO,
     WOW_REASON_DFS_PHYERR_RADADR_EVENT,
     WOW_REASON_BEACON_RECV,
@@ -5441,20 +5515,20 @@ typedef enum wow_ioac_pattern_type {
     WOW_IOAC_EXTEND_PATTERN,
 } WOW_IOAC_PATTERN_TYPE;
 
-typedef struct acer_ioac_pkt_pattern_s {
-    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_ACER_IOAC_PKT_PATTERN_T */
+typedef struct ioac_pkt_pattern_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_IOAC_PKT_PATTERN_T */
     A_UINT32 pattern_type;
-    A_UINT32 pattern[WOW_DEFAULT_ACER_IOAC_PATTERN_SIZE_DWORD];
-    A_UINT32 random[WOW_DEFAULT_ACER_IOAC_RANDOM_SIZE_DWORD];
+    A_UINT32 pattern[WOW_DEFAULT_IOAC_PATTERN_SIZE_DWORD];
+    A_UINT32 random[WOW_DEFAULT_IOAC_RANDOM_SIZE_DWORD];
     A_UINT32 pattern_len;
     A_UINT32 random_len;
-} WOW_ACER_IOAC_PKT_PATTERN_T;
+} WOW_IOAC_PKT_PATTERN_T;
 
-typedef struct acer_ioac_tmr_pattern_s {
-    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_ACER_IOAC_TMR_PATTERN_T */
+typedef struct ioac_tmr_pattern_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_IOAC_TMR_PATTERN_T */
     A_UINT32 wake_in_s;
     A_UINT32 vdev_id;
-} WOW_ACER_IOAC_TMR_PATTERN_T;
+} WOW_IOAC_TMR_PATTERN_T;
 
 typedef struct {
     A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_KEEPALIVE_CMD_fixed_param */
@@ -5466,32 +5540,32 @@ typedef struct {
     A_UINT32 nID;
 } WMI_WOW_IOAC_DEL_KEEPALIVE_CMD_fixed_param;
 
-typedef struct acer_ioac_keepalive_s {
-    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_IOAC_KEEPALIVE_T */
-    A_UINT32 keepalive_pkt_buf[WOW_DEFAULT_ACER_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD];
+typedef struct ioac_keepalive_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_KEEPALIVE_T */
+    A_UINT32 keepalive_pkt_buf[WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD];
     A_UINT32 keepalive_pkt_len;
     A_UINT32 period_in_ms;
     A_UINT32 vdev_id;
-} WOW_IOAC_KEEPALIVE_T;
+} WMI_WOW_IOAC_KEEPALIVE_T;
 
 typedef struct {
-    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param */
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_PATTERN_CMD_fixed_param */
     A_UINT32 vdev_id;
     A_UINT32 pattern_type;
 /*
  * Following this struct are these TLVs. Note that they are all array of structures
  * but can have at most one element. Which TLV is empty or has one element depends
  * on the field pattern_type. This is to emulate an union.
- *     WOW_ACER_IOAC_PKT_PATTERN_T pattern_info_acer_pkt[];
- *     WOW_ACER_IOAC_TMR_PATTERN_T pattern_info_acer_tmr[];
+ *     WOW_IOAC_PKT_PATTERN_T pattern_info_pkt[];
+ *     WOW_IOAC_TMR_PATTERN_T pattern_info_tmr[];
  */
-} WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param;
+} WMI_WOW_IOAC_ADD_PATTERN_CMD_fixed_param;
 
 typedef struct {
-    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param */
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param */
     A_UINT32 vdev_id;
     A_UINT32 pattern_type;
-} WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param;
+} WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param;
 
 typedef struct {
     A_UINT32        tlv_header;     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_ADD_PATTERN_CMD_fixed_param */
@@ -5920,14 +5994,23 @@ typedef enum _WMI_NLO_CIPHER_ALGORITHM {
     WMI_NLO_CIPHER_ALGO_WEP            = 0x101,
 } WMI_NLO_CIPHER_ALGORITHM;
 
+/* SSID broadcast  type passed in NLO params */
+typedef enum _WMI_NLO_SSID_BcastNwType
+{
+  WMI_NLO_BCAST_UNKNOWN      = 0,
+  WMI_NLO_BCAST_NORMAL       = 1,
+  WMI_NLO_BCAST_HIDDEN       = 2,
+} WMI_NLO_SSID_BcastNwType;
+
 #define WMI_NLO_MAX_SSIDS    16
 #define WMI_NLO_MAX_CHAN     48
 
-#define WMI_NLO_CONFIG_STOP      (0x1 << 0)
-#define WMI_NLO_CONFIG_START     (0x1 << 1)
-#define WMI_NLO_CONFIG_RESET     (0x1 << 2)
-#define WMI_NLO_CONFIG_SLOW_SCAN (0x1 << 4)
-#define WMI_NLO_CONFIG_FAST_SCAN (0x1 << 5)
+#define WMI_NLO_CONFIG_STOP             (0x1 << 0)
+#define WMI_NLO_CONFIG_START            (0x1 << 1)
+#define WMI_NLO_CONFIG_RESET            (0x1 << 2)
+#define WMI_NLO_CONFIG_SLOW_SCAN        (0x1 << 4)
+#define WMI_NLO_CONFIG_FAST_SCAN        (0x1 << 5)
+#define WMI_NLO_CONFIG_SSID_HIDE_EN     (0x1 << 6)
 
 /* NOTE: wmi_nlo_ssid_param structure can't be changed without breaking the compatibility */
 typedef struct wmi_nlo_ssid_param
@@ -5949,6 +6032,14 @@ typedef struct wmi_nlo_auth_param
 	A_UINT32 valid;
     A_UINT32 auth_type;
 } wmi_nlo_auth_param;
+
+/* NOTE: wmi_nlo_bcast_nw_param structure can't be changed without breaking the compatibility */
+typedef struct wmi_nlo_bcast_nw_param
+{
+    A_UINT32 valid;
+    A_UINT32 bcast_nw_type;
+} wmi_nlo_bcast_nw_param;
+
 /* NOTE: wmi_nlo_rssi_param structure can't be changed without breaking the compatibility */
 typedef struct wmi_nlo_rssi_param
 {
@@ -5962,6 +6053,7 @@ typedef struct nlo_configured_parameters {
     wmi_nlo_enc_param enc_type;
     wmi_nlo_auth_param auth_type;
     wmi_nlo_rssi_param rssi_cond;
+    wmi_nlo_bcast_nw_param bcast_nw_type; /* indicates if the SSID is hidden or not */
 } nlo_configured_parameters;
 
 typedef struct wmi_nlo_config {
@@ -8515,6 +8607,16 @@ typedef struct {
         A_UINT32 module_id_bitmap[MAX_MODULE_ID_BITMAP_WORDS];
      */
 } wmi_debug_log_config_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_pdev_get_temperature_cmd_fixed_param  */
+    A_UINT32 param;     /* Reserved for future use */
+} wmi_pdev_get_temperature_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_pdev_temperature_event_fixed_param */
+    A_INT32  value;     /* temprature value in Celcius degree */
+} wmi_pdev_temperature_event_fixed_param;
 
 #ifdef __cplusplus
 }

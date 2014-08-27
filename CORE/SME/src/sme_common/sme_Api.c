@@ -72,6 +72,7 @@
 #ifdef WLAN_FEATURE_NAN
 #include "nan_Api.h"
 #endif
+#include "regdomain_common.h"
 
 extern tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
@@ -2247,6 +2248,12 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                csrProcessRoamOffloadSynchInd(pMac, pMsg->bodyptr);
                vos_mem_free(pMsg->bodyptr);
                break;
+          case eWNI_SME_HO_FAIL_IND:
+               VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                     "LFR3:%s: Rcvd eWNI_SME_HO_FAIL_IND", __func__);
+               csrProcessHOFailInd(pMac, pMsg->bodyptr);
+               vos_mem_free(pMsg->bodyptr);
+               break;
 #endif
           case eWNI_PMC_ENTER_BMPS_RSP:
           case eWNI_PMC_EXIT_BMPS_RSP:
@@ -2705,7 +2712,22 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                 }
                 break;
 #endif /* WLAN_FEATURE_NAN */
+          case eWNI_SME_LINK_STATUS_IND:
+          {
+                tAniGetLinkStatus *pLinkStatus =
+                             (tAniGetLinkStatus *) pMsg->bodyptr;
+                if (pLinkStatus) {
+                    if (pMac->sme.linkStatusCallback) {
+                        pMac->sme.linkStatusCallback(pLinkStatus->linkStatus,
+                                               pMac->sme.linkStatusContext);
+                    }
 
+                    pMac->sme.linkStatusCallback = NULL;
+                    pMac->sme.linkStatusContext = NULL;
+                    vos_mem_free(pLinkStatus);
+                }
+                break;
+          }
           default:
 
              if ( ( pMsg->type >= eWNI_SME_MSG_TYPES_BEGIN )
@@ -3833,14 +3855,19 @@ eHalStatus sme_RoamFreeConnectProfile(tHalHandle hHal,
     \param numItems - a variable that has the number of tPmkidCacheInfo
                       allocated when retruning, this is either the number needed
                       or number of items put into pPMKIDCache
+    \param update_entire_cache - this bool value specifies if the entire pmkid
+                               cache should be overwritten or should it be
+                               updated entry by entry.
     \return eHalStatus - when fail, it usually means the buffer allocated is not
                          big enough and pNumItems has the number of
                          tPmkidCacheInfo.
     \Note: pNumItems is a number of tPmkidCacheInfo,
            not sizeof(tPmkidCacheInfo) * something
   ---------------------------------------------------------------------------*/
-eHalStatus sme_RoamSetPMKIDCache( tHalHandle hHal, tANI_U8 sessionId, tPmkidCacheInfo *pPMKIDCache,
-                                  tANI_U32 numItems )
+eHalStatus sme_RoamSetPMKIDCache( tHalHandle hHal, tANI_U8 sessionId,
+                                  tPmkidCacheInfo *pPMKIDCache,
+                                  tANI_U32 numItems,
+                                  tANI_BOOLEAN update_entire_cache )
 {
    eHalStatus status = eHAL_STATUS_FAILURE;
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
@@ -3852,7 +3879,8 @@ eHalStatus sme_RoamSetPMKIDCache( tHalHandle hHal, tANI_U8 sessionId, tPmkidCach
    {
       if( CSR_IS_SESSION_VALID( pMac, sessionId ) )
       {
-         status = csrRoamSetPMKIDCache( pMac, sessionId, pPMKIDCache, numItems );
+         status = csrRoamSetPMKIDCache( pMac, sessionId, pPMKIDCache,
+                                        numItems, update_entire_cache);
       }
       else
       {
@@ -3864,7 +3892,9 @@ eHalStatus sme_RoamSetPMKIDCache( tHalHandle hHal, tANI_U8 sessionId, tPmkidCach
    return (status);
 }
 
-eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId, tANI_U8 *pBSSId )
+eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId,
+                                      tANI_U8 *pBSSId,
+                                      tANI_BOOLEAN flush_cache )
 {
    eHalStatus status = eHAL_STATUS_FAILURE;
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
@@ -3873,7 +3903,8 @@ eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId, tANI_U
    {
       if( CSR_IS_SESSION_VALID( pMac, sessionId ) )
       {
-         status = csrRoamDelPMKIDfromCache( pMac, sessionId, pBSSId );
+         status = csrRoamDelPMKIDfromCache( pMac, sessionId,
+                                            pBSSId, flush_cache );
       }
       else
       {
@@ -5154,6 +5185,51 @@ eHalStatus sme_GetStatistics(tHalHandle hHal, eCsrStatsRequesterType requesterId
 
 }
 
+eHalStatus sme_getLinkStatus(tHalHandle hHal,
+                             tCsrLinkStatusCallback callback,
+                             void *pContext,
+                             tANI_U8 sessionId)
+{
+   eHalStatus status = eHAL_STATUS_FAILURE;
+   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+   tAniGetLinkStatus *pMsg;
+   vos_msg_t vosMessage;
+
+   status = sme_AcquireGlobalLock(&pMac->sme);
+   if (HAL_STATUS_SUCCESS(status)) {
+        pMsg = vos_mem_malloc(sizeof(tAniGetLinkStatus));
+        if (NULL == pMsg) {
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                   "%s: Not able to allocate memory for link status", __func__);
+            sme_ReleaseGlobalLock( &pMac->sme );
+            return eHAL_STATUS_FAILURE;
+        }
+
+        pMsg->msgType = WDA_LINK_STATUS_GET_REQ;
+        pMsg->msgLen = (tANI_U16)sizeof(tAniGetLinkStatus);
+        pMsg->sessionId = sessionId;
+        pMac->sme.linkStatusContext = pContext;
+        pMac->sme.linkStatusCallback = callback;
+
+        vosMessage.type = WDA_LINK_STATUS_GET_REQ;
+        vosMessage.bodyptr = pMsg;
+        vosMessage.reserved = 0;
+
+        if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(VOS_MODULE_ID_WDA,
+                                   &vosMessage))) {
+           VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                         "%s: Post LINK STATUS MSG fail", __func__);
+           vos_mem_free(pMsg);
+           pMac->sme.linkStatusContext = NULL;
+           pMac->sme.linkStatusCallback = NULL;
+           status = eHAL_STATUS_FAILURE;
+        }
+   }
+
+   sme_ReleaseGlobalLock(&pMac->sme);
+   return (status);
+}
+
 /* ---------------------------------------------------------------------------
     \fn smeGetTLSTAState
     \helper function to get the TL STA State whenever the function is called.
@@ -5876,260 +5952,6 @@ VOS_STATUS sme_NeighborReportRequest (tHalHandle hHal, tANI_U8 sessionId,
     return (status);
 }
 #endif
-
-//The following are debug APIs to support direct read/write register/memory
-//They are placed in SME because HW cannot be access when in LOW_POWER state
-//AND not connected. The knowledge and synchronization is done in SME
-
-//sme_DbgReadRegister
-//Caller needs to validate the input values
-VOS_STATUS sme_DbgReadRegister(tHalHandle hHal, v_U32_t regAddr, v_U32_t *pRegValue)
-{
-   VOS_STATUS   status = VOS_STATUS_E_FAILURE;
-   tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-   tPmcPowerState PowerState;
-   tANI_U32  sessionId = 0;
-   MTRACE(vos_trace(VOS_MODULE_ID_SME,
-               TRACE_CODE_SME_RX_HDD_DBG_READREG, NO_SESSION, 0));
-
-   /* 1) To make Quarky work in FTM mode **************************************/
-
-   if(eDRIVER_TYPE_MFG == pMac->gDriverType)
-   {
-      if (eWLAN_PAL_STATUS_SUCCESS == wpalDbgReadRegister(regAddr, pRegValue))
-      {
-         return VOS_STATUS_SUCCESS;
-      }
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   /* 2) NON FTM mode driver *************************************************/
-
-   /* Acquire SME global lock */
-   if (eHAL_STATUS_SUCCESS != sme_AcquireGlobalLock(&pMac->sme))
-   {
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   if(HAL_STATUS_SUCCESS(pmcQueryPowerState(pMac, &PowerState, NULL, NULL)))
-   {
-      /* Are we not in IMPS mode? Or are we in connected? Then we're safe*/
-      if(!csrIsConnStateDisconnected(pMac, sessionId) || (ePMC_LOW_POWER != PowerState))
-      {
-         if (eWLAN_PAL_STATUS_SUCCESS == wpalDbgReadRegister(regAddr, pRegValue))
-         {
-            status = VOS_STATUS_SUCCESS;
-         }
-         else
-         {
-            status = VOS_STATUS_E_FAILURE;
-         }
-      }
-      else
-      {
-         status = VOS_STATUS_E_FAILURE;
-      }
-   }
-
-   /* This is a hack for Qualky/pttWniSocket
-      Current implementation doesn't allow pttWniSocket to inform Qualky an error */
-   if ( VOS_STATUS_SUCCESS != status )
-   {
-      *pRegValue = 0xDEADBEEF;
-       status = VOS_STATUS_SUCCESS;
-   }
-
-   /* Release SME global lock */
-   sme_ReleaseGlobalLock(&pMac->sme);
-
-   return (status);
-}
-
-
-//sme_DbgWriteRegister
-//Caller needs to validate the input values
-VOS_STATUS sme_DbgWriteRegister(tHalHandle hHal, v_U32_t regAddr, v_U32_t regValue)
-{
-   VOS_STATUS    status = VOS_STATUS_E_FAILURE;
-   tpAniSirGlobal  pMac = PMAC_STRUCT(hHal);
-   tPmcPowerState PowerState;
-   tANI_U32   sessionId = 0;
-
-   /* 1) To make Quarky work in FTM mode **************************************/
-
-   MTRACE(vos_trace(VOS_MODULE_ID_SME,
-                    TRACE_CODE_SME_RX_HDD_DBG_WRITEREG, NO_SESSION, 0));
-   if(eDRIVER_TYPE_MFG == pMac->gDriverType)
-   {
-      if (eWLAN_PAL_STATUS_SUCCESS == wpalDbgWriteRegister(regAddr, regValue))
-      {
-         return VOS_STATUS_SUCCESS;
-      }
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   /* 2) NON FTM mode driver *************************************************/
-
-   /* Acquire SME global lock */
-   if (eHAL_STATUS_SUCCESS != sme_AcquireGlobalLock(&pMac->sme))
-   {
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   if(HAL_STATUS_SUCCESS(pmcQueryPowerState(pMac, &PowerState, NULL, NULL)))
-   {
-      /* Are we not in IMPS mode? Or are we in connected? Then we're safe*/
-      if(!csrIsConnStateDisconnected(pMac, sessionId) || (ePMC_LOW_POWER != PowerState))
-      {
-         if (eWLAN_PAL_STATUS_SUCCESS == wpalDbgWriteRegister(regAddr, regValue))
-         {
-            status = VOS_STATUS_SUCCESS;
-         }
-         else
-         {
-            status = VOS_STATUS_E_FAILURE;
-         }
-      }
-      else
-      {
-         status = VOS_STATUS_E_FAILURE;
-      }
-   }
-
-   /* Release SME global lock */
-   sme_ReleaseGlobalLock(&pMac->sme);
-
-   return (status);
-}
-
-
-
-//sme_DbgReadMemory
-//Caller needs to validate the input values
-//pBuf caller allocated buffer has the length of nLen
-VOS_STATUS sme_DbgReadMemory(tHalHandle hHal, v_U32_t memAddr, v_U8_t *pBuf, v_U32_t nLen)
-{
-   VOS_STATUS  status  = VOS_STATUS_E_FAILURE;
-   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
-   tPmcPowerState PowerState;
-   tANI_U32 sessionId  = 0;
-   tANI_U32 cmd = READ_MEMORY_DUMP_CMD;
-   tANI_U32 arg1 = memAddr;
-   tANI_U32 arg2 = nLen/4;
-   tANI_U32 arg3 = 4;
-   tANI_U32 arg4 = 0;
-   /* 1) To make Quarky work in FTM mode **************************************/
-
-   MTRACE(vos_trace(VOS_MODULE_ID_SME,
-                       TRACE_CODE_SME_RX_HDD_DBG_READMEM, NO_SESSION, 0));
-   if(eDRIVER_TYPE_MFG == pMac->gDriverType)
-   {
-      if (VOS_STATUS_SUCCESS == WDA_HALDumpCmdReq(pMac, cmd, arg1, arg2, arg3, arg4, (tANI_U8*)pBuf))
-      {
-         return VOS_STATUS_SUCCESS;
-      }
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   /* 2) NON FTM mode driver *************************************************/
-
-   /* Acquire SME global lock */
-   if (eHAL_STATUS_SUCCESS != sme_AcquireGlobalLock(&pMac->sme))
-   {
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   if(HAL_STATUS_SUCCESS(pmcQueryPowerState(pMac, &PowerState, NULL, NULL)))
-   {
-      /* Are we not in IMPS mode? Or are we in connected? Then we're safe*/
-      if(!csrIsConnStateDisconnected(pMac, sessionId) || (ePMC_LOW_POWER != PowerState))
-      {
-         if (VOS_STATUS_SUCCESS == WDA_HALDumpCmdReq(pMac, cmd, arg1, arg2, arg3, arg4, (tANI_U8 *)pBuf))
-         {
-            status = VOS_STATUS_SUCCESS;
-         }
-         else
-         {
-            status = VOS_STATUS_E_FAILURE;
-         }
-      }
-      else
-      {
-         status = VOS_STATUS_E_FAILURE;
-      }
-   }
-
-   /* This is a hack for Qualky/pttWniSocket
-      Current implementation doesn't allow pttWniSocket to inform Qualky an error */
-   if (VOS_STATUS_SUCCESS != status)
-   {
-      vos_mem_set(pBuf, nLen, 0xCD);
-      status = VOS_STATUS_SUCCESS;
-      smsLog(pMac, LOGE, FL(" filled with 0xCD because it cannot access the hardware"));
-   }
-
-   /* Release SME lock */
-   sme_ReleaseGlobalLock(&pMac->sme);
-
-   return (status);
-}
-
-
-//sme_DbgWriteMemory
-//Caller needs to validate the input values
-VOS_STATUS sme_DbgWriteMemory(tHalHandle hHal, v_U32_t memAddr, v_U8_t *pBuf, v_U32_t nLen)
-{
-   VOS_STATUS    status = VOS_STATUS_E_FAILURE;
-   tpAniSirGlobal  pMac = PMAC_STRUCT(hHal);
-   tPmcPowerState PowerState;
-   tANI_U32   sessionId = 0;
-
-   /* 1) To make Quarky work in FTM mode **************************************/
-
-   MTRACE(vos_trace(VOS_MODULE_ID_SME,
-                      TRACE_CODE_SME_RX_HDD_DBG_WRITEMEM, NO_SESSION, 0));
-   if(eDRIVER_TYPE_MFG == pMac->gDriverType)
-   {
-      {
-         return VOS_STATUS_SUCCESS;
-      }
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   /* 2) NON FTM mode driver *************************************************/
-
-   /* Acquire SME global lock */
-   if (eHAL_STATUS_SUCCESS != sme_AcquireGlobalLock(&pMac->sme))
-   {
-      return VOS_STATUS_E_FAILURE;
-   }
-
-   if(HAL_STATUS_SUCCESS(pmcQueryPowerState(pMac, &PowerState, NULL, NULL)))
-   {
-      /* Are we not in IMPS mode? Or are we in connected? Then we're safe*/
-      if(!csrIsConnStateDisconnected(pMac, sessionId) || (ePMC_LOW_POWER != PowerState))
-      {
-         if (eWLAN_PAL_STATUS_SUCCESS == wpalDbgWriteMemory(memAddr, (void *)pBuf, nLen))
-         {
-            status = VOS_STATUS_SUCCESS;
-         }
-         else
-         {
-            status = VOS_STATUS_E_FAILURE;
-         }
-      }
-      else
-      {
-         status = VOS_STATUS_E_FAILURE;
-      }
-   }
-
-   /* Release Global lock */
-   sme_ReleaseGlobalLock(&pMac->sme);
-
-   return (status);
-}
-
 
 void pmcLog(tpAniSirGlobal pMac, tANI_U32 loglevel, const char *pString, ...)
 {
@@ -10937,6 +10759,7 @@ eHalStatus sme_UpdateTdlsPeerState(tHalHandle hHal,
     tANI_U8 num;
     tANI_U8 chanId;
     tANI_U8 i;
+    tANI_U8 preOffChanOffset;
 
     if (eHAL_STATUS_SUCCESS == (status = sme_AcquireGlobalLock(&pMac->sme)))
     {
@@ -11032,6 +10855,19 @@ eHalStatus sme_UpdateTdlsPeerState(tHalHandle hHal,
            peerStateParams->peerCap.prefOffChanNum;
        pTdlsPeerStateParams->peerCap.prefOffChanBandwidth =
            peerStateParams->peerCap.prefOffChanBandwidth;
+
+       /* Ideally better to get offset from ini or userspace, for now
+        * in case of 40MHz, assume lower primary
+        */
+       if (pTdlsPeerStateParams->peerCap.prefOffChanBandwidth == 20)
+           preOffChanOffset = BW20;
+       else
+           preOffChanOffset = BW40_LOW_PRIMARY;
+
+       pTdlsPeerStateParams->peerCap.opClassForPrefOffChan =
+           regdm_get_opclass_from_channel(pMac->scan.countryCodeCurrent,
+                           pTdlsPeerStateParams->peerCap.prefOffChanNum,
+                           preOffChanOffset);
 
        vosMessage.type = WDA_UPDATE_TDLS_PEER_STATE;
        vosMessage.reserved = 0;

@@ -322,7 +322,7 @@ typedef enum _throttle_phase {
 #define THROTTLE_TX_THRESHOLD (100)
 
 #ifdef IPA_UC_OFFLOAD
-typedef void (*ipa_uc_op_cb_type)(u_int8_t op_code, void *osif_ctxt);
+typedef void (*ipa_uc_op_cb_type)(u_int8_t *op_msg, void *osif_ctxt);
 #endif /* IPA_UC_OFFLOAD */
 
 /*
@@ -746,12 +746,10 @@ struct ol_txrx_vdev_t {
 
 	enum wlan_op_mode opmode;
 
-#ifndef CONFIG_QCA_WIFI_ISOC
 #ifdef  QCA_IBSS_SUPPORT
         /* ibss mode related */
         int16_t ibss_peer_num;              /* the number of active peers */
         int16_t ibss_peer_heart_beat_timer; /* for detecting peer departure */
-#endif
 #endif
 
 #if defined(CONFIG_HL_SUPPORT)

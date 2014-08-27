@@ -438,13 +438,13 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_host_auto_shutdown_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_update_whal_mib_stats_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_chan_avoid_update_cmd_param,
-    WMITLV_TAG_STRUC_WOW_ACER_IOAC_PKT_PATTERN_T,
-    WMITLV_TAG_STRUC_WOW_ACER_IOAC_TMR_PATTERN_T,
+    WMITLV_TAG_STRUC_WOW_IOAC_PKT_PATTERN_T,
+    WMITLV_TAG_STRUC_WOW_IOAC_TMR_PATTERN_T,
     WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_KEEPALIVE_CMD_fixed_param,
     WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_KEEPALIVE_CMD_fixed_param,
-    WMITLV_TAG_STRUC_WOW_IOAC_KEEPALIVE_T,
-    WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param,
-    WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param,
+    WMITLV_TAG_STRUC_WMI_WOW_IOAC_KEEPALIVE_T,
+    WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_PATTERN_CMD_fixed_param,
+    WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param,
     WMITLV_TAG_STRUC_wmi_start_link_stats_cmd_fixed_param,
     WMITLV_TAG_STRUC_wmi_clear_link_stats_cmd_fixed_param,
     WMITLV_TAG_STRUC_wmi_request_link_stats_cmd_fixed_param,
@@ -500,6 +500,11 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_extwow_set_app_type2_params_cmd_fixed_param,
     WMITLV_TAG_STRUC_wmi_lpi_status_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_lpi_handoff_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_rate_stats_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_rate_ht_info,
+    WMITLV_TAG_STRUC_wmi_ric_request_fixed_param,
+    WMITLV_TAG_STRUC_wmi_pdev_get_temperature_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_pdev_temperature_event_fixed_param
 } WMITLV_TAG_ID;
 
 /*
@@ -660,10 +665,10 @@ typedef enum {
     OP(WMI_PDEV_SET_LED_CONFIG_CMDID)\
     OP(WMI_HOST_AUTO_SHUTDOWN_CFG_CMDID) \
     OP(WMI_CHAN_AVOID_UPDATE_CMDID) \
-    OP(WMI_WOW_ACER_IOAC_ADD_KEEPALIVE_CMDID) \
-    OP(WMI_WOW_ACER_IOAC_DEL_KEEPALIVE_CMDID) \
-    OP(WMI_WOW_ACER_IOAC_ADD_WAKE_PATTERN_CMDID) \
-    OP(WMI_WOW_ACER_IOAC_DEL_WAKE_PATTERN_CMDID) \
+    OP(WMI_WOW_IOAC_ADD_KEEPALIVE_CMDID) \
+    OP(WMI_WOW_IOAC_DEL_KEEPALIVE_CMDID) \
+    OP(WMI_WOW_IOAC_ADD_WAKE_PATTERN_CMDID) \
+    OP(WMI_WOW_IOAC_DEL_WAKE_PATTERN_CMDID) \
     OP(WMI_REQUEST_LINK_STATS_CMDID) \
     OP(WMI_START_LINK_STATS_CMDID) \
     OP(WMI_CLEAR_LINK_STATS_CMDID) \
@@ -683,7 +688,10 @@ typedef enum {
     OP(WMI_ROAM_SYNCH_COMPLETE) \
     OP(WMI_EXTWOW_ENABLE_CMDID) \
     OP(WMI_EXTWOW_SET_APP_TYPE1_PARAMS_CMDID) \
-    OP(WMI_EXTWOW_SET_APP_TYPE2_PARAMS_CMDID)
+    OP(WMI_EXTWOW_SET_APP_TYPE2_PARAMS_CMDID) \
+    OP(WMI_ROAM_SET_RIC_REQUEST_CMDID) \
+    OP(WMI_PDEV_GET_TEMPERATURE_CMDID)
+
 
 
 /*
@@ -770,8 +778,10 @@ typedef enum {
     OP(WMI_D0_WOW_DISABLE_ACK_EVENTID) \
     OP(WMI_ROAM_SYNCH_EVENTID) \
     OP(WMI_LPI_STATUS_EVENTID) \
-    OP(WMI_LPI_HANDOFF_EVENTID)
-
+    OP(WMI_LPI_HANDOFF_EVENTID) \
+    OP(WMI_UPDATE_VDEV_RATE_STATS_EVENTID) \
+    OP(WMI_PDEV_TEMPERATURE_EVENTID) \
+    OP(WMI_DIAG_EVENTID)
 
 /* TLV definitions of WMI commands */
 
@@ -1431,6 +1441,12 @@ WMITLV_CREATE_PARAM_STRUC(WMI_ROAM_AP_PROFILE);
 
 WMITLV_CREATE_PARAM_STRUC(WMI_ROAM_SYNCH_COMPLETE)
 
+#define WMITLV_TABLE_WMI_ROAM_SET_RIC_REQUEST_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_ric_request_fixed_param, wmi_ric_request_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, wmi_ric_tspec, ric_tspec_list, WMITLV_SIZE_VAR)
+
+WMITLV_CREATE_PARAM_STRUC(WMI_ROAM_SET_RIC_REQUEST_CMDID);
+
 /* Scan scheduler priority Table Cmd */
 #define WMITLV_TABLE_WMI_SCAN_SCH_PRIO_TBL_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_scan_sch_priority_table_cmd_fixed_param, wmi_scan_sch_priority_table_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
@@ -1474,32 +1490,32 @@ WMITLV_CREATE_PARAM_STRUC(WMI_DFS_PHYERR_FILTER_DIS_CMDID);
 
 WMITLV_CREATE_PARAM_STRUC(WMI_WOW_ADD_WAKE_PATTERN_CMDID);
 
-/* Acer IOAC add keep alive cmd. */
-#define WMITLV_TABLE_WMI_WOW_ACER_IOAC_ADD_KEEPALIVE_CMDID(id,op,buf,len) \
+/* IOAC add keep alive cmd. */
+#define WMITLV_TABLE_WMI_WOW_IOAC_ADD_KEEPALIVE_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_KEEPALIVE_CMD_fixed_param, WMI_WOW_IOAC_ADD_KEEPALIVE_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, WOW_IOAC_KEEPALIVE_T, keepalive_set, WMITLV_SIZE_VAR)
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, WMI_WOW_IOAC_KEEPALIVE_T, keepalive_set, WMITLV_SIZE_VAR)
 
-WMITLV_CREATE_PARAM_STRUC(WMI_WOW_ACER_IOAC_ADD_KEEPALIVE_CMDID);
+WMITLV_CREATE_PARAM_STRUC(WMI_WOW_IOAC_ADD_KEEPALIVE_CMDID);
 
-/* Acer IOAC del keep alive cmd. */
-#define WMITLV_TABLE_WMI_WOW_ACER_IOAC_DEL_KEEPALIVE_CMDID(id,op,buf,len) \
+/* IOAC del keep alive cmd. */
+#define WMITLV_TABLE_WMI_WOW_IOAC_DEL_KEEPALIVE_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_KEEPALIVE_CMD_fixed_param, WMI_WOW_IOAC_DEL_KEEPALIVE_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 
-WMITLV_CREATE_PARAM_STRUC(WMI_WOW_ACER_IOAC_DEL_KEEPALIVE_CMDID);
+WMITLV_CREATE_PARAM_STRUC(WMI_WOW_IOAC_DEL_KEEPALIVE_CMDID);
 
-/* WOW ACER IOAC Add Wake Pattern Cmd */
-#define WMITLV_TABLE_WMI_WOW_ACER_IOAC_ADD_WAKE_PATTERN_CMDID(id,op,buf,len) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param, WMI_WOW_ACER_IOAC_ADD_PATTERN_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, WOW_ACER_IOAC_PKT_PATTERN_T, pattern_info_acer_pkt, WMITLV_SIZE_VAR) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, WOW_ACER_IOAC_TMR_PATTERN_T, pattern_info_acer_tmr, WMITLV_SIZE_VAR)
+/* WOW IOAC Add Wake Pattern Cmd */
+#define WMITLV_TABLE_WMI_WOW_IOAC_ADD_WAKE_PATTERN_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_WOW_IOAC_ADD_PATTERN_CMD_fixed_param, WMI_WOW_IOAC_ADD_PATTERN_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, WOW_IOAC_PKT_PATTERN_T, pattern_info_pkt, WMITLV_SIZE_VAR) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, WOW_IOAC_TMR_PATTERN_T, pattern_info_tmr, WMITLV_SIZE_VAR)
 
-WMITLV_CREATE_PARAM_STRUC(WMI_WOW_ACER_IOAC_ADD_WAKE_PATTERN_CMDID);
+WMITLV_CREATE_PARAM_STRUC(WMI_WOW_IOAC_ADD_WAKE_PATTERN_CMDID);
 
-/* WOW ACER IOAC Delete Wake Pattern Cmd */
-#define WMITLV_TABLE_WMI_WOW_ACER_IOAC_DEL_WAKE_PATTERN_CMDID(id,op,buf,len) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param, WMI_WOW_ACER_IOAC_DEL_PATTERN_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+/* WOW IOAC Delete Wake Pattern Cmd */
+#define WMITLV_TABLE_WMI_WOW_IOAC_DEL_WAKE_PATTERN_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param, WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 
-WMITLV_CREATE_PARAM_STRUC(WMI_WOW_ACER_IOAC_DEL_WAKE_PATTERN_CMDID);
+WMITLV_CREATE_PARAM_STRUC(WMI_WOW_IOAC_DEL_WAKE_PATTERN_CMDID);
 
 /* extwow enable Cmd */
 #define WMITLV_TABLE_WMI_EXTWOW_ENABLE_CMDID(id,op,buf,len) \
@@ -1888,6 +1904,11 @@ WMITLV_CREATE_PARAM_STRUC(WMI_CHAN_AVOID_UPDATE_CMDID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_d0_wow_enable_disable_cmd_fixed_param, wmi_d0_wow_enable_disable_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_D0_WOW_ENABLE_DISABLE_CMDID);
 
+/* Pdev get chip temperature Cmd */
+#define WMITLV_TABLE_WMI_PDEV_GET_TEMPERATURE_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_pdev_get_temperature_cmd_fixed_param, wmi_pdev_get_temperature_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_PDEV_GET_TEMPERATURE_CMDID);
+
 /************************** TLV definitions of WMI events *******************************/
 
 /* Service Ready event */
@@ -2105,6 +2126,11 @@ WMITLV_CREATE_PARAM_STRUC(WMI_RFKILL_STATE_CHANGE_EVENTID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, bufp, WMITLV_SIZE_VAR)
 WMITLV_CREATE_PARAM_STRUC(WMI_DEBUG_MESG_EVENTID);
 
+/* Diagnostics Event */
+#define WMITLV_TABLE_WMI_DIAG_EVENTID(id,op,buf,len)\
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, bufp, WMITLV_SIZE_VAR)
+WMITLV_CREATE_PARAM_STRUC(WMI_DIAG_EVENTID);
+
 /* IGTK Offload Event */
 #define WMITLV_TABLE_WMI_GTK_OFFLOAD_STATUS_EVENTID(id,op,buf,len)\
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_GTK_OFFLOAD_STATUS_EVENT_fixed_param, WMI_GTK_OFFLOAD_STATUS_EVENT_fixed_param, fixed_param, WMITLV_SIZE_FIX)
@@ -2168,6 +2194,11 @@ WMITLV_CREATE_PARAM_STRUC(WMI_HOST_SWBA_EVENTID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, data, WMITLV_SIZE_VAR)
 WMITLV_CREATE_PARAM_STRUC(WMI_UPDATE_STATS_EVENTID);
 
+/* For vdev based ht/vht info upload*/
+#define WMITLV_TABLE_WMI_UPDATE_VDEV_RATE_STATS_EVENTID(id,op,buf,len)\
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_vdev_rate_stats_event_fixed_param, wmi_vdev_rate_stats_event_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_STRUC, wmi_vdev_rate_ht_info, ht_info, WMITLV_SIZE_VAR)
+WMITLV_CREATE_PARAM_STRUC(WMI_UPDATE_VDEV_RATE_STATS_EVENTID);
 /* Update iface link stats Event */
 #define WMITLV_TABLE_WMI_IFACE_LINK_STATS_EVENTID(id,op,buf,len)\
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_iface_link_stats_event_fixed_param, wmi_iface_link_stats_event_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
@@ -2326,6 +2357,11 @@ WMITLV_CREATE_PARAM_STRUC(WMI_PEER_STATE_EVENTID);
 #define WMITLV_TABLE_WMI_D0_WOW_DISABLE_ACK_EVENTID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_d0_wow_disable_ack_event_fixed_param, wmi_d0_wow_disable_ack_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_D0_WOW_DISABLE_ACK_EVENTID);
+
+/* Pdev get chip temperature event */
+#define WMITLV_TABLE_WMI_PDEV_TEMPERATURE_EVENTID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_pdev_temperature_event_fixed_param, wmi_pdev_temperature_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_PDEV_TEMPERATURE_EVENTID);
 
 #ifdef __cplusplus
 }

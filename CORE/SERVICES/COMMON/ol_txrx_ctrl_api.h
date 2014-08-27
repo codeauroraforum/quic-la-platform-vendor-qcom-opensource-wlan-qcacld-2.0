@@ -241,12 +241,7 @@ ol_txrx_set_wmm_param(ol_txrx_pdev_handle data_pdev, struct ol_tx_wmm_param_t wm
  *
  * @param data_peer - which peer is being paused
  */
-#if defined(CONFIG_HL_SUPPORT) && defined(QCA_WIFI_ISOC)
-void
-ol_txrx_peer_pause(ol_txrx_peer_handle data_peer);
-#else
 #define ol_txrx_peer_pause(data_peer) /* no-op */
-#endif /* CONFIG_HL_SUPPORT */
 
 /**
  * @brief Notify tx data SW that a peer-TID is ready to transmit to.
@@ -753,30 +748,7 @@ ol_txrx_peer_keyinstalled_state_update(
     ol_txrx_peer_handle data_peer,
     u_int8_t val);
 
-#ifdef QCA_WIFI_ISOC
-/**
- * @brief Confirm that a requested tx ADDBA negotiation has completed
- * @details
- *  For systems in which ADDBA-request / response handshaking is handled
- *  by the host SW, the data SW will request for the control SW to perform
- *  the ADDBA negotiation at an appropriate time.
- *  This function is used by the control SW to inform the data SW that the
- *  ADDBA negotiation has finished, and the data SW can now resume
- *  transmissions from the peer-TID tx queue in question.
- *
- * @param peer - which peer the ADDBA-negotiation was with
- * @param tid - which traffic type the ADDBA-negotiation was for
- * @param status - whether the negotiation completed or was aborted:
- *            success: the negotiation completed
- *            reject:  the negotiation completed but was rejected
- *            busy:    the negotiation was aborted - try again later
- */
-void
-ol_tx_addba_conf(
-    ol_txrx_peer_handle data_peer, int tid, enum ol_addba_status status);
-#else
 #define ol_tx_addba_conf(data_peer, tid, status) /* no-op */
-#endif
 
 /**
  * @brief Find a txrx peer handle from the peer's MAC address
@@ -1208,7 +1180,7 @@ ol_txrx_ipa_uc_set_active(
 void
 ol_txrx_ipa_uc_op_response(
    ol_txrx_pdev_handle pdev,
-   u_int8_t op_code);
+   u_int8_t *op_msg);
 
 /**
  * @brief callback function registration
@@ -1223,8 +1195,17 @@ ol_txrx_ipa_uc_op_response(
  */
 void ol_txrx_ipa_uc_register_op_cb(
    ol_txrx_pdev_handle pdev,
-   void (*ipa_uc_op_cb_type)(u_int8_t op_code, void *osif_ctxt),
+   void (*ipa_uc_op_cb_type)(u_int8_t *op_msg, void *osif_ctxt),
    void *osif_dev);
+
+/**
+ * @brief query uc data path stats
+ * @details
+ *  Query uc data path stats from firmware
+ *
+ * @param pdev - handle to the HTT instance
+ */
+void ol_txrx_ipa_uc_get_stat(ol_txrx_pdev_handle pdev);
 #else
 #define ol_txrx_ipa_uc_get_resource(          \
    pdev,                                      \
@@ -1250,12 +1231,14 @@ void ol_txrx_ipa_uc_register_op_cb(
 
 #define ol_txrx_ipa_uc_op_response(           \
    pdev,                                      \
-   op_code) /* NO-OP */
+   op_data) /* NO-OP */
 
 #define ol_txrx_ipa_uc_register_op_cb(        \
    pdev,                                      \
    ipa_uc_op_cb_type,                         \
    osif_dev) /* NO-OP */
+
+#define ol_txrx_ipa_uc_get_stat(pdev) /* NO-OP */
 #endif /* IPA_UC_OFFLOAD */
 
 #endif /* _OL_TXRX_CTRL_API__H_ */

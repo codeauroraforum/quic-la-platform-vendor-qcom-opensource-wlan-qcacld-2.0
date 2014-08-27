@@ -63,7 +63,9 @@
 #include "wlan_hdd_tdls.h"
 #endif
 #include "sme_Api.h"
-
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+#include "wlan_hdd_hostapd.h"
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
 #ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
 #endif
@@ -1288,6 +1290,7 @@ static void hdd_SendReAssocEvent(struct net_device *dev,
     v_U8_t *rspRsnIe = kmalloc(IW_GENERIC_IE_MAX, GFP_KERNEL);
     tANI_U32 rspRsnLength = 0;
     struct ieee80211_channel *chan;
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
     if (!rspRsnIe) {
         hddLog(LOGE, FL("Unable to allocate RSN IE"));
@@ -1313,6 +1316,15 @@ static void hdd_SendReAssocEvent(struct net_device *dev,
     pFTAssocRsp += FT_ASSOC_RSP_IES_OFFSET;
     hddLog(LOG1, FL("AssocRsp is now at %02x%02x"),
                    (unsigned int)pFTAssocRsp[0], (unsigned int)pFTAssocRsp[1]);
+
+   /* Active session count is decremented upon disconnection, but during
+    * roaming, there is no disconnect indication and hence active session
+    * count is not decremented.
+    * After roaming is completed, active session count is incremented
+    * as a part of connect indication but effectively after roaming the
+    * active session count should still be the same and hence upon
+    * successful reassoc decrement the active session count here */
+    wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
 
     /* Send the Assoc Resp, the supplicant needs this for initial Auth */
     len = pCsrRoamInfo->nAssocRspLength - FT_ASSOC_RSP_IES_OFFSET;
@@ -1361,6 +1373,9 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
     struct net_device *dev = pAdapter->dev;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+    hdd_adapter_t *pHostapdAdapter;
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
     VOS_STATUS vosStatus = VOS_STATUS_E_FAILURE;
     v_U8_t reqRsnIe[DOT11F_IE_RSN_MAX_LEN];
     tANI_U32 reqRsnLength = DOT11F_IE_RSN_MAX_LEN;
@@ -1885,6 +1900,25 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
     }
 
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+    if (eCSR_ROAM_RESULT_ASSOCIATED == roamResult &&
+        pHddCtx->cfg_ini->SapSccChanAvoidance) {
+        pHostapdAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_SOFTAP);
+        if (pHostapdAdapter != NULL) {
+             /* Restart SAP if its operating channel is different
+              * from AP channel.
+              */
+             if (pHostapdAdapter->sessionCtx.ap.operatingChannel !=
+                pRoamInfo->pBssDesc->channelId) {
+                hddLog(VOS_TRACE_LEVEL_ERROR,
+                       "Restart Sap as SAP channel is %d and STA channel is %d",
+                       pHostapdAdapter->sessionCtx.ap.operatingChannel,
+                       pRoamInfo->pBssDesc->channelId);
+                hdd_restart_softap(pHddCtx, pHostapdAdapter);
+             }
+        }
+    }
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
     return eHAL_STATUS_SUCCESS;
 }
 
@@ -3606,7 +3640,8 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
             // Finally set the PMKSA ID Cache in CSR
             result = sme_RoamSetPMKIDCache(halHandle,pAdapter->sessionId,
                                            PMKIDCache,
-                                           dot11RSNIE.pmkid_count );
+                                           dot11RSNIE.pmkid_count,
+                                           FALSE);
         }
     }
     else if (gen_ie[0] == DOT11F_EID_WPA)

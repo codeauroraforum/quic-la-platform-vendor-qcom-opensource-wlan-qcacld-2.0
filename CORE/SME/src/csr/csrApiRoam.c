@@ -67,6 +67,8 @@
 #if defined(FEATURE_WLAN_ESE) && !defined(FEATURE_WLAN_ESE_UPLOAD)
 #include "csrEse.h"
 #endif /* FEATURE_WLAN_ESE && !FEATURE_WLAN_ESE_UPLOAD */
+#include "regdomain_common.h"
+
 #define CSR_NUM_IBSS_START_CHANNELS_50      4
 #define CSR_NUM_IBSS_START_CHANNELS_24      3
 #define CSR_WAIT_FOR_KEY_TIMEOUT_PERIOD         ( 5 * VOS_TIMER_TO_SEC_UNIT )  // 5 seconds, for WPA, WPA2, CCKM
@@ -258,6 +260,7 @@ extern void SysProcessMmhMsg(tpAniSirGlobal pMac, tSirMsgQ* pMsg);
 extern void btampEstablishLogLinkHdlr(void* pMsg);
 static void csrSerDesUnpackDiassocRsp(tANI_U8 *pBuf, tSirSmeDisassocRsp *pRsp);
 void csrReinitPreauthCmd(tpAniSirGlobal pMac, tSmeCmd *pCommand);
+void csrInitOperatingClasses(tHalHandle hHal);
 
 //Initialize global variables
 static void csrRoamInitGlobals(tpAniSirGlobal pMac)
@@ -467,7 +470,7 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
     bufLen = sizeof(tSirUpdateChanList) +
         (sizeof(tSirUpdateChanParam) * (numChan - 1));
 
-    limInitOperatingClasses((tHalHandle)pMac);
+    csrInitOperatingClasses((tHalHandle)pMac);
     pChanList = (tSirUpdateChanList *) vos_mem_malloc(bufLen);
     if (!pChanList)
     {
@@ -2334,7 +2337,7 @@ eHalStatus csrInitChannelList( tHalHandle hHal )
     csrSaveChannelPowerForBand(pMac, eANI_BOOLEAN_TRUE);
     // Apply the base channel list, power info, and set the Country code...
     csrApplyChannelPowerCountryInfo( pMac, &pMac->scan.base20MHzChannels, pMac->scan.countryCodeCurrent, eANI_BOOLEAN_TRUE );
-    limInitOperatingClasses(hHal);
+    csrInitOperatingClasses(hHal);
     return (status);
 }
 eHalStatus csrChangeConfigParams(tpAniSirGlobal pMac,
@@ -12377,19 +12380,22 @@ eHalStatus csrRoamSetPSK_PMK(tpAniSirGlobal pMac, tANI_U32 sessionId,
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 eHalStatus csrRoamSetPMKIDCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
-                                 tPmkidCacheInfo *pPMKIDCache, tANI_U32 numItems )
+                                 tPmkidCacheInfo *pPMKIDCache,
+                                 tANI_U32 numItems,
+                                 tANI_BOOLEAN update_entire_cache )
 {
     eHalStatus status = eHAL_STATUS_INVALID_PARAMETER;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
 
-    if(!pSession)
+    if (!pSession)
     {
         smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
         return eHAL_STATUS_FAILURE;
     }
 
     smsLog(pMac, LOGW, "csrRoamSetPMKIDCache called, numItems = %d", numItems);
-    if(numItems <= CSR_MAX_PMKID_ALLOWED)
+
+    if (numItems <= CSR_MAX_PMKID_ALLOWED)
     {
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
         {
@@ -12407,52 +12413,105 @@ eHalStatus csrRoamSetPMKIDCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
             WLAN_VOS_DIAG_EVENT_REPORT(&secEvent, EVENT_WLAN_SECURITY);
         }
 #endif//FEATURE_WLAN_DIAG_SUPPORT_CSR
+
         status = eHAL_STATUS_SUCCESS;
-        //numItems may be 0 to clear the cache
-        pSession->NumPmkidCache = (tANI_U16)numItems;
-        if(numItems && pPMKIDCache)
-        {
-            vos_mem_copy(pSession->PmkidCacheInfo, pPMKIDCache,
-                         sizeof(tPmkidCacheInfo) * numItems);
-            status = eHAL_STATUS_SUCCESS;
+        if (update_entire_cache) {
+            pSession->NumPmkidCache = (tANI_U16)numItems;
+            if (numItems && pPMKIDCache)
+            {
+                vos_mem_copy(pSession->PmkidCacheInfo, pPMKIDCache,
+                             sizeof(tPmkidCacheInfo) * numItems);
+            }
+        } else {
+            tANI_U32 i = 0, j = 0;
+            tANI_U8 BSSIDMatched = 0;
+            tPmkidCacheInfo *pmksa;
+
+            for (i = 0; i < numItems; i++) {
+                pmksa = &pPMKIDCache[i];
+                for (j = 0; j < CSR_MAX_PMKID_ALLOWED; j++) {
+                    if (vos_mem_compare(pSession->PmkidCacheInfo[j].BSSID,
+                                pmksa->BSSID, VOS_MAC_ADDR_SIZE)) {
+                        /* If a matching BSSID found, update it */
+                        BSSIDMatched = 1;
+                        vos_mem_copy(pSession->PmkidCacheInfo[j].PMKID,
+                                     pmksa->PMKID, CSR_RSN_PMKID_SIZE);
+                        break;
+                    }
+                }
+
+                if (!BSSIDMatched) {
+                    vos_mem_copy(
+                       pSession->PmkidCacheInfo[pSession->NumPmkidCache].BSSID,
+                       pmksa->BSSID, ETHER_ADDR_LEN);
+                    vos_mem_copy(
+                       pSession->PmkidCacheInfo[pSession->NumPmkidCache].PMKID,
+                       pmksa->PMKID, CSR_RSN_PMKID_SIZE);
+                    /* Increment the CSR local cache index */
+                    if (pSession->NumPmkidCache < (CSR_MAX_PMKID_ALLOWED - 1))
+                        pSession->NumPmkidCache++;
+                    else
+                        pSession->NumPmkidCache = 0;
+                }
+                BSSIDMatched = 0;
+            }
         }
     }
     return (status);
 }
 
 eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
-                                 tANI_U8 *pBSSId )
+                                     tANI_U8 *pBSSId,
+                                     tANI_BOOLEAN flush_cache )
 {
     eHalStatus status = eHAL_STATUS_FAILURE;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_BOOLEAN fMatchFound = FALSE;
     tANI_U32 Index;
+
     if(!pSession)
     {
         smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
         return eHAL_STATUS_FAILURE;
     }
-    do
-    {
-        for( Index=0; Index < pSession->NumPmkidCache; Index++ )
-        {
-            smsLog(pMac, LOGW, "Delete PMKID for "
-                   MAC_ADDRESS_STR, MAC_ADDR_ARRAY(pBSSId));
-            if( vos_mem_compare( pBSSId, pSession->PmkidCacheInfo[Index].BSSID, sizeof(tCsrBssid) ) )
-            {
-                fMatchFound = TRUE;
-                break;
-            }
-        }
-        if( !fMatchFound ) break;
-        vos_mem_set(pSession->PmkidCacheInfo[Index].BSSID, sizeof(tCsrBssid), 0);
-        status = eHAL_STATUS_SUCCESS;
+
+    /* Check if there are no entries to delete */
+    if (0 == pSession->NumPmkidCache) {
+       smsLog(pMac, LOG1, FL("No entries to delete/Flush"));
+       return eHAL_STATUS_SUCCESS;
     }
-    while( 0 );
-    smsLog(pMac, LOGW, "csrDelPMKID called return match = %d Status = %d",
-        fMatchFound, status);
-    return status;
+
+    if (!flush_cache) {
+        for (Index = 0; Index < CSR_MAX_PMKID_ALLOWED; Index++) {
+            if (vos_mem_compare(pSession->PmkidCacheInfo[Index].BSSID,
+                      pBSSId, VOS_MAC_ADDR_SIZE)) {
+                fMatchFound = 1;
+
+                /* Clear this - the matched entry */
+                 vos_mem_zero(&pSession->PmkidCacheInfo[Index],
+                              sizeof(tPmkidCacheInfo));
+
+                 status = eHAL_STATUS_SUCCESS;
+                 break;
+              }
+        }
+
+        if (Index == CSR_MAX_PMKID_ALLOWED && !fMatchFound) {
+           smsLog(pMac, LOG1, FL("No such PMKSA entry exists "MAC_ADDRESS_STR),
+                  MAC_ADDR_ARRAY(pBSSId));
+           return status;
+        }
+
+        return status;
+    } else {
+        /* Flush the entire cache */
+        vos_mem_zero(pSession->PmkidCacheInfo,
+                     sizeof(tPmkidCacheInfo) * CSR_MAX_PMKID_ALLOWED);
+        pSession->NumPmkidCache = 0;
+        return eHAL_STATUS_SUCCESS;
+    }
 }
+
 tANI_U32 csrRoamGetNumPMKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId)
 {
     return (pMac->roam.roamSession[sessionId].NumPmkidCache);
@@ -12922,6 +12981,7 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
     tANI_U32 dwTmp;
     tANI_U8 wpaRsnIE[DOT11F_IE_RSN_MAX_LEN];    //RSN MAX is bigger than WPA MAX
     tANI_U32 ucDot11Mode = 0;
+    tANI_U8 txBFCsnValue = 0;
 
     if(!pSession)
     {
@@ -13488,7 +13548,11 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
         pBuf++;
 
         // txBFCsnValue
-        *pBuf = (tANI_U8)pMac->roam.configParam.txBFCsnValue;
+        txBFCsnValue = (tANI_U8)pMac->roam.configParam.txBFCsnValue;
+        if (pIes->VHTCaps.present) {
+            txBFCsnValue = MIN(txBFCsnValue, pIes->VHTCaps.numSoundingDim);
+        }
+        *pBuf = txBFCsnValue;
         pBuf++;
 
         // txMuBformee
@@ -18528,4 +18592,169 @@ err_synch_rsp:
     vos_mem_free(pFTRoamOffloadSynchRsp->pbssDescription);
     pFTRoamOffloadSynchRsp->pbssDescription = NULL;
 }
+
+
+/*----------------------------------------------------------------------------
+ * fn csrProcessHOFailInd
+ * brief  This function will process the Hand Off Failure indication
+ *        received from the firmware. It will trigger a disconnect on
+ *        the session which the firmware reported a hand off failure
+ * param  pMac global structure
+ * param  pMsgBuf - Contains the session ID for which the handler should apply
+ * --------------------------------------------------------------------------*/
+void csrProcessHOFailInd(tpAniSirGlobal pMac, void *pMsgBuf)
+{
+   tSirSmeHOFailureInd *pSmeHOFailInd = (tSirSmeHOFailureInd *)pMsgBuf;
+   tANI_U32 sessionId;
+
+   if (pSmeHOFailInd)
+       sessionId = pSmeHOFailInd->sessionId;
+   else {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+            "LFR3: Hand-Off Failure Ind is NULL");
+       return;
+   }
+   /* Roaming is supported only on Infra STA Mode. */
+   if (!csrRoamIsStaMode(pMac, sessionId)) {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+            "LFR3:HO Fail cannot be handled for session %d",sessionId);
+       return;
+   }
+
+   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+            "LFR3:Issue Disconnect on session %d", sessionId);
+   csrRoamDisconnect(pMac, sessionId, eCSR_DISCONNECT_REASON_UNSPECIFIED);
+}
 #endif
+
+void csrInitOperatingClasses(tHalHandle hHal)
+{
+    tANI_U8 Index = 0;
+    tANI_U8 class = 0;
+    tANI_U8 i = 0;
+    tANI_U8 j = 0;
+    tANI_U8 swap = 0;
+    tANI_U8 numChannels = 0;
+    tANI_U8 numClasses = 0;
+    tANI_BOOLEAN found;
+    tANI_U8 opClasses[SIR_MAC_MAX_SUPP_OPER_CLASSES];
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+
+    smsLog(pMac, LOG1, FL("Current Country = %c%c"),
+                          pMac->scan.countryCodeCurrent[0],
+                          pMac->scan.countryCodeCurrent[1]);
+
+    for (j = 0; j < SIR_MAC_MAX_SUPP_OPER_CLASSES; j++) {
+        opClasses[j] = 0;
+    }
+
+    numChannels = pMac->scan.baseChannels.numChannels;
+
+    smsLog(pMac, LOG1, FL("Num of base channels %d"), numChannels);
+
+    for (Index = 0;
+         Index < numChannels && i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1);
+         Index++) {
+        class = regdm_get_opclass_from_channel(pMac->scan.countryCodeCurrent,
+                            pMac->scan.baseChannels.channelList[Index],
+                            BWALL);
+        smsLog(pMac, LOG4, FL("for chan %d, op class: %d"),
+               pMac->scan.baseChannels.channelList[Index],
+               class);
+
+        found = FALSE;
+        for (j = 0 ; j < SIR_MAC_MAX_SUPP_OPER_CLASSES - 1; j++) {
+           if (opClasses[j] == class) {
+              found = TRUE;
+              break;
+           }
+        }
+        if (!found) {
+            opClasses[i]= class;
+            i++;
+        }
+    }
+
+    numChannels = pMac->scan.base20MHzChannels.numChannels;
+
+    smsLog(pMac, LOG1, FL("Num of 20MHz channels %d"), numChannels);
+
+    for (Index = 0;
+         Index < numChannels && i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1);
+         Index++) {
+        class = regdm_get_opclass_from_channel(pMac->scan.countryCodeCurrent,
+                            pMac->scan.base20MHzChannels.channelList[Index],
+                            BWALL);
+        smsLog(pMac, LOG4, FL("for chan %d, op class: %d"),
+               pMac->scan.base20MHzChannels.channelList[ Index ],
+               class);
+
+        found = FALSE;
+        for (j = 0 ; j < SIR_MAC_MAX_SUPP_OPER_CLASSES - 1; j++) {
+           if (opClasses[j] == class) {
+              found = TRUE;
+              break;
+           }
+        }
+        if (!found) {
+            opClasses[i]= class;
+            i++;
+        }
+    }
+
+    numChannels = pMac->scan.base40MHzChannels.numChannels;
+
+    smsLog(pMac, LOG1, FL("Num of 40MHz channels %d"), numChannels);
+
+    for (Index = 0;
+         Index < numChannels && i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1);
+         Index++) {
+        class = regdm_get_opclass_from_channel(pMac->scan.countryCodeCurrent,
+                            pMac->scan.base40MHzChannels.channelList[Index],
+                            BWALL);
+        smsLog(pMac, LOG4, FL("for chan %d, op class: %d"),
+               pMac->scan.base40MHzChannels.channelList[ Index ],
+               class);
+
+        found = FALSE;
+        for (j = 0 ; j < SIR_MAC_MAX_SUPP_OPER_CLASSES - 1; j++) {
+           if (opClasses[j] == class) {
+              found = TRUE;
+              break;
+           }
+        }
+        if (!found) {
+            opClasses[i]= class;
+            i++;
+        }
+    }
+
+    numClasses = i;
+
+    /* As per spec the operating classes should be in ascending order.
+     * Bubble sort is fine since we don't have many classes
+     */
+    for (i = 0 ; i < (numClasses - 1); i++) {
+        for (j = 0 ; j < (numClasses - i - 1); j++) {
+            /* For decreasing order use < */
+            if (opClasses[j] > opClasses[j+1]) {
+                swap = opClasses[j];
+                opClasses[j] = opClasses[j+1];
+                opClasses[j+1] = swap;
+            }
+        }
+    }
+
+    smsLog(pMac, LOG1, FL("Total number of unique supported op classes %d"),
+           numClasses);
+    for (i = 0; i < numClasses; i++) {
+        smsLog(pMac, LOG1, FL("supported opClasses[%d] = %d"), i,
+               opClasses[i]);
+    }
+
+    /* Set the ordered list of op classes in regdomain
+     * for use by other modules
+     */
+    regdm_set_curr_opclasses(numClasses, &opClasses[0]);
+}
+

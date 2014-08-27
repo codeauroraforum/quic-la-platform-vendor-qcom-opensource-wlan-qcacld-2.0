@@ -80,7 +80,9 @@
 #include "cfgApi.h"
 #include "wniCfgAp.h"
 #include "wlan_hdd_misc.h"
-
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+#include <vos_utils.h>
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
 #if defined CONFIG_CNSS
 #include <net/cnss.h>
 #endif
@@ -117,6 +119,114 @@ extern int process_wma_set_command(int sessid, int paramid,
 /*---------------------------------------------------------------------------
  *   Function definitions
  *-------------------------------------------------------------------------*/
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_hostapd_channel_wakelock_init
+
+  \param  - Pointer to HDD context
+
+  \return - None
+
+  --------------------------------------------------------------------------*/
+void hdd_hostapd_channel_wakelock_init(hdd_context_t *pHddCtx)
+{
+    /* Iniitialize the wakelock */
+    vos_wake_lock_init(&pHddCtx->sap_dfs_wakelock, "sap_dfs_wakelock");
+    atomic_set(&pHddCtx->sap_dfs_ref_cnt, 0);
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_hostapd_channel_allow_suspend - Allow suspend in a channel.
+
+            Called when,
+                1. BSS stopped
+                2. Channel switch
+
+  \param  - pAdapter, channel
+
+  \return - None
+
+  --------------------------------------------------------------------------*/
+void hdd_hostapd_channel_allow_suspend(hdd_adapter_t *pAdapter,
+        u_int8_t channel)
+{
+
+    hdd_context_t *pHddCtx = (hdd_context_t*)(pAdapter->pHddCtx);
+    hdd_hostapd_state_t *pHostapdState =
+        WLAN_HDD_GET_HOSTAP_STATE_PTR(pAdapter);
+
+    /* Return if BSS is already stopped */
+    if (pHostapdState->bssState == BSS_STOP)
+        return;
+
+    /* Release wakelock when no more DFS channels are used */
+    if (NV_CHANNEL_DFS == vos_nv_getChannelEnabledState(channel)) {
+        if (atomic_dec_and_test(&pHddCtx->sap_dfs_ref_cnt)) {
+            hddLog(LOGE, FL("DFS: allowing suspend (chan %d)"), channel);
+            vos_wake_lock_release(&pHddCtx->sap_dfs_wakelock);
+        }
+    }
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_hostapd_channel_prevent_suspend - Prevent suspend in a channel.
+
+            Called when,
+                1. BSS started
+                2. Channel switch
+
+  \param  - pAdapter, channel
+
+  \return - None
+
+  --------------------------------------------------------------------------*/
+void hdd_hostapd_channel_prevent_suspend(hdd_adapter_t *pAdapter,
+        u_int8_t channel)
+{
+    hdd_context_t *pHddCtx = (hdd_context_t*)(pAdapter->pHddCtx);
+    hdd_hostapd_state_t *pHostapdState =
+        WLAN_HDD_GET_HOSTAP_STATE_PTR(pAdapter);
+
+    /* Return if BSS is already started */
+    if (pHostapdState->bssState == BSS_START)
+        return;
+
+    /* Acquire wakelock if we have at least one DFS channel in use */
+    if (NV_CHANNEL_DFS == vos_nv_getChannelEnabledState(channel)) {
+        if (atomic_inc_return(&pHddCtx->sap_dfs_ref_cnt) == 1) {
+            hddLog(LOGE, FL("DFS: preventing suspend (chan %d)"), channel);
+            vos_wake_lock_acquire(&pHddCtx->sap_dfs_wakelock);
+        }
+    }
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_hostapd_channel_wakelock_deinit
+
+  \param  - Pointer to HDD context
+
+  \return - None
+
+  --------------------------------------------------------------------------*/
+void hdd_hostapd_channel_wakelock_deinit(hdd_context_t *pHddCtx)
+{
+    if (atomic_read(&pHddCtx->sap_dfs_ref_cnt)) {
+        /* Release wakelock */
+        vos_wake_lock_release(&pHddCtx->sap_dfs_wakelock);
+        /* Reset the reference count */
+        atomic_set(&pHddCtx->sap_dfs_ref_cnt, 0);
+        hddLog(LOGE, FL("DFS: allowing suspend"));
+    }
+
+    /* Destroy lock */
+    vos_wake_lock_destroy(&pHddCtx->sap_dfs_wakelock);
+}
+
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_hostapd_open() - HDD Open function for hostapd interface
@@ -441,6 +551,29 @@ VOS_STATUS hdd_set_sap_ht2040_mode(hdd_adapter_t *pHostapdAdapter,
 }
 #endif
 
+#ifdef FEATURE_WLAN_FORCE_SAP_SCC
+/**---------------------------------------------------------------------------
+  \brief hdd_restart_softap() -
+   Restart SAP  on STA channel to support
+   STA + SAP concurrency.
+
+  --------------------------------------------------------------------------*/
+void hdd_restart_softap(hdd_context_t *pHddCtx,
+                        hdd_adapter_t *pHostapdAdapter)
+{
+   tHddAvoidFreqList   hdd_avoid_freq_list;
+
+   /* generate vendor specific event */
+   vos_mem_zero((void *)&hdd_avoid_freq_list, sizeof(tHddAvoidFreqList));
+   hdd_avoid_freq_list.avoidFreqRange[0].startFreq =
+        vos_chan_to_freq(pHostapdAdapter->sessionCtx.ap.operatingChannel);
+   hdd_avoid_freq_list.avoidFreqRange[0].endFreq =
+        vos_chan_to_freq(pHostapdAdapter->sessionCtx.ap.operatingChannel);
+   hdd_avoid_freq_list.avoidFreqRangeCount = 1;
+   wlan_hdd_send_avoid_freq_event(pHddCtx, &hdd_avoid_freq_list);
+}
+#endif /* FEATURE_WLAN_FORCE_SAP_SCC */
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_hostapd_set_mac_address() -
@@ -743,6 +876,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             wlan_hdd_auto_shutdown_enable(pHddCtx, VOS_TRUE);
 #endif
             pHddApCtx->operatingChannel = pSapEvent->sapevt.sapStartBssCompleteEvent.operatingChannel;
+
+            hdd_hostapd_channel_prevent_suspend(pHostapdAdapter,
+                    pHddApCtx->operatingChannel);
+
             pHostapdState->bssState = BSS_START;
 
 #ifdef FEATURE_GREEN_AP
@@ -846,6 +983,9 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
         case eSAP_STOP_BSS_EVENT:
             hddLog(LOG1, FL("BSS stop status = %s"),pSapEvent->sapevt.sapStopBssCompleteEvent.status ?
                              "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
+
+            hdd_hostapd_channel_allow_suspend(pHostapdAdapter,
+                    pHddApCtx->operatingChannel);
 
 #ifdef FEATURE_GREEN_AP
             hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_PS_STOP_EVENT);
@@ -1287,6 +1427,12 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
         case eSAP_CHANNEL_CHANGE_EVENT:
             hddLog(LOG1, FL("Received eSAP_CHANNEL_CHANGE_EVENT event"));
+            /* Prevent suspend for new channel */
+            hdd_hostapd_channel_prevent_suspend(pHostapdAdapter,
+                    pSapEvent->sapevt.sapChannelChange.operatingChannel);
+            /* Allow suspend for old channel */
+            hdd_hostapd_channel_allow_suspend(pHostapdAdapter,
+                    pHddApCtx->operatingChannel);
             /* TODO Need to indicate operating channel change to hostapd */
             return VOS_STATUS_SUCCESS;
 
@@ -2494,6 +2640,23 @@ static iw_softap_setparam(struct net_device *dev,
                         set_value, VDEV_CMD);
                 break;
             }
+#ifdef IPA_UC_OFFLOAD
+        case QCSAP_IPA_UC_STAT:
+            {
+                /* If input value is non-zero get stats */
+                if (set_value) {
+                    ret = process_wma_set_command(
+                         (int)pHostapdAdapter->sessionId,
+                         (int)WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID,
+                          0, VDEV_CMD);
+                }
+                else {
+                    /* place holder for stats clean up
+                     * Stats clean not implemented yet on firmware and ipa */
+                }
+                return ret;
+            }
+#endif /* IPA_UC_OFFLOAD */
         default:
             hddLog(LOGE, FL("Invalid setparam command %d value %d"),
                     sub_cmd, set_value);
@@ -4290,7 +4453,6 @@ int iw_get_softap_linkspeed(struct net_device *dev,
    return 0;
 }
 
-
 static const iw_handler      hostapd_handler[] =
 {
    (iw_handler) NULL,           /* SIOCSIWCOMMIT */
@@ -4539,6 +4701,12 @@ static const struct iw_priv_args hostapd_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0,
         "setRadar" },
+#ifdef IPA_UC_OFFLOAD
+    {   QCSAP_IPA_UC_STAT,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "ipaucstat" },
+#endif /* IPA_UC_OFFLOAD */
 
     {   QCASAP_TX_CHAINMASK_CMD,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

@@ -278,8 +278,16 @@ ol_txrx_pdev_attach(
         desc_pool_size = ol_tx_desc_pool_size_hl(ctrl_pdev);
         adf_os_atomic_init(&pdev->tx_queue.rsrc_cnt);
         adf_os_atomic_add(desc_pool_size, &pdev->tx_queue.rsrc_cnt);
+#if defined(CONFIG_PER_VDEV_TX_DESC_POOL)
+        /*
+         * 5% margin of unallocated desc is too much for per vdev mechanism.
+         * Define the value seperately.
+         */
+        pdev->tx_queue.rsrc_threshold_lo = TXRX_HL_TX_FLOW_CTRL_MGMT_RESERVED;
+#else
         /* always maintain a 5% margin of unallocated descriptors */
         pdev->tx_queue.rsrc_threshold_lo = (5 * desc_pool_size)/100;
+#endif
         /* when freeing up descriptors, keep going until there's a 15% margin */
         pdev->tx_queue.rsrc_threshold_hi = (15 * desc_pool_size)/100;
     } else {
@@ -834,11 +842,9 @@ ol_txrx_vdev_attach(
     vdev->hlTdlsFlag = false;
     #endif
 
-    #ifndef CONFIG_QCA_WIFI_ISOC
     #ifdef  QCA_IBSS_SUPPORT
     vdev->ibss_peer_num = 0;
     vdev->ibss_peer_heart_beat_timer = 0;
-    #endif
     #endif
 
     #if defined(CONFIG_HL_SUPPORT)
@@ -1381,7 +1387,7 @@ ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer)
      */
 
     if (0 == adf_os_atomic_read(&(peer->ref_cnt)) ) {
-        TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1, "The Peer is not present anymore\n");
+        TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "The Peer is not present anymore\n");
         adf_os_assert(0);
         return;
     }
@@ -1499,7 +1505,7 @@ ol_txrx_peer_detach(ol_txrx_peer_handle peer)
     /* debug print to dump rx reorder state */
     //htt_rx_reorder_log_print(vdev->pdev->htt_pdev);
 
-    TXRX_PRINT(TXRX_PRINT_LEVEL_INFO2,
+    TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
         "%s:peer %p (%02x:%02x:%02x:%02x:%02x:%02x)\n",
           __func__, peer,
           peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -2090,11 +2096,11 @@ ol_txrx_ipa_uc_set_active(
 void
 ol_txrx_ipa_uc_op_response(
    ol_txrx_pdev_handle pdev,
-   u_int8_t op_code
+   u_int8_t *op_msg
 )
 {
    if (pdev->ipa_uc_op_cb) {
-      pdev->ipa_uc_op_cb(op_code, pdev->osif_dev);
+      pdev->ipa_uc_op_cb(op_msg, pdev->osif_dev);
    }
 }
 
@@ -2105,6 +2111,11 @@ void ol_txrx_ipa_uc_register_op_cb(
 {
    pdev->ipa_uc_op_cb = op_cb;
    pdev->osif_dev = osif_dev;
+}
+
+void ol_txrx_ipa_uc_get_stat(ol_txrx_pdev_handle pdev)
+{
+   htt_h2t_ipa_uc_get_stats(pdev->htt_pdev);
 }
 
 #endif /* IPA_UC_OFFLOAD */
