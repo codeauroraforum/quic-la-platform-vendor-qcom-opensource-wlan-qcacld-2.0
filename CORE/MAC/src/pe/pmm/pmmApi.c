@@ -3297,7 +3297,10 @@ tSirRetStatus pmmOffloadEnterBmpsReqHandler(tpAniSirGlobal pMac,
     if (NULL == pEnablePsReqParams)
     {
         pmmLog(pMac, LOGE,
-               FL("Memory allocation failed for pEnablePsReqParams"));
+                FL("Memory allocation failed for pEnablePsReqParams"));
+        limSendSmeRsp(pMac, eWNI_PMC_ENTER_BMPS_RSP, eSIR_FAILURE,
+                psessionEntry->smeSessionId,
+                psessionEntry->transactionId);
         return eSIR_MEM_ALLOC_FAILED;
     }
 
@@ -3329,6 +3332,9 @@ tSirRetStatus pmmOffloadEnterBmpsReqHandler(tpAniSirGlobal pMac,
     {
         pmmLog(pMac, LOGE, FL("Posting WDA_ENTER_BMPS_REQ failed"));
         vos_mem_free(pEnablePsReqParams);
+        limSendSmeRsp(pMac, eWNI_PMC_ENTER_BMPS_RSP, eSIR_FAILURE,
+                psessionEntry->smeSessionId,
+                psessionEntry->transactionId);
         return eSIR_FAILURE;
     }
     /*
@@ -3438,6 +3444,9 @@ tSirRetStatus pmmOffloadExitBmpsReqHandler(tpAniSirGlobal pMac,
     if (NULL == pDisablePsReqParams)
     {
         pmmLog(pMac, LOGE, FL("Memory allocation failed for tDisablePsParams"));
+        limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, eSIR_FAILURE,
+                psessionEntry->smeSessionId,
+                psessionEntry->transactionId);
         return eSIR_MEM_ALLOC_FAILED;
     }
 
@@ -3457,6 +3466,9 @@ tSirRetStatus pmmOffloadExitBmpsReqHandler(tpAniSirGlobal pMac,
     {
         pmmLog(pMac, LOGE, FL("Posting WDA_EXIT_BMPS_REQ failed"));
         vos_mem_free(pDisablePsReqParams);
+        limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, eSIR_FAILURE,
+                psessionEntry->smeSessionId,
+                psessionEntry->transactionId);
         return eSIR_FAILURE;
     }
     /*
