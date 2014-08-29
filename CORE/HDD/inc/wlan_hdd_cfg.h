@@ -2498,6 +2498,10 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_MAX_CONCURRENT_CONNECTIONS_MIN        ( 1 )
 #define CFG_MAX_CONCURRENT_CONNECTIONS_MAX        ( 4 )
 
+#define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_NAME    "gEnableDeauthToDisassocMap"
+#define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_MIN     ( 0 )
+#define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_MAX     ( 1 )
+#define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_DEFAULT ( 0 )
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3037,6 +3041,7 @@ typedef struct
 
    v_S31_t                     dfsRadarPriMultiplier;
    v_U8_t                      gMaxConcurrentActiveSessions;
+   v_BOOL_t                    gEnableDeauthToDisassocMap;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
