@@ -257,7 +257,9 @@ enum {
     QCSAP_GET_ACL,
     QCASAP_TX_CHAINMASK_CMD,
     QCASAP_RX_CHAINMASK_CMD,
-    QCASAP_NSS_CMD
+    QCASAP_NSS_CMD,
+    QCSAP_IPA_UC_STAT,
+    QCASAP_SET_PHYMODE,
 };
 
 int iw_softap_get_channel_list(struct net_device *dev,
