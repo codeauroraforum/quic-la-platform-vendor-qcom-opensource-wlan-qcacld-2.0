@@ -199,6 +199,11 @@ CONFIG_CHECKSUM_OFFLOAD := 1
 #Enable GTK offload
 CONFIG_GTK_OFFLOAD := 1
 
+#Enable EXT WOW
+ifeq ($(CONFIG_ROME_IF),pci)
+	CONFIG_EXT_WOW := 1
+endif
+
 #Set this to 1 to catch erroneous Target accesses during debug.
 CONFIG_ATH_PCIE_ACCESS_DEBUG := 0
 
@@ -216,6 +221,9 @@ CONFIG_QCA_SINGLE_BINARY_SUPPORT := 0
 
 #Enable collecting target RAM dump after kernel panic
 CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC := 1
+
+#Flag to enable/disable secure firmware feature
+CONFIG_FEATURE_SECURE_FIRMWARE := 0
 
 #Flag to enable Stats Ext implementation
 CONFIG_FEATURE_STATS_EXT := 1
@@ -1181,6 +1189,11 @@ CDEFINES += -DWLAN_FEATURE_GTK_OFFLOAD
 CDEFINES += -DIGTK_OFFLOAD
 endif
 
+#Enable GTK Offload
+ifeq ($(CONFIG_EXT_WOW), 1)
+CDEFINES += -DWLAN_FEATURE_EXTWOW_SUPPORT
+endif
+
 #Mark it as SMP Kernel
 ifeq ($(CONFIG_SMP),y)
 CDEFINES += -DQCA_CONFIG_SMP
@@ -1237,6 +1250,11 @@ endif
 #Enable collecting target RAM dump after kernel panic
 ifeq ($(CONFIG_TARGET_RAMDUMP_AFTER_KERNEL_PANIC), 1)
 CDEFINES += -DTARGET_RAMDUMP_AFTER_KERNEL_PANIC
+endif
+
+#Enable/disable secure firmware feature
+ifeq ($(CONFIG_FEATURE_SECURE_FIRMWARE), 1)
+CDEFINES += -DFEATURE_SECURE_FIRMWARE
 endif
 
 ifeq ($(CONFIG_ATH_PCIE_ACCESS_DEBUG), 1)
