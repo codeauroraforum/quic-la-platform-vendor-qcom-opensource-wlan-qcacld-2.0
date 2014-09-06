@@ -741,6 +741,8 @@ static void hdd_ipa_destory_rm_resource(struct hdd_ipa_priv *hdd_ipa)
 
 static void hdd_ipa_send_skb_to_network(adf_nbuf_t skb, hdd_adapter_t *adapter)
 {
+	struct hdd_ipa_priv *hdd_ipa = ghdd_ipa;
+
 	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
 		HDD_IPA_LOG(VOS_TRACE_LEVEL_ERROR, "Invalid adapter: 0x%p",
 				adapter);
@@ -748,6 +750,12 @@ static void hdd_ipa_send_skb_to_network(adf_nbuf_t skb, hdd_adapter_t *adapter)
 		adf_nbuf_free(skb);
 		return;
 	}
+
+	if (hdd_ipa->hdd_ctx->isUnloadInProgress) {
+		adf_nbuf_free(skb);
+		return;
+	}
+
 	skb->dev = adapter->dev;
 	skb->protocol = eth_type_trans(skb, skb->dev);
 	skb->ip_summed = CHECKSUM_NONE;
@@ -766,6 +774,11 @@ static void hdd_ipa_send_pkt_to_ipa(struct hdd_ipa_priv *hdd_ipa)
 	adf_nbuf_t buf;
 	struct ipa_tx_data_desc *send_desc_head = NULL;
 
+	/* Unloading is in progress so do not proceed to send the packets to
+	 * IPA
+	 */
+	if (hdd_ipa->hdd_ctx->isUnloadInProgress)
+		return;
 
 	/* Make it priority queue request as send descriptor */
 	send_desc_head = hdd_ipa_alloc_data_desc(hdd_ipa, 1);
@@ -1222,10 +1235,12 @@ static void hdd_ipa_i2w_cb(void *priv, enum ipa_dp_evt_type evt,
 	hdd_ipa = iface_context->hdd_ipa;
 
 	/*
-	 * When SSR is going on, just drop the packets. There is no use in
-	 * queueing the packets as STA has to connect back any way
+	 * When SSR is going on or driver is unloading, just drop the packets.
+	 * During SSR, there is no use in queueing the packets as STA has to
+	 * connect back any way
 	 */
-	if (hdd_ipa->hdd_ctx->isLogpInProgress) {
+	if (hdd_ipa->hdd_ctx->isLogpInProgress ||
+			hdd_ipa->hdd_ctx->isUnloadInProgress) {
 		ipa_free_skb(ipa_tx_desc);
 		iface_context->stats.num_tx_drop++;
 		return;
@@ -1912,7 +1927,8 @@ static void hdd_ipa_rx_pipe_desc_free(void)
 	spin_unlock_bh(&hdd_ipa->q_lock);
 
 	if (i != max_desc_cnt)
-		HDD_IPA_LOG(VOS_TRACE_LEVEL_FATAL, "free desc leak");
+		HDD_IPA_LOG(VOS_TRACE_LEVEL_FATAL, "free desc leak: %u, %u", i,
+				max_desc_cnt);
 
 }
 
@@ -2267,6 +2283,11 @@ VOS_STATUS hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 	if (!hdd_ipa_is_enabled(hdd_ctx))
 		return VOS_STATUS_SUCCESS;
 
+	unregister_inetaddr_notifier(&hdd_ipa->ipv4_notifier);
+	hdd_ipa_teardown_sys_pipe(hdd_ipa);
+
+	hdd_ipa_destory_rm_resource(hdd_ipa);
+
 	cancel_work_sync(&hdd_ipa->pm_work);
 
 	adf_os_spin_lock_bh(&hdd_ipa->pm_lock);
@@ -2292,16 +2313,26 @@ VOS_STATUS hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 
 	hdd_ipa_debugfs_remove(hdd_ipa);
 
+	/* This should never hit but still make sure that there are no pending
+	 * descriptor in IPA hardware
+	 */
 	if (hdd_ipa->pending_hw_desc_cnt != 0) {
-		HDD_IPA_LOG(VOS_TRACE_LEVEL_FATAL, "IPA Pending write done: %d",
+		HDD_IPA_LOG(VOS_TRACE_LEVEL_ERROR,
+				"IPA Pending write done: %d Waiting!",
 				hdd_ipa->pending_hw_desc_cnt);
-		msleep(5);
-	}
-	hdd_ipa_rx_pipe_desc_free();
-	hdd_ipa_teardown_sys_pipe(hdd_ipa);
-	hdd_ipa_destory_rm_resource(hdd_ipa);
 
-	unregister_inetaddr_notifier(&hdd_ipa->ipv4_notifier);
+		for (i = 0; hdd_ipa->pending_hw_desc_cnt != 0 && i < 10; i++) {
+			usleep(100);
+		}
+
+		HDD_IPA_LOG(VOS_TRACE_LEVEL_ERROR,
+				"IPA Pending write done: desc: %d %s(%d)!",
+				hdd_ipa->pending_hw_desc_cnt,
+				hdd_ipa->pending_hw_desc_cnt == 0 ? "completed"
+				: "leak", i);
+	}
+
+	hdd_ipa_rx_pipe_desc_free();
 	adf_os_mem_free(hdd_ipa);
 	hdd_ctx->hdd_ipa = NULL;
 
