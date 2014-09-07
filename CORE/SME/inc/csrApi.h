@@ -653,6 +653,7 @@ typedef enum
     eCSR_DISCONNECT_REASON_HANDOFF,
     eCSR_DISCONNECT_REASON_IBSS_JOIN_FAILURE,
     eCSR_DISCONNECT_REASON_IBSS_LEAVE,
+    eCSR_DISCONNECT_REASON_STA_HAS_LEFT,
 }eCsrRoamDisconnectReason;
 
 typedef enum
@@ -1737,6 +1738,11 @@ eHalStatus csrSetBand(tHalHandle hHal, tANI_U8 sessionId, eCsrBand eBand);
 eCsrBand csrGetCurrentBand (tHalHandle hHal);
 
 typedef void (*csrReadyToSuspendCallback)(void *pContext, boolean suspended);
+
+#ifdef WLAN_FEATURE_EXTWOW_SUPPORT
+typedef void (*csrReadyToExtWoWCallback)(void *pContext, boolean status);
+#endif
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 eHalStatus csrRoamIssueFTRoamOffloadSynch(tHalHandle hHal, tANI_U32 sessionId,
                                           tSirBssDescription *pBssDescription);

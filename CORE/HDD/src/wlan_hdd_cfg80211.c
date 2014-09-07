@@ -4066,13 +4066,6 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
         return -EINVAL;
     }
 
-    if (params->tail && !params->tail_len)
-    {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                   FL("tail_len is zero but tail is not NULL"));
-        return -EINVAL;
-    }
-
     if(params->head)
         head_len = params->head_len;
     else
@@ -5644,14 +5637,16 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
 
     mutex_lock(&pHddCtx->sap_lock);
     if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags)) {
+        hdd_hostapd_state_t *pHostapdState =
+                    WLAN_HDD_GET_HOSTAP_STATE_PTR(pAdapter);
+
+        vos_event_reset(&pHostapdState->vosEvent);
 #ifdef WLAN_FEATURE_MBSSID
         status = WLANSAP_StopBss(WLAN_HDD_GET_SAP_CTX_PTR(pAdapter));
 #else
         status = WLANSAP_StopBss(pHddCtx->pvosContext);
 #endif
         if (VOS_IS_STATUS_SUCCESS(status)) {
-            hdd_hostapd_state_t *pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(pAdapter);
-
             status = vos_wait_single_event(&pHostapdState->vosEvent, 10000);
 
             if (!VOS_IS_STATUS_SUCCESS(status)) {
@@ -9548,7 +9543,6 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
         return status;
     }
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-#define KEY_MGMT_OFFLOAD_BITMASK 0x4
     /* Supplicant indicate its decision to offload key management
      * by setting the third bit in flags in case of Secure connection
      * so if the supplicant does not support this then LFR3.0 shall
@@ -9559,26 +9553,29 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
      * enabled in INI and FW also has the capability to handle
      * key management offload as part of LFR3.0
      */
-    VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_DEBUG,
-            "%s: LFR3:Supplicant key mgmt offload capability flags %x",
-                                                  __func__,req->flags);
-    if (!(req->auth_type == NL80211_AUTHTYPE_OPEN_SYSTEM) ||
-        (req->auth_type == NL80211_AUTHTYPE_FT)) {
-        if (!(req->flags & KEY_MGMT_OFFLOAD_BITMASK)) {
-            hddLog(VOS_TRACE_LEVEL_DEBUG,
-            FL("Supplicant does not support key mgmt offload for this AP"));
-            pHddCtx->cfg_ini->isRoamOffloadEnabled = 0;
-            status =    sme_UpdateRoamOffloadEnabled(pHddCtx->hHal, FALSE);
-        } else {
-            pHddCtx->cfg_ini->isRoamOffloadEnabled = 1;
-            status =    sme_UpdateRoamOffloadEnabled(pHddCtx->hHal, TRUE);
-        }
-        if (0 != status) {
-            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                   "%s: Could not update the RoamOffload enable", __func__);
-            return status;
-        }
+
+#ifdef NL80211_KEY_LEN_PMK /* if kernel supports key mgmt offload */
+    VOS_TRACE( VOS_MODULE_ID_HDD,
+               VOS_TRACE_LEVEL_ERROR,
+               "%s: LFR3:Supplicant association request flags %x",
+               __func__, req->flags);
+    if (!(req->flags & ASSOC_REQ_OFFLOAD_KEY_MGMT)) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+        FL("Supplicant does not support key mgmt offload for this AP"));
+        sme_UpdateRoamKeyMgmtOffloadEnabled(pHddCtx->hHal,
+                                            pAdapter->sessionId,
+                                            FALSE);
+    } else {
+        sme_UpdateRoamKeyMgmtOffloadEnabled(pHddCtx->hHal,
+                                            pAdapter->sessionId,
+                                            TRUE);
     }
+#else
+    hddLog(VOS_TRACE_LEVEL_ERROR,
+        FL("Kernel does not support key mgmt offload"));
+    sme_UpdateRoamKeyMgmtOffloadEnabled(pHddCtx->hHal, pAdapter->sessionId, FALSE);
+#endif /* #ifdef NL80211_KEY_LEN_PMK */
+
 #endif
     if (vos_max_concurrent_connections_reached()) {
         hddLog(VOS_TRACE_LEVEL_ERROR, FL("Reached max concurrent connections"));
@@ -9810,14 +9807,24 @@ static int __wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
 
         case WLAN_REASON_PREV_AUTH_NOT_VALID:
         case WLAN_REASON_CLASS2_FRAME_FROM_NONAUTH_STA:
-        case WLAN_REASON_DEAUTH_LEAVING:
              reasonCode = eCSR_DISCONNECT_REASON_DEAUTH;
              break;
 
+        case WLAN_REASON_DEAUTH_LEAVING:
+             reasonCode = pHddCtx->cfg_ini->gEnableDeauthToDisassocMap ?
+                 eCSR_DISCONNECT_REASON_STA_HAS_LEFT :
+                 eCSR_DISCONNECT_REASON_DEAUTH;
+             break;
+        case WLAN_REASON_DISASSOC_STA_HAS_LEFT:
+             reasonCode = eCSR_DISCONNECT_REASON_STA_HAS_LEFT;
+             break;
         default:
              reasonCode = eCSR_DISCONNECT_REASON_UNSPECIFIED;
             break;
         }
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                  FL("convert to internal reason %d to reasonCode %d"),
+                  reason, reasonCode);
         pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
         pScanInfo =  &pAdapter->scan_info;
         if (pScanInfo->mScanPending) {
@@ -10890,7 +10897,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
             }
             if (rate_flags & eHAL_TX_RATE_SGI)
             {
-                sinfo->txrate.flags |= RATE_INFO_FLAGS_MCS;
+                if (!(sinfo->txrate.flags & RATE_INFO_FLAGS_VHT_MCS))
+                    sinfo->txrate.flags |= RATE_INFO_FLAGS_MCS;
                 sinfo->txrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
             }
 

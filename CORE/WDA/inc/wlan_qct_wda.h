@@ -407,6 +407,7 @@ typedef struct
 typedef struct {
    v_UINT_t param_id;
    v_UINT_t param_value;
+   v_UINT_t param_sec_value;
    v_UINT_t param_vdev_id;
    v_UINT_t param_vp_dev;
 } wda_cli_set_cmd_t;
@@ -971,6 +972,12 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 #define WDA_LINK_STATUS_GET_REQ SIR_HAL_LINK_STATUS_GET_REQ
 #define WDA_GET_LINK_STATUS_RSP_IND SIR_HAL_GET_LINK_STATUS_RSP_IND
+
+#ifdef WLAN_FEATURE_EXTWOW_SUPPORT
+#define WDA_WLAN_EXT_WOW                      SIR_HAL_CONFIG_EXT_WOW
+#define WDA_WLAN_SET_APP_TYPE1_PARAMS         SIR_HAL_CONFIG_APP_TYPE1_PARAMS
+#define WDA_WLAN_SET_APP_TYPE2_PARAMS         SIR_HAL_CONFIG_APP_TYPE2_PARAMS
+#endif
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 

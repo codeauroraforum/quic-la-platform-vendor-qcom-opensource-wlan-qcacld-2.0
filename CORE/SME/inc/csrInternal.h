@@ -75,6 +75,7 @@
 )
 
 #define CSR_IS_SESSION_ANY(sessionId) (sessionId == CSR_SESSION_ID_ANY)
+#define CSR_MAX_NUM_COUNTRY_CODE  100
 #define CSR_IS_SELECT_5GHZ_MARGIN( pMac ) \
 ( \
    (((pMac)->roam.configParam.nSelect5GHzMargin)?eANI_BOOLEAN_TRUE:eANI_BOOLEAN_FALSE) \
@@ -220,6 +221,7 @@ typedef enum
     eCSR_ROAM_SUBSTATE_JOINED_NO_TRAFFIC,
     eCSR_ROAM_SUBSTATE_JOINED_NON_REALTIME_TRAFFIC,
     eCSR_ROAM_SUBSTATE_JOINED_REALTIME_TRAFFIC,
+    eCSR_ROAM_SUBSTATE_DISASSOC_STA_HAS_LEFT,
 //  max is 15 unless the bitfield is expanded...
 } eCsrRoamSubState;
 
@@ -700,6 +702,11 @@ typedef struct tagCsrOsChannelMask
     tANI_U8 channelList[WNI_CFG_VALID_CHANNEL_LIST_LEN];
 }tCsrOsChannelMask;
 
+typedef struct tagCsrVotes11d
+{
+    tANI_U8 votes;
+    tANI_U8 countryCode[WNI_CFG_COUNTRY_CODE_LEN];
+}tCsrVotes11d;
 
 typedef struct tagCsrScanStruct
 {
@@ -745,6 +752,12 @@ typedef struct tagCsrScanStruct
     tANI_S8 currentCountryRSSI;     // RSSI for current country code
     tANI_BOOLEAN f11dInfoApplied;
     tANI_BOOLEAN fCancelIdleScan;
+    tANI_U8 countryCodeCount;
+    tCsrVotes11d votes11d[CSR_MAX_NUM_COUNTRY_CODE]; //counts for various advertized country codes
+    //in 11d IE from probe rsp or beacons of neighboring APs;
+    //will use the most popular one (max count)
+    tANI_U8 countryCodeElected[WNI_CFG_COUNTRY_CODE_LEN];
+
     tANI_U8 numBGScanChannel;   //number of valid channels in the bgScanChannelList
     tANI_U8 bgScanChannelList[WNI_CFG_BG_SCAN_CHANNEL_LIST_LEN];
     //the ChannelInfo member is not used in this structure.
@@ -980,6 +993,7 @@ typedef struct tagCsrRoamSession
     tCsrRoamOffloadSynchStruct roamOffloadSynchParams;
     tANI_U8 psk_pmk[SIR_ROAM_SCAN_PSK_SIZE];
     size_t  pmk_len;
+    tANI_U8 RoamKeyMgmtOffloadEnabled;
 #endif
 
     /* SME FT Context */

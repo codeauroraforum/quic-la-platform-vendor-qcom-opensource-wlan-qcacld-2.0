@@ -4927,9 +4927,7 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac,
     eHalStatus  status = eHAL_STATUS_SUCCESS;
     VOS_STATUS  vstatus;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-    tpSirSmeRoamOffloadSynchCnf pRoamOffloadSynchCnf;
     tCsrRoamInfo roamInfo;
-    vos_msg_t msg;
     tCsrRoamSession *pSession = &pMac->roam.roamSession[sessionId];
 #endif
     tpFTRoamCallbackUsrCtx  pUsrCtx;
@@ -5122,8 +5120,6 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
                      if (pSession->roamOffloadSynchParams.bRoamSynchInProgress)
                      {
-                        VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
-                        "SYNCH_CNF");
                          if (pMac->roam.pReassocResp != NULL)
                          {
                             VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
@@ -5134,46 +5130,16 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac,
                          if (eSIR_ROAM_AUTH_STATUS_AUTHENTICATED ==
                              pSession->roamOffloadSynchParams.authStatus)
                          {
-                             pRoamOffloadSynchCnf =
-                             vos_mem_malloc(sizeof(tSirSmeRoamOffloadSynchCnf));
-                             if (NULL == pRoamOffloadSynchCnf)
-                             {
-                                 VOS_TRACE(VOS_MODULE_ID_SME,
-                                 VOS_TRACE_LEVEL_ERROR,
-                                 "%s: not able to allocate memory for roam"
-                                 "offload synch confirmation data", __func__);
-                                 return eHAL_STATUS_FAILURE;
-                             }
                              VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
                                "LFR3: Sending authorized event to supplicant");
                              csrRoamCallCallback(pMac, sessionId, &roamInfo, 0,
                                                 eCSR_ROAM_AUTHORIZED_EVENT, 0);
-                             pRoamOffloadSynchCnf->sessionId = sessionId;
-                             msg.type     = WDA_ROAM_OFFLOAD_SYNCH_CNF;
-                             msg.reserved = 0;
-                             msg.bodyptr  = pRoamOffloadSynchCnf;
                              VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
-                                   "LFR3: Posting WDA_ROAM_OFFLOAD_SYNCH_CNF");
-                             if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(
-                                                    VOS_MODULE_ID_WDA, &msg)))
-                             {
-                                 VOS_TRACE(VOS_MODULE_ID_SME,
-                                 VOS_TRACE_LEVEL_DEBUG,
-                                 "%s: Not able to post"
-                                 "WDA_ROAM_OFFLOAD_SYNCH_CNF message to WDA",
-                                 __func__);
-                                 vos_mem_free(pRoamOffloadSynchCnf);
-                                 return eHAL_STATUS_FAILURE;
-                             }
+                             "LFR3:Send SynchCnf auth status authenticated");
+                             csrRoamOffloadSendSynchCnf( pMac, sessionId);
                          }
                          pSession->roamOffloadSynchParams.bRoamSynchInProgress =
                          VOS_FALSE;
-                         if (eSIR_ROAM_AUTH_STATUS_CONNECTED ==
-                             pSession->roamOffloadSynchParams.authStatus) {
-                             csrRoamOffloadScan(pMac, sessionId,
-                                                ROAM_SCAN_OFFLOAD_START,
-                                                REASON_CONNECT);
-                         }
                      } else
 #endif
                      csrRoamOffloadScan(pMac, sessionId,
