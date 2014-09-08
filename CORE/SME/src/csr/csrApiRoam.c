@@ -5458,6 +5458,7 @@ eHalStatus csrRoamOffloadSendSynchCnf(tpAniSirGlobal pMac, tANI_U8 sessionId)
 {
     tpSirSmeRoamOffloadSynchCnf pRoamOffloadSynchCnf;
     vos_msg_t msg;
+    tCsrRoamSession *pSession = &pMac->roam.roamSession[sessionId];
     pRoamOffloadSynchCnf =
             vos_mem_malloc(sizeof(tSirSmeRoamOffloadSynchCnf));
     if (NULL == pRoamOffloadSynchCnf)
@@ -5466,6 +5467,7 @@ eHalStatus csrRoamOffloadSendSynchCnf(tpAniSirGlobal pMac, tANI_U8 sessionId)
           VOS_TRACE_LEVEL_ERROR,
           "%s: not able to allocate memory for roam"
           "offload synch confirmation data", __func__);
+        pSession->roamOffloadSynchParams.bRoamSynchInProgress = VOS_FALSE;
         return eHAL_STATUS_FAILURE;
     }
     pRoamOffloadSynchCnf->sessionId = sessionId;
@@ -5477,14 +5479,14 @@ eHalStatus csrRoamOffloadSendSynchCnf(tpAniSirGlobal pMac, tANI_U8 sessionId)
     if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(
                                     VOS_MODULE_ID_WDA, &msg)))
     {
-            VOS_TRACE(VOS_MODULE_ID_SME,
-                VOS_TRACE_LEVEL_DEBUG,
-                "%s: Not able to post"
-                  "WDA_ROAM_OFFLOAD_SYNCH_CNF message to WDA",
-                     __func__);
-            vos_mem_free(pRoamOffloadSynchCnf);
-         return eHAL_STATUS_FAILURE;
+        VOS_TRACE(VOS_MODULE_ID_SME,VOS_TRACE_LEVEL_DEBUG,
+        "%s: Not able to post WDA_ROAM_OFFLOAD_SYNCH_CNF message to WDA",
+        __func__);
+        vos_mem_free(pRoamOffloadSynchCnf);
+        pSession->roamOffloadSynchParams.bRoamSynchInProgress = VOS_FALSE;
+        return eHAL_STATUS_FAILURE;
     }
+    pSession->roamOffloadSynchParams.bRoamSynchInProgress = VOS_FALSE;
     return eHAL_STATUS_SUCCESS;
 }
 #endif
@@ -18201,6 +18203,7 @@ csrRoamChannelChangeReq( tpAniSirGlobal pMac, tCsrBssid bssid,
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tSirChanChangeRequest *pMsg;
+    tANI_U32 vhtChannelWidth;
 
     pMsg = vos_mem_malloc( sizeof(tSirChanChangeRequest) );
     if (!pMsg)
@@ -18209,6 +18212,13 @@ csrRoamChannelChangeReq( tpAniSirGlobal pMac, tCsrBssid bssid,
     }
 
     vos_mem_set((void *)pMsg, sizeof( tSirChanChangeRequest ), 0);
+
+    /*
+     * We are getting channel width from sapDfsInfor structure
+     * because we've implemented channel width fallback mechanism for DFS
+     * which will result in channel width changing dynamically.
+     */
+    vhtChannelWidth = pMac->sap.SapDfsInfo.new_chanWidth;
 
 #ifdef WLAN_FEATURE_11AC
     // cbMode = 1 in cfg.ini is mapped to PHY_DOUBLE_CHANNEL_HIGH_PRIMARY = 3
@@ -18221,7 +18231,10 @@ csrRoamChannelChangeReq( tpAniSirGlobal pMac, tCsrBssid bssid,
         }
         else
         {
-            ccmCfgSetInt(pMac, WNI_CFG_VHT_CHANNEL_WIDTH,  pMac->roam.configParam.nVhtChannelWidth, NULL, eANI_BOOLEAN_FALSE);
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_MED,
+                      FL("sapdfs: channel width is [%d]"), vhtChannelWidth);
+            ccmCfgSetInt(pMac, WNI_CFG_VHT_CHANNEL_WIDTH,
+                         vhtChannelWidth, NULL, eANI_BOOLEAN_FALSE);
         }
     }
 #endif
