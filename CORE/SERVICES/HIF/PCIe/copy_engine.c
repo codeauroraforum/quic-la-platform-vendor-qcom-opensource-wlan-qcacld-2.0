@@ -229,7 +229,7 @@ CE_sendlist_init(struct CE_sendlist *sendlist)
     sl->num_items=0;
 }
 
-void
+int
 CE_sendlist_buf_add(struct CE_sendlist *sendlist,
                     CE_addr_t buffer,
                     unsigned int nbytes,
@@ -239,7 +239,10 @@ CE_sendlist_buf_add(struct CE_sendlist *sendlist,
     unsigned int num_items = sl->num_items;
     struct CE_sendlist_item *item;
 
-    A_ASSERT(num_items < CE_SENDLIST_ITEMS_MAX);
+	if (num_items >= CE_SENDLIST_ITEMS_MAX) {
+		A_ASSERT(num_items < CE_SENDLIST_ITEMS_MAX);
+		return A_NO_RESOURCE;
+	}
 
     item = &sl->item[num_items];
     item->send_type = CE_SIMPLE_BUFFER_TYPE;
@@ -247,6 +250,7 @@ CE_sendlist_buf_add(struct CE_sendlist *sendlist,
     item->u.nbytes = nbytes;
     item->flags = flags;
     sl->num_items = num_items+1;
+	return A_OK;
 }
 
 int
