@@ -397,6 +397,8 @@
 
 #define SIR_MAC_EID_VENDOR                221
 
+#define SIR_MAC_WAPI_EID                68
+
 // reserved                            222-254
 #define SIR_MAC_HT_CAPABILITIES_EID    45
 #define SIR_MAC_HT_CAPABILITIES_EID_MIN    0
@@ -1087,7 +1089,15 @@ typedef __ani_attr_pre_packed struct sSirMacWpaInfo
 {
     tANI_U8        length;
     tANI_U8        info[SIR_MAC_MAX_IE_LENGTH];
-} __ani_attr_packed tSirMacWpaInfo, *tpSirMacWpaInfo, tSirMacRsnInfo, *tpSirMacRsnInfo;
+} __ani_attr_packed tSirMacWpaInfo, *tpSirMacWpaInfo,
+    tSirMacRsnInfo, *tpSirMacRsnInfo;
+
+typedef __ani_attr_pre_packed struct sSirMacWapiInfo
+{
+    tANI_U8        length;
+    tANI_U8        info[SIR_MAC_MAX_IE_LENGTH];
+} __ani_attr_packed tSirMacWapiInfo, *tpSirMacWapiInfo,
+    tSirMacWapiInfo, *tpSirMacWapiInfo;
 
 typedef __ani_attr_pre_packed struct sSirMacFHParamSet
 {

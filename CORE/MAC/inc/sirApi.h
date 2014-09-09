@@ -1224,6 +1224,7 @@ typedef struct sSirSmeAssocInd
     tANI_U8              bcastSig; // DPU signature for broadcast packets
     tAniAuthType         authType;
     tAniSSID             ssId; // SSID used by STA to associate
+    tSirWAPIie           wapiIE;//WAPI IE received from peer
     tSirRSNie            rsnIE;// RSN IE received from peer
     tSirAddie            addIE;// Additional IE received from peer, which possibly include WSC IE and/or P2P IE
 
