@@ -7415,9 +7415,11 @@ static int __wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
         case WLAN_CIPHER_SUITE_KRK:
             setKey.encType = eCSR_ENCRYPT_TYPE_KRK;
             break;
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
         case WLAN_CIPHER_SUITE_BTK:
             setKey.encType = eCSR_ENCRYPT_TYPE_BTK;
             break;
+#endif
 #endif
 
 #ifdef WLAN_FEATURE_11W
@@ -9619,9 +9621,11 @@ static int wlan_hdd_cfg80211_set_cipher( hdd_adapter_t *pAdapter,
         case WLAN_CIPHER_SUITE_KRK:
             encryptionType = eCSR_ENCRYPT_TYPE_KRK;
             break;
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
         case WLAN_CIPHER_SUITE_BTK:
             encryptionType = eCSR_ENCRYPT_TYPE_BTK;
             break;
+#endif
 #endif
             default:
                 hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Unsupported cipher type %d",
