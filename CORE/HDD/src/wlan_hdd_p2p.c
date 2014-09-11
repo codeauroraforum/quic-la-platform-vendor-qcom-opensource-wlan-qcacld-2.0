@@ -571,11 +571,6 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
     pRemainChanCtx->cookie = *cookie;
     pRemainChanCtx->rem_on_chan_request = request_type;
 
-    mutex_lock(&cfgState->remain_on_chan_ctx_lock);
-    cfgState->remain_on_chan_ctx = pRemainChanCtx;
-    pAdapter->is_roc_inprogress = TRUE;
-    mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
-
     cfgState->current_freq = chan->center_freq;
 
     pRemainChanCtx->action_pkt_buff.freq = 0;
@@ -596,6 +591,7 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
 
     mutex_lock(&cfgState->remain_on_chan_ctx_lock);
     cfgState->remain_on_chan_ctx = pRemainChanCtx;
+    pAdapter->is_roc_inprogress = TRUE;
     mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
 
     status =  hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
