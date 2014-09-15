@@ -1460,6 +1460,10 @@ struct hdd_context_s
 #ifdef FEATURE_GREEN_AP
     hdd_green_ap_ctx_t *green_ap_ctx;
 #endif
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+    vos_timer_t skip_acs_scan_timer;
+    v_U8_t skip_acs_scan_status;
+#endif
 
     vos_wake_lock_t sap_dfs_wakelock;
     atomic_t sap_dfs_ref_cnt;
