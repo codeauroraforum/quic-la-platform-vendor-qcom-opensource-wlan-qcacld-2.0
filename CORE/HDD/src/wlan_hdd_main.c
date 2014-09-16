@@ -11045,7 +11045,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    vos_mem_zero(pHddCtx, sizeof( hdd_context_t ));
 
    pHddCtx->wiphy = wiphy;
-   hdd_prevent_suspend();
    pHddCtx->isLoadInProgress = TRUE;
    pHddCtx->ioctl_scan_mode = eSIR_ACTIVE_SCAN;
 
@@ -11794,7 +11793,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    hdd_hostapd_channel_wakelock_init(pHddCtx);
 
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
-   hdd_allow_suspend();
 #ifndef CONFIG_ENABLE_LINUX_REG
    /*updating wiphy so that regulatory user hints can be processed*/
    if (wiphy)
@@ -12001,8 +11999,6 @@ err_free_adf_context:
 #endif
 
 err_free_hdd_context:
-   hdd_allow_suspend();
-
    /* wiphy_free() will free the HDD context so remove global reference */
    if (pVosContext)
       ((VosContextType*)(pVosContext))->pHDDContext = NULL;
@@ -12060,6 +12056,7 @@ static int hdd_driver_init( void)
    ENTER();
 
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
+   hdd_prevent_suspend();
 #ifdef HDD_TRACE_RECORD
    MTRACE(hddTraceInit());
 #endif
@@ -12145,17 +12142,16 @@ static int hdd_driver_init( void)
            ret_status = 0;
    }
 
-   if (ret_status)
-   {
-       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: WLAN Driver Initialization failed",
+   hdd_allow_suspend();
+
+   if (ret_status) {
+       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: WLAN Driver Initialization failed",
                __func__);
        hif_unregister_driver();
        vos_preClose( &pVosContext );
        ret_status = -ENODEV;
        break;
-   }
-   else
-   {
+   } else {
        pr_info("%s: driver loaded\n", WLAN_MODULE_NAME);
        return 0;
    }
