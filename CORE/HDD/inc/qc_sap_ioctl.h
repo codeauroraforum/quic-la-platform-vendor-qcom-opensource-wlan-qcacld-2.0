@@ -259,6 +259,7 @@ enum {
     QCASAP_RX_CHAINMASK_CMD,
     QCASAP_NSS_CMD,
     QCASAP_SET_PHYMODE,
+    QCASAP_GET_TEMP_CMD,
 };
 
 int iw_softap_get_channel_list(struct net_device *dev,

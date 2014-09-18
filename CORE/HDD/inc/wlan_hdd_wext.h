@@ -428,4 +428,7 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
                                    int new_phymode,
                                    hdd_context_t *phddctx);
 
+void hdd_GetTemperatureCB(int temperature, void *pContext);
+VOS_STATUS wlan_hdd_get_temperature(hdd_adapter_t *pAdapter,
+        union iwreq_data *wrqu, char *extra);
 #endif // __WEXT_IW_H__
