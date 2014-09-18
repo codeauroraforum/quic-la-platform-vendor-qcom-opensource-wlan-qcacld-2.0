@@ -3668,4 +3668,15 @@ v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal);
     -------------------------------------------------------------------------*/
 tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal);
 
+/* ---------------------------------------------------------------------------
+   \fn sme_GetTemperature
+   \brief SME API to get the pdev temperature
+   \param hHal
+   \param temperature context
+   \param pCallbackfn: callback fn with response (temperature)
+   \- return eHalStatus
+   -------------------------------------------------------------------------*/
+eHalStatus sme_GetTemperature(tHalHandle hHal,
+        void *tempContext,
+        void (*pCallbackfn)(int temperature, void *pContext));
 #endif //#if !defined( __SME_API_H )

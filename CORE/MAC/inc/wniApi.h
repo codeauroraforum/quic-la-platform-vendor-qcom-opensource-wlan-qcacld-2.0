@@ -403,6 +403,8 @@ enum eWniMsgTypes
 #ifdef QCA_HT_2040_COEX
     eWNI_SME_SET_HT_2040_MODE,
 #endif
+    eWNI_SME_MSG_GET_TEMPERATURE_IND,
+
     eWNI_SME_MSG_TYPES_END
 };
 
