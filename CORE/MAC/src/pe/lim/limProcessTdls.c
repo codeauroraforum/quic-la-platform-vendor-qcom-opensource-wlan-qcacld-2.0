@@ -1932,7 +1932,7 @@ tSirRetStatus limSendTdlsLinkSetupCnfFrame(tpAniSirGlobal pMac, tSirMacAddr peer
     }
     if ( true == psessionEntry->vhtCapability)
     {
-        PopulateDot11fVHTOperation( pMac, &tdlsSetupCnf.VHTOperation);
+        PopulateDot11fVHTOperation( pMac, psessionEntry, &tdlsSetupCnf.VHTOperation);
     }
 
     /*
