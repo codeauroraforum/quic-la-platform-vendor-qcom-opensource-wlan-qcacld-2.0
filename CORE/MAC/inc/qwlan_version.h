@@ -1,5 +1,5 @@
-/*utomatic merge failed; fix conflicts and then commit the result.
- * Copyright (c) 2012-2013,2014 The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -34,7 +34,7 @@ FILE:
 
 BRIEF DESCRIPTION:
    WLAN Host Version file.
-   Build number automaticly updated by build scripts.
+   Build number automatically updated by build scripts.
 
 ===========================================================================*/
 
@@ -43,9 +43,9 @@ BRIEF DESCRIPTION:
 #define QWLAN_VERSION_PATCH            0
 #define QWLAN_VERSION_EXTRA            ""
 
-#define QWLAN_VERSION_BUILD            188
+#define QWLAN_VERSION_BUILD            189
 
-#define QWLAN_VERSIONSTR               "1.0.0.188"
+#define QWLAN_VERSIONSTR               "1.0.0.189A"
 
 
 #define AR6320_REV1_VERSION             0x5000000
