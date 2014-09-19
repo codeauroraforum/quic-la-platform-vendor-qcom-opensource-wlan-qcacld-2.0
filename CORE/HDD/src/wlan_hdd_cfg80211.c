@@ -2182,6 +2182,14 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     hdd_hostapd_state_t *pHostapdState;
     v_CONTEXT_t pVosContext = (WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext;
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
+#ifdef WLAN_FEATURE_11AC
+    v_BOOL_t sapForce11ACFor11n =
+#ifdef WLAN_FEATURE_MBSSID
+             pHostapdAdapter->sap_dyn_ini_cfg.apForce11ACFor11n;
+#else
+             pHddCtx->cfg_ini->apForce11ACFor11n;
+#endif
+#endif
     struct qc_mac_acl_entry *acl_entry = NULL;
     v_SINT_t i;
     hdd_config_t *iniConfig;
@@ -2614,6 +2622,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
      * Otherwise, leave whatever is set in hostapd (a OR b OR g OR n mode) */
     if( ((pConfig->SapHw_mode == eSAP_DOT11_MODE_11n) ||
          (pConfig->SapHw_mode == eSAP_DOT11_MODE_11n_ONLY)) &&
+         sapForce11ACFor11n &&
         (((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_AUTO) ||
          ((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac) ||
          ((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY)) )
