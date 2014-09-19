@@ -1233,10 +1233,11 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             {
                 /* send peer status indication to oem app */
                 hdd_SendPeerStatusIndToOemApp(
-                  &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac,
-                  ePeerConnected,
-                  pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.timingMeasCap,
-                  pHostapdAdapter->sessionId, pHddApCtx->operatingChannel);
+                    &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac,
+                    ePeerConnected,
+                    pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.timingMeasCap,
+                    pHostapdAdapter->sessionId,
+                    &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.chan_info);
             }
 
 #ifdef FEATURE_GREEN_AP
@@ -1329,7 +1330,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 hdd_SendPeerStatusIndToOemApp(
                   &pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac,
                   ePeerDisconnected, 0,
-                  pHostapdAdapter->sessionId, pHddApCtx->operatingChannel);
+                  pHostapdAdapter->sessionId, NULL);
             }
 
 #ifdef MSM_PLATFORM
