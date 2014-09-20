@@ -155,6 +155,10 @@ typedef struct tagSmeStruct
     /* Maximum interfaces allowed by the host */
     tANI_U8 max_intf_count;
     void (* StatsExtCallback) (void *, tStatsExtEvent *);
+
+    /* get temperature event context and callback */
+    void *pTemperatureCbContext;
+    void (*pGetTemperatureCb)(int temperature, void *context);
 } tSmeStruct, *tpSmeStruct;
 
 
