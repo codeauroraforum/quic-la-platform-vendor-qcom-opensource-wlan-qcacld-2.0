@@ -2328,6 +2328,15 @@ sirConvertAssocReqFrame2Struct(tpAniSirGlobal pMac,
         ConvertWPAOpaque( pMac, &pAssocReq->wpa, &ar->WPAOpaque );
     }
 
+#ifdef FEATURE_WLAN_WAPI
+    // WAPI
+    if ( ar->WAPIOpaque.present )
+    {
+        pAssocReq->wapiPresent = 1;
+        ConvertWAPIOpaque( pMac, &pAssocReq->wapi, &ar->WAPIOpaque );
+    }
+#endif
+
     // RSN
     if ( ar->RSNOpaque.present )
     {
