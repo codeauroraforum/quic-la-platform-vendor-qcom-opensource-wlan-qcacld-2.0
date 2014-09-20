@@ -689,6 +689,7 @@ typedef struct tagCsrConfig
 #endif
     tANI_BOOLEAN allowDFSChannelRoam;
     tANI_BOOLEAN obssEnabled;
+    tANI_BOOLEAN apAutoChannelSelection;
 }tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo
