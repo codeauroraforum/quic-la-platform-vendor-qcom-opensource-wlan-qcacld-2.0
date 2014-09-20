@@ -280,6 +280,7 @@ extern spinlock_t hdd_context_lock;
 #define RSSI_CONTEXT_MAGIC  0x52535349   //RSSI
 #define POWER_CONTEXT_MAGIC 0x504F5752   //POWR
 #define SNR_CONTEXT_MAGIC   0x534E5200   //SNR
+#define TEMP_CONTEXT_MAGIC 0x74656d70   // TEMP (temperature)
 
 #ifdef FEATURE_WLAN_BATCH_SCAN
 #define HDD_BATCH_SCAN_VERSION (17)
@@ -1101,6 +1102,9 @@ struct hdd_adapter_s
     unsigned int tx_flow_high_watermark_offset;
 #endif /* QCA_LL_TX_FLOW_CT */
     v_BOOL_t offloads_configured;
+
+   /* variable for temperature in Celsius */
+   int temperature;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
