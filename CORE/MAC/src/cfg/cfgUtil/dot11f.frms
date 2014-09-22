@@ -4230,7 +4230,7 @@ FRAME TDLSSetupCnf
     OPTIE  TimeoutInterval;
     OPTIE  HTInfo;
     OPTIE  LinkIdentifier;
-    OPTIE  WMMInfoStation;
+    OPTIE  WMMParams;
     OPTIE  VHTOperation;
     OPTIE  OperatingMode;
 }
