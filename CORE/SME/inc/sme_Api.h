@@ -4040,4 +4040,14 @@ eHalStatus sme_getLinkStatus(tHalHandle hHal,
                              tCsrLinkStatusCallback callback,
                              void *pContext,
                              tANI_U8 sessionId);
+
+/* ---------------------------------------------------------------------------
+    \fn sme_SetScanningMacOui
+    \brief  SME API to set scanning mac oui
+    \param  hHal
+    \param  pScanMacOui: Scanning Mac Oui (input 3 bytes)
+    \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_SetScanningMacOui(tHalHandle hHal, tSirScanMacOui *pScanMacOui);
+
 #endif //#if !defined( __SME_API_H )
