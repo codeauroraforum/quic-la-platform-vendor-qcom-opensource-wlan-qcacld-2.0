@@ -4934,7 +4934,7 @@ typedef struct
 
 typedef struct
 {
-    /* Time of discovery */
+    /* Time of discovery (in micro second) */
     tANI_U64      ts;
 
     /* Null terminated SSID */
@@ -4942,7 +4942,7 @@ typedef struct
 
     tSirMacAddr   bssid;
 
-    /* Frequency in MHz*/
+    /* Frequency in MHz */
     tANI_U32      channel;
 
     /* RSSI in dBm */
