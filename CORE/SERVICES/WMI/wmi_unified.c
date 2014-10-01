@@ -46,6 +46,10 @@
 #include "macTrace.h"
 #include "if_pci.h"
 
+#if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC) && defined(CONFIG_CNSS)
+#include <net/cnss.h>
+#endif
+
 #define WMI_MIN_HEAD_ROOM 64
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
@@ -577,6 +581,14 @@ static u_int8_t* get_wmi_cmd_string(WMI_CMD_ID wmi_command)
 	return "Invalid WMI cmd";
 }
 
+/* worker thread to recover when Target doesn't respond with credits */
+static void recovery_work_handler(struct work_struct *recovery)
+{
+    cnss_device_self_recovery();
+}
+
+static DECLARE_WORK(recovery_work, recovery_work_handler);
+
 /* WMI command API */
 int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, int len,
 			 WMI_CMD_ID cmd_id)
@@ -629,7 +641,8 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, int len,
 		//dump_CE_debug_register(scn->hif_sc);
 		adf_os_atomic_dec(&wmi_handle->pending_cmds);
 		pr_err("%s: MAX 1024 WMI Pending cmds reached.\n", __func__);
-		VOS_BUG(0);
+		vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+		schedule_work(&recovery_work);
 		return -EBUSY;
 	}
 
