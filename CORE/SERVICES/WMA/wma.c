@@ -11042,7 +11042,7 @@ static void wma_delete_sta_req_ap_mode(tp_wma_handle wma,
 send_del_rsp:
 	if (del_sta->respReqd) {
 		WMA_LOGD("%s: Sending del rsp to umac (status: %d)",
-			__func__, del_sta->status);
+					__func__, del_sta->status);
 		wma_send_msg(wma, WDA_DELETE_STA_RSP, (void *)del_sta, 0);
 	}
 }
@@ -11103,9 +11103,11 @@ static void wma_del_tdls_sta(tp_wma_handle wma,
 	del_sta->status = VOS_STATUS_SUCCESS;
 
 send_del_rsp:
-	WMA_LOGD("%s: Sending del rsp to umac (status: %d)",
-	         __func__, del_sta->status);
-	wma_send_msg(wma, WDA_DELETE_STA_RSP, (void *)del_sta, 0);
+	if (del_sta->respReqd) {
+		WMA_LOGD("%s: Sending del rsp to umac (status: %d)",
+					__func__, del_sta->status);
+		wma_send_msg(wma, WDA_DELETE_STA_RSP, (void *)del_sta, 0);
+	}
 }
 #endif
 
@@ -11126,20 +11128,25 @@ static void wma_delete_sta_req_sta_mode(tp_wma_handle wma,
 #endif
 	wma_roam_scan_offload_end_connect(wma, params->smesessionId);
 	params->status = status;
-	WMA_LOGD("%s: vdev_id %d status %d", __func__, params->smesessionId, status);
-	wma_send_msg(wma, WDA_DELETE_STA_RSP, (void *)params, 0);
+	if (params->respReqd) {
+		WMA_LOGD("%s: vdev_id %d status %d", __func__,
+				params->smesessionId, status);
+		wma_send_msg(wma, WDA_DELETE_STA_RSP, (void *)params, 0);
+	}
 }
 
 static void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 {
 	tANI_U8 oper_mode = BSS_OPERATIONAL_MODE_STA;
+	u_int8_t smesession_id = del_sta->smesessionId;
+	bool rsp_requested = del_sta->respReqd;
 
-	if (wma_is_vdev_in_ap_mode(wma, del_sta->smesessionId)) {
+	if (wma_is_vdev_in_ap_mode(wma, smesession_id)) {
 		wma_allow_suspend_check(wma);
 		oper_mode = BSS_OPERATIONAL_MODE_AP;
 	}
 #ifdef QCA_IBSS_SUPPORT
-	if (wma_is_vdev_in_ibss_mode(wma, del_sta->smesessionId)) {
+	if (wma_is_vdev_in_ibss_mode(wma, smesession_id)) {
 		oper_mode = BSS_OPERATIONAL_MODE_IBSS;
 		WMA_LOGD("%s: to delete sta for IBSS mode", __func__);
         }
@@ -11160,12 +11167,18 @@ static void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 
 #ifndef CONFIG_QCA_WIFI_ISOC
 #ifdef QCA_IBSS_SUPPORT
-        /* adjust heart beat thresold timer value for detecting ibss peer departure */
+	/* adjust heart beat thresold timer value for
+	 * detecting ibss peer departure
+	 */
         if (oper_mode == BSS_OPERATIONAL_MODE_IBSS)
-                wma_adjust_ibss_heart_beat_timer(wma, del_sta->smesessionId, -1);
+		wma_adjust_ibss_heart_beat_timer(wma, smesession_id, -1);
 #endif
 #endif
-
+	if (!rsp_requested) {
+		WMA_LOGD("%s: vdev_id %d status %d", __func__,
+			del_sta->smesessionId, del_sta->status);
+		vos_mem_free(del_sta);
+	}
 }
 
 static int32_t wmi_unified_vdev_stop_send(wmi_unified_t wmi, u_int8_t vdev_id)
