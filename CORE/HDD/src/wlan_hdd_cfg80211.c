@@ -703,14 +703,21 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
 static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] =
 {
 #ifdef FEATURE_WLAN_CH_AVOID
-    {
+    [QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX] = {
         .vendor_id = QCA_NL80211_VENDOR_ID,
         .subcmd = QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY
     },
 #endif /* FEATURE_WLAN_CH_AVOID */
 
+#ifdef WLAN_FEATURE_NAN
+    [QCA_NL80211_VENDOR_SUBCMD_NAN_INDEX] = {
+        .vendor_id = QCA_NL80211_VENDOR_ID,
+        .subcmd = QCA_NL80211_VENDOR_SUBCMD_NAN
+    },
+#endif
+
 #ifdef WLAN_FEATURE_STATS_EXT
-    {
+    [QCA_NL80211_VENDOR_SUBCMD_STATS_EXT_INDEX] = {
         .vendor_id = QCA_NL80211_VENDOR_ID,
         .subcmd = QCA_NL80211_VENDOR_SUBCMD_STATS_EXT
     },
@@ -750,6 +757,108 @@ int is_driver_dfs_capable(struct wiphy *wiphy, struct wireless_dev *wdev,
               "%s: dfs capability: buffer alloc fail", __func__);
     return -1;
 
+}
+
+static int
+wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
+                                         struct wireless_dev *wdev,
+                                         void *data, int data_len)
+{
+    hdd_context_t *pHddCtx      = wiphy_priv(wiphy);
+    struct sk_buff *skb         = NULL;
+    tANI_U32       fset         = 0;
+
+    if (wiphy->interface_modes & BIT(NL80211_IFTYPE_STATION)) {
+        hddLog(LOG1, FL("Infra Station mode is supported by driver"));
+        fset |= WIFI_FEATURE_INFRA;
+    }
+
+    if (TRUE == hdd_is_5g_supported(pHddCtx)) {
+        hddLog(LOG1, FL("INFRA_5G is supported by firmware"));
+        fset |= WIFI_FEATURE_INFRA_5G;
+    }
+
+#ifdef WLAN_FEATURE_P2P
+    if ((wiphy->interface_modes & BIT(NL80211_IFTYPE_P2P_CLIENT)) &&
+        (wiphy->interface_modes & BIT(NL80211_IFTYPE_P2P_GO))) {
+        hddLog(LOG1, FL("WiFi-Direct is supported by driver"));
+        fset |= WIFI_FEATURE_P2P;
+    }
+#endif
+
+    /* Soft-AP is supported currently by default */
+    fset |= WIFI_FEATURE_SOFT_AP;
+
+#ifdef FEATURE_WLAN_EXTSCAN
+    if (sme_IsFeatureSupportedByFW(EXTENDED_SCAN)) {
+        hddLog(LOG1, FL("EXTScan is supported by firmware"));
+        fset |= WIFI_FEATURE_EXTSCAN;
+    }
+#endif
+
+#ifdef WLAN_FEATURE_NAN
+    if (sme_IsFeatureSupportedByFW(NAN)) {
+        hddLog(LOG1, FL("NAN is supported by firmware"));
+        fset |= WIFI_FEATURE_NAN;
+    }
+#endif
+
+    if (sme_IsFeatureSupportedByFW(RTT)) {
+        hddLog(LOG1, FL("RTT is supported by firmware"));
+        fset |= WIFI_FEATURE_D2D_RTT;
+        fset |= WIFI_FEATURE_D2AP_RTT;
+    }
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+    if (sme_IsFeatureSupportedByFW(BATCH_SCAN)) {
+        hddLog(LOG1, FL("Batch scan is supported by firmware"));
+        fset |= WIFI_FEATURE_BATCH_SCAN;
+    }
+#endif
+
+#ifdef FEATURE_WLAN_SCAN_PNO
+    if (pHddCtx->cfg_ini->configPNOScanSupport &&
+        sme_IsFeatureSupportedByFW(PNO)) {
+        hddLog(LOG1, FL("PNO is supported by firmware"));
+        fset |= WIFI_FEATURE_PNO;
+    }
+#endif
+
+    /* STA+STA is supported currently by default */
+    fset |= WIFI_FEATURE_ADDITIONAL_STA;
+
+#ifdef FEATURE_WLAN_TDLS
+    if ((TRUE == pHddCtx->cfg_ini->fEnableTDLSSupport) &&
+        sme_IsFeatureSupportedByFW(TDLS)) {
+        hddLog(LOG1, FL("TDLS is supported by firmware"));
+        fset |= WIFI_FEATURE_TDLS;
+    }
+#endif
+
+#ifdef WLAN_AP_STA_CONCURRENCY
+    /* AP+STA concurrency is supported currently by default */
+    fset |= WIFI_FEATURE_AP_STA;
+#endif
+
+    skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
+                                              NLMSG_HDRLEN);
+
+    if (!skb) {
+        hddLog(LOGE, FL("cfg80211_vendor_cmd_alloc_reply_skb failed"));
+        return -EINVAL;
+    }
+    hddLog(LOG1, FL("Supported Features : 0x%x"), fset);
+
+    if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET, fset)) {
+        hddLog(LOGE, FL("nla put fail"));
+        goto nla_put_failure;
+    }
+
+    return cfg80211_vendor_cmd_reply(skb);
+
+nla_put_failure:
+    kfree_skb(skb);
+    return -EINVAL;
 }
 
 #ifdef WLAN_FEATURE_STATS_EXT
@@ -850,9 +959,15 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
                  WIPHY_VENDOR_CMD_NEED_NETDEV |
                  WIPHY_VENDOR_CMD_NEED_RUNNING,
         .doit = wlan_hdd_cfg80211_stats_ext_request
-    }
+    },
 #endif
-
+    {
+        .info.vendor_id = QCA_NL80211_VENDOR_ID,
+        .info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GET_SUPPORTED_FEATURES,
+        .flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+                 WIPHY_VENDOR_CMD_NEED_NETDEV,
+        .doit = wlan_hdd_cfg80211_get_supported_features
+    },
 };
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -117,36 +117,145 @@ typedef struct {
  * qca_wlan_vendor_attr is open source file src/common/qca-vendor.h in
  * git://w1.fi/srv/git/hostap.git; the values here are just a copy of that
  */
-/* Vendor speicific sub-command id and their index */
-#define QCA_NL80211_VENDOR_ID                          0x001374
-#define QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY      10
-#define QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY       11
-#define QCA_NL80211_VENDOR_SUBCMD_NAN                  12
-#define QCA_NL80211_VENDOR_SUBCMD_STATS_EXT            13
 
-enum qca_wlan_vendor_attr
-{
-    QCA_WLAN_VENDOR_ATTR_INVALID = 0,
-    /* used by QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY */
-    QCA_WLAN_VENDOR_ATTR_DFS     = 1,
-    /* used by QCA_NL80211_VENDOR_SUBCMD_NAN */
-    QCA_WLAN_VENDOR_ATTR_NAN     = 2,
-    /* used by QCA_NL80211_VENDOR_SUBCMD_STATS_EXT */
-    QCA_WLAN_VENDOR_ATTR_STATS_EXT     = 3,
-    /* keep last */
-    QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
-    QCA_WLAN_VENDOR_ATTR_MAX       = QCA_WLAN_VENDOR_ATTR_AFTER_LAST - 1,
+#define QCA_NL80211_VENDOR_ID                          0x001374
+
+enum qca_nl80211_vendor_subcmds {
+    QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
+    QCA_NL80211_VENDOR_SUBCMD_TEST = 1,
+    /* subcmds 2..9 not yet allocated */
+    QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY = 10,
+    QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY =  11,
+    QCA_NL80211_VENDOR_SUBCMD_NAN =  12,
+    QCA_NL80211_VENDOR_SUBCMD_STATS_EXT = 13,
+    /* subcommands for link layer statistics start here */
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_SET = 14,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET = 15,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_CLR = 16,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_RADIO_RESULTS = 17,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_IFACE_RESULTS = 18,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_PEERS_RESULTS = 19,
+    /* subcommands for extscan start here */
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_START = 20,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_STOP = 21,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_VALID_CHANNELS = 22,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_CAPABILITIES = 23,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_CACHED_RESULTS = 24,
+    /* Used when report_threshold is reached in scan cache. */
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_RESULTS_AVAILABLE = 25,
+    /* Used to report scan results when each probe rsp. is received,
+     * if report_events enabled in wifi_scan_cmd_params.
+     */
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_FULL_SCAN_RESULT = 26,
+    /* Indicates progress of scanning state-machine. */
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_EVENT = 27,
+    /* Indicates BSSID Hotlist. */
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_HOTLIST_AP_FOUND = 28,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SET_BSSID_HOTLIST = 29,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_RESET_BSSID_HOTLIST = 30,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SIGNIFICANT_CHANGE = 31,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SET_SIGNIFICANT_CHANGE = 32,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_RESET_SIGNIFICANT_CHANGE = 33,
+    /* EXT TDLS */
+    QCA_NL80211_VENDOR_SUBCMD_TDLS_ENABLE = 34,
+    QCA_NL80211_VENDOR_SUBCMD_TDLS_DISABLE = 35,
+    QCA_NL80211_VENDOR_SUBCMD_TDLS_GET_STATUS = 36,
+    QCA_NL80211_VENDOR_SUBCMD_TDLS_STATE = 37,
+    /* Get supported features */
+    QCA_NL80211_VENDOR_SUBCMD_GET_SUPPORTED_FEATURES = 38,
+
+    /* Set scanning_mac_oui */
+    QCA_NL80211_VENDOR_SUBCMD_SCANNING_MAC_OUI = 39,
 };
 
-/* Vendor specific sub-command index, may change later due to NAN */
+enum qca_nl80211_vendor_subcmds_index {
+#if defined(FEATURE_WLAN_CH_AVOID) || defined(FEATURE_WLAN_FORCE_SAP_SCC)
+    QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX = 0,
+#endif /* FEATURE_WLAN_CH_AVOID || FEATURE_WLAN_FORCE_SAP_SCC */
+
+#ifdef WLAN_FEATURE_NAN
+    QCA_NL80211_VENDOR_SUBCMD_NAN_INDEX,
+#endif /* WLAN_FEATURE_NAN */
+
 #ifdef WLAN_FEATURE_STATS_EXT
-#define QCA_NL80211_VENDOR_SUBCMD_STATS_EXT_INDEX   1
+    QCA_NL80211_VENDOR_SUBCMD_STATS_EXT_INDEX,
 #endif /* WLAN_FEATURE_STATS_EXT */
 
-/* Vendor specific sub-command id and their index */
-#ifdef FEATURE_WLAN_CH_AVOID
-#define QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX   0
-#endif /* FEATURE_WLAN_CH_AVOID */
+#ifdef FEATURE_WLAN_EXTSCAN
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_START_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_STOP_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_CAPABILITIES_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_CACHED_RESULTS_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_RESULTS_AVAILABLE_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_FULL_SCAN_RESULT_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_EVENT_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_HOTLIST_AP_FOUND_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SET_BSSID_HOTLIST_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_RESET_BSSID_HOTLIST_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SIGNIFICANT_CHANGE_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SET_SIGNIFICANT_CHANGE_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_RESET_SIGNIFICANT_CHANGE_INDEX,
+#endif /* FEATURE_WLAN_EXTSCAN */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_SET_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_GET_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_LL_STATS_CLR_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_LL_RADIO_STATS_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_LL_IFACE_STATS_INDEX,
+    QCA_NL80211_VENDOR_SUBCMD_LL_PEER_INFO_STATS_INDEX,
+#endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+    /* EXT TDLS */
+    QCA_NL80211_VENDOR_SUBCMD_TDLS_STATE_CHANGE_INDEX,
+};
+
+enum qca_wlan_vendor_attr {
+    QCA_WLAN_VENDOR_ATTR_INVALID = 0,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_DFS_CAPABILITY */
+    QCA_WLAN_VENDOR_ATTR_DFS = 1,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_NAN */
+    QCA_WLAN_VENDOR_ATTR_NAN = 2,
+    /* used by QCA_NL80211_VENDOR_SUBCMD_STATS_EXT */
+    QCA_WLAN_VENDOR_ATTR_STATS_EXT = 3,
+    QCA_WLAN_VENDOR_ATTR_IFINDEX = 4,
+    /* keep last */
+    QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
+    QCA_WLAN_VENDOR_ATTR_MAX =
+    QCA_WLAN_VENDOR_ATTR_AFTER_LAST - 1
+};
+
+enum qca_wlan_vendor_attr_get_supported_features {
+    QCA_WLAN_VENDOR_ATTR_FEATURE_SET_INVALID = 0,
+    /* Unsigned 32-bit value */
+    QCA_WLAN_VENDOR_ATTR_FEATURE_SET = 1,
+    /* keep last */
+    QCA_WLAN_VENDOR_ATTR_FEATURE_SET_AFTER_LAST,
+    QCA_WLAN_VENDOR_ATTR_FEATURE_SET_MAX =
+        QCA_WLAN_VENDOR_ATTR_FEATURE_SET_AFTER_LAST - 1,
+};
+
+/* Feature defines */
+#define WIFI_FEATURE_INFRA              0x0001   /* Basic infrastructure mode */
+#define WIFI_FEATURE_INFRA_5G           0x0002   /* Support for 5 GHz Band */
+#define WIFI_FEATURE_HOTSPOT            0x0004   /* Support for GAS/ANQP */
+#define WIFI_FEATURE_P2P                0x0008   /* Wifi-Direct */
+#define WIFI_FEATURE_SOFT_AP            0x0010   /* Soft AP */
+#define WIFI_FEATURE_EXTSCAN            0x0020   /* Extended Scan APIs */
+#define WIFI_FEATURE_NAN                0x0040   /* Neighbor Awareness
+                                                    Networking */
+#define WIFI_FEATURE_D2D_RTT            0x0080   /* Device-to-device RTT */
+#define WIFI_FEATURE_D2AP_RTT           0x0100   /* Device-to-AP RTT */
+#define WIFI_FEATURE_BATCH_SCAN         0x0200   /* Batched Scan (legacy) */
+#define WIFI_FEATURE_PNO                0x0400   /* Preferred network offload */
+#define WIFI_FEATURE_ADDITIONAL_STA     0x0800   /* Support for two STAs */
+#define WIFI_FEATURE_TDLS               0x1000   /* Tunnel directed link
+                                                    setup */
+#define WIFI_FEATURE_TDLS_OFFCHANNEL    0x2000   /* Support for TDLS off
+                                                    channel */
+#define WIFI_FEATURE_EPR                0x4000   /* Enhanced power reporting */
+#define WIFI_FEATURE_AP_STA             0x8000   /* Support for AP STA
+                                                    Concurrency */
+/* Add more features here */
 
 #ifdef FEATURE_WLAN_CH_AVOID
 #define HDD_MAX_AVOID_FREQ_RANGES   4

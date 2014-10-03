@@ -19441,15 +19441,30 @@ static inline void wma_update_target_services(tp_wma_handle wh,
 	}
 #endif
 
+#ifdef FEATURE_WLAN_EXTSCAN
+	if (WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap,
+		WMI_SERVICE_EXTSCAN)) {
+		gFwWlanFeatCaps |= (1 << EXTENDED_SCAN);
+	}
+#endif
 	cfg->lte_coex_ant_share = WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap,
 					WMI_SERVICE_LTE_ANT_SHARE_SUPPORT);
 #ifdef FEATURE_WLAN_TDLS
 	/* Enable TDLS */
-	cfg->en_tdls = WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap,
-	                                      WMI_SERVICE_TDLS);
+	if (WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap, WMI_SERVICE_TDLS)) {
+		cfg->en_tdls = 1;
+		gFwWlanFeatCaps |= (1 << TDLS);
+	}
 #endif
 	if (WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap, WMI_SERVICE_BEACON_OFFLOAD))
 		cfg->beacon_offload = TRUE;
+#ifdef WLAN_FEATURE_NAN
+	if (WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap, WMI_SERVICE_NAN))
+		gFwWlanFeatCaps |= (1 << NAN);
+#endif
+
+	if (WMI_SERVICE_IS_ENABLED(wh->wmi_service_bitmap, WMI_SERVICE_RTT))
+		gFwWlanFeatCaps |= (1 << RTT);
 }
 
 static inline void wma_update_target_ht_cap(tp_wma_handle wh,
