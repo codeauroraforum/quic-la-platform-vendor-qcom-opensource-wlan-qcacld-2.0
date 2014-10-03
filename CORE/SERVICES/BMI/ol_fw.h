@@ -72,6 +72,7 @@
 
 #define DRAM_LOCATION           0x00400000
 #define DRAM_SIZE               0x000a8000
+#define DRAM_LOCAL_BASE_ADDRESS (0x100000)
 
 #define IRAM_LOCATION           0x00980000
 #define IRAM_SIZE               0x00038000
