@@ -12133,6 +12133,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    mutex_init(&pHddCtx->sap_lock);
 
    pHddCtx->isLoadInProgress = FALSE;
+   pHddCtx->wifi_turn_on_time_since_boot = adf_get_boottime();
 
 #ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
    /* Initialize the wake lcok */
