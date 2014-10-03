@@ -2149,7 +2149,6 @@ static int ol_diag_read_reg_loc(struct ol_softc *scn, u_int8_t *buffer,
 out:
 	return result;
 }
-#endif
 
 void ol_dump_target_memory(HIF_DEVICE *hif_device, void *memoryBlock)
 {
@@ -2175,6 +2174,7 @@ void ol_dump_target_memory(HIF_DEVICE *hif_device, void *memoryBlock)
 		bufferLoc += size;
 	}
 }
+#endif
 
 /**---------------------------------------------------------------------------
  *   \brief  ol_target_coredump
