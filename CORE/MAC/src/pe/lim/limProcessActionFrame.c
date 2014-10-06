@@ -2423,7 +2423,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                pHdr = WDA_GET_RX_MAC_HEADER(pRxPacketInfo);
                /* Forward to the SME to HDD to wpa_supplicant */
                limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType, (tANI_U8*)pHdr,
-                       frameLen + sizeof(tSirMacMgmtHdr), 0,
+                       frameLen + sizeof(tSirMacMgmtHdr),
+                       psessionEntry->smeSessionId,
                        WDA_GET_RX_CH( pRxPacketInfo ),
                        psessionEntry, rssi);
                break;
@@ -2490,7 +2491,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                  /* Forward to the SME to HDD to wpa_supplicant */
                  // type is ACTION
                  limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType,
-                    (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr), 0,
+                    (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr),
+                    psessionEntry->smeSessionId,
                     WDA_GET_RX_CH( pRxPacketInfo ), psessionEntry, 0);
               }
               else
@@ -2525,7 +2527,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                  /* Forward to the SME to HDD to wpa_supplicant */
                  // type is ACTION
                  limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType,
-                    (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr), 0,
+                    (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr),
+                    psessionEntry->smeSessionId,
                     WDA_GET_RX_CH( pRxPacketInfo ), psessionEntry, 0);
               }
               else
@@ -2545,10 +2548,11 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
               frameLen = WDA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
 
               limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType,
-                    (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr), 0,
+                    (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr),
+                    psessionEntry->smeSessionId,
                     WDA_GET_RX_CH( pRxPacketInfo ), psessionEntry, 0);
             }
-
+            break;
 #ifdef FEATURE_WLAN_TDLS
            case SIR_MAC_TDLS_DIS_RSP:
            {
@@ -2562,7 +2566,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
                                     ("Public Action TDLS Discovery RSP ..")) ;
                limSendSmeMgmtFrameInd(pMac, pHdr->fc.subType,
-                  (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr), 0,
+                  (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr),
+                  psessionEntry->smeSessionId,
                   WDA_GET_RX_CH( pRxPacketInfo ), psessionEntry, rssi);
            }
                break;
