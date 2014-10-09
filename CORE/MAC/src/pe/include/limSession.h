@@ -451,6 +451,7 @@ typedef struct sPESession           // Added to Support BT-AMP
     tftPEContext  ftPEContext;
 #endif
     tANI_BOOLEAN            isNonRoamReassoc;
+    tANI_U8  isKeyInstalled;
 }tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------
