@@ -15227,7 +15227,8 @@ static inline u_int32_t wma_get_uapsd_mask(tpUapsd_Params uapsd_params)
 	return uapsd_val;
 }
 
-static int32_t wma_set_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, u_int8_t enable)
+static int32_t wma_set_force_sleep(tp_wma_handle wma, u_int32_t vdev_id,
+			u_int8_t enable, u_int8_t is_qpower_enabled)
 {
 	int32_t ret;
 	tANI_U32 cfg_data_val = 0;
@@ -15298,7 +15299,7 @@ static int32_t wma_set_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, u_int8_
 	 * So Disable QPower explicitly
 	 */
 	ret = wmi_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
-					WMI_STA_PS_ENABLE_QPOWER, 0);
+				WMI_STA_PS_ENABLE_QPOWER, is_qpower_enabled);
 	if (ret) {
 		WMA_LOGE("Disable QPower Failed vdevId %d", vdev_id);
 		return ret;
@@ -15384,7 +15385,8 @@ static int32_t wma_set_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, u_int8_
 	return 0;
 }
 
-static int32_t wma_set_qpower_force_sleep(tp_wma_handle wma, u_int32_t vdev_id, u_int8_t enable)
+int32_t wma_set_qpower_force_sleep(tp_wma_handle wma, u_int32_t vdev_id,
+							u_int8_t enable)
 {
 	int32_t ret;
 	tANI_U32 cfg_data_val = 0;
@@ -15515,10 +15517,8 @@ static void wma_enable_sta_ps_mode(tp_wma_handle wma, tpEnablePsParams ps_req)
 			goto resp;
 		}
 
-		if(is_qpower_enabled)
-			ret = wma_set_qpower_force_sleep(wma, vdev_id, false);
-		else
-			ret = wma_set_force_sleep(wma, vdev_id, false);
+		ret = wma_set_force_sleep(wma, vdev_id, false,
+						is_qpower_enabled);
 		if (ret) {
 			WMA_LOGE("Enable Sta Ps Failed vdevId %d", vdev_id);
 			ps_req->status = VOS_STATUS_E_FAILURE;
@@ -15548,10 +15548,9 @@ static void wma_enable_sta_ps_mode(tp_wma_handle wma, tpEnablePsParams ps_req)
 		}
 
 		WMA_LOGD("Enable Forced Sleep vdevId %d", vdev_id);
-		if(is_qpower_enabled)
-			ret = wma_set_qpower_force_sleep(wma, vdev_id, true);
-		else
-			ret = wma_set_force_sleep(wma, vdev_id, true);
+
+		ret = wma_set_force_sleep(wma, vdev_id, false,
+						is_qpower_enabled);
 
 		if (ret) {
 			WMA_LOGE("Enable Forced Sleep Failed vdevId %d",
@@ -15628,10 +15627,9 @@ static void wma_enable_uapsd_mode(tp_wma_handle wma,
 	}
 
 	WMA_LOGD("Enable Forced Sleep vdevId %d", vdev_id);
-	if(is_qpower_enabled)
-		ret = wma_set_qpower_force_sleep(wma, vdev_id, true);
-	else
-		ret = wma_set_force_sleep(wma, vdev_id, true);
+
+	ret = wma_set_force_sleep(wma, vdev_id, false,
+						is_qpower_enabled);
 	if (ret) {
 		WMA_LOGE("Enable Forced Sleep Failed vdevId %d", vdev_id);
 		ps_req->status = VOS_STATUS_E_FAILURE;
@@ -15669,10 +15667,8 @@ static void wma_disable_uapsd_mode(tp_wma_handle wma,
 	}
 
 	/* Re enable Sta Mode Powersave with proper configuration */
-	if(is_qpower_enabled)
-		ret = wma_set_qpower_force_sleep(wma, vdev_id, false);
-	else
-		ret = wma_set_force_sleep(wma, vdev_id, false);
+	ret = wma_set_force_sleep(wma, vdev_id, false,
+						is_qpower_enabled);
 	if (ret) {
 		WMA_LOGE("Disable Forced Sleep Failed vdevId %d", vdev_id);
 		ps_req->status = VOS_STATUS_E_FAILURE;
