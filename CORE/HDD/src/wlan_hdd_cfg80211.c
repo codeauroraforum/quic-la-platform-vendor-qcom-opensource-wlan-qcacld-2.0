@@ -8931,7 +8931,6 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     v_U8_t* pP2pIe = NULL;
 
     ENTER();
-    hddLog(VOS_TRACE_LEVEL_ERROR, "received scan request");
 
     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
                      TRACE_CODE_HDD_CFG80211_SCAN,
@@ -15194,7 +15193,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
                           pData->ap.beaconPeriod,
                           pData->ap.capability,
                           pData->ap.ieLength);
-    VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+    VOS_TRACE_HEX_DUMP(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                        pData->ap.ieData, pData->ap.ieLength);
 
     if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_RESULTS_REQUEST_ID,
