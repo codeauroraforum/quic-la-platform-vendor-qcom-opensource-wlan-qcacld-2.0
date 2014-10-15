@@ -5732,14 +5732,23 @@ typedef enum _WMI_NLO_CIPHER_ALGORITHM {
     WMI_NLO_CIPHER_ALGO_WEP            = 0x101,
 } WMI_NLO_CIPHER_ALGORITHM;
 
+/* SSID broadcast  type passed in NLO params */
+typedef enum _WMI_NLO_SSID_BcastNwType
+{
+  WMI_NLO_BCAST_UNKNOWN      = 0,
+  WMI_NLO_BCAST_NORMAL       = 1,
+  WMI_NLO_BCAST_HIDDEN       = 2,
+} WMI_NLO_SSID_BcastNwType;
+
 #define WMI_NLO_MAX_SSIDS    16
 #define WMI_NLO_MAX_CHAN     48
 
-#define WMI_NLO_CONFIG_STOP      (0x1 << 0)
-#define WMI_NLO_CONFIG_START     (0x1 << 1)
-#define WMI_NLO_CONFIG_RESET     (0x1 << 2)
-#define WMI_NLO_CONFIG_SLOW_SCAN (0x1 << 4)
-#define WMI_NLO_CONFIG_FAST_SCAN (0x1 << 5)
+#define WMI_NLO_CONFIG_STOP             (0x1 << 0)
+#define WMI_NLO_CONFIG_START            (0x1 << 1)
+#define WMI_NLO_CONFIG_RESET            (0x1 << 2)
+#define WMI_NLO_CONFIG_SLOW_SCAN        (0x1 << 4)
+#define WMI_NLO_CONFIG_FAST_SCAN        (0x1 << 5)
+#define WMI_NLO_CONFIG_SSID_HIDE_EN     (0x1 << 6)
 
 /* NOTE: wmi_nlo_ssid_param structure can't be changed without breaking the compatibility */
 typedef struct wmi_nlo_ssid_param
@@ -5761,6 +5770,14 @@ typedef struct wmi_nlo_auth_param
 	A_UINT32 valid;
     A_UINT32 auth_type;
 } wmi_nlo_auth_param;
+
+/* NOTE: wmi_nlo_bcast_nw_param structure can't be changed without breaking the compatibility */
+typedef struct wmi_nlo_bcast_nw_param
+{
+    A_UINT32 valid;
+    A_UINT32 bcast_nw_type;
+} wmi_nlo_bcast_nw_param;
+
 /* NOTE: wmi_nlo_rssi_param structure can't be changed without breaking the compatibility */
 typedef struct wmi_nlo_rssi_param
 {
@@ -5774,6 +5791,7 @@ typedef struct nlo_configured_parameters {
     wmi_nlo_enc_param enc_type;
     wmi_nlo_auth_param auth_type;
     wmi_nlo_rssi_param rssi_cond;
+    wmi_nlo_bcast_nw_param bcast_nw_type; /* indicates if the SSID is hidden or not */
 } nlo_configured_parameters;
 
 typedef struct wmi_nlo_config {
