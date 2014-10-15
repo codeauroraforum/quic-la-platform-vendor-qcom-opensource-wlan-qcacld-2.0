@@ -1541,6 +1541,7 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter);
 #endif /*End of FEATURE_WLAN_BATCH_SCAN*/
 
 void wlan_hdd_send_svc_nlink_msg(int type);
+boolean hdd_is_5g_supported(hdd_context_t * pHddCtx);
 
 #ifdef WLAN_FEATURE_STATS_EXT
 void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
