@@ -13754,7 +13754,8 @@ csrSendChngMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U32 sessionId)
 }
 
 #ifdef QCA_HT_2040_COEX
-eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId, ePhyChanBondState cbMode)
+eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId,
+                           ePhyChanBondState cbMode, tANI_BOOLEAN obssEnabled)
 {
     tpSirSetHT2040Mode pMsg;
     tANI_U16 len = 0;
@@ -13788,6 +13789,7 @@ eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId, ePhyChanBon
         pMsg->sessionId       = sessionId;
         smsLog(pMac, LOG1, FL("  session %d HT20/40 mode %d"), sessionId, cbMode);
         pMsg->cbMode = cbMode;
+        pMsg->obssEnabled = obssEnabled;
         status = palSendMBMessage(pMac->hHdd, pMsg);
     }
      return status;
