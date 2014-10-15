@@ -5169,7 +5169,20 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
     }
 
     vos_mem_copy(updateIE.bssid, pHostapdAdapter->macAddressCurrent.bytes,
-                   sizeof(tSirMacAddr));
+                 sizeof(tSirMacAddr));
+
+#ifdef QCA_HT_2040_COEX
+    if (WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode) {
+        tSmeConfigParams smeConfig;
+
+        vos_mem_zero(&smeConfig, sizeof(smeConfig));
+        sme_GetConfigParam(WLAN_HDD_GET_HAL_CTX(pHostapdAdapter), &smeConfig);
+        if (smeConfig.csrConfig.obssEnabled)
+            wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
+                    WLAN_EID_OVERLAP_BSS_SCAN_PARAM);
+    }
+#endif
+
     updateIE.smeSessionId =  pHostapdAdapter->sessionId;
 
     if (test_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags)) {
@@ -5316,6 +5329,9 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
     int freq = chan->center_freq; /* freq is in MHZ */
     hdd_context_t *pHddCtx;
     int status;
+#ifdef QCA_HT_2040_COEX
+    tSmeConfigParams smeConfig;
+#endif
 
     ENTER();
 
@@ -5478,6 +5494,14 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                     return -EINVAL;
                 }
             }
+            vos_mem_zero(&smeConfig, sizeof(smeConfig));
+            sme_GetConfigParam(pHddCtx->hHal, &smeConfig);
+            if (NL80211_CHAN_HT20 == channel_type)
+                smeConfig.csrConfig.obssEnabled = VOS_FALSE;
+            else
+                smeConfig.csrConfig.obssEnabled = VOS_TRUE;
+            sme_UpdateConfig (pHddCtx->hHal, &smeConfig);
+
 #endif
         }
     }
@@ -5605,19 +5629,6 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
                                pConfig->acsAllowedChnls,
                                sizeof(pConfig->acsAllowedChnls));
     }
-
-#ifdef QCA_HT_2040_COEX
-    if ((pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP)&&
-        pHddCtx->cfg_ini->ht2040CoexEnabled)
-    {
-       tSmeConfigParams smeConfig;
-
-       vos_mem_zero(&smeConfig, sizeof (tSmeConfigParams));
-       sme_GetConfigParam(hHal, &smeConfig);
-       smeConfig.csrConfig.obssEnabled = 1;
-       sme_UpdateConfig (hHal, &smeConfig);
-    }
-#endif
 
     if (pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP)
     {
