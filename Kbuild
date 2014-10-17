@@ -1143,6 +1143,9 @@ endif
 #features specific to mdm9630
 ifeq ($(CONFIG_ARCH_MDM9630), y)
 
+#Enable Channel Matrix restriction for all targets
+CDEFINES += -DWLAN_ENABLE_CHNL_MATRIX_RESTRICTION
+
 #enable MCC TO SCC switch
 CDEFINES += -DFEATURE_WLAN_MCC_TO_SCC_SWITCH
 
