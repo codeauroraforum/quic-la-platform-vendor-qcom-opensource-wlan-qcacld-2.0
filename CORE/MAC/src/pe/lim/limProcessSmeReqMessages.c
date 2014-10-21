@@ -2515,8 +2515,11 @@ __limProcessSmeReassocReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     return;
 
 end:
-    if (pReassocReq)
+    if (pReassocReq) {
         vos_mem_free( pReassocReq);
+        if (psessionEntry)
+            psessionEntry->pLimReAssocReq = NULL;
+    }
 
     if (psessionEntry)
     {
