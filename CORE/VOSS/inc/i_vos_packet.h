@@ -76,10 +76,6 @@ struct vos_pkt_t
    void *pkt_buf;
 };
 
-// the number of Receive vos packets used exclusively for vos packet
-// allocations of type VOS_PKT_TYPE_RX_RAW
-#define VPKT_NUM_RX_RAW_PACKETS (1024)
-
 #else
 #include <vos_types.h>
 #include <vos_list.h>
