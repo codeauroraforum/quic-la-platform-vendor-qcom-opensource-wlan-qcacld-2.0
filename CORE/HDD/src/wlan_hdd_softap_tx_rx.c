@@ -561,9 +561,7 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
    pDestMacAddress = (v_MACADDR_t*)skb->data;
 
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
-
-   VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO,
+   VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_INFO,
               "%s: enter", __func__);
 
    if (vos_is_macaddr_broadcast( pDestMacAddress ) ||
@@ -663,6 +661,8 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       }
    }
 #endif /* QCA_PKT_PROTO_TRACE */
+   pAdapter->stats.tx_bytes += skb->len;
+   ++pAdapter->stats.tx_packets;
 
    if (WLANTL_SendSTA_DataFrame((WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
                                  STAId, skb
@@ -676,10 +676,6 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
         goto drop_pkt;
    }
 
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitClassifiedAC[ac];
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitQueued;
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitQueuedAC[ac];
-
    dev->trans_start = jiffies;
 
    VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO_LOW, "%s: exit", __func__);
@@ -689,8 +685,6 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 drop_pkt:
 
    ++pAdapter->stats.tx_dropped;
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
-   ++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
    kfree_skb(skb);
 
    return NETDEV_TX_OK;
