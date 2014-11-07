@@ -470,7 +470,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     v_U8_t staId;
     VOS_STATUS vos_status;
     v_BOOL_t bWPSState;
-    v_BOOL_t bApActive = FALSE;
     v_BOOL_t bAuthRequired = TRUE;
     tpSap_AssocMacAddr pAssocStasArray = NULL;
     char unknownSTAEvent[IW_CUSTOM_MAX+1];
@@ -729,6 +728,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                vos_pkt_trace_buf_update("HA:ASSOC");
             }
 #endif /* QCA_PKT_PROTO_TRACE */
+            pHddApCtx->bApActive = VOS_TRUE;
             // Stop AP inactivity timer
             if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_RUNNING)
             {
@@ -823,21 +823,22 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 #endif /* QCA_PKT_PROTO_TRACE */
             hdd_softap_DeregisterSTA(pHostapdAdapter, staId);
 
-            if (0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)
+            pHddApCtx->bApActive = VOS_FALSE;
+            spin_lock_bh( &pHostapdAdapter->staInfo_lock );
+            for (i = 0; i < WLAN_MAX_STA_COUNT; i++)
             {
-                spin_lock_bh( &pHostapdAdapter->staInfo_lock );
-                // Start AP inactivity timer if no stations associated with it
-                for (i = 0; i < WLAN_MAX_STA_COUNT; i++)
-                {
-                    if (pHostapdAdapter->aStaInfo[i].isUsed && i != (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->uBCStaId)
-                    {
-                        bApActive = TRUE;
-                        break;
-                    }
+                if (pHostapdAdapter->aStaInfo[i].isUsed &&
+                    i != (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->uBCStaId) {
+                    pHddApCtx->bApActive = VOS_TRUE;
+                    break;
                 }
-                spin_unlock_bh( &pHostapdAdapter->staInfo_lock );
+            }
+            spin_unlock_bh( &pHostapdAdapter->staInfo_lock );
 
-                if (bApActive == FALSE)
+            /* Start AP inactivity timer if no stations associated with it */
+            if ((0 !=
+                (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)) {
+                if (pHddApCtx->bApActive == FALSE)
                 {
                     if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_STOPPED)
                     {

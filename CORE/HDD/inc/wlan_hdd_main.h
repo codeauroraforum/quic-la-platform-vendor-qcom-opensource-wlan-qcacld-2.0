@@ -786,6 +786,8 @@ struct hdd_ap_ctx_s
    tCsrRoamSetKey wepKey[CSR_MAX_NUM_KEY];
 
    beacon_data_t *beacon;
+
+   v_BOOL_t bApActive;
 };
 
 struct hdd_mon_ctx_s
