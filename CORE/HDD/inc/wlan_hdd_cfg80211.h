@@ -170,6 +170,7 @@ enum qca_nl80211_vendor_subcmds {
     /* Set scanning_mac_oui */
     QCA_NL80211_VENDOR_SUBCMD_SCANNING_MAC_OUI = 39,
 
+    QCA_NL80211_VENDOR_SUBCMD_DO_ACS = 54,
     /* Deprecated */
     QCA_NL80211_VENDOR_SUBCMD_OCB_SET_SCHED = 53,
 
@@ -190,6 +191,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_DCC_CLEAR_STATS = 98,
 	QCA_NL80211_VENDOR_SUBCMD_DCC_UPDATE_NDL = 99,
 	QCA_NL80211_VENDOR_SUBCMD_DCC_STATS_EVENT = 100,
+
 };
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -231,6 +233,8 @@ enum qca_nl80211_vendor_subcmds_index {
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
     /* EXT TDLS */
     QCA_NL80211_VENDOR_SUBCMD_TDLS_STATE_CHANGE_INDEX,
+    /* ACS OBSS Coex*/
+    QCA_NL80211_VENDOR_SUBCMD_DO_ACS_INDEX,
     /* DFS */
     QCA_NL80211_VENDOR_SUBCMD_DFS_OFFLOAD_CAC_STARTED_INDEX,
     QCA_NL80211_VENDOR_SUBCMD_DFS_OFFLOAD_CAC_FINISHED_INDEX,
@@ -883,6 +887,26 @@ typedef struct sHddAvoidFreqList
 } tHddAvoidFreqList;
 #endif /* FEATURE_WLAN_CH_AVOID || FEATURE_WLAN_FORCE_SAP_SCC */
 
+enum qca_wlan_vendor_attr_acs_offload {
+       QCA_WLAN_VENDOR_ATTR_ACS_CHANNEL_INVALID = 0,
+       QCA_WLAN_VENDOR_ATTR_ACS_PRIMARY_CHANNEL,
+       QCA_WLAN_VENDOR_ATTR_ACS_SECONDARY_CHANNEL,
+       QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE,
+       QCA_WLAN_VENDOR_ATTR_ACS_HT_ENABLED,
+       QCA_WLAN_VENDOR_ATTR_ACS_HT40_ENABLED,
+       /* keep last */
+       QCA_WLAN_VENDOR_ATTR_ACS_AFTER_LAST,
+       QCA_WLAN_VENDOR_ATTR_ACS_MAX =
+       QCA_WLAN_VENDOR_ATTR_ACS_AFTER_LAST - 1
+};
+
+enum qca_wlan_vendor_acs_hw_mode {
+        QCA_ACS_MODE_IEEE80211B,
+        QCA_ACS_MODE_IEEE80211G,
+        QCA_ACS_MODE_IEEE80211A,
+        QCA_ACS_MODE_IEEE80211AD,
+};
+
 struct cfg80211_bss* wlan_hdd_cfg80211_update_bss_db( hdd_adapter_t *pAdapter,
                                       tCsrRoamInfo *pRoamInfo
                                       );
@@ -997,4 +1021,6 @@ backported_cfg80211_vendor_event_alloc(struct wiphy *wiphy,
 #define cfg80211_vendor_event_alloc backported_cfg80211_vendor_event_alloc
 #endif
 
+void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_context_t *pHddCtx,
+                                        v_U8_t priChannel, v_U8_t secChannel);
 #endif
