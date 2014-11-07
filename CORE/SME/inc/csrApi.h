@@ -1049,6 +1049,7 @@ typedef struct tagCsrNeighborRoamConfigParams
     tANI_U8        nRoamBmissFirstBcnt;
     tANI_U8        nRoamBmissFinalBcnt;
     tANI_U8        nRoamBeaconRssiWeight;
+    tANI_U8        delay_before_vdev_stop;
 }tCsrNeighborRoamConfigParams;
 #endif
 
