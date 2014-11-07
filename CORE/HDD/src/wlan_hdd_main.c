@@ -12458,7 +12458,7 @@ void hdd_ch_avoid_cb
               {
                   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                             "%s: Restarting SAP", __func__);
-                  wlan_hdd_send_svc_nlink_msg(WLAN_SVC_LTE_COEX_IND);
+                  wlan_hdd_send_svc_nlink_msg(WLAN_SVC_LTE_COEX_IND, NULL, 0);
                   restart_sap_in_progress = 1;
                   /* current operating channel is un-safe channel, restart driver */
                   hdd_hostapd_stop(hostapd_adapter->dev);
@@ -12471,11 +12471,12 @@ void hdd_ch_avoid_cb
 }
 #endif /* FEATURE_WLAN_CH_AVOID */
 
-void wlan_hdd_send_svc_nlink_msg(int type)
+void wlan_hdd_send_svc_nlink_msg(int type, void *data, int len)
 {
     struct sk_buff *skb;
     struct nlmsghdr *nlh;
     tAniMsgHdr *ani_hdr;
+    void *nl_data = NULL;
 
     skb = alloc_skb(NLMSG_SPACE(WLAN_NL_MAX_PAYLOAD), GFP_KERNEL);
 
@@ -12504,6 +12505,14 @@ void wlan_hdd_send_svc_nlink_msg(int type)
         ani_hdr->length = 0;
         nlh->nlmsg_len = NLMSG_LENGTH((sizeof(tAniMsgHdr)));
         skb_put(skb, NLMSG_SPACE(sizeof(tAniMsgHdr)));
+        break;
+    case WLAN_SVC_WLAN_STATUS_IND:
+    case WLAN_SVC_WLAN_VERSION_IND:
+        ani_hdr->length = len;
+        nlh->nlmsg_len = NLMSG_LENGTH((sizeof(tAniMsgHdr) + len));
+        nl_data = (char *)ani_hdr + sizeof(tAniMsgHdr);
+        memcpy(nl_data, data, len);
+        skb_put(skb, NLMSG_SPACE(sizeof(tAniMsgHdr) + len));
         break;
     default:
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
