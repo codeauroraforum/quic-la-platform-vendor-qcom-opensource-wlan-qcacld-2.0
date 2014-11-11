@@ -179,7 +179,9 @@ void lim_check_sta_in_pe_entries(tpAniSirGlobal pMac, tpSirMacMgmtHdr pHdr)
     {
         if( (pMac->lim.gpSession[i].valid) &&
             (pMac->lim.gpSession[i].pePersona == VOS_STA_SAP_MODE) &&
-            ((psessionEntry = &pMac->lim.gpSession[i]) != NULL)) {
+            (&pMac->lim.gpSession[i] != NULL)) {
+
+            psessionEntry = &pMac->lim.gpSession[i];
 
             pStaDs = dphLookupHashEntry(pMac, pHdr->sa, &assocId,
                             &psessionEntry->dph.dphHashTable);
