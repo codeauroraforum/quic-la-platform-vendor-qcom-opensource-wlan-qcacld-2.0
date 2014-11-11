@@ -728,6 +728,18 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                vos_pkt_trace_buf_update("HA:ASSOC");
             }
 #endif /* QCA_PKT_PROTO_TRACE */
+
+#ifdef MSM_PLATFORM
+            /* start timer in sap/p2p_go */
+            if (pHddApCtx->bApActive == VOS_FALSE)
+            {
+                spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
+                pHostapdAdapter->prev_tx_packets = pHostapdAdapter->stats.tx_packets;
+                pHostapdAdapter->prev_rx_packets = pHostapdAdapter->stats.rx_packets;
+                hdd_start_bus_bw_compute_timer(pHostapdAdapter);
+                spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+            }
+#endif
             pHddApCtx->bApActive = VOS_TRUE;
             // Stop AP inactivity timer
             if (pHddApCtx->hdd_ap_inactivity_timer.state == VOS_TIMER_STATE_RUNNING)
@@ -780,19 +792,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             }
 #endif
 
-#ifdef MSM_PLATFORM
-            /* start timer in sap/p2p_go */
-            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-            pHddCtx->sta_cnt++;
-            pHostapdAdapter->connection++;
-            if (1 == pHostapdAdapter->connection) {
-                pHostapdAdapter->prev_tx_packets = pHostapdAdapter->stats.tx_packets;
-                pHostapdAdapter->prev_rx_packets = pHostapdAdapter->stats.rx_packets;
-            }
-            if (1 == pHddCtx->sta_cnt)
-                hdd_start_bus_bw_compute_timer(pHostapdAdapter);
-            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
-#endif
             break;
         case eSAP_STA_DISASSOC_EVENT:
             memcpy(wrqu.addr.sa_data, &pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac,
@@ -875,16 +874,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
 #ifdef MSM_PLATFORM
             /*stop timer in sap/p2p_go */
-            spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-            pHddCtx->sta_cnt--;
-            pHostapdAdapter->connection--;
-            if (0 == pHostapdAdapter->connection) {
+            if (pHddApCtx->bApActive == FALSE)
+            {
+                spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
                 pHostapdAdapter->prev_tx_packets = 0;
                 pHostapdAdapter->prev_rx_packets = 0;
-            }
-            if (0 == pHddCtx->sta_cnt)
                 hdd_stop_bus_bw_compute_timer(pHostapdAdapter);
-            spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+                spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
+            }
 #endif
             break;
         case eSAP_WPS_PBC_PROBE_REQ_EVENT:

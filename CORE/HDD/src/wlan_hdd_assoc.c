@@ -662,7 +662,6 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
                 MAC_ADDR_ARRAY(wrqu.ap_addr.sa_data));
         hdd_SendUpdateBeaconIEsEvent(pAdapter, pCsrRoamInfo);
 
-
         /* Send IWEVASSOCRESPIE Event if WLAN_FEATURE_CIQ_METRICS is Enabled Or
          * Send IWEVASSOCRESPIE Event if WLAN_FEATURE_VOWIFI_11R is Enabled
          * and fFTEnable is TRUE */
@@ -696,14 +695,9 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
 #ifdef MSM_PLATFORM
         /* start timer in sta/p2p_cli */
         spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-        pHddCtx->sta_cnt++;
-        pAdapter->connection++;
-        if (1 == pAdapter->connection) {
-            pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
-            pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
-        }
-        if (1 == pHddCtx->sta_cnt)
-            hdd_start_bus_bw_compute_timer(pAdapter);
+        pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
+        pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
+        hdd_start_bus_bw_compute_timer(pAdapter);
         spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 #endif
     }
@@ -719,7 +713,6 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         pr_info("wlan: disconnected\n");
         type = WLAN_STA_DISASSOC_DONE_IND;
         memset(wrqu.ap_addr.sa_data,'\0',ETH_ALEN);
-
 
 #ifdef QCA_WIFI_2_0
         if (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
@@ -737,14 +730,9 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
 #ifdef MSM_PLATFORM
         /* stop timer in sta/p2p_cli */
         spin_lock_irqsave(&pHddCtx->bus_bw_lock, flags);
-        pHddCtx->sta_cnt--;
-        pAdapter->connection--;
-        if (0 == pAdapter->connection) {
-            pAdapter->prev_tx_packets = 0;
-            pAdapter->prev_rx_packets = 0;
-        }
-        if (0 == pHddCtx->sta_cnt)
-            hdd_stop_bus_bw_compute_timer(pAdapter);
+        pAdapter->prev_tx_packets = 0;
+        pAdapter->prev_rx_packets = 0;
+        hdd_stop_bus_bw_compute_timer(pAdapter);
         spin_unlock_irqrestore(&pHddCtx->bus_bw_lock, flags);
 #endif
     }

@@ -3421,6 +3421,35 @@ REG_VARIABLE( CFG_ADVERTISE_CONCURRENT_OPERATION_NAME , WLAN_PARAM_Integer,
               CFG_ENABLE_SELF_RECOVERY_DEFAULT,
               CFG_ENABLE_SELF_RECOVERY_MIN,
               CFG_ENABLE_SELF_RECOVERY_MAX ),
+#ifdef MSM_PLATFORM
+   REG_VARIABLE( CFG_BUS_BANDWIDTH_HIGH_THRESHOLD, WLAN_PARAM_Integer,
+              hdd_config_t, busBandwidthHighThreshold,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_DEFAULT,
+              CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_MIN,
+              CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_MAX ),
+
+   REG_VARIABLE( CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD, WLAN_PARAM_Integer,
+              hdd_config_t, busBandwidthMediumThreshold,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_DEFAULT,
+              CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_MIN,
+              CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_MAX ),
+
+   REG_VARIABLE( CFG_BUS_BANDWIDTH_LOW_THRESHOLD, WLAN_PARAM_Integer,
+              hdd_config_t, busBandwidthLowThreshold,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_BUS_BANDWIDTH_LOW_THRESHOLD_DEFAULT,
+              CFG_BUS_BANDWIDTH_LOW_THRESHOLD_MIN,
+              CFG_BUS_BANDWIDTH_LOW_THRESHOLD_MAX ),
+
+   REG_VARIABLE( CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL, WLAN_PARAM_Integer,
+              hdd_config_t, busBandwidthComputeInterval,
+              VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+              CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_DEFAULT,
+              CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_MIN,
+              CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_MAX),
+#endif
 };
 
 /*
@@ -3838,6 +3867,21 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
            "Name = [gEnableSelfRecovery] Value = [%u]",
                    pHddCtx->cfg_ini->enableSelfRecovery);
+
+#ifdef MSM_PLATFORM
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+          "Name = [gBusBandwidthHighThreshold] Value = [%u] ",
+          pHddCtx->cfg_ini->busBandwidthHighThreshold);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+          "Name = [gBusBandwidthMediumThreshold] Value = [%u] ",
+          pHddCtx->cfg_ini->busBandwidthMediumThreshold);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+          "Name = [gBusBandwidthLowThreshold] Value = [%u] ",
+          pHddCtx->cfg_ini->busBandwidthLowThreshold);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+          "Name = [gbusBandwidthComputeInterval] Value = [%u] ",
+          pHddCtx->cfg_ini->busBandwidthComputeInterval);
+#endif
 }
 
 #define CFG_VALUE_MAX_LEN 256
