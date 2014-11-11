@@ -10103,7 +10103,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
            "%s: pAdapter is NULL, cannot Abort scan", __func__);
 
    /* Stop the traffic monitor timer */
-   if ((NULL != pHddCtx->cfg_ini) && (pHddCtx->cfg_ini->dynSplitscan)) {
+   if ((NULL != pConfig) && (pConfig->dynSplitscan)) {
        if (VOS_TIMER_STATE_RUNNING ==
                     vos_timer_getCurrentState(&pHddCtx->tx_rx_trafficTmr)) {
             vos_timer_stop(&pHddCtx->tx_rx_trafficTmr);
@@ -10144,7 +10144,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    }
 #endif
 
-   if(!pConfig->enablePowersaveOffload)
+   if (pConfig && !pConfig->enablePowersaveOffload)
    {
       //Disable IMPS/BMPS as we do not want the device to enter any power
       //save mode during shutdown
@@ -10289,7 +10289,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 #endif
 
    //Close Watchdog
-   if(pHddCtx->cfg_ini->fIsLogpEnabled)
+   if (pConfig && pConfig->fIsLogpEnabled)
       vos_watchdog_close(pVosContext);
 
    //Clean up HDD Nlink Service
@@ -10300,7 +10300,6 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 #else
    nl_srv_exit();
 #endif /* WLAN_KD_READY_NOTIFIER */
-
 
    /* Cancel the vote for XO Core ON.
     * This is done here to ensure there is no race condition since MC, TX and WD threads have
