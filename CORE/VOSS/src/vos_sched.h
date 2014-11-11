@@ -67,7 +67,6 @@
   ------------------------------------------------------------------------*/
 #include <vos_event.h>
 #include "i_vos_types.h"
-#include "i_vos_packet.h"
 #include <linux/wait.h>
 #ifdef WLAN_OPEN_SOURCE
 #include <linux/wakelock.h>
@@ -101,8 +100,10 @@
 ** worst-case scenario.  Must be able to handle all
 ** incoming frames, as well as overhead for internal
 ** messaging
+**
+** Increased to 2000 to handle more RX frames
 */
-#define VOS_CORE_MAX_MESSAGES           (VPKT_NUM_RX_RAW_PACKETS + 32)
+#define VOS_CORE_MAX_MESSAGES 2000
 
 #ifdef QCA_CONFIG_SMP
 /*
