@@ -14084,7 +14084,6 @@ void wlan_hdd_auto_shutdown_enable(hdd_context_t *hdd_ctx, v_BOOL_t enable)
 }
 #endif
 
-#ifdef WLAN_FEATURE_MBSSID
 hdd_adapter_t * hdd_get_con_sap_adapter(hdd_adapter_t *this_sap_adapter)
 {
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(this_sap_adapter);
@@ -14111,7 +14110,6 @@ hdd_adapter_t * hdd_get_con_sap_adapter(hdd_adapter_t *this_sap_adapter)
 
     return con_sap_adapter;
 }
-#endif
 
 #ifdef MSM_PLATFORM
 void hdd_start_bus_bw_compute_timer(hdd_adapter_t *pAdapter)
