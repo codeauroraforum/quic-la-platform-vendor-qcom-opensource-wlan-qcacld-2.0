@@ -706,7 +706,11 @@ wlan_tasklet(unsigned long data)
          goto irq_handled;
     }
 
+#ifdef FEATURE_WLAN_D0WOW
+    if (adf_os_atomic_read(&sc->wow_done) && !adf_os_atomic_read(&sc->in_d0wow))
+#else
     if (adf_os_atomic_read(&sc->wow_done))
+#endif
          goto irq_handled;
 
     adf_os_atomic_set(&sc->ce_suspend, 0);
@@ -1374,6 +1378,9 @@ again:
 
     adf_os_atomic_init(&sc->tasklet_from_intr);
     adf_os_atomic_init(&sc->wow_done);
+#ifdef FEATURE_WLAN_D0WOW
+    adf_os_atomic_init(&sc->in_d0wow);
+#endif
     adf_os_atomic_init(&sc->ce_suspend);
     adf_os_atomic_init(&sc->pci_link_suspended);
     init_waitqueue_head(&ol_sc->sc_osdev->event_queue);
@@ -1719,6 +1726,9 @@ again:
 
     adf_os_atomic_init(&sc->tasklet_from_intr);
     adf_os_atomic_init(&sc->wow_done);
+#ifdef FEATURE_WLAN_D0WOW
+    adf_os_atomic_init(&sc->in_d0wow);
+#endif
     adf_os_atomic_init(&sc->ce_suspend);
     adf_os_atomic_init(&sc->pci_link_suspended);
 
