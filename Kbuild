@@ -1170,6 +1170,9 @@ CDEFINES += -DFEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
 #Enable OBSS feature for mdm9630
 CDEFINES += -DQCA_HT_2040_COEX
 
+#Disable HT40 in 2.4GHZ STA mode
+CDEFINES += -DQCA_HT_20_24G_STA_ONLY
+
 else
 
 #Open P2P device interface only for non-MDM9630 platform
