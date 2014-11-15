@@ -1247,7 +1247,10 @@ CDEFINES += -DFEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
 #Enable OBSS feature
 CDEFINES += -DQCA_HT_2040_COEX
 
-else
+#Disable HT40 in 2.4GHZ STA mode
+CDEFINES += -DQCA_HT_20_24G_STA_ONLY
+
+else #CONFIG_MOBILE_ROUTER
 
 #Open P2P device interface only for non-Mobile router use cases
 CDEFINES += -DWLAN_OPEN_P2P_INTERFACE
