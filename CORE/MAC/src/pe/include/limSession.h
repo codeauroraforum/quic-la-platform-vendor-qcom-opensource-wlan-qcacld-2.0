@@ -417,6 +417,7 @@ typedef struct sPESession           // Added to Support BT-AMP
 
     /* Flag to indicate Chan Sw announcement is required */
     tANI_U8  dfsIncludeChanSwIe;
+    tANI_U8  isKeyInstalled;
 }tPESession, *tpPESession;
 
 #define LIM_MAX_ACTIVE_SESSIONS 4
