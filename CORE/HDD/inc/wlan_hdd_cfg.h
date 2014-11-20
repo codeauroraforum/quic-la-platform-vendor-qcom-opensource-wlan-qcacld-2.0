@@ -2829,6 +2829,18 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MAX     ( 1 )
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_DEFAULT ( 1 )
 
+
+enum dot11p_mode {
+    WLAN_HDD_11P_DISABLED = 0,
+    WLAN_HDD_11P_STANDALONE,
+    WLAN_HDD_11P_CONCURRENT,
+};
+
+#define CFG_DOT11P_MODE_NAME             "gDot11PMode"
+#define CFG_DOT11P_MODE_DEFAULT          ( WLAN_HDD_11P_DISABLED )
+#define CFG_DOT11P_MODE_MIN              ( WLAN_HDD_11P_DISABLED )
+#define CFG_DOT11P_MODE_MAX              ( WLAN_HDD_11P_CONCURRENT )
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3432,8 +3444,11 @@ typedef struct
    v_U32_t                     extWowApp2TcpRxTimeout;
 #endif
    v_BOOL_t                    gEnableDeauthToDisassocMap;
+
    uint8_t                     conc_custom_rule1;
    uint8_t                     is_sta_connection_in_5gz_enabled;
+
+   uint8_t                     dot11p_mode;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
