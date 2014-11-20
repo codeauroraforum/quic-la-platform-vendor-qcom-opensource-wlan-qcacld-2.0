@@ -4541,9 +4541,9 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
         sme_GetConfigParam(hal, &smeconfig);
 
         smeconfig.csrConfig.phyMode = phymode;
-#ifdef QCA_HT_2040_COEX
         if (phymode == eCSR_DOT11_MODE_11n &&
                              chwidth == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
+#ifdef QCA_HT_2040_COEX
             smeconfig.csrConfig.obssEnabled = eANI_BOOLEAN_FALSE;
             halStatus = sme_SetHT2040Mode(hal, pAdapter->sessionId,
                                       eHT_CHAN_HT20, eANI_BOOLEAN_FALSE);
@@ -4551,16 +4551,23 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
                 hddLog(LOGE, FL("Failed to disable OBSS"));
                 return -EIO;
             }
+#endif
         } else if (phymode == eCSR_DOT11_MODE_11n &&
                               chwidth == WNI_CFG_CHANNEL_BONDING_MODE_ENABLE) {
-            if (phddctx->cfg_ini->ht2040CoexEnabled) {
-                smeconfig.csrConfig.obssEnabled = eANI_BOOLEAN_TRUE;
-                halStatus = sme_SetHT2040Mode(hal, pAdapter->sessionId,
+            if (curr_band == eCSR_BAND_24)
+                smeconfig.csrConfig.channelBondingMode24GHz =
+                                    phddctx->cfg_ini->nChannelBondingMode24GHz;
+            else
+                smeconfig.csrConfig.channelBondingMode5GHz =
+                                    phddctx->cfg_ini->nChannelBondingMode5GHz;
+
+#ifdef QCA_HT_2040_COEX
+            smeconfig.csrConfig.obssEnabled = eANI_BOOLEAN_TRUE;
+            halStatus = sme_SetHT2040Mode(hal, pAdapter->sessionId,
                                       eHT_CHAN_HT20, eANI_BOOLEAN_TRUE);
-                if (halStatus == eHAL_STATUS_FAILURE) {
-                    hddLog(LOGE, FL("Failed to enable OBSS"));
-                    return -EIO;
-                }
+            if (halStatus == eHAL_STATUS_FAILURE) {
+                hddLog(LOGE, FL("Failed to enable OBSS"));
+                return -EIO;
             }
         }
 #endif
