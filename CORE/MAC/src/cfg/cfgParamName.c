@@ -69,7 +69,6 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"OPERATIONAL_RATE_SET",
     (unsigned char *)"EXTENDED_OPERATIONAL_RATE_SET",
     (unsigned char *)"PROPRIETARY_OPERATIONAL_RATE_SET",
-    (unsigned char *)"BSSID",
     (unsigned char *)"LISTEN_INTERVAL",
     (unsigned char *)"VALID_CHANNEL_LIST",
     (unsigned char *)"CURRENT_CHANNEL",
@@ -341,4 +340,6 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"CURRENT_RSSI",
     (unsigned char *)"RTT3_ENABLE",
     (unsigned char *)"DEBUG_P2P_REMAIN_ON_CHANNEL",
+    (unsigned char *)"DFS_MASTER_ENABLED",
 };
+
