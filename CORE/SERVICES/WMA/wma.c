@@ -13388,6 +13388,8 @@ static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason)
 	case  WOW_REASON_HOST_AUTO_SHUTDOWN:
 		return "WOW_REASON_HOST_AUTO_SHUTDOWN";
 #endif
+	case WOW_REASON_CLIENT_KICKOUT_EVENT:
+		return "WOW_REASON_CLIENT_KICKOUT_EVENT";
 	}
 	return "unknown";
 }
@@ -13631,6 +13633,32 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 				   param_buf->wow_packet_buffer + 4,
 				   wow_buf_pkt_len);
 		break;
+	case WOW_REASON_CLIENT_KICKOUT_EVENT:
+	{
+		WMI_PEER_STA_KICKOUT_EVENTID_param_tlvs param;
+		if (param_buf->wow_packet_buffer) {
+		    /* station kickout event embedded in wow_packet_buffer */
+		    WMA_LOGD("Host woken up because of sta_kickout event");
+		    vos_mem_copy((u_int8_t *) &wow_buf_pkt_len,
+				param_buf->wow_packet_buffer, 4);
+		    WMA_LOGD("wow_packet_buffer dump");
+				vos_trace_hex_dump(VOS_MODULE_ID_WDA,
+				VOS_TRACE_LEVEL_DEBUG,
+				param_buf->wow_packet_buffer, wow_buf_pkt_len);
+		    if (wow_buf_pkt_len >= sizeof(param)) {
+			param.fixed_param = (wmi_peer_sta_kickout_event_fixed_param *)
+					(param_buf->wow_packet_buffer + 4);
+			wma_peer_sta_kickout_event_handler(handle,
+					(u_int8_t *)&param, sizeof(param));
+		    } else {
+			WMA_LOGE("Wrong length for sta_kickout event = %d bytes",
+					wow_buf_pkt_len);
+		    }
+		} else {
+		    WMA_LOGD("No wow_packet_buffer present");
+		}
+		break;
+	}
 
 	default:
 		break;
