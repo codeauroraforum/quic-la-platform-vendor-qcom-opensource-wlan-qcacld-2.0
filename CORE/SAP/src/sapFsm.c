@@ -1687,6 +1687,7 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
     v_U8_t bandEndChannel ;
     v_U32_t enableLTECoex;
     tHalHandle hHal = VOS_GET_HAL_CB(sapContext->pvosGCtx);
+    v_U32_t dfsMasterCap = FALSE;
 #ifdef FEATURE_WLAN_CH_AVOID
     v_U8_t i;
 #endif
@@ -1810,14 +1811,17 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
     }
 
     /*Search for the Active channels in the given range */
+    ccmCfgGetInt(hHal, WNI_CFG_DFS_MASTER_ENABLED, &dfsMasterCap);
     channelCount = 0;
-    for( loopCount = bandStartChannel; loopCount <= bandEndChannel; loopCount++ )
+    for (loopCount = bandStartChannel; loopCount <= bandEndChannel;
+                    loopCount++)
     {
         if((startChannelNum <= rfChannels[loopCount].channelNum)&&
             (endChannelNum >= rfChannels[loopCount].channelNum ))
         {
-            if( regChannels[loopCount].enabled )
-            {
+            if ((NV_CHANNEL_ENABLE == regChannels[loopCount].enabled) ||
+                (dfsMasterCap &&
+                 (NV_CHANNEL_DFS == regChannels[loopCount].enabled))) {
 #ifdef FEATURE_WLAN_CH_AVOID
                 for( i = 0; i < NUM_20MHZ_RF_CHANNELS; i++ )
                 {
