@@ -97,6 +97,9 @@ ifeq ($(KERNEL_BUILD), 0)
         ifeq ($(CONFIG_ROME_IF),usb)
                 CONFIG_LINUX_QCMBR :=y
         endif
+
+        #Flag to enable 3 port concurrency feature
+        CONFIG_QCA_WIFI_AUTOMOTIVE_CONC := y
 endif
 
 ifeq ($(CONFIG_X86), y)
@@ -907,6 +910,12 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DQCA_LL_TX_FLOW_CT \
 		-DFEATURE_WLAN_LFR \
 		-DFEATURE_WLAN_CH144
+
+ifeq ($(CONFIG_QCA_WIFI_AUTOMOTIVE_CONC), y)
+CDEFINES +=     -DWLAN_FEATURE_MBSSID \
+		-DFEATURE_WLAN_MCC_TO_SCC_SWITCH \
+		-DFEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
+endif
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 CDEFINES +=     -DCONFIG_HL_SUPPORT \
