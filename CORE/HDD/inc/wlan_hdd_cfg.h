@@ -2814,6 +2814,21 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_MIN     ( 0 )
 #define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_MAX     ( 1 )
 #define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_DEFAULT ( 0 )
+/*
+ * Custom concurrency rule1:
+ * If SAP comes up first and STA comes up later then SAP
+ * needs to follow STA's channel.
+ */
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME         "gEnableCustomConcRule1"
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_MIN     ( 0 )
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_MAX     ( 1 )
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_DEFAULT ( 0 )
+
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ         "gEnableStaConnectionIn5Ghz"
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MIN     ( 0 )
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MAX     ( 1 )
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_DEFAULT ( 1 )
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3417,6 +3432,8 @@ typedef struct
    v_U32_t                     extWowApp2TcpRxTimeout;
 #endif
    v_BOOL_t                    gEnableDeauthToDisassocMap;
+   uint8_t                     conc_custom_rule1;
+   uint8_t                     is_sta_connection_in_5gz_enabled;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
