@@ -8890,12 +8890,12 @@ eHalStatus csrScanSaveRoamOffloadApToScanCache(tpAniSirGlobal pMac,
  * Return: first bss descriptor from the scan handle.
  */
 tSirBssDescription*
-csr_get_bssdescr_from_scan_handle(tScanResultHandle *result_handle,
+csr_get_bssdescr_from_scan_handle(tScanResultHandle result_handle,
                                   tSirBssDescription *bss_descr)
 {
    tListElem *first_element = NULL;
    tCsrScanResult *scan_result = NULL;
-   tScanResultList *bss_list = (tScanResultList *)*result_handle;
+   tScanResultList *bss_list = (tScanResultList *)result_handle;
 
    if (NULL == bss_list) {
        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
@@ -8917,6 +8917,5 @@ csr_get_bssdescr_from_scan_handle(tScanResultHandle *result_handle,
                     &scan_result->Result.BssDescriptor,
                     sizeof(tSirBssDescription));
    }
-   vos_mem_free(bss_list);
    return bss_descr;
 }
