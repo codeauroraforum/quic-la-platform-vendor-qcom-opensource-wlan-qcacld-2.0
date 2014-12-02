@@ -901,6 +901,8 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
     // notify apps that we can't pass traffic anymore
     netif_tx_disable(dev);
     netif_carrier_off(dev);
+    pAdapter->hdd_stats.hddTxRxStats.netq_disable_cnt++;
+    pAdapter->hdd_stats.hddTxRxStats.netq_state_off = TRUE;
 
 #ifdef IPA_OFFLOAD
     if (hdd_ipa_is_enabled(pHddCtx))
@@ -1750,6 +1752,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                    since hdd_roamRegisterSTA will flush any cached data frames
                    immediately */
                 netif_tx_wake_all_queues(dev);
+                pAdapter->hdd_stats.hddTxRxStats.netq_enable_cnt++;
+                pAdapter->hdd_stats.hddTxRxStats.netq_state_off = FALSE;
 
                 // Register the Station with TL after associated...
                 vosStatus = hdd_roamRegisterSTA( pAdapter,
@@ -1813,6 +1817,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
             }
 #endif
             netif_tx_wake_all_queues(dev);
+            pAdapter->hdd_stats.hddTxRxStats.netq_enable_cnt++;
+            pAdapter->hdd_stats.hddTxRxStats.netq_state_off = FALSE;
         }
 
         if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
@@ -1966,6 +1972,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
         netif_tx_disable(dev);
         netif_carrier_off(dev);
+        pAdapter->hdd_stats.hddTxRxStats.netq_disable_cnt++;
+        pAdapter->hdd_stats.hddTxRxStats.netq_state_off = TRUE;
 
     }
 
@@ -2523,6 +2531,9 @@ static eHalStatus roamRoamConnectStatusUpdateHandler( hdd_adapter_t *pAdapter, t
          // Stop only when we are inactive
          netif_tx_disable(pAdapter->dev);
          netif_carrier_off(pAdapter->dev);
+         pAdapter->hdd_stats.hddTxRxStats.netq_disable_cnt++;
+         pAdapter->hdd_stats.hddTxRxStats.netq_state_off = TRUE;
+
          VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                    "%s: Set HDD connState to eConnectionState_NotConnected",
                    __func__);
@@ -3171,6 +3182,8 @@ hdd_smeRoamCallback(void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U32 roamId,
             {
                 struct net_device *dev = pAdapter->dev;
                 netif_tx_disable(dev);
+                pAdapter->hdd_stats.hddTxRxStats.netq_disable_cnt++;
+                pAdapter->hdd_stats.hddTxRxStats.netq_state_off = TRUE;
                 /*
                  * Deregister for this STA with TL with the objective to flush
                  * all the packets for this STA from wmm_tx_queue. If not done here,
@@ -3207,6 +3220,8 @@ hdd_smeRoamCallback(void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U32 roamId,
                 hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
                 // notify apps that we can't pass traffic anymore
                 netif_tx_disable(dev);
+                pAdapter->hdd_stats.hddTxRxStats.netq_disable_cnt++;
+                pAdapter->hdd_stats.hddTxRxStats.netq_state_off = TRUE;
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_ESE) || defined(FEATURE_WLAN_LFR)
                 if (pHddStaCtx->ft_carrier_on == FALSE)
                 {
@@ -3235,6 +3250,8 @@ hdd_smeRoamCallback(void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U32 roamId,
                           "Roaming started due to connection lost");
                 netif_tx_disable(pAdapter->dev);
                 netif_carrier_off(pAdapter->dev);
+                pAdapter->hdd_stats.hddTxRxStats.netq_disable_cnt++;
+                pAdapter->hdd_stats.hddTxRxStats.netq_state_off = TRUE;
                 break;
             }
         case eCSR_ROAM_DISASSOCIATED:
