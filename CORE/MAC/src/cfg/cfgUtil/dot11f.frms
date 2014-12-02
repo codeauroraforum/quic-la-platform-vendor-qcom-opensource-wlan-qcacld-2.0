@@ -4184,7 +4184,7 @@ FRAME TDLSDisRsp
     OPTIE  TimeoutInterval;
     OPTIE  RICData;
     OPTIE  HTCaps;
-   //Optional 20/40BSSCoexistence... ignoring
+    OPTIE  HT2040BSSCoexistence;
     MANDIE LinkIdentifier;
     OPTIE  VHTCaps;
 }
@@ -4207,7 +4207,7 @@ FRAME TDLSSetupReq
     OPTIE  TimeoutInterval;
     OPTIE  RICData;
     OPTIE  HTCaps;
-   //Optional 20/40BSSCoexistence... ignoring
+    OPTIE  HT2040BSSCoexistence;
     MANDIE LinkIdentifier;
     OPTIE  WMMInfoStation;
     OPTIE  AID;
@@ -4233,7 +4233,7 @@ FRAME TDLSSetupRsp
     OPTIE  TimeoutInterval;
     OPTIE  RICData;
     OPTIE  HTCaps;
-   //Optional 20/40BSSCoexistence... ignoring
+    OPTIE  HT2040BSSCoexistence;
     OPTIE  LinkIdentifier;
     OPTIE  WMMInfoStation;
     OPTIE  AID;
