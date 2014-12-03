@@ -1070,6 +1070,7 @@ typedef struct
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
   tANI_U8          setRICparams;
 #endif
+  uint8_t          sme_session_id;
 } tAddTsParams, *tpAddTsParams;
 
 typedef struct
