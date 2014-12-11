@@ -247,8 +247,8 @@ WLANSAP_ScanCallback
     }
 
     sme_SelectCBMode(halHandle,
-          sapConvertSapPhyModeToCsrPhyMode(psapContext->csrRoamProfile.phyMode),
-          psapContext->channel, vhtChannelWidth);
+                     psapContext->csrRoamProfile.phyMode,
+                     psapContext->channel, vhtChannelWidth);
 #ifdef SOFTAP_CHANNEL_RANGE
     if(psapContext->channelList != NULL)
     {
@@ -814,8 +814,7 @@ WLANSAP_RoamCallback
         case eCSR_ROAM_RESULT_DFS_CHANSW_UPDATE_SUCCESS:
         case eCSR_ROAM_RESULT_DFS_CHANSW_UPDATE_FAILURE:
         {
-            eCsrPhyMode phyMode =
-               sapConvertSapPhyModeToCsrPhyMode(sapContext->csrRoamProfile.phyMode);
+            eCsrPhyMode phyMode = sapContext->csrRoamProfile.phyMode;
 
             /* Both success and failure cases are handled intentionally handled
              * together. Irrespective of whether the channel switch IE was

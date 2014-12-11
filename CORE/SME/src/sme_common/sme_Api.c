@@ -11663,7 +11663,6 @@ VOS_STATUS sme_SelectCBMode(tHalHandle hHal, eCsrPhyMode eCsrPhyMode,
          eCSR_DOT11_MODE_11n_ONLY != eCsrPhyMode &&
 
          eCSR_DOT11_MODE_11a != eCsrPhyMode &&
-         eCSR_DOT11_MODE_11a_ONLY != eCsrPhyMode &&
 
          eCSR_DOT11_MODE_abg != eCsrPhyMode
       )
@@ -11801,7 +11800,6 @@ VOS_STATUS sme_SelectCBMode(tHalHandle hHal, eCsrPhyMode eCsrPhyMode,
       for 802.11g only phy mode also channel bonding should be zero.
    */
    if (  eCSR_DOT11_MODE_11a == eCsrPhyMode ||
-         eCSR_DOT11_MODE_11a_ONLY == eCsrPhyMode ||
          eCSR_DOT11_MODE_abg == eCsrPhyMode)
    {
       smeConfig.csrConfig.channelBondingMode5GHz =
