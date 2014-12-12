@@ -4280,6 +4280,7 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
        ht40_enabled = 0;
 
     sap_config = &adapter->sessionCtx.ap.sapConfig;
+    sap_config->channel = AUTO_CHANNEL_SELECT;
 
 #ifdef WLAN_FEATURE_MBSSID
     /*
