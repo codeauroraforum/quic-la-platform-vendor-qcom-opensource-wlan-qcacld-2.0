@@ -1045,6 +1045,9 @@ typedef struct sAniSirGlobal
     csrReadyToExtWoWCallback readyToExtWoWCallback;
     void *readyToExtWoWContext;
 #endif
+
+    /* 802.11p enable */
+    bool enable_dot11p;
 } tAniSirGlobal;
 
 typedef enum

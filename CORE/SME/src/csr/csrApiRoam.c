@@ -457,6 +457,7 @@ static tChannelPwrLimit csrFindChannelPwr(tChannelListWithPower * pdefaultPowerT
     return 0;
 }
 
+#define NUM_DOT11P_CHANNELS 9
 eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
 {
     tSirUpdateChanList *pChanList;
@@ -466,6 +467,13 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
     vos_msg_t msg;
     tANI_U8 i, j, social_channel[MAX_SOCIAL_CHANNELS] = {1,6,11};
 
+    /* Temporarily add list of 802.11P channels statically */
+    /* TODO-OCB: Remove after channels are added to reg domain */
+    tANI_U8 dot11p_channels[NUM_DOT11P_CHANNELS] = {
+        172, 174, 176, 178, 180, 182, 184, 175, 181,
+    };
+    tANI_U8 dot11p_power = 23;
+
     if (CSR_IS_5G_BAND_ONLY(pMac))
     {
         for (i = 0; i < MAX_SOCIAL_CHANNELS; i++)
@@ -474,6 +482,10 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
                          == NV_CHANNEL_ENABLE)
                 numChan++;
         }
+    }
+
+    if (pMac->enable_dot11p) {
+        numChan += NUM_DOT11P_CHANNELS;
     }
 
     bufLen = sizeof(tSirUpdateChanList) +
@@ -487,6 +499,7 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
                 "Failed to allocate memory for tSirUpdateChanList");
         return eHAL_STATUS_FAILED_ALLOC;
     }
+    vos_mem_zero(pChanList, bufLen);
 
     msg.type = WDA_UPDATE_CHAN_LIST_REQ;
     msg.reserved = 0;
@@ -523,7 +536,26 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
         }
     }
 
-    if(VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))
+    if (pMac->enable_dot11p) {
+        /* Add 5.9 GHz channels */
+        for (j = 0; j < NUM_DOT11P_CHANNELS; j++) {
+            pChanList->chanParam[i].chanId = dot11p_channels[j];
+            pChanList->chanParam[i].pwr = dot11p_power;
+            pChanList->chanParam[i].dfsSet = VOS_FALSE;
+            if ((pChanList->chanParam[i].chanId != 175)
+                    && (pChanList->chanParam[i].chanId != 181)) {
+                pChanList->chanParam[i].half_rate = VOS_TRUE;
+            }
+            i++;
+        }
+    }
+
+    msg.type = WDA_UPDATE_CHAN_LIST_REQ;
+    msg.reserved = 0;
+    msg.bodyptr = pChanList;
+    pChanList->numChan = i;
+
+    if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_FATAL,
                 "%s: Failed to post msg to WDA", __func__);
@@ -1902,7 +1934,9 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         pMac->roam.configParam.is_sta_connection_in_5gz_enabled =
                                pParam->is_sta_connection_in_5gz_enabled;
 
+        pMac->enable_dot11p = pParam->enable_dot11p;
     }
+
     return status;
 }
 
@@ -2048,6 +2082,9 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
         pParam->isRoamOffloadEnabled =
                                 pMac->roam.configParam.isRoamOffloadEnabled;
 #endif
+
+        pParam->enable_dot11p = pMac->enable_dot11p;
+
         csrSetChannels(pMac, pParam);
 
         pParam->obssEnabled = pMac->roam.configParam.obssEnabled;
