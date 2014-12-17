@@ -362,6 +362,10 @@ tSirRetStatus schSetFixedBeaconFields(tpAniSirGlobal pMac,tpPESession psessionEn
       }
     }
 
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+    /* populate proprietary IE for MDM device operating in AP-MCC */
+    populate_dot11f_avoid_channels_ie(pMac, &pBcn2->QComVendorIE, psessionEntry);
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
     if (psessionEntry->dot11mode != WNI_CFG_DOT11_MODE_11B)
         PopulateDot11fERPInfo( pMac, &pBcn2->ERPInfo, psessionEntry );
@@ -607,6 +611,15 @@ void limUpdateProbeRspTemplateIeBitmapBeacon2(tpAniSirGlobal pMac,
                      (void *)&beacon2->SuppOperatingClasses,
                      sizeof(beacon2->SuppOperatingClasses));
     }
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+    if(beacon2->QComVendorIE.present)
+    {
+        SetProbeRspIeBitmap(DefProbeRspIeBitmap, SIR_MAC_QCOM_VENDOR_EID);
+        vos_mem_copy((void *)&prb_rsp->QComVendorIE,
+                     (void *)&beacon2->QComVendorIE,
+                     sizeof(beacon2->QComVendorIE));
+    }
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
     /* ERP information */
     if(beacon2->ERPInfo.present)

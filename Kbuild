@@ -1331,6 +1331,10 @@ ifeq ($(CONFIG_STATICALLY_ADD_11P_CHANNELS),y)
 CDEFINES += -DFEATURE_STATICALLY_ADD_11P_CHANNELS
 endif
 
+ifeq ($(CONFIG_ARCH_MDM9640), y)
+CDEFINES += -DFEATURE_AP_MCC_CH_AVOIDANCE
+endif
+
 KBUILD_CPPFLAGS += $(CDEFINES)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
