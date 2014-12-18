@@ -40,11 +40,11 @@ BRIEF DESCRIPTION:
 
 #define QWLAN_VERSION_MAJOR            4
 #define QWLAN_VERSION_MINOR            0
-#define QWLAN_VERSION_PATCH            2
-#define QWLAN_VERSION_EXTRA            "LE"
-#define QWLAN_VERSION_BUILD            30
+#define QWLAN_VERSION_PATCH            10
+#define QWLAN_VERSION_EXTRA            ""
+#define QWLAN_VERSION_BUILD            1
 
-#define QWLAN_VERSIONSTR               "4.0.2.30LE"
+#define QWLAN_VERSIONSTR               "4.0.10.001"
 
 #ifdef QCA_WIFI_2_0
 
