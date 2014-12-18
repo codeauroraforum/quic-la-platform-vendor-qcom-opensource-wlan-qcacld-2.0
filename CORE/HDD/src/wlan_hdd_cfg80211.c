@@ -2890,6 +2890,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     hdd_hostapd_state_t *pHostapdState;
     v_CONTEXT_t pVosContext = (WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext;
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 #ifdef WLAN_FEATURE_11AC
     v_BOOL_t sapForce11ACFor11n =
 #ifdef WLAN_FEATURE_MBSSID
@@ -2901,7 +2902,6 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     struct qc_mac_acl_entry *acl_entry = NULL;
     v_SINT_t i;
     hdd_config_t *iniConfig;
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
     v_BOOL_t MFPCapable =  VOS_FALSE;
     v_BOOL_t MFPRequired =  VOS_FALSE;
     u_int16_t prev_rsn_length = 0;
@@ -3371,8 +3371,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 #endif
                 == eSAP_RF_SUBBAND_2_4_GHZ)) &&
             (WLAN_HDD_GET_CTX(pHostapdAdapter)->cfg_ini->enableVhtFor24GHzBand
-                                                                 == FALSE)) ||
-            (WLAN_HDD_GET_CTX(pHostapdAdapter)->isVHT80Allowed == FALSE))
+                                                                 == FALSE)))
         {
             pConfig->SapHw_mode = eSAP_DOT11_MODE_11n;
         }
@@ -3381,10 +3380,19 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
     if ( AUTO_CHANNEL_SELECT != pConfig->channel )
     {
+        if ((eSAP_DOT11_MODE_11ac == pConfig->SapHw_mode) ||
+            (eSAP_DOT11_MODE_11ac_ONLY == pConfig->SapHw_mode)) {
+            pConfig->vht_channel_width = pHddCtx->cfg_ini->vhtChannelWidth;
+            if ((pConfig->vht_channel_width == eHT_CHANNEL_WIDTH_80MHZ) &&
+                                        (pHddCtx->isVHT80Allowed == false)) {
+                pConfig->vht_channel_width = eHT_CHANNEL_WIDTH_40MHZ;
+            }
+        }
+        pConfig->vht_ch_width_orig = pConfig->vht_channel_width;
         sme_SelectCBMode(hHal,
             sapConvertSapPhyModeToCsrPhyMode(pConfig->SapHw_mode),
             pConfig->channel,
-            WLAN_HDD_GET_CTX(pHostapdAdapter)->cfg_ini->vhtChannelWidth);
+            &pConfig->vht_channel_width);
     }
     // ht_capab is not what the name conveys,this is used for protection bitmap
     pConfig->ht_capab =
@@ -6868,6 +6876,8 @@ void hdd_select_cbmode( hdd_adapter_t *pAdapter,v_U8_t operationChannel)
     v_U8_t iniDot11Mode =
                (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->dot11Mode;
     eHddDot11Mode   hddDot11Mode = iniDot11Mode;
+    v_U32_t vht_channel_width =
+               (WLAN_HDD_GET_CTX(pAdapter))->cfg_ini->vhtChannelWidth;
 
     hddLog(LOG1, FL("Channel Bonding Mode Selected is %u"),
            iniDot11Mode);
@@ -6894,7 +6904,7 @@ void hdd_select_cbmode( hdd_adapter_t *pAdapter,v_U8_t operationChannel)
     sme_SelectCBMode((WLAN_HDD_GET_CTX(pAdapter)->hHal),
                      hdd_cfg_xlate_to_csr_phy_mode(hddDot11Mode),
                      operationChannel,
-                     WLAN_HDD_GET_CTX(pAdapter)->cfg_ini->vhtChannelWidth);
+                     &vht_channel_width);
 }
 
 /*

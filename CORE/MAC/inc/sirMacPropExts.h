@@ -174,6 +174,11 @@ typedef enum eSirMacPropReasonCodes
     eSIR_MAC_ULA_TIMEOUT_REASON=0xFF00
 } tSirMacPropReasonCodes;
 
+#define WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ      0
+#define WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ         1
+#define WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ        2
+#define WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ 3
+
 
 /// Proprietary IE definition
 typedef struct sSirMacPropIE
