@@ -1474,7 +1474,9 @@ struct hdd_context_s
 
     struct work_struct  sap_start_work;
     bool is_sap_restart_required;
+    bool is_sta_connection_pending;
     spinlock_t sap_update_info_lock;
+    spinlock_t sta_update_info_lock;
 
     v_U8_t dev_dfs_cac_status;
 
@@ -1711,9 +1713,10 @@ void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr);
 void wlan_hdd_disable_roaming(hdd_adapter_t *pAdapter);
 void wlan_hdd_enable_roaming(hdd_adapter_t *pAdapter);
 #endif
-VOS_STATUS wlan_hdd_check_con_channel_sap_and_sta(hdd_adapter_t *sta_adapter,
+VOS_STATUS wlan_hdd_check_custom_con_channel_rules(hdd_adapter_t *sta_adapter,
                                               hdd_adapter_t *ap_adapter,
                                               tCsrRoamProfile *roam_profile,
+                                              tScanResultHandle *scan_cache,
                                               bool *concurrent_chnl_same);
 #ifdef WLAN_FEATURE_MBSSID
 void wlan_hdd_stop_sap(hdd_adapter_t *ap_adapter);
