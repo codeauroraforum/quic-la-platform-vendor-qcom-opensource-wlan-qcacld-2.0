@@ -2583,6 +2583,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_INITIAL_DWELL_TIME_MIN             (0)
 #define CFG_INITIAL_DWELL_TIME_MAX             (100)
 
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_NAME         "gInitialScanNoDFSChnl"
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_DEFAULT      (0)
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_MIN          (0)
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_MAX          (1)
+
 #define CFG_OVERRIDE_COUNTRY_CODE                "gStaCountryCode"
 #define CFG_OVERRIDE_COUNTRY_CODE_DEFAULT        "000"
 
@@ -2995,6 +3000,7 @@ typedef struct
    v_U32_t        nActiveMaxChnTime;     //in units of milliseconds
 
    v_U32_t        nInitialDwellTime;     //in units of milliseconds
+   bool           initial_scan_no_dfs_chnl;
 
    v_U32_t        nActiveMinChnTimeBtc;     //in units of milliseconds
    v_U32_t        nActiveMaxChnTimeBtc;     //in units of milliseconds
