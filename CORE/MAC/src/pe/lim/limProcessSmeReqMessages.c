@@ -768,7 +768,7 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
             channelNumber = pSmeStartBssReq->channelId;
             if (pSmeStartBssReq->obssEnabled)
                 psessionEntry->htSupportedChannelWidthSet =
-                                 IS_DOT11_MODE_HT(psessionEntry->dot11mode)?1:0;
+                          IS_DOT11_MODE_HT(psessionEntry->dot11mode)  ? 1 : 0;
             else
                 psessionEntry->htSupportedChannelWidthSet =
                                  (pSmeStartBssReq->cbMode)?1:0;
