@@ -8677,7 +8677,7 @@ static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
        || (WLAN_HDD_P2P_GO == pAdapter->device_mode)
        )
     {
-        if( NULL == mac )
+        if ((NULL == mac) || (vos_is_macaddr_broadcast((v_MACADDR_t *)mac)))
         {
             v_U16_t i;
             for(i = 0; i < WLAN_MAX_STA_COUNT; i++)
