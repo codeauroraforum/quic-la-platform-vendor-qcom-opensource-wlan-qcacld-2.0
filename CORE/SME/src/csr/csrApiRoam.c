@@ -2116,7 +2116,7 @@ eHalStatus csrSetPhyMode(tHalHandle hHal, tANI_U32 phyMode, eCsrBand eBand, tANI
         if(eCSR_BAND_24 == eBand)
         {
             if(CSR_IS_RADIO_A_ONLY(pMac)) break;
-            if((eCSR_DOT11_MODE_11a & phyMode) || (eCSR_DOT11_MODE_11a_ONLY & phyMode)) break;
+            if(eCSR_DOT11_MODE_11a & phyMode) break;
         }
         if(eCSR_BAND_5G == eBand)
         {
@@ -2136,13 +2136,6 @@ eHalStatus csrSetPhyMode(tHalHandle hHal, tANI_U32 phyMode, eCsrBand eBand, tANI
             {
                 if(eCSR_DOT11_MODE_11n_ONLY != phyMode) break;
                 newPhyMode = eCSR_DOT11_MODE_11n_ONLY;
-            }
-            else if(eCSR_DOT11_MODE_11a_ONLY & phyMode)
-            {
-                if(eCSR_DOT11_MODE_11a_ONLY != phyMode) break;
-                if(eCSR_BAND_24 == eBand) break;
-                newPhyMode = eCSR_DOT11_MODE_11a_ONLY;
-                eBand = eCSR_BAND_5G;
             }
             else if(eCSR_DOT11_MODE_11g_ONLY & phyMode)
             {
