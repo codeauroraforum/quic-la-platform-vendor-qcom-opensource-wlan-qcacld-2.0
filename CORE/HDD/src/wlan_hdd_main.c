@@ -7185,12 +7185,12 @@ hdd_parse_send_action_frame_v1_data(const tANI_U8 *pValue,
         return -EINVAL;
     }
 
-    /*getting the next argument ie the dwell time */
+    /* getting the next argument ie the dwell time */
     v = sscanf(inPtr, "%31s ", tempBuf);
     if (1 != v) return -EINVAL;
 
     v = kstrtos32(tempBuf, 10, &tempInt);
-    if ( v < 0 || tempInt < 0) return -EINVAL;
+    if ( v < 0 || tempInt <= 0) return -EINVAL;
 
     *pDwellTime = tempInt;
 
