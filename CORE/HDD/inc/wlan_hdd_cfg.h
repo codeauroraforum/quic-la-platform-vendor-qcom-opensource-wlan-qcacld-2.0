@@ -2820,14 +2820,19 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
  * needs to follow STA's channel.
  */
 #define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME         "gEnableCustomConcRule1"
-#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_MIN     ( 0 )
-#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_MAX     ( 1 )
-#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_DEFAULT ( 0 )
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_MIN     (0)
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_MAX     (1)
+#define CFG_ENABLE_CUSTOM_CONC_RULE1_NAME_DEFAULT (0)
+
+#define CFG_ENABLE_CUSTOM_CONC_RULE2_NAME         "gEnableCustomConcRule2"
+#define CFG_ENABLE_CUSTOM_CONC_RULE2_NAME_MIN     (0)
+#define CFG_ENABLE_CUSTOM_CONC_RULE2_NAME_MAX     (1)
+#define CFG_ENABLE_CUSTOM_CONC_RULE2_NAME_DEFAULT (0)
 
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ         "gEnableStaConnectionIn5Ghz"
-#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MIN     ( 0 )
-#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MAX     ( 1 )
-#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_DEFAULT ( 1 )
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MIN     (0)
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MAX     (1)
+#define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_DEFAULT (1)
 
 
 enum dot11p_mode {
@@ -3446,6 +3451,7 @@ typedef struct
    v_BOOL_t                    gEnableDeauthToDisassocMap;
 
    uint8_t                     conc_custom_rule1;
+   uint8_t                     conc_custom_rule2;
    uint8_t                     is_sta_connection_in_5gz_enabled;
 
    uint8_t                     dot11p_mode;
