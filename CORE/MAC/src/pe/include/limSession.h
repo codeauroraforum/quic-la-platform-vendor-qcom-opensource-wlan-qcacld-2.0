@@ -444,6 +444,7 @@ typedef struct sPESession           // Added to Support BT-AMP
     // Size of the trailing portion
     tANI_U16 schBeaconOffsetEnd;
 
+    tANI_U8  isKeyInstalled;
 }tPESession, *tpPESession;
 
 #define LIM_MAX_ACTIVE_SESSIONS 4
