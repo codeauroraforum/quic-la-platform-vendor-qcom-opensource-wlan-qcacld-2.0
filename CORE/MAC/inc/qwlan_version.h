@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,9 +43,9 @@ BRIEF DESCRIPTION:
 #define QWLAN_VERSION_PATCH            73
 #define QWLAN_VERSION_EXTRA            ""
 
-#define QWLAN_VERSION_BUILD            13
+#define QWLAN_VERSION_BUILD            14
 
-#define QWLAN_VERSIONSTR               "4.2.73.13"
+#define QWLAN_VERSIONSTR               "4.2.73.14"
 
 
 #define AR6320_REV1_VERSION             0x5000000
