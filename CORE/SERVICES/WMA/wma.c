@@ -12807,6 +12807,12 @@ wma_update_protection_mode(tp_wma_handle wma, u_int8_t vdev_id,
 
 	prot_mode = llbcoexist ? IEEE80211_PROT_CTSONLY : IEEE80211_PROT_NONE;
 
+	if (!wma->interfaces[vdev_id].vdev_up) {
+		WMA_LOGE("%s:vdev %d is not up. Skipping to send PROTECTION_MODE"
+				, __func__, vdev_id);
+		return;
+	}
+
 	ret = wmi_unified_vdev_set_param_send(wma->wmi_handle, vdev_id,
 					      WMI_VDEV_PARAM_PROTECTION_MODE,
 					      prot_mode);
