@@ -4283,7 +4283,6 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
     sap_config = &adapter->sessionCtx.ap.sapConfig;
     sap_config->channel = AUTO_CHANNEL_SELECT;
-
 #ifdef WLAN_FEATURE_MBSSID
     /*
      * Check if AP+AP case, once primary AP chooses a DFS
@@ -4414,6 +4413,7 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
         hddLog(LOGE, FL("ACS channel select failed"));
         goto out;
     }
+    sap_config->acs_case = true;
 
 out:
     if (0 == status) {
@@ -6932,6 +6932,7 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
         hdd_change_sap_restart_required_status(pHddCtx, false);
     }
 
+    pAdapter->sessionCtx.ap.sapConfig.acs_case = false;
     hdd_hostapd_stop(dev);
 
     old = pAdapter->sessionCtx.ap.beacon;
