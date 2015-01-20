@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -115,6 +115,7 @@
 #define CSR_ROAMING_DFS_CHANNEL_ENABLED_NORMAL     (1)
 #define CSR_ROAMING_DFS_CHANNEL_ENABLED_ACTIVE     (2)
 
+#define CSR_CUSTOM_CONC_GO_BI    100
 typedef enum
 {
     eCsrNextScanNothing,
