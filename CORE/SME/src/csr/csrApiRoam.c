@@ -6707,6 +6707,7 @@ eHalStatus csrRoamCopyProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pDstProfile,
         pDstProfile->cfg_protection    = pSrcProfile->cfg_protection;
         pDstProfile->wps_state         = pSrcProfile->wps_state;
         pDstProfile->ieee80211d        = pSrcProfile->ieee80211d;
+        pDstProfile->sap_dot11mc        = pSrcProfile->sap_dot11mc;
         vos_mem_copy(&pDstProfile->Keys, &pSrcProfile->Keys,
                      sizeof(pDstProfile->Keys));
 #ifdef WLAN_FEATURE_VOWIFI_11R
@@ -7805,7 +7806,9 @@ eHalStatus csrRoamSaveConnectedInfomation(tpAniSirGlobal pMac, tANI_U32 sessionI
 
         if (pIesTemp->ExtCap.present)
         {
-            pConnectProfile->proxyARPService = pIesTemp->ExtCap.proxyARPService;
+            struct s_ext_cap *p_ext_cap = (struct s_ext_cap *)
+                                          pIesTemp->ExtCap.bytes;
+            pConnectProfile->proxyARPService = p_ext_cap->proxyARPService;
         }
 
         if ( NULL == pIes )
@@ -12456,6 +12459,7 @@ eHalStatus csrRoamIssueStartBss( tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRo
         pParam->addIeParams.probeRespBCNData_buff =
             pProfile->addIeParams.probeRespBCNData_buff;
     }
+    pParam->sap_dot11mc = pProfile->sap_dot11mc;
     // When starting an IBSS, start on the channel from the Profile.
     status = csrSendMBStartBssReqMsg( pMac, sessionId, pProfile->BSSType, pParam, pBssDesc );
     return (status);
@@ -14782,6 +14786,7 @@ eHalStatus csrSendMBStartBssReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, eCs
         pBuf += sizeof(pParam->addIeParams);
 
         *pBuf++ = (tANI_U8)pMac->roam.configParam.obssEnabled;
+        *pBuf++ = (tANI_U8)pParam->sap_dot11mc;
 
         msgLen = (tANI_U16)(sizeof(tANI_U32 ) + (pBuf - wTmpBuf)); //msg_header + msg
         pMsg->length = pal_cpu_to_be16(msgLen);

@@ -369,6 +369,7 @@ typedef struct tagCsrRoamStartBssParams
 #endif
 
     tSirAddIeParams     addIeParams;
+    uint8_t             sap_dot11mc;
 
 }tCsrRoamStartBssParams;
 

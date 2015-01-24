@@ -483,7 +483,8 @@ typedef struct sPESession           // Added to Support BT-AMP
      */
     tANI_U16 old_protection_state;
     tSirMacAddr             prev_ap_bssid;
-}tPESession, *tpPESession;
+    uint8_t sap_dot11mc;
+} tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------
   Function declarations and documenation
