@@ -2866,6 +2866,13 @@ enum dot11p_mode {
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX       (1)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT   (0)
 
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+#define CFG_SAP_MCC_CHANNEL_AVOIDANCE_NAME       "gSapChannelAvoidance"
+#define CFG_SAP_MCC_CHANNEL_AVOIDANCE_MIN        ( 0 )
+#define CFG_SAP_MCC_CHANNEL_AVOIDANCE_MAX        ( 1 )
+#define CFG_SAP_MCC_CHANNEL_AVOIDANCE_DEFAULT    ( 0 )
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3478,6 +3485,10 @@ typedef struct
    bool                        is_ramdump_enabled;
    uint8_t                     sap_dot11mc;
    uint8_t                     prefer_non_dfs_on_radar;
+   uint32_t                    sta_miracast_mcc_rest_time_val;
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+   bool                        sap_channel_avoidance;
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

@@ -660,6 +660,18 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle,
                 channelnum++, pChans++) {
         chSafe = VOS_TRUE;
 
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+        if(pMac->sap.sap_channel_avoidance) {
+            if(sap_check_in_avoid_ch_list(pSapCtx, *pChans)) {
+                VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                          "Ch %d used by another MDM device with SAP in MCC",
+                          *pChans);
+                chSafe = VOS_FALSE;
+                continue;
+            }
+        }
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
         /* check if the channel is in NOL blacklist */
         if(sapDfsIsChannelInNolList(pSapCtx, *pChans,
                         PHY_SINGLE_CHANNEL_CENTERED))

@@ -1458,6 +1458,26 @@ static v_U8_t sapRandomChannelSel(ptSapContext sapContext)
             }
         }
 
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+        /* avoid channels on which another MDM AP in MCC mode is detected. */
+        if (pMac->sap.sap_channel_avoidance
+                && sapContext->sap_detected_avoid_ch_ie.present) {
+            for( j=0;
+                 j < sizeof(sapContext->sap_detected_avoid_ch_ie.channels);
+                 j++) {
+                if (sapContext->sap_detected_avoid_ch_ie.channels[j]
+                            == channelID) {
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_LOW,
+                              FL("index: %d, Channel = %d, avoided due to "
+                              "presence of another AP+AP MCC device in same "
+                              "channel."),
+                              i, channelID);
+                    sapContext->SapAllChnlList.channelList[i].valid = VOS_FALSE;
+                }
+            }
+        }
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
         /* check if the channel is within ACS channel range */
         isOutOfRange = sapAcsChannelCheck(sapContext,
                                           channelID);
