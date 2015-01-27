@@ -247,6 +247,7 @@ limProcessAssocReqFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
     tPmfSaQueryTimerId timerId;
     tANI_U32 retryInterval;
 #endif
+    bool assoc_req_copied = false;
 
     limGetPhyMode(pMac, &phyMode, psessionEntry);
 
@@ -1125,6 +1126,7 @@ sendIndToSme:
         }
 
         psessionEntry->parsedAssocReq[pStaDs->assocId] = pAssocReq;
+        assoc_req_copied = true;
     }
 
 
@@ -1442,6 +1444,7 @@ if (limPopulateMatchingRateSet(pMac,
 
     // BTAMP: Storing the parsed assoc request in the psessionEntry array
     psessionEntry->parsedAssocReq[pStaDs->assocId] = pAssocReq;
+    assoc_req_copied = true;
 
     /* BTAMP: If STA context already exist (ie. updateContext = 1)
      * for this STA, then we should delete the old one, and add
@@ -1530,22 +1533,32 @@ if (limPopulateMatchingRateSet(pMac,
     return;
 
 error:
-    if (pAssocReq != NULL)
-    {
-        if ( pAssocReq->assocReqFrame )
-        {
+    if (pAssocReq != NULL) {
+        if (pAssocReq->assocReqFrame) {
             vos_mem_free(pAssocReq->assocReqFrame);
             pAssocReq->assocReqFrame = NULL;
+            pAssocReq->assocReqFrameLength = 0;
         }
-
         vos_mem_free(pAssocReq);
+        if (assoc_req_copied) /* to avoid double free */
+            psessionEntry->parsedAssocReq[pStaDs->assocId] = NULL;
     }
 
-    /* If it is not duplicate Assoc request then only make to Null */
+    /* If it is not duplicate Assoc request then only free the memory */
     if ((pStaDs != NULL) &&
           (pStaDs->mlmStaContext.mlmState != eLIM_MLM_WT_ADD_STA_RSP_STATE)) {
-            if (psessionEntry->parsedAssocReq != NULL)
-                psessionEntry->parsedAssocReq[pStaDs->assocId] = NULL;
+            if (psessionEntry->parsedAssocReq != NULL) {
+                pTempAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
+                if (pTempAssocReq != NULL) {
+                    if (pTempAssocReq->assocReqFrame) {
+                        vos_mem_free(pTempAssocReq->assocReqFrame);
+                        pTempAssocReq->assocReqFrame = NULL;
+                        pTempAssocReq->assocReqFrameLength = 0;
+                    }
+                    vos_mem_free(pTempAssocReq);
+                    psessionEntry->parsedAssocReq[pStaDs->assocId] = NULL;
+                }
+            }
     }
 
     return;
