@@ -2691,9 +2691,8 @@ eHalStatus csrRoamCallCallback(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoam
         pRoamInfo->chan_info.reg_info_2 =
             (csrGetCfgMaxTxPower(pMac, pRoamInfo->chan_info.chan_id) << 8);
         vos_mem_free(beacon_ies);
-    }
-
-    if ((u1 == eCSR_ROAM_FT_REASSOC_FAILED) && (pSession->bRefAssocStartCnt)) {
+    } else if ((u1 == eCSR_ROAM_FT_REASSOC_FAILED) &&
+                                            (pSession->bRefAssocStartCnt)) {
         /*
          * Decrement bRefAssocStartCnt for FT reassoc failure.
          * Reason: For FT reassoc failures, we first call
@@ -2705,6 +2704,10 @@ eHalStatus csrRoamCallCallback(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoam
          * failure, decrement bRefAssocStartCnt.
          */
         pSession->bRefAssocStartCnt--;
+    } else if (u1 == eCSR_ROAM_SET_CHANNEL_RSP && u2 ==
+                                    eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS) {
+        pSession->connectedProfile.operationChannel =
+                          pRoamInfo->channelChangeRespEvent->newChannelNumber;
     }
 
     if(NULL != pSession->callback)
