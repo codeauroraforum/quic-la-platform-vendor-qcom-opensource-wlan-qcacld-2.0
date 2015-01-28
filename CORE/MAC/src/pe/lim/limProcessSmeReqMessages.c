@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -709,6 +709,7 @@ __limHandleSmeStartBssRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                  }
                  psessionEntry->ssidHidden = pSmeStartBssReq->ssidHidden;
                  psessionEntry->wps_state = pSmeStartBssReq->wps_state;
+                 psessionEntry->sap_dot11mc = pSmeStartBssReq->sap_dot11mc;
                  limGetShortSlotFromPhyMode(pMac, psessionEntry,
                                             psessionEntry->gLimPhyMode,
                                             &psessionEntry->shortSlotTimeSupported);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3939,6 +3939,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_DOT11P_MODE_DEFAULT,
                 CFG_DOT11P_MODE_MIN,
                 CFG_DOT11P_MODE_MAX),
+
+   REG_VARIABLE(CFG_SAP_DOT11MC, WLAN_PARAM_Integer,
+                hdd_config_t, sap_dot11mc,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_SAP_DOT11MC_DEFAULT,
+                CFG_SAP_DOT11MC_MIN,
+                CFG_SAP_DOT11MC_MAX ),
 };
 
 #ifdef WLAN_FEATURE_MBSSID

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2846,6 +2846,11 @@ enum dot11p_mode {
 #define CFG_DOT11P_MODE_MIN              ( WLAN_HDD_11P_DISABLED )
 #define CFG_DOT11P_MODE_MAX              ( WLAN_HDD_11P_CONCURRENT )
 
+#define CFG_SAP_DOT11MC               "gSapDot11mc"
+#define CFG_SAP_DOT11MC_MIN           (0)
+#define CFG_SAP_DOT11MC_MAX           (1)
+#define CFG_SAP_DOT11MC_DEFAULT       (0)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3455,6 +3460,7 @@ typedef struct
    uint8_t                     is_sta_connection_in_5gz_enabled;
 
    uint8_t                     dot11p_mode;
+   uint8_t                     sap_dot11mc;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

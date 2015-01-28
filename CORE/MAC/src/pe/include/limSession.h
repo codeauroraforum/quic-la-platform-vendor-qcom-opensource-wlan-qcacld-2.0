@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -480,7 +480,8 @@ typedef struct sPESession           // Added to Support BT-AMP
      * gLimOlbcParams, gLimOverlap11gParams, gLimOverlapHt20Params etc
      */
     tANI_U16 old_protection_state;
-}tPESession, *tpPESession;
+    uint8_t sap_dot11mc;
+} tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------
   Function declarations and documenation
