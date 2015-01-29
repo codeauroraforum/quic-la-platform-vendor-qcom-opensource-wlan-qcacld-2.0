@@ -148,6 +148,9 @@ typedef struct sSirProbeRespBeacon
     tANI_U8                   Vendor3IEPresent;
     tDot11fIEIBSSParams       IBSSParams;
 
+#ifdef FEATURE_WLAN_ESE
+    uint8_t    is_ese_ver_ie_present;
+#endif
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
 
 // probe Request structure
