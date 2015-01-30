@@ -4730,6 +4730,7 @@ static int __wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
 #endif
     eHalStatus halStatus;
     hdd_context_t *pHddCtx;
+    hdd_ap_ctx_t *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
 
     ENTER();
 
@@ -4922,21 +4923,14 @@ static int __wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
                         __LINE__, status );
             }
         }
-
-        /* Saving WEP keys */
-        else if( eCSR_ENCRYPT_TYPE_WEP40_STATICKEY  == setKey.encType ||
-                eCSR_ENCRYPT_TYPE_WEP104_STATICKEY  == setKey.encType  )
-        {
-            //Save the wep key in ap context. Issue setkey after the BSS is started.
-            hdd_ap_ctx_t *pAPCtx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
-            vos_mem_copy(&pAPCtx->wepKey[key_index], &setKey, sizeof(tCsrRoamSetKey));
-        }
+        if (pairwise ||
+                eCSR_ENCRYPT_TYPE_WEP40_STATICKEY == setKey.encType ||
+                eCSR_ENCRYPT_TYPE_WEP104_STATICKEY  == setKey.encType)
+            vos_mem_copy(&ap_ctx->wepKey[key_index], &setKey,
+                                               sizeof(tCsrRoamSetKey));
         else
-        {
-            //Save the key in ap context. Issue setkey after the BSS is started.
-            hdd_ap_ctx_t *pAPCtx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
-            vos_mem_copy(&pAPCtx->groupKey, &setKey, sizeof(tCsrRoamSetKey));
-        }
+            vos_mem_copy(&ap_ctx->groupKey, &setKey,
+                                               sizeof(tCsrRoamSetKey));
     }
     else if ( (pAdapter->device_mode == WLAN_HDD_INFRA_STATION) ||
               (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) )
