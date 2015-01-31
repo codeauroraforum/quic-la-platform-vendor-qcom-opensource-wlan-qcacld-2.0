@@ -610,8 +610,10 @@ static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
 #ifdef CFG80211_DEL_STA_V2
     struct station_del_parameters delStaParams;
 #endif
+    tsap_Config_t *pConfig;
 
     pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+    pConfig = &ap_adapter->sessionCtx.ap.sapConfig;
 
     mutex_lock(&pHddCtx->sap_lock);
     if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
@@ -647,6 +649,12 @@ static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
         clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
         wlan_hdd_decr_active_session(pHddCtx, ap_adapter->device_mode);
         hddLog(LOGE, FL("SAP Stop Success"));
+
+        if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+            hddLog(LOGE, FL("SAP Not able to set AP IEs"));
+            WLANSAP_ResetSapConfigAddIE(pConfig, eUPDATE_IE_ALL);
+            goto end;
+        }
 
         if (WLANSAP_StartBss(
 #ifdef WLAN_FEATURE_MBSSID
@@ -14419,6 +14427,7 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
     hdd_hostapd_state_t *hostapd_state;
     VOS_STATUS vos_status;
     hdd_context_t *hdd_ctx;
+    tsap_Config_t *pConfig;
 
     if (NULL == ap_adapter) {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -14429,6 +14438,7 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
     hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
     hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
     hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+    pConfig = &ap_adapter->sessionCtx.ap.sapConfig;
 
     if (0 != wlan_hdd_validate_context(hdd_ctx))
     {
@@ -14437,15 +14447,19 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
         return;
     }
     mutex_lock(&hdd_ctx->sap_lock);
-    if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
-        return;
+    if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags))
+        goto end;
+
+    if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+        hddLog(LOGE, FL("SAP Not able to set AP IEs"));
+        WLANSAP_ResetSapConfigAddIE(pConfig, eUPDATE_IE_ALL);
+        goto end;
     }
 
     if (WLANSAP_StartBss(hdd_ap_ctx->sapContext, hdd_hostapd_SAPEventCB,
                          &hdd_ap_ctx->sapConfig, (v_PVOID_t)ap_adapter->dev)
                          != VOS_STATUS_SUCCESS) {
-        mutex_unlock(&hdd_ctx->sap_lock);
-        return;
+        goto end;
     }
 
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
@@ -14454,8 +14468,7 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
     if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   FL("SAP Start failed"));
-        mutex_unlock(&hdd_ctx->sap_lock);
-        return;
+        goto end;
     }
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
               FL("SAP Start Success"));
@@ -14463,6 +14476,7 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
     wlan_hdd_incr_active_session(hdd_ctx, ap_adapter->device_mode);
     hostapd_state->bCommit = TRUE;
 
+end:
     mutex_unlock(&hdd_ctx->sap_lock);
     return;
 }
