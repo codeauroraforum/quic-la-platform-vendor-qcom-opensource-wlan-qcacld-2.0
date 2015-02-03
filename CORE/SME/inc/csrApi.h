@@ -959,6 +959,7 @@ typedef struct tagCsrRoamProfile
     tANI_U8 disableDFSChSwitch;
     /* addIe params */
     tSirAddIeParams        addIeParams;
+    uint8_t sap_dot11mc;
 }tCsrRoamProfile;
 
 
