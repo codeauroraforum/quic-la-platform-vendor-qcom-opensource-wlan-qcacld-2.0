@@ -540,7 +540,7 @@ int32_t main(int32_t argc, char *argv[])
                isDriverLoaded = TRUE;
                close(sock_fd);
                /* Wait for driver to Load */
-               sleep(5);
+               sleep(10);
                sock_fd = create_nl_socket();
                if (sock_fd < 0) {
                    printf("create nl sock failed ret %d \n", sock_fd);
