@@ -1930,7 +1930,8 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     int size;
     beacon_data_t *beacon = NULL;
     beacon_data_t *old = NULL;
-    int head_len,tail_len;
+    int head_len, tail_len, proberesp_ies_len, assocresp_ies_len;
+    const u8 *head, *tail, *proberesp_ies, *assocresp_ies;
 
     ENTER();
     if (params->head && !params->head_len)
@@ -1941,55 +1942,76 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     if (!params->head && !old)
         return -EINVAL;
 
-    if(params->head)
+    if (params->head) {
         head_len = params->head_len;
-    else
+        head = params->head;
+    } else {
         head_len = old->head_len;
+        head = old->head;
+    }
 
-    if(params->tail || !old)
+    if (params->tail || !old) {
         tail_len = params->tail_len;
-    else
+        tail = params->tail;
+    } else {
         tail_len = old->tail_len;
+        tail = old->tail;
+    }
 
-    size = sizeof(beacon_data_t) + head_len + tail_len;
+    if (params->proberesp_ies || !old) {
+        proberesp_ies_len = params->proberesp_ies_len;
+        proberesp_ies = params->proberesp_ies;
+    } else {
+        proberesp_ies_len = old->proberesp_ies_len;
+        proberesp_ies = old->proberesp_ies;
+    }
+
+    if (params->assocresp_ies || !old) {
+        assocresp_ies_len = params->assocresp_ies_len;
+        assocresp_ies = params->assocresp_ies;
+    } else {
+        assocresp_ies_len = old->assocresp_ies_len;
+        assocresp_ies = old->assocresp_ies;
+    }
+
+    size = sizeof(beacon_data_t) + head_len + tail_len +
+        proberesp_ies_len + assocresp_ies_len;
 
     beacon = kzalloc(size, GFP_KERNEL);
 
-    if( beacon == NULL )
+    if (beacon == NULL)
         return -ENOMEM;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
-    if(params->dtim_period || !old )
+    if (params->dtim_period || !old)
         beacon->dtim_period = params->dtim_period;
     else
         beacon->dtim_period = old->dtim_period;
 #else
-    if(dtim_period || !old )
+    if (dtim_period || !old)
         beacon->dtim_period = dtim_period;
     else
         beacon->dtim_period = old->dtim_period;
 #endif
 
-    beacon->head = ((u8 *) beacon) + sizeof(beacon_data_t);
+    /* -----------------------------------------------
+     * | head | tail | proberesp_ies | assocresp_ies |
+     * -----------------------------------------------
+     */
+    beacon->head = ((u8 *)beacon) + sizeof(beacon_data_t);
     beacon->tail = beacon->head + head_len;
+    beacon->proberesp_ies = beacon->tail + tail_len;
+    beacon->assocresp_ies = beacon->proberesp_ies + proberesp_ies_len;
+
     beacon->head_len = head_len;
     beacon->tail_len = tail_len;
+    beacon->proberesp_ies_len = proberesp_ies_len;
+    beacon->assocresp_ies_len= assocresp_ies_len;
 
-    if(params->head) {
-        memcpy (beacon->head,params->head,beacon->head_len);
-    }
-    else {
-        if(old)
-            memcpy (beacon->head,old->head,beacon->head_len);
-    }
-
-    if(params->tail) {
-        memcpy (beacon->tail,params->tail,beacon->tail_len);
-    }
-    else {
-       if(old)
-           memcpy (beacon->tail,old->tail,beacon->tail_len);
-    }
+    memcpy(beacon->head, head, head_len);
+    memcpy(beacon->tail, tail, tail_len);
+    memcpy(beacon->proberesp_ies, proberesp_ies, proberesp_ies_len);
+    memcpy(beacon->assocresp_ies, assocresp_ies, assocresp_ies_len);
 
     *ppBeacon = beacon;
 
@@ -2254,21 +2276,17 @@ static void wlan_hdd_add_extra_ie(hdd_adapter_t* pHostapdAdapter,
     return;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
-static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
-                            struct beacon_parameters *params)
-#else
-static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
-                                     struct cfg80211_beacon_data *params)
-#endif
+int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter)
 {
     v_U8_t *genie;
     v_U8_t total_ielen = 0;
     int ret = 0;
     tsap_Config_t *pConfig;
     tSirUpdateIE   updateIE;
+    beacon_data_t *pBeacon = NULL;
 
     pConfig = &pHostapdAdapter->sessionCtx.ap.sapConfig;
+    pBeacon = pHostapdAdapter->sessionCtx.ap.beacon;
 
     genie = vos_mem_malloc(MAX_GENIE_LEN);
 
@@ -2353,8 +2371,8 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
 
     /* Added for Probe response IE */
     if (test_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags)) {
-        updateIE.ieBufferlength = params->proberesp_ies_len;
-        updateIE.pAdditionIEBuffer = (tANI_U8*)params->proberesp_ies;
+        updateIE.ieBufferlength = pBeacon->proberesp_ies_len;
+        updateIE.pAdditionIEBuffer = (tANI_U8*)pBeacon->proberesp_ies;
         updateIE.append = VOS_FALSE;
         updateIE.notify = VOS_FALSE;
 
@@ -2367,15 +2385,15 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
         WLANSAP_ResetSapConfigAddIE(pConfig, eUPDATE_IE_PROBE_RESP);
     } else {
         WLANSAP_UpdateSapConfigAddIE(pConfig,
-                                     params->proberesp_ies,
-                                     params->proberesp_ies_len,
+                                     pBeacon->proberesp_ies,
+                                     pBeacon->proberesp_ies_len,
                                      eUPDATE_IE_PROBE_RESP);
     }
 
     /* Assoc resp Add ie Data */
     if (test_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags)) {
-        updateIE.ieBufferlength = params->assocresp_ies_len;
-        updateIE.pAdditionIEBuffer = (tANI_U8*)params->assocresp_ies;
+        updateIE.ieBufferlength = pBeacon->assocresp_ies_len;
+        updateIE.pAdditionIEBuffer = (tANI_U8*)pBeacon->assocresp_ies;
         updateIE.append = VOS_FALSE;
         updateIE.notify = VOS_FALSE;
         if (sme_UpdateAddIE(WLAN_HDD_GET_HAL_CTX(pHostapdAdapter),
@@ -2387,8 +2405,8 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
         WLANSAP_ResetSapConfigAddIE(pConfig, eUPDATE_IE_ASSOC_RESP);
     } else {
        WLANSAP_UpdateSapConfigAddIE(pConfig,
-                                    params->assocresp_ies,
-                                    params->assocresp_ies_len,
+                                    pBeacon->assocresp_ies,
+                                    pBeacon->assocresp_ies_len,
                                     eUPDATE_IE_ASSOC_RESP);
     }
 
@@ -3198,7 +3216,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     pConfig->ht_capab =
                  (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->apProtection;
 
-    if ( 0 != wlan_hdd_cfg80211_update_apies(pHostapdAdapter, params) )
+    if ( 0 != wlan_hdd_cfg80211_update_apies(pHostapdAdapter))
     {
         hddLog(LOGE, FL("SAP Not able to set AP IEs"));
         WLANSAP_ResetSapConfigAddIE(pConfig, eUPDATE_IE_ALL);
@@ -3669,7 +3687,8 @@ static int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
         if (old)
             return -EALREADY;
 
-        status = wlan_hdd_cfg80211_alloc_new_beacon(pAdapter, &new, &params->beacon, params->dtim_period);
+        status = wlan_hdd_cfg80211_alloc_new_beacon(pAdapter, &new,
+                        &params->beacon, params->dtim_period);
 
         if (status != 0)
         {
