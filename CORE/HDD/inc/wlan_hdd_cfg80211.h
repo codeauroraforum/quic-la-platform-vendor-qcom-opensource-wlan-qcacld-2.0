@@ -283,4 +283,6 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
 
 void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_context_t *pHddCtx,
                                         v_U8_t priChannel, v_U8_t secChannel);
+
+int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter);
 #endif
