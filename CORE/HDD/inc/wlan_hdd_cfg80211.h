@@ -281,8 +281,9 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
                                    tHddAvoidFreqList *pAvoidFreqList);
 #endif
 
-void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_context_t *pHddCtx,
-                                        v_U8_t priChannel, v_U8_t secChannel);
-
+#ifdef QCA_HT_2040_COEX
+void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_adapter_t *adapter,
+				uint8_t priChannel, uint8_t secChannel);
+#endif
 int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter);
 #endif
