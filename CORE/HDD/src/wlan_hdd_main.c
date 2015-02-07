@@ -570,8 +570,10 @@ static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
     hdd_hostapd_state_t *pHostapdState;
     VOS_STATUS vos_status;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(ap_adapter);
+    tsap_Config_t *pConfig;
 
     pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+    pConfig = &ap_adapter->sessionCtx.ap.sapConfig;
 
     mutex_lock(&pHddCtx->sap_lock);
     if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
@@ -599,6 +601,12 @@ static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
         clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
         wlan_hdd_decr_active_session(pHddCtx, ap_adapter->device_mode);
         hddLog(LOGE, FL("SAP Stop Success"));
+
+        if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+            hddLog(LOGE, FL("SAP Not able to set AP IEs"));
+            WLANSAP_ResetSapConfigAddIE(pConfig, eUPDATE_IE_ALL);
+            goto end;
+        }
 
         if (WLANSAP_StartBss(
 #ifdef WLAN_FEATURE_MBSSID
