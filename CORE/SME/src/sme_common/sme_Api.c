@@ -1656,6 +1656,9 @@ eHalStatus sme_UpdateConfig(tHalHandle hHal, tpSmeConfigParams pSmeConfigParams)
    pMac->enable5gEBT = pSmeConfigParams->enable5gEBT;
    pMac->sme.enableSelfRecovery = pSmeConfigParams->enableSelfRecovery;
 
+   pMac->f_prefer_non_dfs_on_radar =
+                       pSmeConfigParams->f_prefer_non_dfs_on_radar;
+
    return status;
 }
 
@@ -4436,6 +4439,7 @@ eHalStatus sme_GetConfigParam(tHalHandle hHal, tSmeConfigParams *pParam)
       pParam->fP2pListenOffload = pMac->fP2pListenOffload;
       pParam->max_intf_count = pMac->sme.max_intf_count;
       pParam->enableSelfRecovery = pMac->sme.enableSelfRecovery;
+      pParam->f_prefer_non_dfs_on_radar = pMac->f_prefer_non_dfs_on_radar;
       sme_ReleaseGlobalLock( &pMac->sme );
    }
 

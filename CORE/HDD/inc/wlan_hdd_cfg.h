@@ -2851,6 +2851,11 @@ enum dot11p_mode {
 #define CFG_SAP_DOT11MC_MAX           (1)
 #define CFG_SAP_DOT11MC_DEFAULT       (0)
 
+#define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR           "gPreferNonDfsChanOnRadar"
+#define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MIN       (0)
+#define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX       (1)
+#define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT   (0)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3461,6 +3466,7 @@ typedef struct
 
    uint8_t                     dot11p_mode;
    uint8_t                     sap_dot11mc;
+   uint8_t                     prefer_non_dfs_on_radar;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
