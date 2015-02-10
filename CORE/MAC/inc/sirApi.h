@@ -668,7 +668,6 @@ typedef struct sSirSmeStartBssReq
     tSirAddIeParams         addIeParams;
 
     tANI_BOOLEAN            obssEnabled;
-    uint8_t                 sap_dot11mc;
 
 } tSirSmeStartBssReq, *tpSirSmeStartBssReq;
 
