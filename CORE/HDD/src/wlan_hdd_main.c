@@ -9720,10 +9720,6 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 #ifdef IPA_OFFLOAD
    hdd_ipa_cleanup(pHddCtx);
 #endif
-   //Free up dynamically allocated members inside HDD Adapter
-   kfree(pHddCtx->cfg_ini);
-   pHddCtx->cfg_ini= NULL;
-
 
    /* free the power on lock from platform driver */
    if (free_riva_power_on_lock("wlan"))
@@ -9734,6 +9730,13 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 
 free_hdd_ctx:
    wiphy_unregister(wiphy) ;
+
+   /* Free up dynamically allocated members inside HDD Adapter */
+   if (pHddCtx->cfg_ini) {
+       kfree(pHddCtx->cfg_ini);
+       pHddCtx->cfg_ini= NULL;
+   }
+
    wiphy_free(wiphy) ;
    if (hdd_is_ssr_required())
    {
