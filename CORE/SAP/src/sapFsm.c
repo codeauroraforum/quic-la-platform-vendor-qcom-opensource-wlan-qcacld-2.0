@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3868,6 +3868,7 @@ sapconvertToCsrProfile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType, t
         profile->addIeParams.probeRespBCNDataLen = 0;
         profile->addIeParams.probeRespBCNData_buff = NULL;
     }
+    profile->sap_dot11mc = pconfig_params->sap_dot11mc;
 
     return eSAP_STATUS_SUCCESS; /* Success. */
 }
