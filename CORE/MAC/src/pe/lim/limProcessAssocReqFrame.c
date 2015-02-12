@@ -1420,19 +1420,17 @@ if (limPopulateMatchingRateSet(pMac,
 
     if (pAssocReq->ExtCap.present)
     {
-        struct s_ext_cap *p_ext_cap = (struct s_ext_cap *)
-                                       pAssocReq->ExtCap.bytes;
         pStaDs->timingMeasCap = 0;
-        pStaDs->timingMeasCap |= (p_ext_cap->timingMeas)?
+        pStaDs->timingMeasCap |= (pAssocReq->ExtCap.timingMeas)?
                                   RTT_TIMING_MEAS_CAPABILITY:
                                   RTT_INVALID;
-        pStaDs->timingMeasCap |= (p_ext_cap->fineTimingMeas)?
+        pStaDs->timingMeasCap |= (pAssocReq->ExtCap.fineTimingMeas)?
                                   RTT_FINE_TIMING_MEAS_CAPABILITY:
                                   RTT_INVALID;
         PELOG1(limLog(pMac, LOG1,
                FL("ExtCap present, timingMeas: %d fineTimingMeas: %d"),
-               p_ext_cap->timingMeas,
-               p_ext_cap->fineTimingMeas);)
+               pAssocReq->ExtCap.timingMeas,
+               pAssocReq->ExtCap.fineTimingMeas);)
     }
     else
     {
