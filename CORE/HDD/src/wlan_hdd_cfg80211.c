@@ -999,7 +999,7 @@ static int wlan_hdd_config_acs(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 
         sap_config->skip_acs_scan_status = eSAP_DO_NEW_ACS_SCAN;
 
-        if (con_sap_config && con_sap_config->channel == AUTO_CHANNEL_SELECT &&
+        if (con_sap_config && con_sap_config->acs_case == true &&
             hdd_ctx->skip_acs_scan_status == eSAP_SKIP_ACS_SCAN) {
 
             hddLog(LOG1, FL("Operating Band: PriAP: %d SecAP: %d"),
@@ -2935,11 +2935,6 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
     hddLog(VOS_TRACE_LEVEL_INFO_HIGH,"****pConfig->dtim_period=%d***",
                                       pConfig->dtim_period);
-    status = wlan_hdd_config_acs(pHddCtx, pHostapdAdapter);
-    if (status) {
-        hddLog(LOGE, FL("ACS config failed"));
-        return -EINVAL;
-    }
 
     if (pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP)
     {
@@ -3033,6 +3028,12 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         }
         else
         {
+            status = wlan_hdd_config_acs(pHddCtx, pHostapdAdapter);
+            if (status) {
+                hddLog(LOGE, FL("ACS config failed"));
+                return -EINVAL;
+            }
+
              if(1 != pHddCtx->is_dynamic_channel_range_set)
              {
 #ifdef WLAN_FEATURE_MBSSID
