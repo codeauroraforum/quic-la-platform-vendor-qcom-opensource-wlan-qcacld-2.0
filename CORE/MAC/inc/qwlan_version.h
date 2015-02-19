@@ -60,6 +60,6 @@ struct qwlan_hw {
     const char *name;
 };
 
-#endif
+#endif /* QCA_WIFI_2_0 */
 
 #endif /* QWLAN_VERSION_H */
