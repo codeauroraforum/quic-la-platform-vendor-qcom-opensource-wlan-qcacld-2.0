@@ -118,6 +118,7 @@ typedef struct _smeConfigParams
     tANI_U8       max_intf_count;
     tANI_BOOLEAN  enable5gEBT;
     tANI_BOOLEAN  enableSelfRecovery;
+    uint8_t       f_prefer_non_dfs_on_radar;
 } tSmeConfigParams, *tpSmeConfigParams;
 
 typedef enum

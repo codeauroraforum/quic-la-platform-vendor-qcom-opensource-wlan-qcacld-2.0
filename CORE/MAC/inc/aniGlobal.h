@@ -1048,6 +1048,7 @@ typedef struct sAniSirGlobal
 
     /* 802.11p enable */
     bool enable_dot11p;
+    uint8_t f_prefer_non_dfs_on_radar;
 } tAniSirGlobal;
 
 typedef enum

@@ -3946,6 +3946,14 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_SAP_DOT11MC_DEFAULT,
                 CFG_SAP_DOT11MC_MIN,
                 CFG_SAP_DOT11MC_MAX ),
+
+   REG_VARIABLE(CFG_ENABLE_NON_DFS_CHAN_ON_RADAR, WLAN_PARAM_Integer,
+                hdd_config_t, prefer_non_dfs_on_radar,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT,
+                CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MIN,
+                CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX),
+
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -6374,6 +6382,9 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    /* Update 802.11p config */
    smeConfig->csrConfig.enable_dot11p = (pHddCtx->cfg_ini->dot11p_mode !=
                                              WLAN_HDD_11P_DISABLED);
+
+   smeConfig->f_prefer_non_dfs_on_radar =
+                       pHddCtx->cfg_ini->prefer_non_dfs_on_radar;
 
    halStatus = sme_UpdateConfig( pHddCtx->hHal, smeConfig);
    if ( !HAL_STATUS_SUCCESS( halStatus ) )
