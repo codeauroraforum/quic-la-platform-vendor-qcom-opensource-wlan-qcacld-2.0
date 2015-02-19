@@ -50,7 +50,7 @@
 #include "rrmApi.h"
 #endif
 
-
+#include "regdomain_common.h"
 
 ////////////////////////////////////////////////////////////////////////
 void dot11fLog(tpAniSirGlobal pMac, int loglevel, const char *pString,...)
@@ -236,6 +236,35 @@ PopulateDot11fCapabilities(tpAniSirGlobal         pMac,
 
     return eSIR_SUCCESS;
 } // End PopulateDot11fCapabilities.
+
+/**
+ * populate_dot_11_f_ext_chann_switch_ann() - Function to populate ECS
+ * @mac_ptr:		Pointer to PMAC structure
+ * @dot_11_ptr:		ECS element
+ * @session_entry:	PE session entry
+ *
+ * This function is used to populate the extended channel switch element
+ *
+ * Return: None
+ *
+ */
+void populate_dot_11_f_ext_chann_switch_ann(tpAniSirGlobal mac_ptr,
+		tDot11fIEext_chan_switch_ann *dot_11_ptr,
+		tpPESession session_entry)
+{
+	dot_11_ptr->switch_mode = session_entry->gLimChannelSwitch.switchMode;
+	dot_11_ptr->new_reg_class = regdm_get_opclass_from_channel(
+					mac_ptr->scan.countryCodeCurrent,
+					session_entry->gLimChannelSwitch.
+					primaryChannel,
+					session_entry->gLimChannelSwitch.
+					secondarySubBand);
+	dot_11_ptr->new_channel =
+		session_entry->gLimChannelSwitch.primaryChannel;
+	dot_11_ptr->switch_count =
+		session_entry->gLimChannelSwitch.switchCount;
+	dot_11_ptr->present = 1;
+}
 
 void
 PopulateDot11fChanSwitchAnn(tpAniSirGlobal          pMac,
@@ -2076,6 +2105,12 @@ tSirRetStatus sirConvertProbeFrame2Struct(tpAniSirGlobal       pMac,
                        sizeof(pProbeResp->channelSwitchIE) );
     }
 
+    if (pr->ext_chan_switch_ann.present) {
+        pProbeResp->ext_chan_switch_present = 1;
+        vos_mem_copy(&pProbeResp->ext_chan_switch, &pr->ext_chan_switch_ann,
+                       sizeof(tDot11fIEext_chan_switch_ann));
+    }
+
     if (pr->sec_chan_offset_ele.present) {
         pProbeResp->sec_chan_offset_present = 1;
         vos_mem_copy(&pProbeResp->sec_chan_offset, &pr->sec_chan_offset_ele,
@@ -3258,6 +3293,12 @@ sirParseBeaconIE(tpAniSirGlobal        pMac,
                       sizeof(pBeaconStruct->channelSwitchIE));
     }
 
+    if (pBies->ext_chan_switch_ann.present) {
+        pBeaconStruct->ext_chan_switch_present = 1;
+        vos_mem_copy(&pBeaconStruct->ext_chan_switch, &pBies->ext_chan_switch_ann,
+                      sizeof(tDot11fIEext_chan_switch_ann));
+    }
+
     if (pBies->sec_chan_offset_ele.present) {
         pBeaconStruct->sec_chan_offset_present = 1;
         vos_mem_copy(&pBeaconStruct->sec_chan_offset, &pBies->sec_chan_offset_ele,
@@ -3508,6 +3549,12 @@ sirConvertBeaconFrame2Struct(tpAniSirGlobal       pMac,
         pBeaconStruct->channelSwitchPresent = 1;
         vos_mem_copy( &pBeaconStruct->channelSwitchIE, &pBeacon->ChanSwitchAnn,
                                      sizeof(pBeaconStruct->channelSwitchIE) );
+    }
+
+    if (pBeacon->ext_chan_switch_ann.present) {
+        pBeaconStruct->ext_chan_switch_present = 1;
+        vos_mem_copy(&pBeaconStruct->ext_chan_switch, &pBeacon->ext_chan_switch_ann,
+                                        sizeof(tDot11fIEext_chan_switch_ann));
     }
 
     if (pBeacon->sec_chan_offset_ele.present) {
