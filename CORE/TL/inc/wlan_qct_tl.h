@@ -3021,6 +3021,8 @@ WLANTL_TLDebugMessage
 
 
 #ifdef QCA_WIFI_2_0
+void WLANTL_PauseUnPauseQs(void *vos_context, v_BOOL_t flag);
+
 #ifdef QCA_LL_TX_FLOW_CT
 /*=============================================================================
   FUNCTION    WLANTL_GetTxResource
