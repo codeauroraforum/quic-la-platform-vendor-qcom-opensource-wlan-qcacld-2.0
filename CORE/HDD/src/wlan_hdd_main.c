@@ -13580,6 +13580,7 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     tHalHandle hHal;
     hdd_ap_ctx_t *pHddApCtx;
     v_U16_t intf_ch = 0;
+    v_U32_t vht_channel_width = 0;
 
    if ((pHddCtx->cfg_ini->WlanMccToSccSwitchMode == VOS_MCC_TO_SCC_SWITCH_DISABLE)
        || !(vos_concurrent_open_sessions_running()
@@ -13601,8 +13602,10 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
 
 #ifdef WLAN_FEATURE_MBSSID
     intf_ch = WLANSAP_CheckCCIntf(pHddApCtx->sapContext);
+    vht_channel_width = wlan_sap_get_vht_ch_width(pHddApCtx->sapContext);
 #else
     intf_ch = WLANSAP_CheckCCIntf(pHddCtx->pvosContext);
+    vht_channel_width = wlan_sap_get_vht_ch_width(pHddApCtx->pvosContext);
 #endif
     if (intf_ch == 0)
         return;
@@ -13611,7 +13614,12 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     sme_SelectCBMode(hHal,
             sapConvertSapPhyModeToCsrPhyMode(pHddApCtx->sapConfig.SapHw_mode),
                                              pHddApCtx->sapConfig.channel,
-                                             pHddCtx->cfg_ini->vhtChannelWidth);
+                                             &vht_channel_width);
+#ifdef WLAN_FEATURE_MBSSID
+    wlan_sap_set_vht_ch_width(pHddApCtx->sapContext, vht_channel_width);
+#else
+    wlan_sap_set_vht_ch_width(pHddApCtx->pvosContext, vht_channel_width);
+#endif
     wlan_hdd_restart_sap(ap_adapter);
 }
 
