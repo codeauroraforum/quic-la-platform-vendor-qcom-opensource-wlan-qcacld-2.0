@@ -285,6 +285,7 @@ extern spinlock_t hdd_context_lock;
 #define LINK_CONTEXT_MAGIC  0x4C494E4B   //LINKSPEED
 #define LINK_STATUS_MAGIC   0x4C4B5354   //LINKSTATUS(LNST)
 #define TEMP_CONTEXT_MAGIC 0x74656d70   // TEMP (temperature)
+#define FW_STATUS_MAGIC 0x46575354 /* FWSTATUS(FWST) */
 
 #ifdef FEATURE_WLAN_BATCH_SCAN
 #define HDD_BATCH_SCAN_VERSION (17)
@@ -1731,4 +1732,5 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter);
 static inline void wlan_hdd_stop_sap(hdd_adapter_t *ap_adapter) {}
 static inline void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter) {}
 #endif
+bool wlan_hdd_get_fw_state(hdd_adapter_t *adapter);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
