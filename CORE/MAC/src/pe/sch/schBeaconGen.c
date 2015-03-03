@@ -318,6 +318,8 @@ tSirRetStatus schSetFixedBeaconFields(tpAniSirGlobal pMac,tpPESession psessionEn
                            psessionEntry);
     }
 
+    populate_dot11_supp_operating_classes(pMac, &pBcn2->SuppOperatingClasses,
+                                          psessionEntry);
     PopulateDot11fCountry( pMac, &pBcn2->Country, psessionEntry);
     if(pBcn1->Capabilities.qos)
     {
@@ -596,6 +598,16 @@ void limUpdateProbeRspTemplateIeBitmapBeacon2(tpAniSirGlobal pMac,
                      sizeof(beacon2->ChanSwitchAnn));
 
     }
+
+    /* Supported operating class */
+    if(beacon2->SuppOperatingClasses.present)
+    {
+        SetProbeRspIeBitmap(DefProbeRspIeBitmap,SIR_MAC_OPERATING_CLASS_EID);
+        vos_mem_copy((void *)&prb_rsp->SuppOperatingClasses,
+                     (void *)&beacon2->SuppOperatingClasses,
+                     sizeof(beacon2->SuppOperatingClasses));
+    }
+
     /* ERP information */
     if(beacon2->ERPInfo.present)
     {
