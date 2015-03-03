@@ -1633,6 +1633,8 @@ hif_pci_remove(struct pci_dev *pdev)
         iounmap(scn->ramdump_base);
 #endif
 
+    hif_dump_pipe_debug_count(sc->hif_device);
+
     A_FREE(scn);
     A_FREE(sc->hif_device);
     A_FREE(sc);
@@ -1680,6 +1682,7 @@ void hif_pci_shutdown(struct pci_dev *pdev)
         printk("Host driver is not ready for SSR, attempting anyway\n");
 
     hdd_wlan_shutdown();
+    hif_dump_pipe_debug_count(sc->hif_device);
 
     mem = (void __iomem *)sc->mem;
 
