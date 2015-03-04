@@ -1428,8 +1428,10 @@ static char* dump_lim_update_cb_Mode(tpAniSirGlobal pMac, tANI_U32 arg1, tANI_U3
 
     wlan_cfgGetInt(pMac, WNI_CFG_LOCAL_POWER_CONSTRAINT, &localPwrConstraint);
 
-    limSendSwitchChnlParams(pMac, psessionEntry->currentOperChannel, psessionEntry->htSecondaryChannelOffset,
-                                                                  (tPowerdBm) localPwrConstraint, psessionEntry->peSessionId);
+    limSendSwitchChnlParams(pMac, psessionEntry->currentOperChannel,
+                            psessionEntry->htSecondaryChannelOffset,
+                            (tPowerdBm) localPwrConstraint,
+                            psessionEntry->peSessionId, VOS_FALSE);
     if ( (limGetSystemRole(psessionEntry) == eLIM_AP_ROLE) ||
           (limGetSystemRole(psessionEntry) == eLIM_STA_IN_IBSS_ROLE))
            schSetFixedBeaconFields(pMac,psessionEntry);
