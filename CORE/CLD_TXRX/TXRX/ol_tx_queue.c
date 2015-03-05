@@ -476,6 +476,51 @@ ol_txrx_peer_tid_unpause(ol_txrx_peer_handle peer, int tid)
 #endif /* defined(CONFIG_HL_SUPPORT) */
 
 #if defined(CONFIG_HL_SUPPORT) || defined(QCA_SUPPORT_TXRX_VDEV_PAUSE_LL)
+/**
+ * ol_txrx_pdev_pause() - Suspend all tx data for the specified physical device.
+ * @data_pdev: the physical device being paused.
+ * @reason:  pause reason.
+ *
+ * This function applies to HL systems -
+ * in LL systems, applies when txrx_vdev_pause_all is enabled.
+ * In some systems it is necessary to be able to temporarily
+ * suspend all WLAN traffic, e.g. to allow another device such as bluetooth
+ * to temporarily have exclusive access to shared RF chain resources.
+ * This function suspends tx traffic within the specified physical device.
+ *
+ *
+ * Return: None
+ */
+void
+ol_txrx_pdev_pause(ol_txrx_pdev_handle pdev, u_int32_t reason)
+{
+	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
+
+	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
+		ol_txrx_vdev_pause(vdev, reason);
+	}
+}
+
+/**
+ * ol_txrx_pdev_unpause() - Resume tx for the specified physical device..
+ * @data_pdev: the physical device being paused.
+ * @reason:  pause reason.
+ *
+ *  This function applies to HL systems -
+ *  in LL systems, applies when txrx_vdev_pause_all is enabled.
+ *
+ *
+ * Return: None
+ */
+void
+ol_txrx_pdev_unpause(ol_txrx_pdev_handle pdev, u_int32_t reason)
+{
+	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
+
+	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
+		ol_txrx_vdev_unpause(vdev, reason);
+	}
+}
 
 void
 ol_txrx_vdev_pause(ol_txrx_vdev_handle vdev, u_int32_t reason)
@@ -529,7 +574,11 @@ ol_txrx_vdev_unpause(ol_txrx_vdev_handle vdev, u_int32_t reason)
         if (vdev->ll_pause.paused_reason & reason)
         {
             vdev->ll_pause.paused_reason &= ~reason;
-            if (!vdev->ll_pause.paused_reason) {
+            if (reason == OL_TXQ_PAUSE_REASON_VDEV_SUSPEND) {
+                adf_os_spin_unlock_bh(&vdev->ll_pause.mutex);
+                ol_tx_vdev_ll_pause_start_timer(vdev);
+            }
+            else if (!vdev->ll_pause.paused_reason) {
                 adf_os_spin_unlock_bh(&vdev->ll_pause.mutex);
                 ol_tx_vdev_ll_pause_queue_send(vdev);
             } else {
