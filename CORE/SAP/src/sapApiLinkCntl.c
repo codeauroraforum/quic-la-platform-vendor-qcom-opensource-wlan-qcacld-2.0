@@ -425,9 +425,14 @@ WLANSAP_PreStartBssAcsScanCallback
           psapContext->csrRoamProfile.phyMode,
           psapContext->channel, &psapContext->vht_channel_width);
 
-        /* determine secondary channel for 11n mode */
+        /* determine secondary channel for 11n / 11ac mode */
         if ((eCSR_DOT11_MODE_11n == psapContext->csrRoamProfile.phyMode) ||
-            (eCSR_DOT11_MODE_11n_ONLY == psapContext->csrRoamProfile.phyMode)) {
+            (eCSR_DOT11_MODE_11n_ONLY == psapContext->csrRoamProfile.phyMode)
+#ifdef WLAN_FEATURE_11AC
+            || (eCSR_DOT11_MODE_11ac == psapContext->csrRoamProfile.phyMode) ||
+            (eCSR_DOT11_MODE_11ac_ONLY == psapContext->csrRoamProfile.phyMode)
+#endif
+            ) {
             ePhyChanBondState cbMode;
 
             if (psapContext->channel > 14)
@@ -437,9 +442,17 @@ WLANSAP_PreStartBssAcsScanCallback
 
             switch (cbMode) {
             case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+#ifdef WLAN_FEATURE_11AC
+            case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW:
+            case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH:
+#endif
                 psapContext->secondary_ch = psapContext->channel + 4;
                 break;
             case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+#ifdef WLAN_FEATURE_11AC
+            case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW:
+            case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH:
+#endif
                 psapContext->secondary_ch = psapContext->channel - 4;
                 break;
             case PHY_SINGLE_CHANNEL_CENTERED:
