@@ -7109,7 +7109,8 @@ void hdd_dfs_indicate_radar(void *context, void *param)
         while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
         {
             pAdapter = pAdapterNode->pAdapter;
-            if (WLAN_HDD_SOFTAP == pAdapter->device_mode)
+            if (WLAN_HDD_SOFTAP == pAdapter->device_mode ||
+		WLAN_HDD_P2P_GO == pAdapter->device_mode)
             {
                 WLAN_HDD_GET_AP_CTX_PTR(pAdapter)->dfs_cac_block_tx = VOS_TRUE;
             }
@@ -14050,7 +14051,8 @@ hdd_adapter_t * hdd_get_con_sap_adapter(hdd_adapter_t *this_sap_adapter)
     status = hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
     while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status ) {
         pAdapter = pAdapterNode->pAdapter;
-        if (pAdapter && pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+        if (pAdapter && ((pAdapter->device_mode == WLAN_HDD_SOFTAP) ||
+                        (pAdapter->device_mode == WLAN_HDD_P2P_GO))) {
             if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags)) {
                 if (pAdapter != this_sap_adapter) {
                     con_sap_adapter = pAdapter;
