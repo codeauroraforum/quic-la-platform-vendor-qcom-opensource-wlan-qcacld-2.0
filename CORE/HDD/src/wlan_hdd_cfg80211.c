@@ -874,6 +874,7 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
     }
 
     vendor_event = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                              NULL,
                               sizeof(tHddAvoidFreqList),
                               QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_INDEX,
                               GFP_KERNEL);
@@ -949,6 +950,7 @@ static void wlan_hdd_cfg80211_nan_callback(void* ctx, tSirNanEvent* msg)
     }
 
     vendor_event = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                                   NULL,
                                    data->event_data_len +
                                    NLMSG_HDRLEN,
                                    QCA_NL80211_VENDOR_SUBCMD_NAN_INDEX,
@@ -1371,6 +1373,7 @@ static void wlan_hdd_cfg80211_stats_ext_callback(void* ctx, tStatsExtEvent* msg)
 
 
     vendor_event = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                                               NULL,
                                                data->event_data_len +
                                                sizeof(tANI_U32) +
                                                NLMSG_HDRLEN + NLMSG_HDRLEN,
@@ -2786,6 +2789,7 @@ static void hdd_link_layer_process_peer_stats(hdd_adapter_t *pAdapter,
      * the sizeof (tSirWifiRateStat) being 32.
      */
     vendor_event = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                          NULL,
                           LL_STATS_EVENT_BUF_SIZE +
                           NLMSG_HDRLEN,
                           QCA_NL80211_VENDOR_SUBCMD_LL_PEER_INFO_STATS_INDEX,
@@ -2893,6 +2897,7 @@ static void hdd_link_layer_process_iface_stats(hdd_adapter_t *pAdapter,
      * interface statistics.
      */
     vendor_event = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                                 NULL,
                                  LL_STATS_EVENT_BUF_SIZE +
                                  NLMSG_HDRLEN,
                                  QCA_NL80211_VENDOR_SUBCMD_LL_IFACE_STATS_INDEX,
@@ -3063,6 +3068,7 @@ static void hdd_link_layer_process_radio_stats(hdd_adapter_t *pAdapter,
      */
 
     vendor_event = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                                 NULL,
                                  LL_STATS_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                                  QCA_NL80211_VENDOR_SUBCMD_LL_RADIO_STATS_INDEX,
                                  GFP_KERNEL);
@@ -3743,6 +3749,7 @@ static int wlan_hdd_cfg80211_exttdls_callback(tANI_U8* mac,
     }
     skb = cfg80211_vendor_event_alloc(
                             pHddCtx->wiphy,
+                            NULL,
                             EXTTDLS_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                             QCA_NL80211_VENDOR_SUBCMD_TDLS_STATE_CHANGE_INDEX,
                             GFP_KERNEL);
@@ -15073,6 +15080,7 @@ wlan_hdd_cfg80211_extscan_get_capabilities_ind(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                      NULL,
                       EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                       QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_CAPABILITIES_INDEX,
                       GFP_KERNEL);
@@ -15152,6 +15160,7 @@ wlan_hdd_cfg80211_extscan_start_rsp(void *ctx, tpSirExtScanStartRspParams pData)
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                                 NULL,
                                  EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                                  QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_START_INDEX,
                                  GFP_KERNEL);
@@ -15192,6 +15201,7 @@ wlan_hdd_cfg80211_extscan_stop_rsp(void *ctx, tpSirExtScanStopRspParams pData)
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                                 NULL,
                                  EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                                  QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_STOP_INDEX,
                                  GFP_KERNEL);
@@ -15234,6 +15244,7 @@ wlan_hdd_cfg80211_extscan_set_bss_hotlist_rsp(void *ctx,
         return;
     }
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                     NULL,
                      EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                      QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SET_BSSID_HOTLIST_INDEX,
                      GFP_KERNEL);
@@ -15277,6 +15288,7 @@ wlan_hdd_cfg80211_extscan_reset_bss_hotlist_rsp(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                   NULL,
                    EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                    QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_RESET_BSSID_HOTLIST_INDEX,
                    GFP_KERNEL);
@@ -15320,6 +15332,7 @@ wlan_hdd_cfg80211_extscan_set_signf_wifi_change_rsp(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                NULL,
                 EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                 QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SET_SIGNIFICANT_CHANGE_INDEX,
                 GFP_KERNEL);
@@ -15364,6 +15377,7 @@ wlan_hdd_cfg80211_extscan_reset_signf_wifi_change_rsp(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+              NULL,
               EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
               QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_RESET_SIGNIFICANT_CHANGE_INDEX,
               GFP_KERNEL);
@@ -15408,6 +15422,7 @@ wlan_hdd_cfg80211_extscan_cached_results_ind(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                    NULL,
                     EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                     QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_GET_CACHED_RESULTS_INDEX,
                     GFP_KERNEL);
@@ -15548,6 +15563,7 @@ wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                      NULL,
                       EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                       QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_HOTLIST_AP_FOUND_INDEX,
                       GFP_KERNEL);
@@ -15666,6 +15682,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                    NULL,
                     EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                     QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SIGNIFICANT_CHANGE_INDEX,
                     GFP_KERNEL);
@@ -15779,6 +15796,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
         return;
     }
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                  NULL,
                   EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                   QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_FULL_SCAN_RESULT_INDEX,
                   GFP_KERNEL);
@@ -15881,6 +15899,7 @@ wlan_hdd_cfg80211_extscan_scan_res_available_event(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                NULL,
                 EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                 QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_RESULTS_AVAILABLE_INDEX,
                 GFP_KERNEL);
@@ -15927,6 +15946,7 @@ wlan_hdd_cfg80211_extscan_scan_progress_event(void *ctx,
     }
 
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+                            NULL,
                             EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                             QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_EVENT_INDEX,
                             GFP_KERNEL);
