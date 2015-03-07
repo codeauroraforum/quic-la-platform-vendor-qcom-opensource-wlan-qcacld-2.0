@@ -3293,7 +3293,9 @@ void limSwitchPrimaryChannel(tpAniSirGlobal pMac, tANI_U8 newChannel,tpPESession
 
 #if defined WLAN_FEATURE_VOWIFI
     limSendSwitchChnlParams(pMac, newChannel, PHY_SINGLE_CHANNEL_CENTERED,
-                                                   psessionEntry->maxTxPower, psessionEntry->peSessionId);
+                            psessionEntry->maxTxPower,
+                            psessionEntry->peSessionId,
+                            VOS_FALSE);
 #else
     if(wlan_cfgGetInt(pMac, WNI_CFG_LOCAL_POWER_CONSTRAINT, &localPwrConstraint) != eSIR_SUCCESS)
     {
@@ -3301,7 +3303,9 @@ void limSwitchPrimaryChannel(tpAniSirGlobal pMac, tANI_U8 newChannel,tpPESession
         return;
     }
     limSendSwitchChnlParams(pMac, newChannel, PHY_SINGLE_CHANNEL_CENTERED,
-                                                   (tPowerdBm)localPwrConstraint, psessionEntry->peSessionId);
+                            (tPowerdBm)localPwrConstraint,
+                            psessionEntry->peSessionId,
+                            VOS_FALSE);
 #endif
     return;
 }
@@ -3339,9 +3343,15 @@ void limSwitchPrimarySecondaryChannel(tpAniSirGlobal pMac, tpPESession psessionE
 #endif
 
 #if defined WLAN_FEATURE_VOWIFI
-                limSendSwitchChnlParams(pMac, newChannel, subband, psessionEntry->maxTxPower, psessionEntry->peSessionId);
+                limSendSwitchChnlParams(pMac, newChannel, subband,
+                                        psessionEntry->maxTxPower,
+                                        psessionEntry->peSessionId,
+                                        VOS_FALSE);
 #else
-                limSendSwitchChnlParams(pMac, newChannel, subband, (tPowerdBm)localPwrConstraint, psessionEntry->peSessionId);
+                limSendSwitchChnlParams(pMac, newChannel, subband,
+                                        (tPowerdBm)localPwrConstraint,
+                                        psessionEntry->peSessionId,
+                                        VOS_FALSE);
 #endif
 
     // Store the new primary and secondary channel in session entries if different
@@ -5173,10 +5183,13 @@ void limUpdateStaRunTimeHTSwitchChnlParams( tpAniSirGlobal   pMac,
 
 #if defined WLAN_FEATURE_VOWIFI
         limSendSwitchChnlParams( pMac, ( tANI_U8 ) pHTInfo->primaryChannel,
-                                 secondaryChnlOffset, psessionEntry->maxTxPower, psessionEntry->peSessionId);
+                                 secondaryChnlOffset, psessionEntry->maxTxPower,
+                                 psessionEntry->peSessionId, VOS_TRUE);
 #else
         limSendSwitchChnlParams( pMac, ( tANI_U8 ) pHTInfo->primaryChannel,
-                                 secondaryChnlOffset, (tPowerdBm)localPwrConstraint, psessionEntry->peSessionId);
+                                 secondaryChnlOffset,
+                                 (tPowerdBm)localPwrConstraint,
+                                 psessionEntry->peSessionId, VOS_TRUE);
 #endif
 
         //In case of IBSS, if STA should update HT Info IE in its beacons.

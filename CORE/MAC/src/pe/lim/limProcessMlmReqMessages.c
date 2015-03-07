@@ -370,7 +370,7 @@ limChangeChannelWithCallback(tpAniSirGlobal pMac, tANI_U8 newChannel,
 
     limSendSwitchChnlParams(pMac, newChannel,
         PHY_SINGLE_CHANNEL_CENTERED,
-        psessionEntry->maxTxPower, psessionEntry->peSessionId);
+        psessionEntry->maxTxPower, psessionEntry->peSessionId, VOS_FALSE);
 
     return;
 }
@@ -4701,12 +4701,16 @@ limSetChannel(tpAniSirGlobal pMac, tANI_U8 channel, tANI_U8 secChannelOffset, tP
 #ifdef WLAN_FEATURE_11AC
     if ( peSession->vhtCapability )
     {
-        limSendSwitchChnlParams( pMac, channel, limGet11ACPhyCBState( pMac,channel,secChannelOffset,peSession->apCenterChan, peSession), maxTxPower, peSessionId);
+        limSendSwitchChnlParams(pMac, channel,
+                                limGet11ACPhyCBState( pMac,channel,
+                                secChannelOffset,peSession->apCenterChan, peSession),
+                                maxTxPower, peSessionId, VOS_FALSE);
     }
     else
 #endif
     {
-        limSendSwitchChnlParams( pMac, channel, secChannelOffset, maxTxPower, peSessionId);
+        limSendSwitchChnlParams(pMac, channel, secChannelOffset, maxTxPower,
+                                peSessionId, VOS_FALSE);
     }
 #else
     if (wlan_cfgGetInt(pMac, WNI_CFG_LOCAL_POWER_CONSTRAINT, &localPwrConstraint) != eSIR_SUCCESS) {
@@ -4717,12 +4721,18 @@ limSetChannel(tpAniSirGlobal pMac, tANI_U8 channel, tANI_U8 secChannelOffset, tP
 #ifdef WLAN_FEATURE_11AC
     if ( peSession->vhtCapability && peSession->vhtCapabilityPresentInBeacon)
     {
-        limSendSwitchChnlParams( pMac, channel, limGet11ACPhyCBState( pMac,channel,secChannelOffset,peSession->apCenterChan, peSession), maxTxPower, peSessionId);
+        limSendSwitchChnlParams(pMac, channel,
+                                limGet11ACPhyCBState( pMac,channel,
+                                secChannelOffset,peSession->apCenterChan,
+                                peSession), maxTxPower,
+                                peSessionId, VOS_FALSE);
     }
     else
 #endif
     {
-        limSendSwitchChnlParams( pMac, channel, secChannelOffset, (tPowerdBm)localPwrConstraint, peSessionId);
+        limSendSwitchChnlParams(pMac, channel, secChannelOffset,
+                                (tPowerdBm)localPwrConstraint, peSessionId,
+                                VOS_FALSE);
     }
 #endif
 

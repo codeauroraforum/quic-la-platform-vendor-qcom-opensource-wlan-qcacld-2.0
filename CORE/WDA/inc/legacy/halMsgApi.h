@@ -1027,6 +1027,8 @@ typedef struct
     tANI_U8  vhtCapable;
 
     tANI_U8  dot11_mode;
+
+    uint8_t restart_on_chan_switch;
 }tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef struct CSAOffloadParams {
