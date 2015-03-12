@@ -1707,4 +1707,17 @@ void wlan_hdd_disable_roaming(hdd_adapter_t *pAdapter);
 void wlan_hdd_enable_roaming(hdd_adapter_t *pAdapter);
 #endif
 int hdd_set_miracast_mode(hdd_adapter_t *pAdapter, tANI_U8 *command);
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+static inline bool hdd_link_layer_stats_supported(void)
+{
+	return true;
+}
+#else
+static inline bool hdd_link_layer_stats_supported(void)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
