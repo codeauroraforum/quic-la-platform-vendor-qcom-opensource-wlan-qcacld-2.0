@@ -984,6 +984,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #endif
 
 #define WDA_SET_SCAN_MAC_OUI_REQ              SIR_HAL_SET_SCAN_MAC_OUI_REQ
+#define WDA_GET_FW_STATUS_REQ                 SIR_HAL_GET_FW_STATUS_REQ
 
 
 #define WDA_OCB_SET_SCHED_REQUEST             SIR_HAL_OCB_SET_SCHED_REQUEST
