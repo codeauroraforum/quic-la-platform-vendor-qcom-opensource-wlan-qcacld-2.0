@@ -162,6 +162,9 @@ endif
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 	CONFIG_PER_VDEV_TX_DESC_POOL := 0
 endif
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+	CONFIG_TX_DESC_MGMT_RESERVE  := 1
+endif
 
 
 #Enable OS specific IRQ abstraction
@@ -1096,6 +1099,12 @@ endif
 ifeq ($(CONFIG_PER_VDEV_TX_DESC_POOL), 1)
 CDEFINES += -DCONFIG_PER_VDEV_TX_DESC_POOL
 endif
+
+#Enable Tx mgmt desc reserve
+ifeq ($(CONFIG_TX_DESC_MGMT_RESERVE), 1)
+CDEFINES += -DCONFIG_TX_DESC_MGMT_RESERVE
+endif
+
 
 #Enable OS specific IRQ abstraction
 ifeq ($(CONFIG_ATH_SUPPORT_SHARED_IRQ), 1)
