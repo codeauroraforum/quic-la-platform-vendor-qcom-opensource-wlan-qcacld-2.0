@@ -3563,11 +3563,9 @@ sapSortMacList(v_MACADDR_t *macList, v_U8_t size)
     v_MACADDR_t temp;
     v_SINT_t nRes = -1;
 
-    if ((NULL == macList) || (size >= MAX_ACL_MAC_ADDRESS))
-    {
-        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                      "In %s, either buffer is NULL or size = %d is more."
-                      , __func__, size);
+    if ((NULL == macList) || (size > MAX_ACL_MAC_ADDRESS)) {
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                  FL("either buffer is NULL or size = %d is more."), size);
         return;
     }
 
@@ -3592,6 +3590,13 @@ sapSearchMacList(v_MACADDR_t *macList, v_U8_t num_mac, v_U8_t *peerMac, v_U8_t *
     v_SINT_t nRes = -1;
     v_S7_t nStart = 0, nEnd, nMiddle;
     nEnd = num_mac - 1;
+
+    if ((NULL == macList) || (num_mac > MAX_ACL_MAC_ADDRESS)) {
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                  FL("either buffer is NULL or size = %d is more."),
+                  num_mac);
+        return eSAP_FALSE;
+    }
 
     while (nStart <= nEnd)
     {
@@ -3628,6 +3633,14 @@ sapAddMacToACL(v_MACADDR_t *macList, v_U8_t *size, v_U8_t *peerMac)
 {
     v_SINT_t nRes = -1;
     int i;
+
+    if (NULL == macList || *size == 0 || *size > MAX_ACL_MAC_ADDRESS) {
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                  FL("either buffer is NULL or size = %d is incorrect."),
+                  *size);
+        return;
+    }
+
     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,"add acl entered");
     for (i=((*size)-1); i>=0; i--)
     {
@@ -3657,7 +3670,13 @@ sapRemoveMacFromACL(v_MACADDR_t *macList, v_U8_t *size, v_U8_t index)
     /* return if the list passed is empty. Ideally this should never happen since this funcn is always
        called after sapSearchMacList to get the index of the mac addr to be removed and this will
        only get called if the search is successful. Still no harm in having the check */
-    if (macList==NULL) return;
+    if ((NULL == macList) || (*size == 0) || (*size > MAX_ACL_MAC_ADDRESS)) {
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                  FL("either buffer is NULL or size = %d is incorrect"),
+                  *size);
+        return;
+    }
+
     for (i=index; i<((*size)-1); i++)
     {
         /* Move mac addresses starting from "index" passed one index up to delete the void
