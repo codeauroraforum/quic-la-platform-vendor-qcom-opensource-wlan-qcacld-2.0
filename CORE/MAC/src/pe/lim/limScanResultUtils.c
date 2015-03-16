@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -251,8 +251,13 @@ limCollectBssDescription(tpAniSirGlobal pMac,
 
     //SINR no longer reported by HW
     pBssDescr->sinr = 0;
-
     pBssDescr->nReceivedTime = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
+    pBssDescr->tsf_delta = WDA_GET_RX_TSF_DELTA(pRxPacketInfo);
+
+    limLog(pMac, LOG1,
+        FL("BSSID: "MAC_ADDRESS_STR " rssi: normalized = %d, tsf_delta = %u"),
+        MAC_ADDR_ARRAY(pHdr->bssId), pBssDescr->rssi,
+        pBssDescr->tsf_delta);
 
 #if defined WLAN_FEATURE_VOWIFI
     if( fScanning )
