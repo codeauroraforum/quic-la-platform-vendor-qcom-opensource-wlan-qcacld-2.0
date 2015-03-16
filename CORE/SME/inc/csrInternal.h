@@ -1016,6 +1016,7 @@ typedef struct tagCsrRoamSession
     tftSMEContext ftSmeContext;
 #endif
     tCsrRoamStoredProfile stored_roam_profile;
+    bool ch_switch_in_progress;
 } tCsrRoamSession;
 
 typedef struct tagCsrRoamStruct
