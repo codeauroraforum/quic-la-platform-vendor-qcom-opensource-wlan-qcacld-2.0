@@ -445,10 +445,9 @@ typedef struct sPESession           // Added to Support BT-AMP
     tANI_U16 schBeaconOffsetEnd;
 
     tANI_U8  isKeyInstalled;
-}tPESession, *tpPESession;
-
-#define LIM_MAX_ACTIVE_SESSIONS 4
-
+    /* flag to indicate country code in beacon */
+    tANI_U8 countryInfoPresent;
+} tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------
   Function declarations and documenation
