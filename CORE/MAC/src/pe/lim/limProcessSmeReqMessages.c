@@ -2203,6 +2203,12 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
         /* Indicate whether spectrum management is enabled*/
         psessionEntry->spectrumMgtEnabled =
            pSmeJoinReq->spectrumMgtIndicator;
+
+        /* Enable the spectrum management if this is a DFS channel */
+        if (psessionEntry->countryInfoPresent &&
+             limIsconnectedOnDFSChannel(psessionEntry->currentOperChannel))
+             psessionEntry->spectrumMgtEnabled = TRUE;
+
         psessionEntry->isOSENConnection =
            pSmeJoinReq->isOSENConnection;
 
@@ -2554,6 +2560,11 @@ __limProcessSmeReassocReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     /* Indicate whether spectrum management is enabled*/
     psessionEntry->spectrumMgtEnabled = pReassocReq->spectrumMgtIndicator;
+
+    /* Enable the spectrum management if this is a DFS channel */
+    if (psessionEntry->countryInfoPresent &&
+             limIsconnectedOnDFSChannel(psessionEntry->currentOperChannel))
+             psessionEntry->spectrumMgtEnabled = TRUE;
 
     psessionEntry->limPrevSmeState = psessionEntry->limSmeState;
     psessionEntry->limSmeState    = eLIM_SME_WT_REASSOC_STATE;
