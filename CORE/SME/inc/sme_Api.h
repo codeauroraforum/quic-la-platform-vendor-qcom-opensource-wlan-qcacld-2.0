@@ -3955,6 +3955,10 @@ eHalStatus sme_getCachedResults (tHalHandle hHal,
 
 eHalStatus sme_set_epno_list(tHalHandle hal,
                                 struct wifi_epno_params *req_msg);
+eHalStatus sme_set_passpoint_list(tHalHandle hal,
+				  struct wifi_passpoint_req *req_msg);
+eHalStatus sme_reset_passpoint_list(tHalHandle hal,
+				    struct wifi_passpoint_req *req_msg);
 
 /* ---------------------------------------------------------------------------
     \fn sme_ExtScanRegisterCallback
