@@ -1834,7 +1834,8 @@ diag_fw_handler(ol_scn_t scn, u_int8_t *data, u_int32_t datalen)
         return 0;
     }
 
-    if ( dbglog_process_type == DBGLOG_PROCESS_NET_RAW) {
+    if ( (dbglog_process_type == DBGLOG_PROCESS_NET_RAW) &&
+        (cnss_diag_pid != 0)) {
          return send_diag_netlink_data((A_UINT8 *)datap,
                                           len, DIAG_TYPE_FW_MSG);
     }
