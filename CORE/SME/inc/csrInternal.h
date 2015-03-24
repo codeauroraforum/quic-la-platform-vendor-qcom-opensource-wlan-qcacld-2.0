@@ -293,6 +293,13 @@ typedef enum
 
 }eCsrDiagWlanStatusEventReason;
 
+typedef enum
+{
+    eCSR_EVENT_TYPE_INVALID = 0,
+    eCSR_EVENT_SCAN_COMPLETE = 70,
+    eCSR_EVENT_SCAN_RES_FOUND = 71,
+} eCSR_WLAN_DIAG_EVENT_TYPE;
+
 #endif //FEATURE_WLAN_DIAG_SUPPORT
 
 typedef struct tagCsrChannel
@@ -1549,6 +1556,10 @@ void csrProcessRoamOffloadSynchInd(tHalHandle hHal,
 eHalStatus csrScanSaveRoamOffloadApToScanCache(tpAniSirGlobal pMac,
             tSirRoamOffloadSynchInd *pRoamOffloadSynchInd);
 void csrProcessHOFailInd(tpAniSirGlobal pMac, void *pMsgBuf);
+#endif
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+void csr_diag_event_report(tpAniSirGlobal pmac, uint16_t event_type,
+                           uint16_t status, uint16_t reasoncode);
 #endif
 #endif
 
