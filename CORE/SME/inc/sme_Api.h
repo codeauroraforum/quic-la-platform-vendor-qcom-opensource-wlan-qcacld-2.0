@@ -4109,4 +4109,9 @@ eHalStatus sme_GetTemperature(tHalHandle hHal,
     -------------------------------------------------------------------------*/
 eHalStatus sme_SetScanningMacOui(tHalHandle hHal, tSirScanMacOui *pScanMacOui);
 
+bool sme_validate_sap_channel_switch(tHalHandle hal,
+					uint16_t sap_ch,
+					eCsrPhyMode sap_phy_mode,
+					uint8_t cc_switch_mode,
+					uint32_t session_id);
 #endif //#if !defined( __SME_API_H )
