@@ -5899,6 +5899,12 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         WLANSAP_set_Dfs_Preferred_Channel_location(hHal,
                                      iniConfig->gSapPreferredChanLocation);
     }
+    else if (pHostapdAdapter->device_mode == WLAN_HDD_P2P_GO)
+    {
+       pConfig->countryCode[0] = pHddCtx->reg.alpha2[0];
+       pConfig->countryCode[1] = pHddCtx->reg.alpha2[1];
+       pConfig->ieee80211d = 0;
+    }
     else
     {
         pConfig->ieee80211d = 0;
