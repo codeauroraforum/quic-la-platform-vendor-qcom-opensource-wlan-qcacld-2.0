@@ -187,8 +187,6 @@ typedef struct sChannelSwitchPropIEStruct
 // generic proprietary IE structure definition
 typedef struct sSirPropIEStruct
 {
-    tANI_U8                    aniIndicator;
-
     tANI_U8                    propRatesPresent:1;
     tANI_U8                    apNamePresent:1;
     tANI_U8                    loadBalanceInfoPresent:1;
