@@ -192,7 +192,7 @@ __limExtScanForwardBcnProbeRsp(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,
     fScanResult->ap.beaconPeriod = pFrame->beaconInterval;
     fScanResult->ap.capability = limGetU16((tANI_U8 *)&pFrame->capabilityInfo);
     fScanResult->ap.channel = WDA_GET_RX_CH(pRxPacketInfo);
-    fScanResult->ap.rssi = WDA_GET_RX_RSSI_DB(pRxPacketInfo);
+    fScanResult->ap.rssi = WDA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);
     fScanResult->ap.rtt = 0;
     fScanResult->ap.rtt_sd = 0;
     fScanResult->ap.ieLength = ieLen;

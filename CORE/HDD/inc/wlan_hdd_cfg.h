@@ -2805,6 +2805,15 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_SAP_DOT11MC_MAX           (1)
 #define CFG_SAP_DOT11MC_DEFAULT       (0)
 
+/* Option to report rssi in cfg80211_inform_bss_frame()
+ * 0 = use rssi value based on noise floor = -96 dBm
+ * 1 = use rssi value based on actual noise floor in hardware
+ */
+#define CFG_INFORM_BSS_RSSI_RAW_NAME               "gInformBssRssiRaw"
+#define CFG_INFORM_BSS_RSSI_RAW_MIN                (0)
+#define CFG_INFORM_BSS_RSSI_RAW_MAX                (1)
+#define CFG_INFORM_BSS_RSSI_RAW_DEFAULT            (1)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3405,6 +3414,7 @@ typedef struct
    v_BOOL_t                    gEnableDeauthToDisassocMap;
    bool                        enable_mac_spoofing;
    uint8_t                     sap_dot11mc;
+   uint8_t                     inform_bss_rssi_raw;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
