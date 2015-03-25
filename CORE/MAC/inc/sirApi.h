@@ -729,6 +729,7 @@ typedef struct sSirBssDescription
     tSirNwType           nwType; // Indicates 11a/b/g
     tANI_U8              aniIndicator;
     tANI_S8              rssi;
+    tANI_S8              rssi_raw;
     tANI_S8              sinr;
     //channelId what peer sent in beacon/probersp.
     tANI_U8              channelId;
