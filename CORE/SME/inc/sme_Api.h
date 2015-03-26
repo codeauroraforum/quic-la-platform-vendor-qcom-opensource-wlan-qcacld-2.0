@@ -4133,6 +4133,9 @@ eHalStatus sme_SetLedFlashing (tHalHandle hHal, tANI_U8 type,
     -------------------------------------------------------------------------*/
 eHalStatus sme_handle_dfs_chan_scan(tHalHandle hHal, tANI_U8 dfs_flag);
 
+eHalStatus sme_configure_dynamic_dtim(tHalHandle hHal, tANI_U8 session_id,
+					  tANI_U32 dynamic_dtim);
+
 eHalStatus sme_configure_stats_avg_factor(tHalHandle hHal, tANI_U8 session_id,
 					  tANI_U16 stats_avg_factor);
 
