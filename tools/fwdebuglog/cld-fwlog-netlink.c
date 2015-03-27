@@ -67,10 +67,10 @@ const uint32_t capabilities = (1 << CAP_NET_RAW) | (1 << CAP_NET_ADMIN);
 /* Groups needed
  * AID_INET      : Open INET socket
  * AID_NET_ADMIN : Handle NL socket
- * AID_QCOM_DIAG : Access DIAG debugfs
+ * AID__DIAG : Access DIAG debugfs
  * AID_WIFI      : WIFI Operation
  */
-const gid_t groups[] = {AID_INET, AID_NET_ADMIN, AID_QCOM_DIAG, AID_WIFI};
+const gid_t groups[] = {AID_INET, AID_NET_ADMIN, AID_DIAG, AID_WIFI};
 #endif
 
 const char options[] =
