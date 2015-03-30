@@ -983,3 +983,7 @@ void PopulateDot11fTimeoutInterval( tpAniSirGlobal pMac,
 void populate_dot11_supp_operating_classes(tpAniSirGlobal mac_ptr,
                 tDot11fIESuppOperatingClasses *dot_11_ptr,
                 tpPESession session_entry);
+
+tSirRetStatus PopulateDot11fTimingAdvertFrame(tpAniSirGlobal pMac,
+    tDot11fTimingAdvertisementFrame *frame);
+
