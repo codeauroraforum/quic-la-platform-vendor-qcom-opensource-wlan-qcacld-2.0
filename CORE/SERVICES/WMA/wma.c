@@ -11572,6 +11572,9 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		case WMI_PDEV_PARAM_DYNAMIC_BW:
 			wma->pdevconfig.cwmenable = privcmd->param_value;
 			break;
+		case WMI_PDEV_PARAM_CTS_CBW:
+			wma->pdevconfig.cts_cbw = privcmd->param_value;
+			break;
 		case WMI_PDEV_PARAM_TX_CHAIN_MASK:
 			wma->pdevconfig.txchainmask = privcmd->param_value;
 			break;
@@ -11736,6 +11739,9 @@ int wma_cli_get_command(void *wmapvosContext, int vdev_id,
 			break;
 		case WMI_PDEV_PARAM_DYNAMIC_BW:
 			ret = wma->pdevconfig.cwmenable;
+			break;
+		case WMI_PDEV_PARAM_CTS_CBW:
+			ret = wma->pdevconfig.cts_cbw;
 			break;
 		case WMI_PDEV_PARAM_TX_CHAIN_MASK:
 			ret = wma->pdevconfig.txchainmask;
