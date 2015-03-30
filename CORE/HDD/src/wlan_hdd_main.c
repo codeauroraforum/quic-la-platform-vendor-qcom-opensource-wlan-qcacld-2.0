@@ -135,6 +135,8 @@ void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #endif
 #include "wma.h"
 
+#include "wlan_hdd_ocb.h"
+
 #if defined(LINUX_QCMBR)
 #define SIOCIOCTLTX99 (SIOCDEVPRIVATE+13)
 #endif
@@ -11417,21 +11419,6 @@ VOS_STATUS hdd_set_sme_chan_list(hdd_context_t *hdd_ctx)
                               hdd_ctx->reg.cc_src);
 }
 
-/**
- * hdd_set_dot11p_config() - Set 802.11p config flag
- * @hdd_ctx:   HDD Context pointer
- *
- * TODO-OCB: This has been temporarily added to ensure this paramter
- * is set in CSR when we init the channel list. This should be removed
- * once the 5.9 GHz channels are added to the regulatory domain.
- */
-void hdd_set_dot11p_config(hdd_context_t *hdd_ctx)
-{
-    sme_set_dot11p_config(hdd_ctx->hHal,
-                          hdd_ctx->cfg_ini->dot11p_mode !=
-                              WLAN_HDD_11P_DISABLED);
-}
-
 /**---------------------------------------------------------------------------
 
   \brief hdd_is_5g_supported() - HDD function to know if hardware supports  5GHz
@@ -12458,6 +12445,8 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                              pHddCtx->target_hw_version,
                              pHddCtx->target_hw_name);
 #endif
+
+	wlan_hdd_dcc_register_for_dcc_stats_event(pHddCtx);
 
    complete(&wlan_start_comp);
    goto success;
