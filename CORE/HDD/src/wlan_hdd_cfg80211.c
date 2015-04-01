@@ -4079,11 +4079,9 @@ static int wlan_hdd_config_acs(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
             hddLog(LOG1, FL("Operating Band: PriAP: %d SecAP: %d"),
                con_sap_config->apOperatingBand, sap_config->apOperatingBand);
 
-            if (con_sap_config->apOperatingBand == 5 &&
-                                              sap_config->apOperatingBand > 0) {
-                sap_config->skip_acs_scan_status = eSAP_SKIP_ACS_SCAN;
-
-            } else if (con_sap_config->apOperatingBand
+            if ((con_sap_config->apOperatingBand == 5 &&
+                   sap_config->apOperatingBand > 0) ||
+                   con_sap_config->apOperatingBand
                                                == sap_config->apOperatingBand) {
                 v_U8_t con_sap_st_ch, con_sap_end_ch;
                 v_U8_t cur_sap_st_ch, cur_sap_end_ch;
@@ -4409,6 +4407,13 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	else
 		ht40_enabled = 0;
 
+	/* ***Note*** Donot set SME config related to ACS operation here because
+	 * ACS operation is not synchronouse and ACS for Second AP may come when
+	 * ACS operation for first AP is going on. So only do_acs is split to
+	 * seperate start_acs routine. Also SME-PMAC struct that is used to
+	 * pass paremeters from HDD to SAP is global. Thus All ACS related SME
+	 * config shall be set only from start_acs.
+	 */
 	sap_config = &adapter->sessionCtx.ap.sapConfig;
 	sap_config->channel = AUTO_CHANNEL_SELECT;
 	sap_config->acs_hw_mode = hw_mode;
@@ -4475,6 +4480,13 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		sap_config->acs_ch_width = 20;
 
 	if (test_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags)) {
+		/* ***Note*** Completion variable usage is not allowed here since
+		 * ACS scan operation may take max 2.2 sec for 5G band.
+		 * 9 Active channel X 40 ms active scan time +
+		 * 16 Passive channel X 110ms passive scan time
+		 * Since this CFG80211 call lock rtnl mutex, we cannot hold on
+		 * for this long. So we split up the scanning part.
+		 */
 		set_bit(ACS_PENDING, &adapter->event_flags);
 		hddLog(LOG1, FL("ACS Pending for wlan%d"),
 							adapter->dev->ifindex);
@@ -9407,7 +9419,11 @@ static int wlan_hdd_cfg80211_update_bss( struct wiphy *wiphy,
      *  restarted, we need to flush previous scan result so that it will reflect
      *  environment change
      */
-    if (pAdapter->device_mode == WLAN_HDD_SOFTAP)
+    if (pAdapter->device_mode == WLAN_HDD_SOFTAP
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+                        && pHddCtx->skip_acs_scan_status != eSAP_SKIP_ACS_SCAN
+#endif
+       )
         sme_ScanFlushResult(hHal, pAdapter->sessionId);
 
     EXIT();
