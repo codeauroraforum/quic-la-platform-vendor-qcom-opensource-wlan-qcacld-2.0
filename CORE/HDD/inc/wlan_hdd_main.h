@@ -108,6 +108,7 @@
    a response from WCNSS */
 #define WLAN_WAIT_TIME_SESSIONOPENCLOSE  15000
 #define WLAN_WAIT_TIME_ABORTSCAN  2000
+#define WLAN_WAIT_TIME_EXTSCAN  1000
 
 
 /** Maximum time(ms) to wait for mc thread suspend **/
@@ -1209,6 +1210,21 @@ typedef struct
 
 }fw_log_info;
 
+#ifdef FEATURE_WLAN_EXTSCAN
+/**
+ * struct hdd_ext_scan_context - hdd ext scan context
+ * @request_id: userspace-assigned ID associated with the request
+ * @response_event: Ext scan wait event
+ * @response_status: Status returned by FW in response to a request
+ *
+ */
+struct hdd_ext_scan_context {
+	uint32_t request_id;
+	int response_status;
+	struct completion response_event;
+};
+#endif
+
 /** Adapter stucture definition */
 
 struct hdd_context_s
@@ -1492,6 +1508,10 @@ struct hdd_context_s
 
     /* Time since boot up to WiFi turn ON (in micro seconds) */
     v_U64_t wifi_turn_on_time_since_boot;
+
+#ifdef FEATURE_WLAN_EXTSCAN
+    struct hdd_ext_scan_context ext_scan_context;
+#endif /* FEATURE_WLAN_EXTSCAN */
 };
 
 /*---------------------------------------------------------------------------
