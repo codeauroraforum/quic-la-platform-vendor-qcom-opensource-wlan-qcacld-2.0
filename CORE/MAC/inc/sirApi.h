@@ -5280,22 +5280,9 @@ typedef struct
 typedef struct
 {
     tANI_U32    requestId;
-    tANI_U32    status;
-} tSirExtScanSetBssidHotListRspParams, *tpSirExtScanSetBssidHotListRspParams;
-
-typedef struct
-{
-    tANI_U32    requestId;
     tANI_U8     sessionId;
 } tSirExtScanResetBssidHotlistReqParams,
   *tpSirExtScanResetBssidHotlistReqParams;
-
-typedef struct
-{
-    tANI_U32    requestId;
-    tANI_U32    status;
-} tSirExtScanResetBssidHotlistRspParams,
-  *tpSirExtScanResetBssidHotlistRspParams;
 
 /**
  * struct sir_ssid_hotlist_param - param for SSID Hotlist
@@ -5351,13 +5338,6 @@ typedef struct
 
 typedef struct
 {
-    tANI_U32      requestId;
-    tANI_U32      status;
-} tSirExtScanSetSignificantChangeRspParams,
-  *tpSirExtScanSetSignificantChangeRspParams;
-
-typedef struct
-{
     tSirMacAddr  bssid;
     tANI_U32     channel;
     tANI_U32     numOfRssi;
@@ -5381,13 +5361,6 @@ typedef struct
     tANI_U8     sessionId;
 } tSirExtScanResetSignificantChangeReqParams,
   *tpSirExtScanResetSignificantChangeReqParams;
-
-typedef struct
-{
-    tANI_U32    requestId;
-    tANI_U32    status;
-} tSirExtScanResetSignificantChangeRspParams,
-  *tpSirExtScanResetSignificantChangeRspParams;
 
 typedef struct
 {
