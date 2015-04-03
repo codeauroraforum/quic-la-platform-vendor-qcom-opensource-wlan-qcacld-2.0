@@ -239,18 +239,20 @@ limCollectBssDescription(tpAniSirGlobal pMac,
     channelNum = pBssDescr->channelId;
     pBssDescr->nwType = limGetNwType(pMac, channelNum, SIR_MAC_MGMT_FRAME, pBPR);
 
-    pBssDescr->aniIndicator = pBPR->propIEinfo.aniIndicator;
-
     // Copy RSSI & SINR from BD
 
     PELOG4(limLog(pMac, LOG4, "***********BSS Description for BSSID:*********** ");
     sirDumpBuf(pMac, SIR_LIM_MODULE_ID, LOG4, pBssDescr->bssId, 6 );
     sirDumpBuf( pMac, SIR_LIM_MODULE_ID, LOG4, (tANI_U8*)pRxPacketInfo, 36 );)
 
-    pBssDescr->rssi = (tANI_S8)WDA_GET_RX_RSSI_DB(pRxPacketInfo);
+    pBssDescr->rssi = (tANI_S8)WDA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);
+    pBssDescr->rssi_raw = (tANI_S8)WDA_GET_RX_RSSI_RAW(pRxPacketInfo);
 
     //SINR no longer reported by HW
     pBssDescr->sinr = 0;
+    limLog(pMac, LOG3,
+        FL(MAC_ADDRESS_STR " rssi: normalized = %d, absolute = %d"),
+        MAC_ADDR_ARRAY(pHdr->bssId), pBssDescr->rssi, pBssDescr->rssi_raw);
 
     pBssDescr->nReceivedTime = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
 
@@ -297,10 +299,9 @@ limCollectBssDescription(tpAniSirGlobal pMac,
     pBPR->channelNumber = pBssDescr->channelId;
 
     limLog( pMac, LOG3,
-        FL("Collected BSS Description for Channel(%1d), length(%u), aniIndicator(%d), IE Fields(%u)"),
+        FL("Collected BSS Description for Channel(%1d), length(%u), IE Fields(%u)"),
         pBssDescr->channelId,
         pBssDescr->length,
-        pBssDescr->aniIndicator,
         ieLen );
 
     return eHAL_STATUS_SUCCESS;
