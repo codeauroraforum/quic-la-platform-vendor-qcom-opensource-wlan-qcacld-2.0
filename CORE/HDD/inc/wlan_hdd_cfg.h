@@ -2811,7 +2811,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_NAME         "gRoamScanHiRssiMaxCount"
 #define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_MIN          (0)
 #define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_MAX          (10)
-#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_DEFAULT      (5)
+#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_DEFAULT      (3)
 
 /* Change in RSSI at which scan is triggered */
 #define CFG_ROAM_SCAN_HI_RSSI_DELTA_NAME           "gRoamScanHiRssiDelta"
@@ -2822,14 +2822,14 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 /* Delay between consecutive scans in milliseconds */
 #define CFG_ROAM_SCAN_HI_RSSI_DELAY_NAME            "gRoamScanHiRssiDelay"
 #define CFG_ROAM_SCAN_HI_RSSI_DELAY_MIN             (5000)
-#define CFG_ROAM_SCAN_HI_RSSI_DELAY_MAX             (15000)
-#define CFG_ROAM_SCAN_HI_RSSI_DELAY_DEFAULT         (5000)
+#define CFG_ROAM_SCAN_HI_RSSI_DELAY_MAX             (0x7fffffff)
+#define CFG_ROAM_SCAN_HI_RSSI_DELAY_DEFAULT         (15000)
 
 /* Upper bound after which scan will not be performed */
 #define CFG_ROAM_SCAN_HI_RSSI_UB_NAME              "gRoamScanHiRssiUpperBound"
-#define CFG_ROAM_SCAN_HI_RSSI_UB_MIN               (-76)
-#define CFG_ROAM_SCAN_HI_RSSI_UB_MAX               (-30)
-#define CFG_ROAM_SCAN_HI_RSSI_UB_DEFAULT           (-45)
+#define CFG_ROAM_SCAN_HI_RSSI_UB_MIN               (-66)
+#define CFG_ROAM_SCAN_HI_RSSI_UB_MAX               (0)
+#define CFG_ROAM_SCAN_HI_RSSI_UB_DEFAULT           (-30)
 
 
 /*---------------------------------------------------------------------------
