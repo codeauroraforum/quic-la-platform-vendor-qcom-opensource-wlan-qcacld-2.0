@@ -405,7 +405,6 @@ void limPerformFTPreAuth(tpAniSirGlobal pMac, eHalStatus status,
     limSendAuthMgmtFrame(pMac, &authFrame,
         psessionEntry->ftPEContext.pFTPreAuthReq->preAuthbssId,
         LIM_NO_WEP_IN_FC, psessionEntry);
-
     return;
 
 preauth_fail:
@@ -1475,7 +1474,7 @@ void limProcessFTPreauthRspTimeout(tpAniSirGlobal pMac)
    /* We have failed pre auth. We need to resume link and get back on
     * home channel
     */
-   limLog(pMac, LOG1, FL("FT Pre-Auth Time Out!!!!"));
+   limLog(pMac, LOGE, FL("FT Pre-Auth Time Out!!!!"));
 
    if ((psessionEntry =
             peFindSessionBySessionId(pMac,
