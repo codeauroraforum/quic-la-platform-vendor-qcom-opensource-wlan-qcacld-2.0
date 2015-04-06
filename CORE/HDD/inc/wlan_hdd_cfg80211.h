@@ -1017,8 +1017,7 @@ struct cfg80211_bss* wlan_hdd_cfg80211_update_bss_list(
 int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
                                    struct cfg80211_wowlan *wow);
 
-void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_adapter_t *adapter,
-		uint8_t priChannel, uint8_t secChannel);
+void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_adapter_t *adapter);
 #if !(defined (SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC))
 static inline struct sk_buff *
 backported_cfg80211_vendor_event_alloc(struct wiphy *wiphy,
