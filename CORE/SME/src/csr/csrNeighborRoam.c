@@ -4757,6 +4757,8 @@ void csr_roam_reset_roam_params(tpAniSirGlobal mac_ctx)
 	struct roam_ext_params *roam_params = NULL;
 	/* clear all the whitelist and preferred BSSID parameters,
 	 * remaining needs to be retained across connections. */
+	VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+			FL("Whitelist and preferred BSSID are reset"));
 	roam_params = &mac_ctx->roam.configParam.roam_params;
 	roam_params->num_ssid_allowed_list = 0;
 	roam_params->num_bssid_favored = 0;
@@ -4807,7 +4809,8 @@ eHalStatus csrNeighborRoamIndicateDisconnect(tpAniSirGlobal pMac,
 
     /* clear the roaming parameters that are per connection.
      * For a new connection, they have to be programmed again. */
-     csr_roam_reset_roam_params(pMac);
+    if (!csrNeighborMiddleOfRoaming((tHalHandle)pMac, sessionId))
+      csr_roam_reset_roam_params(pMac);
 #endif
     if (NULL != pSession)
     {
