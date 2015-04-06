@@ -81,6 +81,7 @@
 #define WMM_OUI_TYPE   "\x00\x50\xf2\x02\x01"
 #define WMM_OUI_TYPE_SIZE  5
 
+#define WLAN_BSS_MEMBERSHIP_SELECTOR_VHT_PHY 126
 #define WLAN_BSS_MEMBERSHIP_SELECTOR_HT_PHY 127
 #define BASIC_RATE_MASK   0x80
 #define RATE_MASK         0x7f
@@ -896,6 +897,11 @@ enum qca_wlan_vendor_attr_acs_offload {
        QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE,
        QCA_WLAN_VENDOR_ATTR_ACS_HT_ENABLED,
        QCA_WLAN_VENDOR_ATTR_ACS_HT40_ENABLED,
+       QCA_WLAN_VENDOR_ATTR_ACS_VHT_ENABLED,
+       QCA_WLAN_VENDOR_ATTR_ACS_CHWIDTH,
+       QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST,
+       QCA_WLAN_VENDOR_ATTR_ACS_VHT_SEG0_CENTER_CHANNEL,
+       QCA_WLAN_VENDOR_ATTR_ACS_VHT_SEG1_CENTER_CHANNEL,
        /* keep last */
        QCA_WLAN_VENDOR_ATTR_ACS_AFTER_LAST,
        QCA_WLAN_VENDOR_ATTR_ACS_MAX =
@@ -1011,10 +1017,8 @@ struct cfg80211_bss* wlan_hdd_cfg80211_update_bss_list(
 int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
                                    struct cfg80211_wowlan *wow);
 
-#ifdef QCA_HT_2040_COEX
 void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_adapter_t *adapter,
 		uint8_t priChannel, uint8_t secChannel);
-#endif
 #if !(defined (SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC))
 static inline struct sk_buff *
 backported_cfg80211_vendor_event_alloc(struct wiphy *wiphy,
