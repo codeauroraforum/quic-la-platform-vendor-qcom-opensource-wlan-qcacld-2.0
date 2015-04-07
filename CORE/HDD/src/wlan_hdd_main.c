@@ -11411,19 +11411,20 @@ VOS_STATUS hdd_post_voss_start_config(hdd_context_t* pHddCtx)
 }
 
 /* wake lock APIs for HDD */
-void hdd_prevent_suspend(void)
+void hdd_prevent_suspend(uint32_t reason)
 {
-    vos_wake_lock_acquire(&wlan_wake_lock);
+	vos_wake_lock_acquire(&wlan_wake_lock, reason);
 }
 
-void hdd_allow_suspend(void)
+void hdd_allow_suspend(uint32_t reason)
 {
-    vos_wake_lock_release(&wlan_wake_lock);
+	vos_wake_lock_release(&wlan_wake_lock, reason);
 }
 
-void hdd_prevent_suspend_timeout(v_U32_t timeout)
+void hdd_prevent_suspend_timeout(v_U32_t timeout, uint32_t reason)
 {
-    vos_wake_lock_timeout_acquire(&wlan_wake_lock, timeout);
+	vos_wake_lock_timeout_acquire(&wlan_wake_lock, timeout,
+                                      reason);
 }
 
 /**---------------------------------------------------------------------------
@@ -12769,7 +12770,7 @@ static int hdd_driver_init( void)
    ENTER();
 
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
-   hdd_prevent_suspend();
+   hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
    /*
     * The Krait is going to Idle/Stand Alone Power Save
     * more aggressively which is resulting in the longer driver load time.
@@ -12791,7 +12792,7 @@ static int hdd_driver_init( void)
                           WLAN_MODULE_NAME);
          if (ret_status < 0) {
             hdd_remove_pm_qos();
-            hdd_allow_suspend();
+            hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
             vos_wake_lock_destroy(&wlan_wake_lock);
          }
          return ret_status;
@@ -12802,7 +12803,7 @@ static int hdd_driver_init( void)
                          &wlan_wake_lock, WLAN_MODULE_NAME);
          if (ret_status < 0) {
             hdd_remove_pm_qos();
-            hdd_allow_suspend();
+            hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
             vos_wake_lock_destroy(&wlan_wake_lock);
          }
          return ret_status;
@@ -12855,7 +12856,7 @@ static int hdd_driver_init( void)
    }
 
    hdd_remove_pm_qos();
-   hdd_allow_suspend();
+   hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 
    if (ret_status) {
        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: WLAN Driver Initialization failed",
