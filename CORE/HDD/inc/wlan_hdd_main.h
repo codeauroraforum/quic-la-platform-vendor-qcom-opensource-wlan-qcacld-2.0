@@ -109,6 +109,7 @@
 #define WLAN_WAIT_TIME_SESSIONOPENCLOSE  15000
 #define WLAN_WAIT_TIME_ABORTSCAN  2000
 #define WLAN_WAIT_TIME_EXTSCAN  1000
+#define WLAN_WAIT_TIME_LL_STATS 5000
 
 
 /** Maximum time(ms) to wait for mc thread suspend **/
@@ -1229,6 +1230,21 @@ struct hdd_ext_scan_context {
 };
 #endif /* End of FEATURE_WLAN_EXTSCAN */
 
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+/**
+ * struct hdd_ll_stats_context - hdd link layer stats context
+ *
+ * @request_id: userspace-assigned link layer stats request id
+ * @request_bitmap: userspace-assigned link layer stats request bitmap
+ * @response_event: LL stats request wait event
+ */
+struct hdd_ll_stats_context {
+	uint32_t request_id;
+	uint32_t request_bitmap;
+	struct completion response_event;
+};
+#endif /* End of WLAN_FEATURE_LINK_LAYER_STATS */
+
 /** Adapter stucture definition */
 
 struct hdd_context_s
@@ -1517,6 +1533,10 @@ struct hdd_context_s
     struct hdd_ext_scan_context ext_scan_context;
 #endif /* FEATURE_WLAN_EXTSCAN */
 
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+    struct hdd_ll_stats_context ll_stats_context;
+#endif /* End of WLAN_FEATURE_LINK_LAYER_STATS */
+
 };
 
 /*---------------------------------------------------------------------------
@@ -1737,10 +1757,28 @@ static inline bool hdd_link_layer_stats_supported(void)
 {
 	return true;
 }
+
+/**
+ * hdd_init_ll_stats_ctx() - initialize link layer stats context
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: none
+ */
+static inline void hdd_init_ll_stats_ctx(hdd_context_t *hdd_ctx)
+{
+	init_completion(&hdd_ctx->ll_stats_context.response_event);
+	hdd_ctx->ll_stats_context.request_bitmap = 0;
+
+	return;
+}
 #else
 static inline bool hdd_link_layer_stats_supported(void)
 {
 	return false;
+}
+static inline void hdd_init_ll_stats_ctx(hdd_context_t *hdd_ctx)
+{
+	return;
 }
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
