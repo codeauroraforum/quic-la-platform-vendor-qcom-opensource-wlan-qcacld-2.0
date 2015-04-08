@@ -1191,13 +1191,6 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 
 	vos_mem_zero(&smeConfig, sizeof(smeConfig));
 	sme_GetConfigParam(hdd_ctx->hHal, &smeConfig);
-	if (sap_config->acs_hw_mode == QCA_ACS_MODE_IEEE80211G)
-		smeConfig.csrConfig.phyMode = eCSR_DOT11_MODE_11g;
-	else if (sap_config->acs_hw_mode == QCA_ACS_MODE_IEEE80211B)
-		smeConfig.csrConfig.phyMode = eCSR_DOT11_MODE_11b;
-	else if (sap_config->acs_hw_mode == QCA_ACS_MODE_IEEE80211A)
-		smeConfig.csrConfig.phyMode = eCSR_DOT11_MODE_11a;
-
 	if (sap_config->acs_ch_width == 40) {
 		switch (adapter->sap_dyn_ini_cfg.apOperatingBand) {
 		case eSAP_RF_SUBBAND_5_ALL_GHZ:
@@ -1210,7 +1203,7 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 			break;
 		}
 
-		smeConfig.csrConfig.phyMode = eCSR_DOT11_MODE_11n;
+		sap_config->acs_hw_mode = eCSR_DOT11_MODE_11n;
 
 #ifdef WLAN_FEATURE_11AC
 		/* Overwrite the hostapd setting for HW mode only for 11ac.
@@ -1224,23 +1217,22 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 						eHDD_DOT11_MODE_11ac) ||
 			(hdd_ctx->cfg_ini->dot11Mode ==
 						eHDD_DOT11_MODE_11ac_ONLY))) {
-			if (hdd_ctx->cfg_ini->dot11Mode ==
+
+			if ((sap_config->acs_hw_mode
+						== eCSR_DOT11_MODE_11g) &&
+				!hdd_ctx->cfg_ini->enableVhtFor24GHzBand)
+				sap_config->acs_hw_mode =
+						eCSR_DOT11_MODE_11n;
+			else if (hdd_ctx->cfg_ini->dot11Mode ==
 						eHDD_DOT11_MODE_11ac_ONLY)
-				smeConfig.csrConfig.phyMode =
+				sap_config->acs_hw_mode =
 						eCSR_DOT11_MODE_11ac_ONLY;
 			else
-				smeConfig.csrConfig.phyMode =
+				sap_config->acs_hw_mode =
 						eCSR_DOT11_MODE_11ac;
-
-			/* for 2.4G */
-			if ((sap_config->acs_hw_mode
-				 == QCA_ACS_MODE_IEEE80211G) &&
-				!hdd_ctx->cfg_ini->enableVhtFor24GHzBand)
-				smeConfig.csrConfig.phyMode =
-						eCSR_DOT11_MODE_11n;
 		}
 #endif
-		hddLog(LOG1, FL("phyMode is %d"), smeConfig.csrConfig.phyMode);
+		hddLog(LOG1, FL("phyMode is %d"), sap_config->acs_hw_mode);
 	}
 	sme_UpdateConfig(hdd_ctx->hHal, &smeConfig);
 
@@ -1337,7 +1329,6 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	sap_config = &adapter->sessionCtx.ap.sapConfig;
 	sap_config->channel = AUTO_CHANNEL_SELECT;
-	sap_config->acs_hw_mode = hw_mode;
 	/* ***Note*** Donot set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
 	 * ACS operation for first AP is going on. So only do_acs is split to
@@ -1345,6 +1336,13 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	 * pass paremeters from HDD to SAP is global. Thus All ACS related SME
 	 * config shall be set only from start_acs.
 	 */
+	if (hw_mode == QCA_ACS_MODE_IEEE80211G)
+		sap_config->acs_hw_mode = eCSR_DOT11_MODE_11g;
+	else if (hw_mode == QCA_ACS_MODE_IEEE80211B)
+		sap_config->acs_hw_mode = eCSR_DOT11_MODE_11b;
+	else if (hw_mode == QCA_ACS_MODE_IEEE80211A)
+		sap_config->acs_hw_mode = eCSR_DOT11_MODE_11a;
+
 	if (1 != hdd_ctx->is_dynamic_channel_range_set) {
 		if (hw_mode !=
 #ifdef WLAN_FEATURE_MBSSID
