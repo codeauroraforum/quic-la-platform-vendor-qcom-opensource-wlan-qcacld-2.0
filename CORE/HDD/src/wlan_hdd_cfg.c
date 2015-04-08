@@ -3947,6 +3947,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_DOT11P_MODE_MIN,
                 CFG_DOT11P_MODE_MAX),
 
+   REG_VARIABLE( CFG_ENABLE_RAMDUMP_COLLECTION, WLAN_PARAM_Integer,
+                 hdd_config_t, is_ramdump_enabled,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_ENABLE_RAMDUMP_COLLECTION_DEFAULT,
+                 CFG_ENABLE_RAMDUMP_COLLECTION_MIN,
+                 CFG_ENABLE_RAMDUMP_COLLECTION_MAX ),
+
    REG_VARIABLE(CFG_SAP_DOT11MC, WLAN_PARAM_Integer,
                 hdd_config_t, sap_dot11mc,
                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -4567,6 +4574,10 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
            "Name = [gExtWoWApp2TcpRxTimeout] Value = [%u]",
                    pHddCtx->cfg_ini->extWowApp2TcpRxTimeout);
 #endif
+
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+            "Name = [gEnableDumpCollect] Value = [%u]",
+                     pHddCtx->cfg_ini->is_ramdump_enabled);
 
 }
 
