@@ -1005,11 +1005,9 @@ static int wlan_hdd_config_acs(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
             hddLog(LOG1, FL("Operating Band: PriAP: %d SecAP: %d"),
                con_sap_config->apOperatingBand, sap_config->apOperatingBand);
 
-            if (con_sap_config->apOperatingBand == 5 &&
-                                              sap_config->apOperatingBand > 0) {
-                sap_config->skip_acs_scan_status = eSAP_SKIP_ACS_SCAN;
-
-            } else if (con_sap_config->apOperatingBand
+            if ((con_sap_config->apOperatingBand == 5 &&
+                   sap_config->apOperatingBand > 0) ||
+                   con_sap_config->apOperatingBand
                                                == sap_config->apOperatingBand) {
                 v_U8_t con_sap_st_ch, con_sap_end_ch;
                 v_U8_t cur_sap_st_ch, cur_sap_end_ch;
@@ -1340,7 +1338,13 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	sap_config = &adapter->sessionCtx.ap.sapConfig;
 	sap_config->channel = AUTO_CHANNEL_SELECT;
 	sap_config->acs_hw_mode = hw_mode;
-
+	/* ***Note*** Donot set SME config related to ACS operation here because
+	 * ACS operation is not synchronouse and ACS for Second AP may come when
+	 * ACS operation for first AP is going on. So only do_acs is split to
+	 * seperate start_acs routine. Also SME-PMAC struct that is used to
+	 * pass paremeters from HDD to SAP is global. Thus All ACS related SME
+	 * config shall be set only from start_acs.
+	 */
 	if (1 != hdd_ctx->is_dynamic_channel_range_set) {
 		if (hw_mode !=
 #ifdef WLAN_FEATURE_MBSSID
@@ -1401,6 +1405,13 @@ static int wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		sap_config->acs_ch_width = 20;
 
 	if (test_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags)) {
+	/* ***Note*** Completion variable usage is not allowed here since
+	 * ACS scan operation may take max 2.2 sec for5G band.
+	 * 9 Active channel X 40 ms active scan time +
+	 * 16 Passive channel X 110ms passive scan time
+	 * Since this CFG80211 call lock rtnl mutex, we cannot hold on
+	 * for this long. So we split up the scanning part.
+	 */
 		set_bit(ACS_PENDING, &adapter->event_flags);
 		hddLog(LOG1, FL("ACS Pending for wlan%d"),
 							adapter->dev->ifindex);
@@ -1508,7 +1519,21 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_adapter_t *adapter,
 	}
 
 	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
-
+	/* ***Note*** As already mentioned Completion variable usage is not
+	 * allowed here since ACS scan operation may take max 2.2 sec.
+	 * Further in AP-AP mode pending ACS is resumed here to serailize ACS
+	 * operation.
+	 * TODO: Delayed operation is used since SME-PMAC strut is global. Thus
+	 * when Primary AP ACS is complete and secondary AP ACS is started here
+	 * immediately, Primary AP start_bss may come inbetween ACS operation
+	 * and overwrite Sec AP ACS paramters. Thus Sec AP ACS is executed with
+	 * delay. This path and below constraint will be removed on sessionizing
+	 * SAP acs parameters and decoupling SAP from PMAC (WIP).
+	 * As per design constraint user space control application must take
+	 * care of serailizing hostapd start for each VIF in AP-AP mode to avoid
+	 * this code path. Sec AP hostapd should be started after Primary AP
+	 * start beaconing which can be confirmed by getchannel iwpriv command
+	 */
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, false);
 	if (con_sap_adapter &&
 		test_bit(ACS_PENDING, &con_sap_adapter->event_flags)) {
@@ -6037,7 +6062,11 @@ static int wlan_hdd_cfg80211_update_bss( struct wiphy *wiphy,
      *  restarted, we need to flush previous scan result so that it will reflect
      *  environment change
      */
-    if (pAdapter->device_mode == WLAN_HDD_SOFTAP)
+    if (pAdapter->device_mode == WLAN_HDD_SOFTAP
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+                        && pHddCtx->skip_acs_scan_status != eSAP_SKIP_ACS_SCAN
+#endif
+       )
         sme_ScanFlushResult(hHal, pAdapter->sessionId);
 
     return 0;
