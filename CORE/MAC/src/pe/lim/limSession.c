@@ -116,15 +116,10 @@ void pe_reset_protection_callback(void *ptr)
     }
 
     current_protection_state |=
-               pe_session_entry->gLimOlbcParams.protectionEnabled              |
-               pe_session_entry->gLimOverlap11gParams.protectionEnabled   << 1 |
-               pe_session_entry->gLimOverlap11aParams.protectionEnabled   << 2 |
-               pe_session_entry->gLimOverlapHt20Params.protectionEnabled  << 3 |
-               pe_session_entry->gLimOverlapNonGfParams.protectionEnabled << 4 |
-               pe_session_entry->gLim11aParams.protectionEnabled          << 5 |
-               pe_session_entry->gLimHt20Params.protectionEnabled         << 6 |
-               pe_session_entry->gLim11bParams.protectionEnabled          << 7 |
-               pe_session_entry->gLim11gParams.protectionEnabled          << 8 ;
+               pe_session_entry->gLimOverlap11gParams.protectionEnabled        |
+               pe_session_entry->gLimOverlap11aParams.protectionEnabled   << 1 |
+               pe_session_entry->gLimOverlapHt20Params.protectionEnabled  << 2 |
+               pe_session_entry->gLimOverlapNonGfParams.protectionEnabled << 3 ;
 
     VOS_TRACE(VOS_MODULE_ID_PE,
               VOS_TRACE_LEVEL_ERROR,
@@ -133,8 +128,6 @@ void pe_reset_protection_callback(void *ptr)
               pe_session_entry->old_protection_state,
               current_protection_state);
 
-    vos_mem_zero(&pe_session_entry->gLimOlbcParams,
-                 sizeof(pe_session_entry->gLimOlbcParams));
     vos_mem_zero(&pe_session_entry->gLimOverlap11gParams,
                  sizeof(pe_session_entry->gLimOverlap11gParams));
     vos_mem_zero(&pe_session_entry->gLimOverlap11aParams,
@@ -143,18 +136,9 @@ void pe_reset_protection_callback(void *ptr)
                  sizeof(pe_session_entry->gLimOverlapHt20Params));
     vos_mem_zero(&pe_session_entry->gLimOverlapNonGfParams,
                  sizeof(pe_session_entry->gLimOverlapNonGfParams));
-    vos_mem_zero(&pe_session_entry->gLim11aParams,
-                 sizeof(pe_session_entry->gLim11aParams));
-    vos_mem_zero(&pe_session_entry->gLimHt20Params,
-                 sizeof(pe_session_entry->gLimHt20Params));
-    vos_mem_zero(&pe_session_entry->gLim11bParams,
-                 sizeof(pe_session_entry->gLim11bParams));
-    vos_mem_zero(&pe_session_entry->gLim11gParams,
-                 sizeof(pe_session_entry->gLim11gParams));
 
     vos_mem_zero(&pe_session_entry->beaconParams,
                  sizeof(pe_session_entry->beaconParams));
-    pe_session_entry->htOperMode = eSIR_HT_OP_MODE_PURE;
 
     if ((current_protection_state != pe_session_entry->old_protection_state) &&
         (VOS_FALSE == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)) {
