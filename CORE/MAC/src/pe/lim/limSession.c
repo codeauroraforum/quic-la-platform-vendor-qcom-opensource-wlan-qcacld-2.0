@@ -105,8 +105,10 @@ void pe_reset_protection_callback(void *ptr)
 {
     tpPESession pe_session_entry = (tpPESession)ptr;
     tpAniSirGlobal mac_ctx = (tpAniSirGlobal)pe_session_entry->mac_ctx;
+    int8_t i = 0;
     tUpdateBeaconParams beacon_params;
     tANI_U16 current_protection_state = 0;
+    tpDphHashNode station_hash_node = NULL;
 
     if (pe_session_entry->valid == false) {
         VOS_TRACE(VOS_MODULE_ID_PE,
@@ -122,7 +124,7 @@ void pe_reset_protection_callback(void *ptr)
                pe_session_entry->gLimOverlapNonGfParams.protectionEnabled << 3 ;
 
     VOS_TRACE(VOS_MODULE_ID_PE,
-              VOS_TRACE_LEVEL_ERROR,
+              VOS_TRACE_LEVEL_INFO,
               FL("old protection state: 0x%04X, "
                  "new protection state: 0x%04X\n"),
               pe_session_entry->old_protection_state,
@@ -140,10 +142,21 @@ void pe_reset_protection_callback(void *ptr)
     vos_mem_zero(&pe_session_entry->beaconParams,
                  sizeof(pe_session_entry->beaconParams));
 
+    /* index 0, is self node, peers start from 1 */
+    for(i = 1 ; i < mac_ctx->lim.gLimAssocStaLimit ; i++)
+    {
+        station_hash_node = dphGetHashEntry(mac_ctx, i,
+                              &pe_session_entry->dph.dphHashTable);
+        if (NULL == station_hash_node)
+            continue;
+        limDecideApProtection(mac_ctx, station_hash_node->staAddr,
+                              &beacon_params, pe_session_entry);
+    }
+
     if ((current_protection_state != pe_session_entry->old_protection_state) &&
         (VOS_FALSE == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)) {
         VOS_TRACE(VOS_MODULE_ID_PE,
-                  VOS_TRACE_LEVEL_ERROR,
+                  VOS_TRACE_LEVEL_INFO,
                   FL("protection changed, update beacon template\n"));
         /* update beacon fix params and send update to FW */
         vos_mem_zero(&beacon_params, sizeof(tUpdateBeaconParams));
