@@ -3959,7 +3959,8 @@ WLANSAP_ACS_CHSelect(v_PVOID_t pvosGCtx,
     sapContext->sessionId = 0xff;
 
     pMac = PMAC_STRUCT( hHal );
-    sapContext->csrRoamProfile.phyMode = pMac->roam.configParam.phyMode;
+
+    sapContext->csrRoamProfile.phyMode = pConfig->acs_hw_mode;
 
     if ((pConfig->channel == AUTO_CHANNEL_SELECT) &&
         (sapContext->isScanSessionOpen == eSAP_FALSE)) {
