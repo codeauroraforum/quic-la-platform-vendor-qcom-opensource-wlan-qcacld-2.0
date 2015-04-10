@@ -17135,6 +17135,10 @@ static const u8 *wma_wow_wake_reason_str(A_INT32 wake_reason)
 	case  WOW_REASON_ROAM_HO:
 		return "WOW_REASON_ROAM_HO";
 #endif
+#ifdef FEATURE_WLAN_EXTSCAN
+	case WOW_REASON_EXTSCAN:
+		return "WOW_REASON_EXTSCAN";
+#endif
 	}
 	return "unknown";
 }
@@ -17372,6 +17376,13 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 		}
 		break;
 	    }
+#ifdef FEATURE_WLAN_EXTSCAN
+	case WOW_REASON_EXTSCAN:
+		{
+			WMA_LOGD("Host woken up because of extscan reason");
+		}
+		break;
+#endif
 	default:
 		break;
 	}
@@ -18182,7 +18193,8 @@ end:
  * wakeup trigger events.
  */
 static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
-					    v_BOOL_t pno_in_progress)
+					    v_BOOL_t pno_in_progress,
+						bool extscan_in_progress)
 {
 	struct wma_txrx_node *iface;
 	VOS_STATUS ret = VOS_STATUS_SUCCESS;
@@ -18422,6 +18434,17 @@ static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
 		WMA_LOGD("IBSS Beacon based wakeup is %s in fw",
 			ibss_vdev_available ? "enabled" : "disabled");
 	}
+#endif
+
+#ifdef FEATURE_WLAN_EXTSCAN
+	ret = wma_add_wow_wakeup_event(wma, WOW_EXTSCAN_EVENT,
+					extscan_in_progress);
+
+	if (ret != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to Configure WOW_EXTSCAN_EVENT to FW");
+		goto end;
+	} else
+		WMA_LOGD("Successfully Configured WOW_EXTSCAN_EVENT to FW");
 #endif
 
 	/* WOW is enabled in pcie suspend callback */
@@ -18684,7 +18707,8 @@ enable_wow:
 	}
 #endif
 
-	ret = wma_feed_wow_config_to_fw(wma, pno_in_progress);
+	ret = wma_feed_wow_config_to_fw(wma, pno_in_progress,
+					extscan_in_progress);
 	if (ret != VOS_STATUS_SUCCESS) {
 		vos_mem_free(info);
 		wma_send_status_to_suspend_ind(wma, FALSE);
