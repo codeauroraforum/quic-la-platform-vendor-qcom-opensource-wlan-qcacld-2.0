@@ -39,6 +39,7 @@
 #include <asm/types.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/prctl.h>
 #include <sys/capability.h>
 #include <linux/prctl.h>
 #include <pwd.h>
