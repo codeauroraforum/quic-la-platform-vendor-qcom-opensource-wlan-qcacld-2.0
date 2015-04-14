@@ -1185,6 +1185,7 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 	hddLog(LOG1, FL("ACS CFG: HW_MODE: %d ACS_BW: %d"),
 			sap_config->acs_hw_mode, sap_config->acs_ch_width);
 
+
 	vos_mem_zero(&smeConfig, sizeof(smeConfig));
 	sme_GetConfigParam(hdd_ctx->hHal, &smeConfig);
 	if (sap_config->acs_hw_mode == QCA_ACS_MODE_IEEE80211G)
@@ -1196,10 +1197,13 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 
 	if (sap_config->acs_ch_width == 40) {
 		switch (adapter->sap_dyn_ini_cfg.apOperatingBand) {
-		case eSAP_RF_SUBBAND_5_ALL_GHZ:
+		case eSAP_RF_SUBBAND_2_4_GHZ:
 			smeConfig.csrConfig.channelBondingMode24GHz = 1;
 			break;
-		case eSAP_RF_SUBBAND_2_4_GHZ:
+		case eSAP_RF_SUBBAND_5_LOW_GHZ:
+		case eSAP_RF_SUBBAND_5_MID_GHZ:
+		case eSAP_RF_SUBBAND_5_HIGH_GHZ:
+		case eSAP_RF_SUBBAND_5_ALL_GHZ:
 			smeConfig.csrConfig.channelBondingMode5GHz = 1;
 			break;
 		default:
