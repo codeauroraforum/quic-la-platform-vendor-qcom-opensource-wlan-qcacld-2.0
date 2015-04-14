@@ -3323,7 +3323,8 @@ int iw_softap_get_channel_list(struct net_device *dev,
 
     for( i = bandStartChannel; i <= bandEndChannel; i++ )
     {
-        if( NV_CHANNEL_ENABLE == regChannels[i].enabled )
+        if ((NV_CHANNEL_ENABLE == regChannels[i].enabled) ||
+            (NV_CHANNEL_DFS == regChannels[i].enabled))
         {
             channel_list->channels[num_channels] = rfChannels[i].channelNum;
             num_channels++;
