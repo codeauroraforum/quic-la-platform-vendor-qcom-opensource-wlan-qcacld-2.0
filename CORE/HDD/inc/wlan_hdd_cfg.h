@@ -2871,6 +2871,15 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_MAX     ( 1 )
 #define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_DEFAULT ( 0 )
 
+/*
+ * If last disconnection was due to HB failure and we reconnect
+ * to same AP next time, send Deauth before starting connection
+ */
+#define CFG_ENABLE_DEAUTH_BEFORE_CONNECTION                  "gSendDeauthBeforeCon"
+#define CFG_ENABLE_DEAUTH_BEFORE_CONNECTION_MIN              (0)
+#define CFG_ENABLE_DEAUTH_BEFORE_CONNECTION_MAX              (1)
+#define CFG_ENABLE_DEAUTH_BEFORE_CONNECTION_DEFAULT          (0)
+
 #define CFG_ENABLE_MAC_ADDR_SPOOFING               "gEnableMacAddrSpoof"
 #define CFG_ENABLE_MAC_ADDR_SPOOFING_MIN           (0)
 #define CFG_ENABLE_MAC_ADDR_SPOOFING_MAX           (1)
@@ -3618,6 +3627,7 @@ typedef struct
    uint32_t                    extscan_active_min_chn_time;
 #endif
    uint8_t                     inform_bss_rssi_raw;
+   v_BOOL_t                    sendDeauthBeforeCon;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

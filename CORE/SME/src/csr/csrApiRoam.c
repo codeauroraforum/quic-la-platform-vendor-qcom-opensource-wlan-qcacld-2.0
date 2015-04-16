@@ -1913,6 +1913,8 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
                                pParam->isRoamOffloadEnabled;
 #endif
         pMac->roam.configParam.obssEnabled = pParam->obssEnabled;
+        pMac->roam.configParam.sendDeauthBeforeCon =
+                               pParam->sendDeauthBeforeCon;
     }
 
     return status;
@@ -2067,6 +2069,8 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 
         pParam->obssEnabled = pMac->roam.configParam.obssEnabled;
 
+        pParam->sendDeauthBeforeCon =
+                     pMac->roam.configParam.sendDeauthBeforeCon;
         status = eHAL_STATUS_SUCCESS;
     }
     return (status);
