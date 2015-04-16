@@ -119,6 +119,8 @@ int wlan_hdd_ftm_start(hdd_context_t *pAdapter);
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
 #endif
+#include "wlan_hdd_memdump.h"
+
 extern int hdd_hostapd_stop (struct net_device *dev);
 void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #endif /* FEATURE_WLAN_CH_AVOID */
@@ -11360,6 +11362,7 @@ static int hdd_driver_init( void)
        break;
    } else {
        pr_info("%s: driver loaded\n", WLAN_MODULE_NAME);
+       memdump_init();
        return 0;
    }
 
@@ -11380,7 +11383,7 @@ static int hdd_driver_init( void)
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
       wlan_logging_sock_deinit_svc();
 #endif
-
+      memdump_deinit();
       pr_err("%s: driver load failure\n", WLAN_MODULE_NAME);
    }
    else
@@ -11484,6 +11487,7 @@ static void hdd_driver_exit(void)
    }
 
    vos_wait_for_work_thread_completion(__func__);
+   memdump_deinit();
 
    hif_unregister_driver();
 
