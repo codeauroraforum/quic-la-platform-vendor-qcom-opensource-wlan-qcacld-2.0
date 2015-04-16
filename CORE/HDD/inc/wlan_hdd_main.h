@@ -1111,8 +1111,11 @@ struct hdd_adapter_s
    /* variable for temperature in Celsius */
    int temperature;
 
-    /* 802.11p */
-    struct completion hdd_ocb_set_sched_req_var;
+	/* State for synchronous OCB requests to WMI */
+	struct sir_ocb_set_config_response ocb_set_config_resp;
+	struct sir_ocb_get_tsf_timer_response ocb_get_tsf_timer_resp;
+	struct sir_dcc_get_stats_response *dcc_get_stats_resp;
+	struct sir_dcc_update_ndl_response dcc_update_ndl_resp;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
