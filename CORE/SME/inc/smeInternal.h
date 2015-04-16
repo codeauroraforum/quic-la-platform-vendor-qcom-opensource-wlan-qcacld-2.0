@@ -130,6 +130,8 @@ typedef struct sSelfRecoveryStats {
     tANI_U8 cmdStatsIndx;
 } tSelfRecoveryStats;
 
+typedef void (*ocb_callback)(void *context, void *response);
+
 typedef struct tagSmeStruct
 {
     eSmeState state;
@@ -182,6 +184,18 @@ typedef struct tagSmeStruct
     /* get temperature event context and callback */
     void *pTemperatureCbContext;
     void (*pGetTemperatureCb)(int temperature, void *context);
+
+    /* OCB callbacks */
+    void *ocb_set_config_context;
+    ocb_callback ocb_set_config_callback;
+    void *ocb_get_tsf_timer_context;
+    ocb_callback ocb_get_tsf_timer_callback;
+    void *dcc_get_stats_context;
+    ocb_callback dcc_get_stats_callback;
+    void *dcc_update_ndl_context;
+    ocb_callback dcc_update_ndl_callback;
+    void *dcc_stats_event_context;
+    ocb_callback dcc_stats_event_callback;
 } tSmeStruct, *tpSmeStruct;
 
 

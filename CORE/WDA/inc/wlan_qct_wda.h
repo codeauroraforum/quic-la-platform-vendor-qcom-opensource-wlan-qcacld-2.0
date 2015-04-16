@@ -395,7 +395,7 @@ typedef struct
    /* Event to wait for WDA stop on FTM mode */
    vos_event_t          ftmStopDoneEvent;
 
-} tWDA_CbContext ; 
+} tWDA_CbContext ;
 
 typedef struct
 {
@@ -987,7 +987,14 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_GET_FW_STATUS_REQ                 SIR_HAL_GET_FW_STATUS_REQ
 
 
-#define WDA_OCB_SET_SCHED_REQUEST             SIR_HAL_OCB_SET_SCHED_REQUEST
+#define WDA_OCB_SET_CONFIG_CMD                SIR_HAL_OCB_SET_CONFIG_CMD
+#define WDA_OCB_SET_UTC_TIME_CMD              SIR_HAL_OCB_SET_UTC_TIME_CMD
+#define WDA_OCB_START_TIMING_ADVERT_CMD       SIR_HAL_OCB_START_TIMING_ADVERT_CMD
+#define WDA_OCB_STOP_TIMING_ADVERT_CMD        SIR_HAL_OCB_STOP_TIMING_ADVERT_CMD
+#define WDA_OCB_GET_TSF_TIMER_CMD             SIR_HAL_OCB_GET_TSF_TIMER_CMD
+#define WDA_DCC_GET_STATS_CMD                 SIR_HAL_DCC_GET_STATS_CMD
+#define WDA_DCC_CLEAR_STATS_CMD               SIR_HAL_DCC_CLEAR_STATS_CMD
+#define WDA_DCC_UPDATE_NDL_CMD                SIR_HAL_DCC_UPDATE_NDL_CMD
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
