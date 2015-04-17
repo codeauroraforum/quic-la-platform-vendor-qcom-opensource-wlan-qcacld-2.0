@@ -460,7 +460,6 @@ static tChannelPwrLimit csrFindChannelPwr(tChannelListWithPower * pdefaultPowerT
     return 0;
 }
 
-#define NUM_DOT11P_CHANNELS 9
 eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
 {
     tSirUpdateChanList *pChanList;
@@ -470,13 +469,6 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
     vos_msg_t msg;
     tANI_U8 i, j, social_channel[MAX_SOCIAL_CHANNELS] = {1,6,11};
 
-    /* Temporarily add list of 802.11P channels statically */
-    /* TODO-OCB: Remove after channels are added to reg domain */
-    tANI_U8 dot11p_channels[NUM_DOT11P_CHANNELS] = {
-        172, 174, 176, 178, 180, 182, 184, 175, 181,
-    };
-    tANI_U8 dot11p_power = 23;
-
     if (CSR_IS_5G_BAND_ONLY(pMac))
     {
         for (i = 0; i < MAX_SOCIAL_CHANNELS; i++)
@@ -485,10 +477,6 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
                          == NV_CHANNEL_ENABLE)
                 numChan++;
         }
-    }
-
-    if (pMac->enable_dot11p) {
-        numChan += NUM_DOT11P_CHANNELS;
     }
 
     bufLen = sizeof(tSirUpdateChanList) +
@@ -536,20 +524,6 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
                 pChanList->chanParam[i].dfsSet = VOS_FALSE;
                 i++;
             }
-        }
-    }
-
-    if (pMac->enable_dot11p) {
-        /* Add 5.9 GHz channels */
-        for (j = 0; j < NUM_DOT11P_CHANNELS; j++) {
-            pChanList->chanParam[i].chanId = dot11p_channels[j];
-            pChanList->chanParam[i].pwr = dot11p_power;
-            pChanList->chanParam[i].dfsSet = VOS_FALSE;
-            if ((pChanList->chanParam[i].chanId != 175)
-                    && (pChanList->chanParam[i].chanId != 181)) {
-                pChanList->chanParam[i].half_rate = VOS_TRUE;
-            }
-            i++;
         }
     }
 
