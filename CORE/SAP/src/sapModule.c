@@ -1295,7 +1295,7 @@ WLANSAP_ModifyACL
                     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO, "Delete from white list");
                     sapRemoveMacFromACL(pSapCtx->acceptMacList, &pSapCtx->nAcceptMac, staWLIndex);
                     /* If a client is deleted from white list and the client is connected, send deauth*/
-                    WLANSAP_DeauthSta(pSapCtx, pPeerStaMac);
+                    WLANSAP_DeauthSta(pCtx, pPeerStaMac);
                     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_LOW, "size of accept and deny lists %d %d",
                             pSapCtx->nAcceptMac, pSapCtx->nDenyMac);
                 }
@@ -1344,7 +1344,7 @@ WLANSAP_ModifyACL
                         sapRemoveMacFromACL(pSapCtx->acceptMacList, &pSapCtx->nAcceptMac, staWLIndex);
                     }
                     /* If we are adding a client to the black list; if its connected, send deauth */
-                    WLANSAP_DeauthSta(pSapCtx, pPeerStaMac);
+                    WLANSAP_DeauthSta(pCtx, pPeerStaMac);
                     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
                             "... Now add to black list");
                     sapAddMacToACL(pSapCtx->denyMacList, &pSapCtx->nDenyMac, pPeerStaMac);
