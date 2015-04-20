@@ -1301,7 +1301,7 @@ WLANSAP_ModifyACL
                                                   eCsrForcedDeauthSta,
                                                   (SIR_MAC_MGMT_DEAUTH >> 4),
                                                    &delStaParams);
-                    WLANSAP_DeauthSta(pSapCtx, &delStaParams);
+                    WLANSAP_DeauthSta(pCtx, &delStaParams);
                     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_LOW, "size of accept and deny lists %d %d",
                             pSapCtx->nAcceptMac, pSapCtx->nDenyMac);
                 }
@@ -1355,7 +1355,7 @@ WLANSAP_ModifyACL
                                                  eCsrForcedDeauthSta,
                                                  (SIR_MAC_MGMT_DEAUTH >> 4),
                                                  &delStaParams);
-                    WLANSAP_DeauthSta(pSapCtx, &delStaParams);
+                    WLANSAP_DeauthSta(pCtx, &delStaParams);
                     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
                             "... Now add to black list");
                     sapAddMacToACL(pSapCtx->denyMacList, &pSapCtx->nDenyMac, pPeerStaMac);
