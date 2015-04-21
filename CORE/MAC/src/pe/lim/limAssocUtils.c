@@ -2973,7 +2973,7 @@ limAddStaSelf(tpAniSirGlobal pMac,tANI_U16 staIdx, tANI_U8 updateSta, tpPESessio
          * TQ STA will do Greenfield only with TQ AP, for
          * everybody else it will be turned off.
         */
-        if( (psessionEntry->pLimJoinReq != NULL) && (!psessionEntry->pLimJoinReq->bssDescription.aniIndicator))
+        if( (psessionEntry->pLimJoinReq != NULL))
         {
             limLog( pMac, LOGE, FL(" Turning off Greenfield, when adding self entry"));
             pAddStaParams->greenFieldCapable = WNI_CFG_GREENFIELD_CAPABILITY_DISABLE;
@@ -3876,7 +3876,7 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
             pAddBssParams->staContext.greenFieldCapable,
             pAddBssParams->staContext.lsigTxopProtection);
 #ifdef WLAN_FEATURE_11AC
-            if (psessionEntry->vhtCapability && pBeaconStruct->VHTCaps.present)
+            if (psessionEntry->vhtCapability && IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps))
             {
                 pAddBssParams->staContext.vhtCapable = 1;
                 pAddBssParams->staContext.vhtSupportedRxNss = pStaDs->vhtSupportedRxNss;
@@ -4296,7 +4296,7 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
     limLog(pMac, LOG2, FL("currentOperChannel %d"),
     pAddBssParams->currentOperChannel);
 #ifdef WLAN_FEATURE_11AC
-    if (psessionEntry->vhtCapability && ( pBeaconStruct->VHTCaps.present ))
+    if (psessionEntry->vhtCapability && IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps))
     {
         pAddBssParams->vhtCapable = pBeaconStruct->VHTCaps.present;
         pAddBssParams->vhtTxChannelWidthSet = pBeaconStruct->VHTOperation.chanWidth;
@@ -4355,7 +4355,7 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
             pAddBssParams->staContext.greenFieldCapable,
             pAddBssParams->staContext.lsigTxopProtection);
 #ifdef WLAN_FEATURE_11AC
-            if (psessionEntry->vhtCapability && pBeaconStruct->VHTCaps.present)
+            if (psessionEntry->vhtCapability && IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps))
             {
                 pAddBssParams->staContext.vhtCapable = 1;
                 if ((pBeaconStruct->VHTCaps.suBeamFormerCap ||

@@ -109,8 +109,7 @@ limExtractApCapability(tpAniSirGlobal pMac, tANI_U8 *pIE, tANI_U16 ieLen,
             LIM_BSS_CAPS_SET(WME, *qosCap);
         if (LIM_BSS_CAPS_GET(WME, *qosCap) && pBeaconStruct->wsmCapablePresent)
             LIM_BSS_CAPS_SET(WSM, *qosCap);
-        if (pBeaconStruct->propIEinfo.aniIndicator &&
-            pBeaconStruct->propIEinfo.capabilityPresent)
+        if (pBeaconStruct->propIEinfo.capabilityPresent)
             *propCap = pBeaconStruct->propIEinfo.capability;
         if (pBeaconStruct->HTCaps.present)
             pMac->lim.htCapabilityPresentInBeacon = 1;
@@ -119,11 +118,13 @@ limExtractApCapability(tpAniSirGlobal pMac, tANI_U8 *pIE, tANI_U16 ieLen,
 
 #ifdef WLAN_FEATURE_11AC
         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO_MED,
-            "***beacon.VHTCaps.present*****=%d",pBeaconStruct->VHTCaps.present);
+            "***beacon.VHTCaps.present*****=%d BSS_VHT_CAPABLE:%d",
+            pBeaconStruct->VHTCaps.present,
+            IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps));
         VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO_MED,
            "***beacon.SU Beamformer Capable*****=%d",pBeaconStruct->VHTCaps.suBeamFormerCap);
 
-        if ( pBeaconStruct->VHTCaps.present && pBeaconStruct->VHTOperation.present)
+        if (IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps) && pBeaconStruct->VHTOperation.present)
         {
             psessionEntry->vhtCapabilityPresentInBeacon = 1;
             psessionEntry->apCenterChan = pBeaconStruct->VHTOperation.chanCenterFreqSeg1;
