@@ -2334,7 +2334,7 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
          * everybody else it will be turned off.
          */
 
-        if( (psessionEntry->pLimJoinReq != NULL) && (!psessionEntry->pLimJoinReq->bssDescription.aniIndicator))
+        if(psessionEntry->pLimJoinReq != NULL)
         {
                 limLog( pMac, LOG1, FL("Sending Assoc Req to Non-TQ AP,"
                                         " Turning off Greenfield"));
