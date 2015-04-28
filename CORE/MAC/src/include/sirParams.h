@@ -676,6 +676,11 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_ROAM_INVOKE                (SIR_HAL_ITC_MSG_TYPES_BEGIN + 297)
 #endif
 
+#ifdef FEATURE_RUNTIME_PM
+#define SIR_HAL_RUNTIME_PM_SUSPEND_IND     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 308)
+#define SIR_HAL_RUNTIME_PM_RESUME_IND      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 309)
+#endif
+
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types

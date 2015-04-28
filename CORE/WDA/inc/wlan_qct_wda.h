@@ -993,6 +993,11 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 #define WDA_SET_SCAN_MAC_OUI_REQ              SIR_HAL_SET_SCAN_MAC_OUI_REQ
 
+#ifdef FEATURE_RUNTIME_PM
+#define WDA_RUNTIME_PM_SUSPEND_IND            SIR_HAL_RUNTIME_PM_SUSPEND_IND
+#define WDA_RUNTIME_PM_RESUME_IND             SIR_HAL_RUNTIME_PM_RESUME_IND
+#endif
+
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
