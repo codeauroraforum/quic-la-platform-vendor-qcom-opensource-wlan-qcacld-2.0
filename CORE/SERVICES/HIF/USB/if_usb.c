@@ -308,7 +308,7 @@ static int hif_usb_suspend(struct usb_interface *interface, pm_message_t state)
 	sc->local_state = state;
 	/* No need to send WMI_PDEV_SUSPEND_CMDID to FW if WOW is enabled */
 	if (wma_is_wow_mode_selected(temp_module)) {
-		if (wma_enable_wow_in_fw(temp_module)) {
+		if (wma_enable_wow_in_fw(temp_module, 0)) {
 			pr_warn("%s[%d]: fail\n", __func__, __LINE__);
 			return -1;
 		}
@@ -358,9 +358,10 @@ static int hif_usb_resume(struct usb_interface *interface)
 #endif
 	/* No need to send WMI_PDEV_RESUME_CMDID to FW if WOW is enabled */
 	if (!wma_is_wow_mode_selected(temp_module)) {
-		wma_resume_target(temp_module);
-	} else if (wma_disable_wow_in_fw(temp_module)) {
-	    return (-1);
+		wma_resume_target(temp_module, 0);
+	} else if (wma_disable_wow_in_fw(temp_module, 0)) {
+		pr_warn("%s[%d]: fail\n", __func__, __LINE__);
+		return (-1);
 	}
 
 	return 0;

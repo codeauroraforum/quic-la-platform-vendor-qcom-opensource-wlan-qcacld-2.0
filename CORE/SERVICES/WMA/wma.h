@@ -592,6 +592,7 @@ typedef struct {
 	vos_event_t target_suspend;
 	vos_event_t wow_tx_complete;
 	vos_event_t recovery_event;
+	vos_event_t runtime_suspend;
 
 	t_cfg_nv_param cfg_nv;
 
@@ -700,6 +701,10 @@ typedef struct {
 	 */
 	u_int8_t ol_ini_info;
 	v_BOOL_t ssdp;
+#ifdef FEATURE_RUNTIME_PM
+	v_BOOL_t runtime_pm;
+	u_int32_t auto_time;
+#endif
         u_int8_t ibss_started;
         tSetBssKeyParams ibsskey_info;
 
