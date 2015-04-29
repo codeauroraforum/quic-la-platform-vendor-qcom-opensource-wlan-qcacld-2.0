@@ -13389,7 +13389,6 @@ eHalStatus sme_ModifyAddIE(tHalHandle hHal,
     return (status);
 }
 
-
 /*----------------------------------------------------------------------------
  \fn  sme_UpdateAddIE
  \brief  This function sends msg to updates the additional IE buffers in PE

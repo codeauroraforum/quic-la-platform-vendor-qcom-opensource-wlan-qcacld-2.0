@@ -18465,8 +18465,8 @@ resume_all:
 resume_tx:
 
     hdd_resume_wlan();
-    return -ETIME;
 
+    return -ETIME;
 }
 
 int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
