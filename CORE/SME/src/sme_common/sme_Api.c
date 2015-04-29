@@ -14628,7 +14628,7 @@ eHalStatus sme_fw_mem_dump(tHalHandle hHal, void *recvd_req)
  * @session_id: session ID
  * @stats_avg_factor: average stats factor
  *
- * This function configures the guard time in firmware
+ * This function configures the avg stats factor in firmware
  *
  * Return: eHalStatus
  */
@@ -14697,11 +14697,11 @@ eHalStatus sme_configure_guard_time(tHalHandle hHal, tANI_U8 session_id,
 	tpAniSirGlobal pMac  = PMAC_STRUCT(hHal);
 	struct sir_guard_time_request *g_time;
 
-	g_time = vos_mem_malloc(sizeof(g_time));
+	g_time = vos_mem_malloc(sizeof(*g_time));
 
 	if (!g_time) {
 		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-			  "%s: Not able to allocate memory for WDA_SET_MDNS_RESPONSE_CMD",
+			  "%s: Not able to allocate memory for SIR_HAL_CONFIG_GUARD_TIME",
 			  __func__);
 		return eHAL_STATUS_E_MALLOC_FAILED;
 	}
