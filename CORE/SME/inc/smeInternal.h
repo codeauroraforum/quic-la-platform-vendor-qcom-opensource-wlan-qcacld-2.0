@@ -181,9 +181,6 @@ typedef struct tagSmeStruct
     /* get temperature event context and callback */
     void *pTemperatureCbContext;
     void (*pGetTemperatureCb)(int temperature, void *context);
-#ifdef FEATURE_BUS_AUTO_SUSPEND
-    bool enable_bus_auto_suspend;
-#endif
     uint8_t miracast_value;
     void (*set_thermal_level_cb)(void *hdd_context, uint8_t level);
 } tSmeStruct, *tpSmeStruct;

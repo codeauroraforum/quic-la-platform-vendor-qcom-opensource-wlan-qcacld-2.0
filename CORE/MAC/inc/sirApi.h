@@ -3492,9 +3492,6 @@ typedef struct sSirWlanSuspendParam
     tANI_U8 configuredMcstBcstFilterSetting;
     tANI_U8 sessionId;
     tANI_U8 connectedState;
-#ifdef FEATURE_BUS_AUTO_SUSPEND
-    void (*resumed_callback)(void *);
-#endif
 }tSirWlanSuspendParam,*tpSirWlanSuspendParam;
 
 typedef struct sSirWlanResumeParam
