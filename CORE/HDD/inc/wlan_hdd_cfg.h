@@ -2847,6 +2847,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ROAM_SCAN_HI_RSSI_UB_DEFAULT           (-30)
 
 
+#define CFG_MULTICAST_HOST_FW_MSGS          "gMulticastHostFwMsgs"
+#define CFG_MULTICAST_HOST_FW_MSGS_MIN      (0)
+#define CFG_MULTICAST_HOST_FW_MSGS_MAX      (1)
+#define CFG_MULTICAST_HOST_FW_MSGS_DEFAULT  (1)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3452,6 +3457,7 @@ typedef struct
    v_BOOL_t                    gEnableDeauthToDisassocMap;
    bool                        enable_mac_spoofing;
    uint8_t                     sap_dot11mc;
+   uint8_t                     multicast_host_fw_msgs;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

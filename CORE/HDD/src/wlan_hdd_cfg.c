@@ -3997,6 +3997,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_SAP_DOT11MC_DEFAULT,
                 CFG_SAP_DOT11MC_MIN,
                 CFG_SAP_DOT11MC_MAX ),
+
+   REG_VARIABLE(CFG_MULTICAST_HOST_FW_MSGS, WLAN_PARAM_Integer,
+                hdd_config_t, multicast_host_fw_msgs,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_MULTICAST_HOST_FW_MSGS_DEFAULT,
+                CFG_MULTICAST_HOST_FW_MSGS_MIN,
+                CFG_MULTICAST_HOST_FW_MSGS_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -6397,6 +6404,8 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig->csrConfig.isRoamOffloadEnabled =
                         pHddCtx->cfg_ini->isRoamOffloadEnabled;
 #endif
+
+   vos_set_multicast_logging(pHddCtx->cfg_ini->multicast_host_fw_msgs);
 
    halStatus = sme_UpdateConfig( pHddCtx->hHal, smeConfig);
    if ( !HAL_STATUS_SUCCESS( halStatus ) )
