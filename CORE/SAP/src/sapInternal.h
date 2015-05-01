@@ -1091,6 +1091,22 @@ SIDE EFFECTS
 ---------------------------------------------------------------------------*/
 v_BOOL_t sapDfsIsChannelInPreferredLocation(tHalHandle hHal, v_U8_t channelID);
 
+/**
+ * sap_check_in_avoid_ch_list() - checks if given channel present is channel
+ * avoidance list
+ * avoid_channels_info struct
+ * @sap_ctx:        sap context.
+ * @channel:        channel to be checked in sap_ctx's avoid ch list
+ *
+ * sap_ctx contains sap_avoid_ch_info strcut containing the list of channels on
+ * which MDM device's AP with MCC was detected. This function checks if given
+ * channel is present in that list.
+ *
+ * Return: true, if channel was present, false othersie.
+ */
+bool
+sap_check_in_avoid_ch_list(ptSapContext sap_ctx, uint8_t channel);
+
 #ifdef __cplusplus
 }
 #endif
