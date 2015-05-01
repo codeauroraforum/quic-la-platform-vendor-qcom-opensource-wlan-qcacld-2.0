@@ -2778,8 +2778,16 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
                     {
                         /* all bands are scanned, compare current best channel
                            with channel scanned previously */
-                        if ( pSpectInfoParams->pSpectCh[count].weight_copy >
+                        if (( pSpectInfoParams->pSpectCh[count].weight_copy >
                               pSapCtx->acsBestChannelInfo.weight)
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+                             /* Weight of the channels(MDM device's AP is
+                              operating) increased to MAX+1 so that they will
+                              be choosen only when there is no other bestchannel
+                              to choose*/
+                              && !sap_check_in_avoid_ch_list(pSapCtx, bestChNum)
+#endif
+                        )
                         {
                             /* previous stored channel is better */
                             bestChNum = pSapCtx->acsBestChannelInfo.channelNum;
