@@ -73,7 +73,6 @@
 
 #include "sapInternal.h"
 #include "smeInside.h"
-#include "_ieee80211_common.h"
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -3318,8 +3317,8 @@ VOS_STATUS
 WLANSAP_set_Dfs_Restrict_JapanW53(tHalHandle hHal, v_U8_t disable_Dfs_W53)
 {
     tpAniSirGlobal pMac = NULL;
+    v_REGDOMAIN_t regDomain;
     VOS_STATUS status;
-    uint8_t dfs_region;
 
     if (NULL != hHal)
     {
@@ -3332,13 +3331,13 @@ WLANSAP_set_Dfs_Restrict_JapanW53(tHalHandle hHal, v_U8_t disable_Dfs_W53)
         return VOS_STATUS_E_FAULT;
     }
 
-    vos_nv_get_dfs_region(&dfs_region);
+    regDomain = sapFetchRegulatoryDomain(hHal);
 
     /*
      * Set the JAPAN W53 restriction only if the current
      * regulatory domain is JAPAN.
      */
-    if (DFS_MKK4_DOMAIN == dfs_region)
+    if (REGDOMAIN_JAPAN == regDomain)
     {
         pMac->sap.SapDfsInfo.is_dfs_w53_disabled = disable_Dfs_W53;
         VOS_TRACE(VOS_MODULE_ID_SAP,
@@ -3390,9 +3389,8 @@ WLANSAP_set_Dfs_Preferred_Channel_location(tHalHandle hHal,
                                    v_U8_t dfs_Preferred_Channels_location)
 {
     tpAniSirGlobal pMac = NULL;
+    v_REGDOMAIN_t regDomain;
     VOS_STATUS status;
-    uint8_t dfs_region;
-
     if (NULL != hHal)
     {
         pMac = PMAC_STRUCT( hHal );
@@ -3404,14 +3402,14 @@ WLANSAP_set_Dfs_Preferred_Channel_location(tHalHandle hHal,
         return VOS_STATUS_E_FAULT;
     }
 
-    vos_nv_get_dfs_region(&dfs_region);
+    regDomain = sapFetchRegulatoryDomain(hHal);
 
     /*
      * The Indoor/Outdoor only random channel selection
      * restriction is currently enforeced only for
      * JAPAN regulatory domain.
      */
-    if (DFS_MKK4_DOMAIN == dfs_region)
+    if (REGDOMAIN_JAPAN == regDomain)
     {
         pMac->sap.SapDfsInfo.sap_operating_chan_preferred_location =
                                                dfs_Preferred_Channels_location;
