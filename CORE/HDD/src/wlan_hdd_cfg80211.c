@@ -11711,7 +11711,8 @@ void hdd_select_cbmode( hdd_adapter_t *pAdapter,v_U8_t operationChannel)
  * This function is used to start the association process
  */
 int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
-        const u8 *ssid, size_t ssid_len, const u8 *bssid, u8 operatingChannel)
+        const u8 *ssid, size_t ssid_len, const u8 *bssid,
+        const u8 *bssid_hint, u8 operatingChannel)
 {
     int status = 0;
     hdd_wext_state_t *pWextState;
@@ -11777,6 +11778,21 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
              */
             vos_mem_copy((void *)(pWextState->req_bssId), bssid,
                     VOS_MAC_ADDR_SIZE);
+        }
+        else if (bssid_hint)
+        {
+            pRoamProfile->BSSIDs.numOfBSSIDs = 1;
+            vos_mem_copy((void *)(pRoamProfile->BSSIDs.bssid), bssid_hint,
+                    VOS_MAC_ADDR_SIZE);
+            /* Save BSSID in separate variable as well, as RoamProfile
+               BSSID is getting zeroed out in the association process. And in
+               case of join failure we should send valid BSSID to supplicant
+             */
+            vos_mem_copy((void *)(pWextState->req_bssId), bssid_hint,
+                    VOS_MAC_ADDR_SIZE);
+            hddLog(LOGW, FL(" bssid_hint "MAC_ADDRESS_STR),
+                   MAC_ADDR_ARRAY(bssid_hint));
+
         }
         else
         {
@@ -12741,10 +12757,12 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
     if (req->channel) {
         status = wlan_hdd_cfg80211_connect_start(pAdapter, req->ssid,
                                                   req->ssid_len, req->bssid,
+                                                  req->bssid_hint,
                                                   req->channel->hw_value);
     } else {
         status = wlan_hdd_cfg80211_connect_start(pAdapter, req->ssid,
-                                                  req->ssid_len, req->bssid, 0);
+                                                  req->ssid_len, req->bssid,
+                                                  req->bssid_hint, 0);
     }
 
     if (0 > status) {
@@ -13257,7 +13275,7 @@ static int __wlan_hdd_cfg80211_join_ibss(struct wiphy *wiphy,
 
     /* Issue connect start */
     status = wlan_hdd_cfg80211_connect_start(pAdapter, params->ssid,
-            params->ssid_len, params->bssid,
+            params->ssid_len, params->bssid, NULL,
             pHddStaCtx->conn_info.operationChannel);
 
     if (0 > status)
