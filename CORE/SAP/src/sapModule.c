@@ -678,6 +678,7 @@ WLANSAP_SetScanAcsChannelParams(tsap_Config_t *pConfig,
 {
     tHalHandle hHal = NULL;
     tANI_BOOLEAN restartNeeded;
+    int ret;
 
     if (NULL == pConfig)
     {
@@ -701,7 +702,33 @@ WLANSAP_SetScanAcsChannelParams(tsap_Config_t *pConfig,
     pSapCtx->scanBandPreference = pConfig->scanBandPreference;
     pSapCtx->acsBandSwitchThreshold = pConfig->acsBandSwitchThreshold;
     pSapCtx->pUsrContext = pUsrContext;
+    pSapCtx->apAutoChannelSelection = VOS_TRUE;
+    pSapCtx->apStartChannelNum = pConfig->apStartChannelNum;
+    pSapCtx->apEndChannelNum = pConfig->apEndChannelNum;
+    pSapCtx->vht_channel_width = pConfig->vht_channel_width;
+    pSapCtx->acs_ch_width = pConfig->acs_ch_width;
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+    pSapCtx->skip_acs_scan_status = pConfig->skip_acs_scan_status;
+    pSapCtx->skip_acs_scan_range1_endch = pConfig->skip_acs_scan_range1_endch;
+    pSapCtx->skip_acs_scan_range1_stch = pConfig->skip_acs_scan_range1_stch;
+    pSapCtx->skip_acs_scan_range2_endch = pConfig->skip_acs_scan_range2_endch;
+    pSapCtx->skip_acs_scan_range2_stch = pConfig->skip_acs_scan_range2_stch;
+#endif
     pSapCtx->enableOverLapCh = pConfig->enOverLapCh;
+    if (strlen(pConfig->acsAllowedChnls) > 0)
+    {
+#ifdef WLAN_FEATURE_MBSSID
+        ret = sapSetPreferredChannel(pSapCtx, pConfig->acsAllowedChnls);
+#else
+        ret = sapSetPreferredChannel(pConfig->acsAllowedChnls);
+#endif
+        if (0 != ret)
+        {
+            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                       "%s: ACS set preferred channel failed!", __func__);
+            return VOS_STATUS_E_FAULT;
+        }
+    }
     /*
      * Set the BSSID to your "self MAC Addr" read
      * the mac address from Configuation ITEM received
@@ -788,6 +815,7 @@ WLANSAP_StartBss
     tANI_BOOLEAN restartNeeded;
     tHalHandle hHal;
     tpAniSirGlobal pmac = NULL;
+    int ret;
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -813,15 +841,39 @@ WLANSAP_StartBss
         /* Channel selection is auto or configured */
         pSapCtx->channel = pConfig->channel;
         pSapCtx->vht_channel_width = pConfig->vht_channel_width;
-        pSapCtx->ch_width_orig = pConfig->ch_width_orig;
+        pSapCtx->vht_ch_width_orig = pConfig->vht_ch_width_orig;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
         pSapCtx->cc_switch_mode = pConfig->cc_switch_mode;
 #endif
         pSapCtx->scanBandPreference = pConfig->scanBandPreference;
         pSapCtx->acsBandSwitchThreshold = pConfig->acsBandSwitchThreshold;
         pSapCtx->pUsrContext = pUsrContext;
+        pSapCtx->apAutoChannelSelection = pConfig->apAutoChannelSelection;
+        pSapCtx->apStartChannelNum = pConfig->apStartChannelNum;
+        pSapCtx->apEndChannelNum = pConfig->apEndChannelNum;
+        pSapCtx->acs_case = pConfig->acs_case;
+        pSapCtx->acs_ch_width = pConfig->acs_ch_width;
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+        pSapCtx->skip_acs_scan_status = pConfig->skip_acs_scan_status;
+        pSapCtx->skip_acs_scan_range1_endch = pConfig->skip_acs_scan_range1_endch;
+        pSapCtx->skip_acs_scan_range1_stch = pConfig->skip_acs_scan_range1_stch;
+        pSapCtx->skip_acs_scan_range2_endch = pConfig->skip_acs_scan_range2_endch;
+        pSapCtx->skip_acs_scan_range2_stch = pConfig->skip_acs_scan_range2_stch;
+#endif
         pSapCtx->enableOverLapCh = pConfig->enOverLapCh;
-        pSapCtx->acs_cfg = &pConfig->acs_cfg;
+        if (strlen(pConfig->acsAllowedChnls) > 0)
+        {
+#ifdef WLAN_FEATURE_MBSSID
+            ret = sapSetPreferredChannel(pSapCtx, pConfig->acsAllowedChnls);
+#else
+            ret = sapSetPreferredChannel(pConfig->acsAllowedChnls);
+#endif
+            if (0 != ret)
+            {
+                VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                       "%s: ACS set preferred channel failed!", __func__);
+            }
+        }
 
         //Set the BSSID to your "self MAC Addr" read the mac address from Configuation ITEM received from HDD
         pSapCtx->csrRoamProfile.BSSIDs.numOfBSSIDs = 1;
@@ -1729,8 +1781,6 @@ WLANSAP_SetChannelChangeWithCsa(v_PVOID_t pvosGCtx, v_U32_t targetChannel)
               * to sap context.
               */
              pMac->sap.SapDfsInfo.target_channel = targetChannel;
-             pMac->sap.SapDfsInfo.new_chanWidth =
-                                   sapContext->ch_width_orig;
 
              /*
               * Set the CSA IE required flag.
@@ -1784,6 +1834,187 @@ WLANSAP_SetChannelChangeWithCsa(v_PVOID_t pvosGCtx, v_U32_t targetChannel)
                    "successfully to sapFsm for Channel = %d",
                     __func__, targetChannel);
 
+    return VOS_STATUS_SUCCESS;
+}
+
+/*==========================================================================
+  FUNCTION    WLANSAP_SetChannelRange
+
+  DESCRIPTION
+    This api function sets the range of channels for AP.
+
+  DEPENDENCIES
+    NA.
+
+  PARAMETERS
+
+    IN
+    startChannel         : start channel
+    endChannel           : End channel
+    operatingBand        : Operating band (2.4GHz/5GHz)
+
+  RETURN VALUE
+    The VOS_STATUS code associated with performing the operation
+
+    VOS_STATUS_SUCCESS:  Success
+
+  SIDE EFFECTS
+============================================================================*/
+VOS_STATUS
+WLANSAP_SetChannelRange(tHalHandle hHal,v_U8_t startChannel, v_U8_t endChannel,
+                              eSapOperatingBand operatingBand)
+{
+
+    v_U8_t    validChannelFlag =0;
+    v_U8_t    loopStartCount =0;
+    v_U8_t    loopEndCount =0;
+    v_U8_t    bandStartChannel =0;
+    v_U8_t    bandEndChannel =0;
+
+    VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+         "WLANSAP_SetChannelRange:startChannel %d,EndChannel %d,Operatingband:%d",
+         startChannel,endChannel,operatingBand);
+
+    /*------------------------------------------------------------------------
+      Sanity check
+      ------------------------------------------------------------------------*/
+    if (( WNI_CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_STAMIN > operatingBand) ||
+          (WNI_CFG_SAP_CHANNEL_SELECT_OPERATING_BAND_STAMAX < operatingBand))
+    {
+         VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                     "Invalid operatingBand on WLANSAP_SetChannelRange");
+        return VOS_STATUS_E_FAULT;
+    }
+    if (( WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL_STAMIN > startChannel) ||
+         (WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL_STAMAX < startChannel))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                    "Invalid startChannel value on WLANSAP_SetChannelRange");
+        return VOS_STATUS_E_FAULT;
+    }
+    if (( WNI_CFG_SAP_CHANNEL_SELECT_END_CHANNEL_STAMIN > endChannel) ||
+         (WNI_CFG_SAP_CHANNEL_SELECT_END_CHANNEL_STAMAX < endChannel))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                      "Invalid endChannel value on WLANSAP_SetChannelRange");
+        return VOS_STATUS_E_FAULT;
+    }
+    switch(operatingBand)
+    {
+       case eSAP_RF_SUBBAND_2_4_GHZ:
+          bandStartChannel = RF_CHAN_1;
+          bandEndChannel = RF_CHAN_14;
+          break;
+
+       case eSAP_RF_SUBBAND_5_LOW_GHZ:
+          bandStartChannel = RF_CHAN_36;
+          bandEndChannel = RF_CHAN_64;
+          break;
+
+       case eSAP_RF_SUBBAND_5_MID_GHZ:
+          bandStartChannel = RF_CHAN_100;
+#ifndef FEATURE_WLAN_CH144
+          bandEndChannel = RF_CHAN_140;
+#else
+          bandEndChannel = RF_CHAN_144;
+#endif /* FEATURE_WLAN_CH144 */
+          break;
+
+       case eSAP_RF_SUBBAND_5_HIGH_GHZ:
+          bandStartChannel = RF_CHAN_149;
+          bandEndChannel = RF_CHAN_165;
+          break;
+
+       case eSAP_RF_SUBBAND_5_ALL_GHZ:
+          bandStartChannel = RF_CHAN_36;
+          bandEndChannel = RF_CHAN_165;
+          break;
+
+       default:
+          VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                   "Invalid operatingBand value on WLANSAP_SetChannelRange");
+          break;
+    }
+
+    /* Validating the start channel is in range or not*/
+    for(loopStartCount = bandStartChannel ; loopStartCount <= bandEndChannel ;
+    loopStartCount++)
+    {
+       if(rfChannels[loopStartCount].channelNum == startChannel )
+       {
+          /* start channel is in the range */
+          break;
+       }
+    }
+    /* Validating the End channel is in range or not*/
+    for(loopEndCount = bandStartChannel ; loopEndCount <= bandEndChannel ;
+    loopEndCount++)
+    {
+        if(rfChannels[loopEndCount].channelNum == endChannel )
+        {
+          /* End channel is in the range */
+            break;
+        }
+    }
+    if((loopStartCount > bandEndChannel)||(loopEndCount > bandEndChannel))
+    {
+       VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Invalid startChannel-%d or EndChannel-%d for band -%d",
+                   __func__,startChannel,endChannel,operatingBand);
+       /* Supplied channels are nt in the operating band so set the default
+            channels for the given operating band */
+       startChannel = rfChannels[bandStartChannel].channelNum;
+       endChannel = rfChannels[bandEndChannel].channelNum;
+    }
+
+    /*Search for the Active channels in the given range */
+    for( loopStartCount = bandStartChannel; loopStartCount <= bandEndChannel; loopStartCount++ )
+    {
+       if((startChannel <= rfChannels[loopStartCount].channelNum)&&
+             (endChannel >= rfChannels[loopStartCount].channelNum ))
+       {
+          if( regChannels[loopStartCount].enabled )
+          {
+             validChannelFlag = 1;
+             break;
+          }
+       }
+    }
+    if(0 == validChannelFlag)
+    {
+       VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+         "%s-No active channels present in the given range for the current region",
+         __func__);
+       /* There is no active channel in the supplied range.Updating the config
+       with the default channels in the given band so that we can select the best channel in the sub-band*/
+       startChannel = rfChannels[bandStartChannel].channelNum;
+       endChannel = rfChannels[bandEndChannel].channelNum;
+    }
+
+    if (ccmCfgSetInt(hHal, WNI_CFG_SAP_CHANNEL_SELECT_OPERATING_BAND,
+       operatingBand, NULL, eANI_BOOLEAN_FALSE)==eHAL_STATUS_FAILURE)
+    {
+         VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+          "Could not pass on WNI_CFG_SAP_CHANNEL_SELECT_OPERATING_BAND to CCn");
+         return VOS_STATUS_E_FAULT;
+    }
+    if (ccmCfgSetInt(hHal, WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL,
+        startChannel, NULL, eANI_BOOLEAN_FALSE)==eHAL_STATUS_FAILURE)
+    {
+
+       VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+          "Could not pass on WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL to CCM");
+       return VOS_STATUS_E_FAULT;
+
+    }
+    if (ccmCfgSetInt(hHal, WNI_CFG_SAP_CHANNEL_SELECT_END_CHANNEL,
+       endChannel, NULL, eANI_BOOLEAN_FALSE)==eHAL_STATUS_FAILURE)
+    {
+
+       VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+          "Could not pass on WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL to CCM");
+       return VOS_STATUS_E_FAULT;
+    }
     return VOS_STATUS_SUCCESS;
 }
 
@@ -2783,7 +3014,7 @@ WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, tANI_U8 tArgetChannel)
     tpAniSirGlobal pMac = NULL;
     eCsrPhyMode phyMode;
     tANI_U32 cbMode;
-    uint16_t vhtChannelWidth;
+    tANI_U32 vhtChannelWidth;
     sapContext = (ptSapContext)pSapCtx;
 
     if ( NULL == sapContext )
@@ -2809,9 +3040,7 @@ WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, tANI_U8 tArgetChannel)
      */
     cbMode = pMac->sap.SapDfsInfo.new_cbMode;
     vhtChannelWidth = pMac->sap.SapDfsInfo.new_chanWidth;
-    sme_SelectCBMode(hHal, phyMode, tArgetChannel, &vhtChannelWidth,
-                                                   sapContext->ch_width_orig);
-    sapContext->csrRoamProfile.vht_channel_width = vhtChannelWidth;
+    sme_SelectCBMode(hHal, phyMode, tArgetChannel, &vhtChannelWidth);
     sapContext->vht_channel_width = vhtChannelWidth;
     halStatus = sme_RoamChannelChangeReq(hHal, sapContext->bssid,
                                          tArgetChannel,
@@ -2923,8 +3152,6 @@ WLANSAP_DfsSendCSAIeRequest(v_PVOID_t pSapCtx)
     eHalStatus halStatus = eHAL_STATUS_FAILURE;
     v_PVOID_t hHal = NULL;
     tpAniSirGlobal pMac = NULL;
-    uint16_t cbmode, vht_ch_width;
-
     sapContext = (ptSapContext)pSapCtx;
 
     if ( NULL == sapContext )
@@ -2942,12 +3169,6 @@ WLANSAP_DfsSendCSAIeRequest(v_PVOID_t pSapCtx)
         return VOS_STATUS_E_FAULT;
     }
     pMac = PMAC_STRUCT( hHal );
-
-    vht_ch_width = pMac->sap.SapDfsInfo.new_chanWidth;
-    cbmode = sme_SelectCBMode(hHal,
-                     sapContext->csrRoamProfile.phyMode,
-                     pMac->sap.SapDfsInfo.target_channel,
-                     &vht_ch_width, sapContext->ch_width_orig);
 
     halStatus = sme_RoamCsaIeRequest(hHal,
                                      sapContext->bssid,
@@ -3408,7 +3629,8 @@ RETURN VALUE NONE
 
 SIDE EFFECTS
 ============================================================================*/
-v_VOID_t WLANSAP_extend_to_acs_range(v_U8_t *startChannelNum,
+v_VOID_t WLANSAP_extend_to_acs_range(v_U8_t operatingBand,
+                                  v_U8_t *startChannelNum,
                                   v_U8_t *endChannelNum,
                                   v_U8_t *bandStartChannel,
                                   v_U8_t *bandEndChannel)
@@ -3419,20 +3641,70 @@ v_VOID_t WLANSAP_extend_to_acs_range(v_U8_t *startChannelNum,
 
     v_U8_t tmp_startChannelNum = 0, tmp_endChannelNum = 0;
 
-    if (*startChannelNum <= 14) {
+    switch(operatingBand)
+    {
+    case eSAP_RF_SUBBAND_2_4_GHZ:
         *bandStartChannel = RF_CHAN_1;
         *bandEndChannel = RF_CHAN_14;
         tmp_startChannelNum = *startChannelNum > 5 ?
                                (*startChannelNum - ACS_2G_EXTEND): 1;
         tmp_endChannelNum = (*endChannelNum + ACS_2G_EXTEND) <= 14 ?
                                (*endChannelNum + ACS_2G_EXTEND):14;
-    } else {
+        break;
+
+    case eSAP_RF_SUBBAND_5_LOW_GHZ:
+        *bandStartChannel = RF_CHAN_36;
+        *bandEndChannel = RF_CHAN_64;
+        tmp_startChannelNum = (*startChannelNum - ACS_5G_EXTEND) > 36 ?
+                               (*startChannelNum - ACS_5G_EXTEND):36;
+        tmp_endChannelNum = (*endChannelNum + ACS_5G_EXTEND) <= 64?
+                               (*endChannelNum + ACS_5G_EXTEND):64;
+        break;
+
+    case eSAP_RF_SUBBAND_5_MID_GHZ:
+        *bandStartChannel = RF_CHAN_100;
+        tmp_startChannelNum = (*startChannelNum - ACS_5G_EXTEND) > 100 ?
+                               (*startChannelNum - ACS_5G_EXTEND):100;
+#ifndef FEATURE_WLAN_CH144
+        *bandEndChannel = RF_CHAN_140;
+        tmp_endChannelNum = (*endChannelNum + ACS_5G_EXTEND) <= 140 ?
+                               (*endChannelNum + ACS_5G_EXTEND):140;
+#else
+        *bandEndChannel = RF_CHAN_144;
+        tmp_endChannelNum = (*endChannelNum + ACS_5G_EXTEND) <= 144 ?
+                               (*endChannelNum + ACS_5G_EXTEND):144;
+#endif /* FEATURE_WLAN_CH144 */
+        break;
+
+    case eSAP_RF_SUBBAND_5_HIGH_GHZ:
+        *bandStartChannel = RF_CHAN_149;
+        *bandEndChannel = RF_CHAN_165;
+        tmp_startChannelNum = (*startChannelNum - ACS_5G_EXTEND) > 149 ?
+                               (*startChannelNum - ACS_5G_EXTEND):149;
+        tmp_endChannelNum = (*endChannelNum + ACS_5G_EXTEND) <= 165 ?
+                             (*endChannelNum + ACS_5G_EXTEND):165;
+        break;
+
+    case eSAP_RF_SUBBAND_5_ALL_GHZ:
         *bandStartChannel = RF_CHAN_36;
         *bandEndChannel = RF_CHAN_165;
         tmp_startChannelNum = (*startChannelNum - ACS_5G_EXTEND) > 36 ?
                                 (*startChannelNum - ACS_5G_EXTEND):36;
         tmp_endChannelNum = (*endChannelNum + ACS_5G_EXTEND) <= 165 ?
                              (*endChannelNum + ACS_5G_EXTEND):165;
+        break;
+
+    default:
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+          "sapGetChannelList:OperatingBand not valid ");
+        /* assume 2.4 GHz */
+        *bandStartChannel = RF_CHAN_1;
+        *bandEndChannel = RF_CHAN_14;
+        tmp_startChannelNum = *startChannelNum > 5 ?
+                                (*startChannelNum - ACS_2G_EXTEND): 1;
+        tmp_endChannelNum = (*endChannelNum + ACS_2G_EXTEND) <= 14 ?
+                             (*endChannelNum + ACS_2G_EXTEND):14;
+        break;
     }
 
     /* Note if the ACS range include only DFS channels, do not cross the range.
@@ -3790,10 +4062,11 @@ WLANSAP_ACS_CHSelect(v_PVOID_t pvosGCtx,
     sapContext->sessionId = 0xff;
 
     pMac = PMAC_STRUCT( hHal );
-    sapContext->acs_cfg = &pConfig->acs_cfg;
-    sapContext->csrRoamProfile.phyMode = sapContext->acs_cfg->hw_mode;
 
-    if (sapContext->isScanSessionOpen == eSAP_FALSE) {
+    sapContext->csrRoamProfile.phyMode = pConfig->acs_hw_mode;
+
+    if ((pConfig->channel == AUTO_CHANNEL_SELECT) &&
+        (sapContext->isScanSessionOpen == eSAP_FALSE)) {
         tANI_U32 type, subType;
 
         if(VOS_STATUS_SUCCESS ==
