@@ -745,6 +745,11 @@ struct ol_txrx_pdev_t {
 	int tid_to_ac[OL_TX_NUM_TIDS + OL_TX_VDEV_NUM_QUEUES];
 };
 
+struct ol_txrx_ocb_chan_info {
+	uint32_t chan_freq;
+	uint16_t disable_rx_stats_hdr:1;
+};
+
 struct ol_txrx_vdev_t {
 	/* pdev - the physical device that is the parent of this virtual device */
 	struct ol_txrx_pdev_t *pdev;
@@ -841,6 +846,10 @@ struct ol_txrx_vdev_t {
 		uint16_t band_center_freq2;
 		WLAN_PHY_MODE phy_mode;
 	} ocb_channel_event;
+
+	/* Information about the schedules in the schedule */
+	struct ol_txrx_ocb_chan_info *ocb_channel_info;
+	uint32_t ocb_channel_count;
 };
 
 struct ol_rx_reorder_array_elem_t {
