@@ -39,12 +39,12 @@ BRIEF DESCRIPTION:
 ===========================================================================*/
 
 #define QWLAN_VERSION_MAJOR            4
-#define QWLAN_VERSION_MINOR            4
+#define QWLAN_VERSION_MINOR            0
 #define QWLAN_VERSION_PATCH            10
 #define QWLAN_VERSION_EXTRA            ""
-#define QWLAN_VERSION_BUILD            22
+#define QWLAN_VERSION_BUILD            92
 
-#define QWLAN_VERSIONSTR               "4.4.10.022"
+#define QWLAN_VERSIONSTR               "4.0.10.92"
 
 
 
