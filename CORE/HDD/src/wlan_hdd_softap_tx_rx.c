@@ -1225,6 +1225,12 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
        return VOS_STATUS_E_FAILURE;
    }
 
+   if (!pAdapter->dev) {
+       VOS_TRACE(VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_FATAL,
+          "Invalid DEV(NULL) Drop packets");
+       return VOS_STATUS_E_FAILURE;
+   }
+
    ++pAdapter->hdd_stats.hddTxRxStats.rxChains;
    if (!pAdapter->dev) {
        VOS_TRACE(VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_FATAL,
