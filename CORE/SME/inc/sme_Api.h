@@ -4125,4 +4125,6 @@ eHalStatus sme_update_nss(tHalHandle h_hal, uint8_t nss);
 
 uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
 
+bool smeNeighborRoamIsHandoffInProgress(tHalHandle hHal, tANI_U8 sessionId);
+
 #endif //#if !defined( __SME_API_H )
