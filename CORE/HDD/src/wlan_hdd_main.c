@@ -8074,6 +8074,19 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
                    hdd_ipv4_notifier_work_queue);
 #endif
 
+         /*
+          * Register IPv4 notifier to notify if any change in IP
+          * So that we can reconfigure the offload parameters
+          */
+         pAdapter->ipv4_notifier.notifier_call = wlan_hdd_ipv4_changed;
+         ret = register_inetaddr_notifier(&pAdapter->ipv4_notifier);
+         if (ret) {
+               hddLog(LOGE, FL("Failed to register IPv4 notifier"));
+         } else {
+               hddLog(LOG1, FL("Registered IPv4 notifier"));
+               pAdapter->ipv4_notifier_registered = true;
+         }
+
 #ifdef WLAN_NS_OFFLOAD
          // Workqueue which gets scheduled in IPv6 notification callback.
 #ifdef CONFIG_CNSS
@@ -8083,6 +8096,18 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          INIT_WORK(&pAdapter->ipv6NotifierWorkQueue,
                    hdd_ipv6_notifier_work_queue);
 #endif
+         /*
+          * Register IPv6 notifier to notify if any change in IP
+          * So that we can reconfigure the offload parameters
+          */
+          pAdapter->ipv6_notifier.notifier_call = wlan_hdd_ipv6_changed;
+          ret = register_inet6addr_notifier(&pAdapter->ipv6_notifier);
+          if (ret) {
+               hddLog(LOGE, FL("Failed to register IPv6 notifier"));
+          } else {
+               hddLog(LOG1, FL("Registered IPv6 notifier"));
+               pAdapter->ipv6_notifier_registered = true;
+          }
 #endif
          //Stop the Interface TX queue.
          netif_tx_disable(pAdapter->dev);
