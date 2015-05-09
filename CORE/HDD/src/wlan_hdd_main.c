@@ -12195,16 +12195,19 @@ static v_U8_t hdd_find_prefd_safe_chnl(hdd_context_t *hdd_ctxt)
 {
    v_U16_t             safe_channels[NUM_20MHZ_RF_CHANNELS];
    v_U16_t             safe_channel_count;
+   uint16_t            unsafe_channel_count;
    v_U8_t              is_unsafe = 1;
    v_U16_t             i;
    v_U16_t             channel_loop;
 
    safe_channel_count = 0;
+   unsafe_channel_count = min((uint16_t)hdd_ctxt->unsafe_channel_count,
+                              (uint16_t)NUM_20MHZ_RF_CHANNELS);
+
    for (i = 0; i < NUM_20MHZ_RF_CHANNELS; i++) {
       is_unsafe = 0;
       for (channel_loop = 0;
-           channel_loop < hdd_ctxt->unsafe_channel_count;
-           channel_loop++) {
+           channel_loop < unsafe_channel_count; channel_loop++) {
          if (rfChannels[i].channelNum ==
              hdd_ctxt->unsafe_channel_list[channel_loop]) {
             is_unsafe = 1;
