@@ -21967,7 +21967,6 @@ static VOS_STATUS wma_nan_req(void *wda_handle, tpNanRequest nan_req)
 }
 #endif
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static void wma_process_unit_test_cmd(WMA_HANDLE handle,
                                       t_wma_unit_test_cmd  *wma_utest)
 {
@@ -22017,7 +22016,6 @@ static void wma_process_unit_test_cmd(WMA_HANDLE handle,
 	}
 	return;
 }
-#endif
 
 VOS_STATUS  wma_scan_probe_setoui(tp_wma_handle wma,
 		tSirScanMacOui *psetoui)
@@ -22607,12 +22605,12 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 					(tSirSmeRoamOffloadSynchCnf *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
+#endif
 		case SIR_HAL_UNIT_TEST_CMD:
 			wma_process_unit_test_cmd(wma_handle,
 					(t_wma_unit_test_cmd *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
-#endif
 #ifdef WLAN_FEATURE_NAN
 		case WDA_NAN_REQUEST:
 			wma_nan_req(wma_handle,
