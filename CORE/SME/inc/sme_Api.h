@@ -4101,4 +4101,8 @@ eHalStatus sme_update_roam_scan_hi_rssi_scan_params(tHalHandle hal_handle,
 eHalStatus sme_wifi_start_logger(tHalHandle hal,
 		struct sir_wifi_start_log start_log);
 
+eHalStatus sme_update_nss(tHalHandle h_hal, uint8_t nss);
+
+uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
+
 #endif //#if !defined( __SME_API_H )
