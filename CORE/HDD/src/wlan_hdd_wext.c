@@ -8161,6 +8161,13 @@ static int iw_set_keepalive_params(struct net_device *dev, struct iw_request_inf
         return 0;
     }
 
+    if (pRequest->timePeriod > WNI_CFG_INFRA_STA_KEEP_ALIVE_PERIOD_STAMAX) {
+        hddLog(LOGE, FL("Value of timePeriod exceed Max limit %d"),
+               pRequest->timePeriod);
+        return -EINVAL;
+    }
+
+
     /* Debug display of request components. */
     hddLog(VOS_TRACE_LEVEL_INFO,
            "%s: Set Keep Alive Request : TimePeriod %d size %zu",
