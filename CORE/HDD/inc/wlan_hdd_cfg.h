@@ -2852,6 +2852,34 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_MULTICAST_HOST_FW_MSGS_MAX      (1)
 #define CFG_MULTICAST_HOST_FW_MSGS_DEFAULT  (1)
 
+/*
+ * fine timing measurement capability information
+ *
+ * <----- fine_time_meas_cap (in bits) ----->
+ *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ *|   9-31   |  8  |  7  |   5  |   4  |   3   |   2   |  1  |  0  |
+ *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ *| reserved | SAP | SAP |P2P-GO|P2P-GO|P2P-CLI|P2P-CLI| STA | STA |
+ *|          |resp |init |resp  |init  |resp   |init   |resp |init |
+ *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ *
+ * resp - responder role; init- initiator role
+ *
+ * CFG_FINE_TIME_MEAS_CAPABILITY_MAX computed based on the table
+ * +-----------------+-----------------+-----------+
+ * |  Device Role    |   Initiator     | Responder |
+ * +-----------------+-----------------+-----------+
+ * |   Station       |       Y         |     N     |
+ * |   P2P-CLI       |       Y         |     Y     |
+ * |   P2P-GO        |       Y         |     Y     |
+ * |   SAP           |       N         |     Y     |
+ * +-----------------+-----------------+-----------+
+ */
+#define CFG_FINE_TIME_MEAS_CAPABILITY              "gfine_time_meas_cap"
+#define CFG_FINE_TIME_MEAS_CAPABILITY_MIN          (0x0000)
+#define CFG_FINE_TIME_MEAS_CAPABILITY_MAX          (0x00BD)
+#define CFG_FINE_TIME_MEAS_CAPABILITY_DEFAULT      (0x000D)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3458,6 +3486,7 @@ typedef struct
    bool                        enable_mac_spoofing;
    uint8_t                     sap_dot11mc;
    uint8_t                     multicast_host_fw_msgs;
+   uint32_t                    fine_time_meas_cap;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

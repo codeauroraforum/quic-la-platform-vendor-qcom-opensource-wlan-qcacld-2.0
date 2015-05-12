@@ -1656,6 +1656,7 @@ eHalStatus sme_UpdateConfig(tHalHandle hHal, tpSmeConfigParams pSmeConfigParams)
 
    pMac->enable5gEBT = pSmeConfigParams->enable5gEBT;
    pMac->sme.enableSelfRecovery = pSmeConfigParams->enableSelfRecovery;
+   pMac->fine_time_meas_cap = pSmeConfigParams->fine_time_meas_cap;
 
    return status;
 }
@@ -4311,6 +4312,7 @@ eHalStatus sme_GetConfigParam(tHalHandle hHal, tSmeConfigParams *pParam)
       pParam->fP2pListenOffload = pMac->fP2pListenOffload;
       pParam->max_intf_count = pMac->sme.max_intf_count;
       pParam->enableSelfRecovery = pMac->sme.enableSelfRecovery;
+      pParam->fine_time_meas_cap = pMac->fine_time_meas_cap;
       sme_ReleaseGlobalLock( &pMac->sme );
    }
 

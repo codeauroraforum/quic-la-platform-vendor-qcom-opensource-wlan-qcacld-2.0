@@ -8201,3 +8201,32 @@ bool lim_validate_received_frame_a1_addr(tpAniSirGlobal mac_ctx,
 	}
 	return true;
 }
+
+/**
+ * lim_set_stads_rtt_cap() - update station node RTT capability
+ * @sta_ds: Station hash node
+ * @ext_cap: Pointer to extended capability
+ *
+ * This funciton update hash node's RTT capability based on received
+ * Extended capability IE.
+ *
+ * Return: None
+ */
+void lim_set_stads_rtt_cap(tpDphHashNode sta_ds, struct s_ext_cap *ext_cap)
+{
+	sta_ds->timingMeasCap = 0;
+	sta_ds->timingMeasCap |= (ext_cap->timingMeas)?
+				  RTT_TIMING_MEAS_CAPABILITY :
+				  RTT_INVALID;
+	sta_ds->timingMeasCap |= (ext_cap->fine_time_meas_initiator)?
+				  RTT_FINE_TIME_MEAS_INITIATOR_CAPABILITY :
+				  RTT_INVALID;
+	sta_ds->timingMeasCap |= (ext_cap->fine_time_meas_responder)?
+				  RTT_FINE_TIME_MEAS_RESPONDER_CAPABILITY :
+				  RTT_INVALID;
+
+	PELOG1(limLog(pMac, LOG1,
+	       FL("ExtCap present, timingMeas: %d Initiator: %d Responder: %d"),
+	       ext_cap->timingMeas, ext_cap->fine_time_meas_initiator,
+	       ext_cap->fine_time_meas_responder);)
+}

@@ -1203,6 +1203,7 @@ typedef struct sAniSirGlobal
     csrReadyToExtWoWCallback readyToExtWoWCallback;
     void *readyToExtWoWContext;
 #endif
+    uint32_t fine_time_meas_cap;
 } tAniSirGlobal;
 
 typedef enum
