@@ -306,7 +306,8 @@ extern spinlock_t hdd_context_lock;
 
 #define HDD_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
 #define HDD_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
-
+#define HDD_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
+#define HDD_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
 
 typedef struct hdd_tx_rx_stats_s
 {
@@ -1494,6 +1495,12 @@ struct hdd_context_s
 
     /* Time since boot up to WiFi turn ON (in micro seconds) */
     v_U64_t wifi_turn_on_time_since_boot;
+
+    /* number of rf chains supported by target */
+    uint32_t  num_rf_chains;
+
+    /* Is htTxSTBC supported by target */
+    uint8_t   ht_tx_stbc_supported;
 };
 
 /*---------------------------------------------------------------------------

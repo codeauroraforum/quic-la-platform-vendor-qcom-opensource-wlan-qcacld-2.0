@@ -4121,4 +4121,8 @@ eHalStatus sme_SetLedFlashing (tHalHandle hHal, tANI_U8 type,
     -------------------------------------------------------------------------*/
 eHalStatus sme_handle_dfs_chan_scan(tHalHandle hHal, tANI_U8 dfs_flag);
 
+eHalStatus sme_update_nss(tHalHandle h_hal, uint8_t nss);
+
+uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
+
 #endif //#if !defined( __SME_API_H )
