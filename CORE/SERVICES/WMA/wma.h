@@ -739,6 +739,7 @@ typedef struct {
 #ifdef FEATURE_WLAN_D0WOW
 	atomic_t in_d0wow;
 #endif
+	vos_timer_t log_completion_timer;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
@@ -1560,5 +1561,7 @@ static inline void wma_set_wifi_start_logger(void *wma_handle,
 	return;
 }
 #endif
+
+void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle);
 
 #endif

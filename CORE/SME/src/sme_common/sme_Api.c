@@ -14954,3 +14954,40 @@ eHalStatus sme_wifi_start_logger(tHalHandle hal,
 	}
 	return status;
 }
+
+/**
+ * vos_send_flush_logs_cmd_to_fw() - Flush FW logs
+ * @mac: MAC handle
+ *
+ * This function is used to send the command that will
+ * be used to flush the logs in the firmware
+ *
+ * Return: eHalStatus
+ */
+eHalStatus vos_send_flush_logs_cmd_to_fw(tpAniSirGlobal mac)
+{
+	eHalStatus status;
+	VOS_STATUS vos_status;
+	vos_msg_t vos_message;
+
+	status = sme_AcquireGlobalLock(&mac->sme);
+	if (status != eHAL_STATUS_SUCCESS) {
+		smsLog(mac, LOGE,
+			FL("sme_AcquireGlobalLock failed!(status=%d)"),
+			status);
+		return status;
+	}
+
+	/* Serialize the req through MC thread */
+	vos_message.bodyptr = NULL;
+	vos_message.type    = SIR_HAL_FLUSH_LOG_TO_FW;
+	vos_status = vos_mq_post_message(VOS_MQ_ID_WDA, &vos_message);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+		smsLog(mac, LOGE,
+			FL("vos_mq_post_message failed!(err=%d)"),
+			vos_status);
+		status = eHAL_STATUS_FAILURE;
+	}
+	sme_ReleaseGlobalLock(&mac->sme);
+	return status;
+}
