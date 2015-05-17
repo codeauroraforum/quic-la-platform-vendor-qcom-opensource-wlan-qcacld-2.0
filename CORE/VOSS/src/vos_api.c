@@ -970,6 +970,13 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
   }
 #endif // WLAN_BTAMP_FEATURE
 
+  if (gpVosContext->htc_ctx)
+  {
+      HTCStop(gpVosContext->htc_ctx);
+      HTCDestroy(gpVosContext->htc_ctx);
+      gpVosContext->htc_ctx = NULL;
+  }
+
   vosStatus = WLANTL_Close(vosContext);
   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
   {
@@ -1038,12 +1045,6 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
      VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
   }
 
-  if (gpVosContext->htc_ctx)
-  {
-      HTCStop(gpVosContext->htc_ctx);
-      HTCDestroy(gpVosContext->htc_ctx);
-      gpVosContext->htc_ctx = NULL;
-  }
 
   vos_mq_deinit(&((pVosContextType)vosContext)->freeVosMq);
 
@@ -2187,6 +2188,13 @@ VOS_STATUS vos_shutdown(v_CONTEXT_t vosContext)
     }
   }
 
+  if (gpVosContext->htc_ctx)
+  {
+    HTCStop(gpVosContext->htc_ctx);
+    HTCDestroy(gpVosContext->htc_ctx);
+    gpVosContext->htc_ctx = NULL;
+  }
+
   vosStatus = wma_wmi_service_close(vosContext);
   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
   {
@@ -2195,12 +2203,6 @@ VOS_STATUS vos_shutdown(v_CONTEXT_t vosContext)
                VOS_ASSERT(VOS_IS_STATUS_SUCCESS(vosStatus));
   }
 
-  if (gpVosContext->htc_ctx)
-  {
-    HTCStop(gpVosContext->htc_ctx);
-    HTCDestroy(gpVosContext->htc_ctx);
-    gpVosContext->htc_ctx = NULL;
-  }
 
   vos_mq_deinit(&((pVosContextType)vosContext)->freeVosMq);
 
