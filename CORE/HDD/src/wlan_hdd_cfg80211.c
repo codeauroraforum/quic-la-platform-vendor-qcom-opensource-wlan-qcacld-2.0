@@ -92,11 +92,9 @@
 #endif
 #include "vos_sched.h"
 #include <qc_sap_ioctl.h>
-#ifdef FEATURE_WLAN_TDLS
 #include "wlan_hdd_tdls.h"
 #include "wlan_hdd_wmm.h"
 #include "wlan_qct_wda.h"
-#endif
 #include "wlan_nv.h"
 #include "wlan_hdd_dev_pwr.h"
 #ifdef CONFIG_CNSS
@@ -6552,10 +6550,13 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
         staAdapter = pAdapterNode->pAdapter;
 
         if (WLAN_HDD_INFRA_STATION == staAdapter->device_mode ||
-           (WLAN_HDD_P2P_CLIENT == staAdapter->device_mode)) {
+           (WLAN_HDD_P2P_CLIENT == staAdapter->device_mode) ||
+           (WLAN_HDD_P2P_GO == staAdapter->device_mode)) {
             pScanInfo = &staAdapter->scan_info;
 
             if (pScanInfo && pScanInfo->mScanPending) {
+               hddLog(LOG1, FL("Aborting pending scan for device mode:%d"),
+                      staAdapter->device_mode);
                INIT_COMPLETION(pScanInfo->abortscan_event_var);
                hdd_abort_mac_scan(staAdapter->pHddCtx, staAdapter->sessionId,
                                   eCSR_SCAN_ABORT_DEFAULT);
@@ -6985,6 +6986,8 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 #endif /* WLAN_BTAMP_FEATURE */
     /* Reset the current device mode bit mask */
     wlan_hdd_clear_concurrency_mode(pHddCtx, pAdapter->device_mode);
+
+    hdd_tdls_notify_mode_change(pAdapter, pHddCtx);
 
     if ((pAdapter->device_mode == WLAN_HDD_INFRA_STATION) ||
         (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) ||
@@ -11670,14 +11673,14 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
         nss = pAdapter->hdd_stats.ClassA_stat.rx_frag_cnt;
 
         if (eHDD_LINK_SPEED_REPORT_ACTUAL == pCfg->reportMaxLinkSpeed) {
+            /* Get current rate flags if report actual */
             rate_flags = pAdapter->hdd_stats.ClassA_stat.promiscuous_rx_frag_cnt;
-            if (pAdapter->hdd_stats.ClassA_stat.mcs_index == INVALID_MCS_IDX) {
-                rate_flags = eHAL_TX_RATE_LEGACY;
-                pAdapter->hdd_stats.ClassA_stat.mcs_index = 0;
-            }
         }
-        else
+
+        if (pAdapter->hdd_stats.ClassA_stat.mcs_index == INVALID_MCS_IDX) {
+            rate_flags = eHAL_TX_RATE_LEGACY;
             pAdapter->hdd_stats.ClassA_stat.mcs_index = 0;
+        }
     }
 #ifdef LINKSPEED_DEBUG_ENABLED
     pr_info("RSSI %d, RLMS %u, rate %d, rssi high %d, rssi mid %d, rssi low %d, rate_flags 0x%x, MCS %d\n",
