@@ -2732,7 +2732,6 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                 vos_mem_free(pMsg->bodyptr);
                 break;
 #endif
-
            case eWNI_SME_DFS_RADAR_FOUND:
            case eWNI_SME_DFS_CSAIE_TX_COMPLETE_IND:
                 {
@@ -2844,6 +2843,12 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                 break;
           }
 #endif
+          case eWNI_SME_SET_THERMAL_LEVEL_IND:
+               if (pMac->sme.set_thermal_level_cb)
+               {
+                   pMac->sme.set_thermal_level_cb(pMac->hHdd, pMsg->bodyval);
+               }
+               break;
           default:
 
              if ( ( pMsg->type >= eWNI_SME_MSG_TYPES_BEGIN )
@@ -13366,8 +13371,19 @@ eHalStatus sme_InitThermalInfo( tHalHandle hHal,
     return eHAL_STATUS_FAILURE;
 }
 
+/*
+ * Plug in set thermal level callback
+ */
+void sme_add_set_thermal_level_callback(tHalHandle hHal,
+                   tSmeSetThermalLevelCallback callback)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+
+    pMac->sme.set_thermal_level_cb = callback;
+}
+
 /* ---------------------------------------------------------------------------
-    \fn sme_InitThermalInfo
+    \fn sme_SetThermalLevel
     \brief  SME API to set the thermal mitigation level
     \param  hHal
     \param  level : thermal mitigation level
