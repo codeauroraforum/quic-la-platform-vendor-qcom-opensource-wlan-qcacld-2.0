@@ -1294,7 +1294,8 @@ if (limPopulateMatchingRateSet(pMac,
                              subType, true, authType, peerIdx, true,
                              (tSirResultCodes) eSIR_MAC_UNSPEC_FAILURE_STATUS, psessionEntry);
 
-        pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
+        if(psessionEntry->parsedAssocReq)
+            pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
         goto error;
     }
 
@@ -1432,7 +1433,8 @@ if (limPopulateMatchingRateSet(pMac,
     }
 
     // BTAMP: Storing the parsed assoc request in the psessionEntry array
-    psessionEntry->parsedAssocReq[pStaDs->assocId] = pAssocReq;
+    if(psessionEntry->parsedAssocReq)
+        psessionEntry->parsedAssocReq[pStaDs->assocId] = pAssocReq;
     assoc_req_copied = true;
 
     /* BTAMP: If STA context already exist (ie. updateContext = 1)
@@ -1458,7 +1460,8 @@ if (limPopulateMatchingRateSet(pMac,
                                   true, pStaDs->mlmStaContext.authType, pStaDs->assocId, true,
                                   (tSirResultCodes) eSIR_MAC_UNSPEC_FAILURE_STATUS, psessionEntry);
 
-            pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
+            if(psessionEntry->parsedAssocReq)
+                pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
             goto error;
         }
     }
@@ -1482,7 +1485,8 @@ if (limPopulateMatchingRateSet(pMac,
 
                 //Restoring the state back.
                 pStaDs->mlmStaContext.mlmState = mlmPrevState;
-                pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
+                if(psessionEntry->parsedAssocReq)
+                    pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
                 goto error;
             }
         }
@@ -1499,7 +1503,9 @@ if (limPopulateMatchingRateSet(pMac,
 
                     //Restoring the state back.
                     pStaDs->mlmStaContext.mlmState = mlmPrevState;
-                    pAssocReq = psessionEntry->parsedAssocReq[pStaDs->assocId];
+                    if(psessionEntry->parsedAssocReq)
+                        pAssocReq =
+                            psessionEntry->parsedAssocReq[pStaDs->assocId];
                     goto error;
             }
 
@@ -1530,7 +1536,8 @@ error:
         }
         vos_mem_free(pAssocReq);
         if (assoc_req_copied) /* to avoid double free */
-            psessionEntry->parsedAssocReq[pStaDs->assocId] = NULL;
+            if(psessionEntry->parsedAssocReq)
+                psessionEntry->parsedAssocReq[pStaDs->assocId] = NULL;
     }
 
     /* If it is not duplicate Assoc request then only free the memory */
