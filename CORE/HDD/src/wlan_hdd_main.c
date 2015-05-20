@@ -1515,6 +1515,22 @@ hdd_extract_assigned_int_from_str
     return pInPtr;
 }
 
+#ifdef IPA_UC_STA_OFFLOAD
+static void hdd_set_thermal_level_cb(hdd_context_t *pHddCtx, u_int8_t level)
+{
+   /* Change IPA to SW path when throttle level greater than 0 */
+   if (level > THROTTLE_LEVEL_0)
+      hdd_ipa_send_mcc_scc_msg(pHddCtx, TRUE);
+   else
+      /* restore original concurrency mode */
+      hdd_ipa_send_mcc_scc_msg(pHddCtx, pHddCtx->mcc_mode);
+}
+#else
+static void hdd_set_thermal_level_cb(hdd_context_t *pHddCtx, u_int8_t level)
+{
+}
+#endif
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_extract_assigned_char_from_str() - Extracts assigned char from
@@ -13076,6 +13092,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
        hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s: Error while initializing thermal information", __func__);
    }
+
+   /* Plug in set thermal level callback */
+   sme_add_set_thermal_level_callback(pHddCtx->hHal,
+                     (tSmeSetThermalLevelCallback)hdd_set_thermal_level_cb);
 
    /* SAR power limit */
    hddtxlimit = vos_mem_malloc(sizeof(tSirTxPowerLimit));
