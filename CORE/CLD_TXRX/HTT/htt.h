@@ -96,6 +96,8 @@
  *          "remote ring" of rx buffers in host member in LL systems.
  *          Add RX_REMOTE_RING_BUFFER_INFO stats type for uploading these stats.
  * 3.12 Add "rx offload packet error" message with initial "MIC error" subtype
+ * 3.13 Expand rx_reorder_stats
+ *      (distinguish duplicates within vs. outside block ack window)
  */
 #define HTT_CURRENT_VERSION_MAJOR 3
 #define HTT_CURRENT_VERSION_MINOR 12
@@ -4336,6 +4338,12 @@ struct rx_reorder_stats {
     A_UINT32 msdu_queued;
     /* Number of MSDUs released from Data Rx MSDU list to MAC ring */
     A_UINT32 msdu_recycled;
+    /* Number of MPDUs with sequence number in the past and within
+       the BA window */
+    A_UINT32 dup_past_within_window;
+    /* Number of MPDUs with sequence number in the past and
+     * outside the BA window */
+    A_UINT32 dup_past_outside_window;
 };
 
 

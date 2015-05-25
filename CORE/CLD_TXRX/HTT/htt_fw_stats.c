@@ -389,6 +389,10 @@ htt_t2h_stats_rx_reorder_stats_print(
                  stats_ptr->msdu_queued);
     adf_os_print("  %u MSDUs released from Rx MSDU list to MAC ring\n",
                  stats_ptr->msdu_recycled);
+    adf_os_print("  %u  MPDUs with SN in the past & within BA window\n",
+                 stats_ptr->dup_past_within_window);
+    adf_os_print("  %u  MPDUs with SN in the past & outside BA window\n",
+                 stats_ptr->dup_past_outside_window);
 }
 
 static void
