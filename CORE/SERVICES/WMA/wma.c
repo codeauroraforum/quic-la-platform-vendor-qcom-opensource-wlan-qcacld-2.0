@@ -18289,8 +18289,6 @@ int wma_disable_wow_in_fw(WMA_HANDLE handle)
 	/* Unpause the vdev as we are resuming */
 	wma_unpause_vdev(wma);
 
-	vos_wake_lock_timeout_acquire(&wma->wow_wake_lock, 2000);
-
 	return ret;
 }
 
