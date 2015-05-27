@@ -5162,15 +5162,6 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
         wlan_hdd_add_hostapd_conf_vsie(pHostapdAdapter, genie, &total_ielen);
     }
 
-    if (WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode)
-    {
-        wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
-                WLAN_EID_OVERLAP_BSS_SCAN_PARAM);
-    }
-
-    vos_mem_copy(updateIE.bssid, pHostapdAdapter->macAddressCurrent.bytes,
-                 sizeof(tSirMacAddr));
-
 #ifdef QCA_HT_2040_COEX
     if (WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode) {
         tSmeConfigParams smeConfig;
@@ -5182,6 +5173,9 @@ static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
                     WLAN_EID_OVERLAP_BSS_SCAN_PARAM);
     }
 #endif
+
+    vos_mem_copy(updateIE.bssid, pHostapdAdapter->macAddressCurrent.bytes,
+                 sizeof(tSirMacAddr));
 
     updateIE.smeSessionId =  pHostapdAdapter->sessionId;
 
@@ -5474,6 +5468,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                 switch (channel_type)
                 {
                 case NL80211_CHAN_HT20:
+                case NL80211_CHAN_NO_HT:
                     sme_SetPhyCBMode24G(pHddCtx->hHal,
                                         PHY_SINGLE_CHANNEL_CENTERED);
                     break;
@@ -5496,7 +5491,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
             }
             vos_mem_zero(&smeConfig, sizeof(smeConfig));
             sme_GetConfigParam(pHddCtx->hHal, &smeConfig);
-            if (NL80211_CHAN_HT20 == channel_type)
+            if (NL80211_CHAN_NO_HT == channel_type)
                 smeConfig.csrConfig.obssEnabled = VOS_FALSE;
             else
                 smeConfig.csrConfig.obssEnabled = VOS_TRUE;
