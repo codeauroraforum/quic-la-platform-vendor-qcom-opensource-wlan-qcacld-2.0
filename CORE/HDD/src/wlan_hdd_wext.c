@@ -4692,7 +4692,6 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
                                     phddctx->cfg_ini->nChannelBondingMode5GHz;
 
 #ifdef QCA_HT_2040_COEX
-            if (phddctx->cfg_ini->ht2040CoexEnabled) {
                 smeconfig.csrConfig.obssEnabled = eANI_BOOLEAN_TRUE;
                 halStatus = sme_SetHT2040Mode(hal, pAdapter->sessionId,
                                       eHT_CHAN_HT20, eANI_BOOLEAN_TRUE);
@@ -4700,7 +4699,6 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
                     hddLog(LOGE, FL("Failed to enable OBSS"));
                     return -EIO;
                 }
-            }
 #endif
         }
 #ifdef WLAN_FEATURE_11AC
