@@ -1668,7 +1668,7 @@ send_fw_diag_nl_data(wmi_unified_t wmi_handle, const u_int8_t *buffer,
         res = nl_srv_ucast(skb_out, cnss_diag_pid, MSG_DONTWAIT);
         if (res < 0)
         {
-            AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
+            AR_DEBUG_PRINTF(ATH_DEBUG_RSVD1,
                             ("nl_srv_ucast failed 0x%x \n", res));
             return res;
         }
@@ -1716,7 +1716,7 @@ send_diag_netlink_data(const u_int8_t *buffer,
 
         res = nl_srv_ucast(skb_out, cnss_diag_pid, MSG_DONTWAIT);
         if (res < 0) {
-            AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
+            AR_DEBUG_PRINTF(ATH_DEBUG_RSVD1,
                             ("nl_srv_ucast failed 0x%x \n", res));
             return res;
         }
@@ -1767,7 +1767,7 @@ dbglog_process_netlink_data(wmi_unified_t wmi_handle, const u_int8_t *buffer,
         res = nl_srv_ucast(skb_out, cnss_diag_pid, MSG_DONTWAIT);
         if (res < 0)
         {
-            AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
+            AR_DEBUG_PRINTF(ATH_DEBUG_RSVD1,
                             ("nl_srv_ucast failed 0x%x \n", res));
             return res;
         }
