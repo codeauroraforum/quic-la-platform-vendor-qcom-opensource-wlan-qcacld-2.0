@@ -1053,26 +1053,20 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
         case eSAP_DFS_CAC_START:
             wlan_hdd_send_svc_nlink_msg(WLAN_SVC_DFS_CAC_START_IND,
                                       &dfs_info, sizeof(struct wlan_dfs_info));
-#ifdef WLAN_FEATURE_MBSSID
             pHddCtx->dev_dfs_cac_status = DFS_CAC_IN_PROGRESS;
-#endif
             break;
 
         case eSAP_DFS_CAC_END:
             wlan_hdd_send_svc_nlink_msg(WLAN_SVC_DFS_CAC_END_IND,
                                       &dfs_info, sizeof(struct wlan_dfs_info));
             pHddApCtx->dfs_cac_block_tx = VOS_FALSE;
-#ifdef WLAN_FEATURE_MBSSID
             pHddCtx->dev_dfs_cac_status = DFS_CAC_ALREADY_DONE;
-#endif
             break;
 
         case eSAP_DFS_RADAR_DETECT:
             wlan_hdd_send_svc_nlink_msg(WLAN_SVC_DFS_RADAR_DETECT_IND,
                                       &dfs_info, sizeof(struct wlan_dfs_info));
-#ifdef WLAN_FEATURE_MBSSID
             pHddCtx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
-#endif
             break;
 
         case eSAP_DFS_NO_AVAILABLE_CHANNEL:
