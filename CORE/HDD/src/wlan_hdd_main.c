@@ -10580,6 +10580,29 @@ static eHalStatus hdd_11d_scan_done(tHalHandle halHandle, void *pContext,
     return eHAL_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_OFFLOAD_PACKETS
+/**
+ * hdd_init_offloaded_packets_ctx() - Initialize offload packets context
+ * @hdd_ctx: hdd global context
+ *
+ * Return: none
+ */
+static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
+{
+	uint8_t i;
+
+	mutex_init(&hdd_ctx->op_ctx.op_lock);
+	for (i = 0; i < MAXNUM_PERIODIC_TX_PTRNS; i++) {
+		hdd_ctx->op_ctx.op_table[i].request_id = 0;
+		hdd_ctx->op_ctx.op_table[i].pattern_id = i;
+	}
+}
+#else
+static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
+{
+}
+#endif
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_wlan_startup() - HDD init function
@@ -10685,6 +10708,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    mutex_init(&pHddCtx->tdls_lock);
 #endif
 
+   hdd_init_offloaded_packets_ctx(pHddCtx);
    // Load all config first as TL config is needed during vos_open
    pHddCtx->cfg_ini = (hdd_config_t*) kmalloc(sizeof(hdd_config_t), GFP_KERNEL);
    if(pHddCtx->cfg_ini == NULL)
