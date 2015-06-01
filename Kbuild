@@ -938,7 +938,8 @@ CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DSDIO_3_0 \
                 -DHIF_SDIO \
                 -DCONFIG_ATH_PROCFS_DIAG_SUPPORT \
-                -DFEATURE_HL_GROUP_CREDIT_FLOW_CONTROL
+                -DFEATURE_HL_GROUP_CREDIT_FLOW_CONTROL \
+		-DDEBUG_HL_LOGGING
 endif
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
