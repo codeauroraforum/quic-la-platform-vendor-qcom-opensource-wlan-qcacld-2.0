@@ -11726,8 +11726,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    init_completion(&pHddCtx->standby_comp_var);
    init_completion(&pHddCtx->req_bmps_comp_var);
 
-   init_completion(&pHddCtx->linux_reg_req);
-
    spin_lock_init(&pHddCtx->schedScan_lock);
 
    hdd_list_init( &pHddCtx->hddAdapters, MAX_NUMBER_OF_ADAPTERS );

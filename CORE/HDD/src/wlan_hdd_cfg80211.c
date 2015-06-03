@@ -6335,6 +6335,8 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
     pSapEventCallback = hdd_hostapd_SAPEventCB;
 
+    (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->dfs_cac_block_tx = VOS_TRUE;
+
     status = WLANSAP_StartBss(
 #ifdef WLAN_FEATURE_MBSSID
                  WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
@@ -10403,7 +10405,7 @@ int wlan_hdd_cfg80211_set_ie( hdd_adapter_t *pAdapter,
                     hddLog (VOS_TRACE_LEVEL_INFO, "%s Set OSEN IE(len %d)",
                             __func__, eLen + 2);
 
-                    if ( SIR_MAC_MAX_IE_LENGTH < (pWextState->assocAddIE.length + eLen) ) {
+                    if ( SIR_MAC_MAX_ADD_IE_LENGTH < (pWextState->assocAddIE.length + eLen) ) {
                            hddLog(VOS_TRACE_LEVEL_FATAL, "Cannot accommodate assocAddIE "
                                "Need bigger buffer space");
                         VOS_ASSERT(0);
