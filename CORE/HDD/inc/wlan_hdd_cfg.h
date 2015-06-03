@@ -1344,6 +1344,13 @@ typedef enum
 #define CFG_ENABLE_HOST_SSDP_MAX               ( 1 )
 #define CFG_ENABLE_HOST_SSDP_DEFAULT           ( 1 )
 
+#ifdef FEATURE_SECURE_FIRMWARE
+#define CFG_ENABLE_FW_HASH_CHECK_NAME          "gEnableFWHashCheck"
+#define CFG_ENABLE_FW_HASH_CHECK_MIN           ( 0 )
+#define CFG_ENABLE_FW_HASH_CHECK_MAX           ( 1 )
+#define CFG_ENABLE_FW_HASH_CHECK_DEFAULT       ( 1 )
+#endif
+
 #define CFG_ENABLE_HOST_NSOFFLOAD_NAME         "hostNSOffload"
 #define CFG_ENABLE_HOST_NSOFFLOAD_MIN          ( 0 )
 #define CFG_ENABLE_HOST_NSOFFLOAD_MAX          ( 1 )
@@ -3431,6 +3438,9 @@ typedef struct
    bool                        enable_mac_spoofing;
    uint8_t                     sap_dot11mc;
    uint8_t                     inform_bss_rssi_raw;
+#ifdef FEATURE_SECURE_FIRMWARE
+   bool                        enable_fw_hash_check;
+#endif
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

@@ -605,7 +605,8 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 		goto end;
 	}
 
-	if (ol_check_fw_hash(fw_mem, fw_entry_size, file)) {
+	if (scn->enable_fw_hash_check &&
+	    ol_check_fw_hash(fw_entry->data, fw_entry_size, file)) {
 		pr_err("Hash Check failed for file:%s\n", filename);
 		status = A_ERROR;
 		goto end;
