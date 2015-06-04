@@ -3020,7 +3020,8 @@ int hif_pm_runtime_get(HIF_DEVICE *hif_device)
 	sc->pm_stats.last_resume_caller = (void *)_RET_IP_;
 	ret = hif_pm_request_resume(sc->dev);
 
-	pr_debug("%s: request resume:%pS in pm_state:%d ret: %d\n",
+	VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
+			"%s: request resume:%pS in pm_state:%d ret: %d\n",
 			__func__, (void *)_RET_IP_,
 			adf_os_atomic_read(&sc->pm_state), ret);
 	return -EAGAIN;
@@ -3037,9 +3038,10 @@ int hif_pm_runtime_put(HIF_DEVICE *hif_device)
 	hif_pm_runtime_mark_last_busy(sc->dev);
 	ret = hif_pm_runtime_put_auto(sc->dev);
 
-	pr_debug("%s: %pS in pm_state:%d ret: %d\n", __func__, (void *)_RET_IP_,
+	VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
+			"%s: %pS in pm_state:%d ret: %d\n",
+			__func__, (void *)_RET_IP_,
 			adf_os_atomic_read(&sc->pm_state), ret);
-
 	return 0;
 }
 
@@ -3053,10 +3055,10 @@ int hif_pm_runtime_prevent_suspend(void *ol_sc)
 
 	ret = __hif_pm_runtime_get(hif_sc->dev);
 
-	pr_debug("%s: request resume:%pS in pm_state:%d ret: %d\n",
+	VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
+			"%s: request resume:%pS in pm_state:%d ret: %d\n",
 			__func__, (void *)_RET_IP_,
 			adf_os_atomic_read(&hif_sc->pm_state), ret);
-
 	return 0;
 
 }
@@ -3071,9 +3073,10 @@ int hif_pm_runtime_allow_suspend(void *ol_sc)
 	hif_pm_runtime_mark_last_busy(hif_sc->dev);
 	ret = hif_pm_runtime_put_auto(hif_sc->dev);
 
-	pr_debug("%s: %pS in pm_state:%d ret: %d\n", __func__, (void *)_RET_IP_,
+	VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
+			"%s: %pS in pm_state:%d ret: %d\n",
+			__func__, (void *)_RET_IP_,
 			adf_os_atomic_read(&hif_sc->pm_state), ret);
-
 	return 0;
 }
 #else
