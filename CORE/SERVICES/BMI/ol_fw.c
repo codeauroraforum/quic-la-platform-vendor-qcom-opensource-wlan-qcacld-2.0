@@ -1230,6 +1230,11 @@ void ol_target_failure(void *instance, A_STATUS status)
 		printk("[%02d]   :  0x%08X\n", i, reg_dump_values[i]);
 	}
 
+	if (scn->enablefwlog) {
+		printk("%s: FWLog is disabled in ini\n", __func__);
+		goto disable_fwlog;
+	}
+
 	if (HIFDiagReadMem(scn->hif_hdl,
 	            host_interest_item_address(scn->target_type, offsetof(struct host_interest_s, hi_dbglog_hdr)),
 	            (A_UCHAR *)&dbglog_hdr_address,
@@ -1277,6 +1282,8 @@ void ol_target_failure(void *instance, A_STATUS status)
 
 	    adf_os_mem_free(dbglog_data);
 	}
+
+disable_fwlog:
 #endif
 
 #if  defined(CONFIG_CNSS) || defined(HIF_SDIO)
