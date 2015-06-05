@@ -419,7 +419,7 @@ static struct ieee80211_supported_band wlan_hdd_band_5_GHZ =
     .vht_cap.cap = IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_11454
                  | IEEE80211_VHT_CAP_SHORT_GI_80
                  | IEEE80211_VHT_CAP_TXSTBC
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0))
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || defined(WITH_BACKPORTS)
                  | (IEEE80211_VHT_CAP_RXSTBC_MASK &
                    ( IEEE80211_VHT_CAP_RXSTBC_1
                    | IEEE80211_VHT_CAP_RXSTBC_2))
@@ -6026,7 +6026,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
             }
             (WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->sapConfig.channel = channel;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)) && !defined(WITH_BACKPORTS)
             (WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->sapConfig.ch_width_orig =
                                                      eHT_CHANNEL_WIDTH_40MHZ;
 #endif
@@ -6043,7 +6043,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                     smeConfig.csrConfig.channelBondingMode5GHz =
                                            eCSR_INI_SINGLE_CHANNEL_CENTERED;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)) && !defined(WITH_BACKPORTS)
                 (WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->sapConfig.ch_width_orig =
                                                      eHT_CHANNEL_WIDTH_20MHZ;
 #endif
@@ -6573,7 +6573,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
         sme_config.csrConfig.WMMSupportMode = eCsrRoamWmmNoQos;
     sme_UpdateConfig(pHddCtx->hHal, &sme_config);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)) && !defined(WITH_BACKPORTS)
     /* Linux kernel < 3.8 does not support ch width param. So for
      * 11AC get from ch width from ini file only if ht40 is enabled.
      * VHT80 depends on HT40 config.
@@ -7114,7 +7114,7 @@ static int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
         }
 
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)) || defined(WITH_BACKPORTS)
         pAdapter->sessionCtx.ap.sapConfig.ch_width_orig =
                                              params->chandef.width;
 #endif
