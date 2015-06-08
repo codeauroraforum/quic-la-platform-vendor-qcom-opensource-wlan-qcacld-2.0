@@ -6500,7 +6500,8 @@ limProcessSmeDfsCsaIeRequest(tpAniSirGlobal pMac, tANI_U32 *pMsg)
         /* Channel switch announcement needs to be included in beacon */
         psessionEntry->dfsIncludeChanSwIe = VOS_TRUE;
         psessionEntry->gLimChannelSwitch.switchCount = LIM_MAX_CSA_IE_UPDATES;
-        psessionEntry->gLimChannelSwitch.switchMode = 1;
+        if (pMac->sap.SapDfsInfo.disable_dfs_ch_switch == VOS_FALSE)
+            psessionEntry->gLimChannelSwitch.switchMode = 1;
 
         /* Validate if SAP is operating HT or VHT
          * mode and set the Channel Switch Wrapper
