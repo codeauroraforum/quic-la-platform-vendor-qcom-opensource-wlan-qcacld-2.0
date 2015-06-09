@@ -117,11 +117,18 @@
  *      tx frames in the target after the peer has already been deleted.
  * 3.19 Add HTT_DBG_STATS_RX_RATE_INFO_V2 and HTT_DBG_STATS_TX_RATE_INFO_V2
  * 3.20 Expand rx_reorder_stats.
- * 3.21 Expand rx_reorder_stats
+ * 3.21 Add optional rx channel spec to HL RX_IND.
+ * 3.22 Expand rx_reorder_stats
  *      (distinguish duplicates within vs. outside block ack window)
+ * 3.23 Add HTT_T2H_MSG_TYPE_RATE_REPORT to report peer justified rate.
+ *      The justified rate is calculated by two steps. The first is to
+ *      multiply user-rate by (1 - PER) and the other is to smooth the
+ *      step 1's result by a low pass filter.
+ *      This change allows HL download scheduling to consider the WLAN
+ *      rate that will be used for transmitting the downloaded frames.
  */
 #define HTT_CURRENT_VERSION_MAJOR 3
-#define HTT_CURRENT_VERSION_MINOR 20
+#define HTT_CURRENT_VERSION_MINOR 23
 
 #define HTT_NUM_TX_FRAG_DESC  1024
 
@@ -2922,6 +2929,7 @@ enum htt_t2h_msg_type {
     HTT_T2H_MSG_TYPE_WDI_IPA_OP_RESPONSE      = 0x14,
     HTT_T2H_MSG_TYPE_CHAN_CHANGE              = 0x15,
     HTT_T2H_MSG_TYPE_RX_OFLD_PKT_ERR          = 0x16,
+    HTT_T2H_MSG_TYPE_RATE_REPORT              = 0x17,
 
     HTT_T2H_MSG_TYPE_TEST,
     /* keep this last */
@@ -4155,7 +4163,8 @@ PREPACK struct hl_htt_rx_desc_base {
     A_UINT32
         seq_num:12,
         encrypted:1,
-        resv0:3,
+        chan_info_present:1,
+        resv0:2,
         mcast_bcast:1,
         fragment:1,
         key_id_oct:8,
@@ -4175,6 +4184,24 @@ PREPACK struct hl_htt_rx_desc_base {
         pn_127_96;
 } POSTPACK;
 
+
+/*
+ * Channel information can optionally be appended after hl_htt_rx_desc_base.
+ * If so, the len field in htt_rx_ind_hl_rx_desc_t will be updated accordingly,
+ * and the chan_info_present flag in hl_htt_rx_desc_base will be set.
+ * Please see htt_chan_change_t for description of the fields.
+ */
+PREPACK struct htt_chan_info_t
+{
+    A_UINT32    primary_chan_center_freq_mhz: 16,
+                contig_chan1_center_freq_mhz: 16;
+    A_UINT32    contig_chan2_center_freq_mhz: 16,
+                phy_mode: 8,
+                reserved: 8;
+} POSTPACK;
+
+#define HTT_CHAN_INFO_SIZE      sizeof(struct htt_chan_info_t)
+
 #define HL_RX_DESC_SIZE         (sizeof(struct hl_htt_rx_desc_base))
 #define HL_RX_DESC_SIZE_DWORD   (HL_RX_STD_DESC_SIZE >> 2)
 
@@ -4182,6 +4209,8 @@ PREPACK struct hl_htt_rx_desc_base {
 #define HTT_HL_RX_DESC_MPDU_SEQ_NUM_S       0
 #define HTT_HL_RX_DESC_MPDU_ENC_M           0x1000
 #define HTT_HL_RX_DESC_MPDU_ENC_S           12
+#define HTT_HL_RX_DESC_CHAN_INFO_PRESENT_M  0x2000
+#define HTT_HL_RX_DESC_CHAN_INFO_PRESENT_S  13
 #define HTT_HL_RX_DESC_MCAST_BCAST_M        0x10000
 #define HTT_HL_RX_DESC_MCAST_BCAST_S        16
 #define HTT_HL_RX_DESC_FRAGMENT_M           0x20000
@@ -4191,6 +4220,54 @@ PREPACK struct hl_htt_rx_desc_base {
 
 #define HTT_HL_RX_DESC_PN_OFFSET            offsetof(struct hl_htt_rx_desc_base, pn_31_0)
 #define HTT_HL_RX_DESC_PN_WORD_OFFSET       (HTT_HL_RX_DESC_PN_OFFSET >> 2)
+
+
+/* Channel information */
+#define HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_M   0x0000ffff
+#define HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_S   0
+#define HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_M   0xffff0000
+#define HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_S   16
+#define HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_M   0x0000ffff
+#define HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_S   0
+#define HTT_CHAN_INFO_PHY_MODE_M                   0x00ff0000
+#define HTT_CHAN_INFO_PHY_MODE_S                   16
+
+
+#define HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_SET(word, value)            \
+    do {                                                                \
+        HTT_CHECK_SET_VAL(HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ, value);  \
+        (word) |= (value)  << HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_S;    \
+    } while (0)
+#define HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_GET(word)                   \
+    (((word) & HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_M) >> HTT_CHAN_INFO_PRIMARY_CHAN_CENTER_FREQ_S)
+
+
+#define HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_SET(word, value)            \
+    do {                                                                \
+        HTT_CHECK_SET_VAL(HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ, value);  \
+        (word) |= (value)  << HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_S;    \
+    } while (0)
+#define HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_GET(word)                   \
+    (((word) & HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_M) >> HTT_CHAN_INFO_CONTIG_CHAN1_CENTER_FREQ_S)
+
+
+#define HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_SET(word, value)            \
+    do {                                                                \
+        HTT_CHECK_SET_VAL(HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ, value);  \
+        (word) |= (value)  << HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_S;    \
+    } while (0)
+#define HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_GET(word)                   \
+    (((word) & HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_M) >> HTT_CHAN_INFO_CONTIG_CHAN2_CENTER_FREQ_S)
+
+
+#define HTT_CHAN_INFO_PHY_MODE_SET(word, value)            \
+    do {                                                \
+        HTT_CHECK_SET_VAL(HTT_CHAN_INFO_PHY_MODE, value);  \
+        (word) |= (value)  << HTT_CHAN_INFO_PHY_MODE_S;    \
+    } while (0)
+#define HTT_CHAN_INFO_PHY_MODE_GET(word)                   \
+    (((word) & HTT_CHAN_INFO_PHY_MODE_M) >> HTT_CHAN_INFO_PHY_MODE_S)
+
 
 /*
  * @brief target -> host rx reorder flush message definition
@@ -6420,5 +6497,120 @@ enum htt_rx_ofld_pkt_err_type {
         ((_var) |= ((_val) << HTT_RX_OFLD_PKT_ERR_MIC_ERR_PN_47_32_S)); \
     } while (0)
 
+/**
+ * @brief peer rate report message
+ *
+ * @details
+ *  HTT_T2H_MSG_TYPE_RATE_REPORT message is sent by target to host to
+ *  indicate the justified rate of all the peers.
+ *
+ *     |31         24|23         16|15          8|7           0|
+ *     |-------------+-------------+-------------+-------------|
+ *     |     peer_count            | reserved    |    msg_type |
+ *     |-------------------------------------------------------|
+ *     :      Payload (variant number of peer rate report)     :
+ *     :- - -- - - - - - - - - - - - - - - - - - - - - - -  - -:
+ * Header fields:
+ *   - msg_type
+ *     Bits 7:0
+ *     Purpose: Identifies this as HTT_T2H_MSG_TYPE_RATE_REPORT message.
+ *     value: 0x17 (HTT_T2H_MSG_TYPE_RATE_REPORT)
+ *   - reserved
+ *     Bits 15:8
+ *     Purpose:
+ *     value:
+ *   - peer_count
+ *     Bits 31:16
+ *     Purpose: Specify how many peer rate report elements are present
+ *     in the payload.
+ *     value:
+ *
+ * Payload:
+ *     There are variant number of peer rate report follow the first 32
+ *     bits. The peer rate report is defined as follows.
+ *
+ *     |31            20|19    16|15                      0|
+ *     |----------------+--------+------------------------|-
+ *     |     reserved   |  phy   |        peer_id         | \
+ *     |--------------------------------------------------|  -> report #0
+ *     |                   rate                           | /
+ *     |----------------+--------+------------------------|-
+ *     |     reserved   |  phy   |        peer_id         | \
+ *     |--------------------------------------------------|  -> report #1
+ *     |                   rate                           | /
+ *     |----------------+--------+------------------------|-
+ *     |     reserved   |  phy   |        peer_id         | \
+ *     |--------------------------------------------------|  -> report #2
+ *     |                   rate                           | /
+ *     |---- ---------------------------------------------|-
+ *     :                                                  :
+ *     :                                                  :
+ *     :                                                  :
+ *     :--------------------------------------------------:
+ *
+ *   - peer_id
+ *     Bits 15:0
+ *     Purpose: identify the peer
+ *     value:
+ *   - phy
+ *     Bits 19:16
+ *     Purpose: identify which phy is in use
+ *     value: 0=11b, 1=11a/g, 2=11n, 3=11ac.
+ *         Please see enum htt_peer_report_phy_type for detail.
+ *   - reserved
+ *     Bits 31:20
+ *     Purpose:
+ *     value:
+ *   - rate
+ *     Bits 31:0
+ *     Purpose: represent the justified rate of the peer specified
+ *     by peer_id
+ *     value:
+ */
+
+enum htt_peer_rate_report_phy_type {
+    HTT_PEER_RATE_REPORT_11B = 0,
+    HTT_PEER_RATE_REPORT_11A_G,
+    HTT_PEER_RATE_REPORT_11N,
+    HTT_PEER_RATE_REPORT_11AC,
+};
+
+#define HTT_PEER_RATE_REPORT_SIZE                8
+
+#define HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_M    0xffff0000
+#define HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_S    16
+
+#define HTT_PEER_RATE_REPORT_MSG_PEER_ID_M       0x0000ffff
+#define HTT_PEER_RATE_REPORT_MSG_PEER_ID_S       0
+
+#define HTT_PEER_RATE_REPORT_MSG_PHY_M           0x000f0000
+#define HTT_PEER_RATE_REPORT_MSG_PHY_S           16
+
+#define HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_GET(_var) \
+    (((_var) & HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_M) \
+    >> HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_S)
+#define HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_SET(_var, _val) \
+    do {                                                     \
+        HTT_CHECK_SET_VAL(HTT_PEER_RATE_REPORT_MSG_PEER_COUNT, _val);  \
+        ((_var) |= ((_val) << HTT_PEER_RATE_REPORT_MSG_PEER_COUNT_S)); \
+    } while (0)
+
+#define HTT_PEER_RATE_REPORT_MSG_PEER_ID_GET(_var) \
+    (((_var) & HTT_PEER_RATE_REPORT_MSG_PEER_ID_M) \
+    >> HTT_PEER_RATE_REPORT_MSG_PEER_ID_S)
+#define HTT_PEER_RATE_REPORT_MSG_PEER_ID_SET(_var, _val) \
+    do {                                                     \
+        HTT_CHECK_SET_VAL(HTT_PEER_RATE_REPORT_MSG_PEER_ID, _val);  \
+        ((_var) |= ((_val) << HTT_PEER_RATE_REPORT_MSG_PEER_ID_S)); \
+    } while (0)
+
+#define HTT_PEER_RATE_REPORT_MSG_PHY_GET(_var) \
+    (((_var) & HTT_PEER_RATE_REPORT_MSG_PHY_M) \
+    >> HTT_PEER_RATE_REPORT_MSG_PHY_S)
+#define HTT_PEER_RATE_REPORT_MSG_PHY_SET(_var, _val) \
+    do {                                                     \
+        HTT_CHECK_SET_VAL(HTT_PEER_RATE_REPORT_MSG_PHY, _val);  \
+        ((_var) |= ((_val) << HTT_PEER_RATE_REPORT_MSG_PHY_S)); \
+    } while (0)
 
 #endif
