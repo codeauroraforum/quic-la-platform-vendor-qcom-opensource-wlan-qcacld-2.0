@@ -4612,6 +4612,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
     v_U8_t nEnableSuspendOld;
 #endif
     INIT_COMPLETION(pWextState->completion_var);
+    memset(&smeConfig, 0x00, sizeof(smeConfig));
 
     if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
     {
@@ -4626,7 +4627,6 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
         {
             if((ENABLE_11D == set_value) || (DISABLE_11D == set_value)) {
 
-                memset(&smeConfig, 0x00, sizeof(smeConfig));
                 sme_GetConfigParam(hHal, &smeConfig);
                 smeConfig.csrConfig.Is11dSupportEnabled = (v_BOOL_t)set_value;
 
@@ -5211,7 +5211,6 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
                        phddctx->cfg_ini->nChannelBondingMode5GHz)))
                chwidth = true;
 
-           memset(&smeConfig, 0x00, sizeof(smeConfig));
            sme_GetConfigParam(hHal, &smeConfig);
            switch (set_value) {
            case eHT_CHANNEL_WIDTH_20MHZ:
@@ -6896,7 +6895,7 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
                 adapter_num++;
             }
 
-            if (pMac) {
+            if (hHal) {
                 /* Printing Lim State starting with global lim states */
                 buf = scnprintf(extra + len, WE_MAX_STR_LEN - len,
                         "\n \n LIM STATES:-"
@@ -8161,6 +8160,13 @@ static int iw_set_keepalive_params(struct net_device *dev, struct iw_request_inf
         return 0;
     }
 
+    if (pRequest->timePeriod > WNI_CFG_INFRA_STA_KEEP_ALIVE_PERIOD_STAMAX) {
+        hddLog(LOGE, FL("Value of timePeriod exceed Max limit %d"),
+               pRequest->timePeriod);
+        return -EINVAL;
+    }
+
+
     /* Debug display of request components. */
     hddLog(VOS_TRACE_LEVEL_INFO,
            "%s: Set Keep Alive Request : TimePeriod %d size %zu",
@@ -9215,14 +9221,18 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
         return -EINVAL;
     }
 
-    if ( (band == eCSR_BAND_24 && pHddCtx->cfg_ini->nBandCapability==2) ||
-         (band == eCSR_BAND_5G && pHddCtx->cfg_ini->nBandCapability==1) ||
-         (band == eCSR_BAND_ALL && pHddCtx->cfg_ini->nBandCapability!=0))
-    {
-         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-             "%s: band value %u violate INI settings %u", __func__,
-             band, pHddCtx->cfg_ini->nBandCapability);
-         return -EIO;
+    if ((band == eCSR_BAND_24 && pHddCtx->cfg_ini->nBandCapability == 2) ||
+        (band == eCSR_BAND_5G && pHddCtx->cfg_ini->nBandCapability == 1)) {
+        hddLog(LOGP, FL("band value %u violate INI settings %u"),
+               band, pHddCtx->cfg_ini->nBandCapability);
+        return -EIO;
+    }
+
+    if (band == eCSR_BAND_ALL) {
+        hddLog(LOG1,
+               FL("Auto band received. Setting band same as ini value %d"),
+               pHddCtx->cfg_ini->nBandCapability);
+        band = pHddCtx->cfg_ini->nBandCapability;
     }
 
     if (eHAL_STATUS_SUCCESS != sme_GetFreqBand(hHal, &currBand))
@@ -9260,20 +9270,16 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
                  (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))) &&
                  (connectedBand != band))
             {
-                 hdd_station_ctx_t *pHddStaCtx = &(pAdapter)->sessionCtx.station;
                  eHalStatus status = eHAL_STATUS_SUCCESS;
                  long lrc;
 
                  /* STA already connected on current band, So issue disconnect
                   * first, then change the band*/
 
-                 hddLog(VOS_TRACE_LEVEL_INFO,
-                         "%s STA (Device mode=%d) connected in band %u, Changing band to %u, Issuing Disconnect"
-                         "Set HDD connState to eConnectionState_NotConnected",
-                            __func__, pAdapter->device_mode,
-                            currBand, band);
+                 hddLog(LOG1,
+                        FL("STA Device mode (%d) connected band %u, Changing band to %u, Issuing Disconnect"),
+                        pAdapter->device_mode, currBand, band);
 
-                 pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
                  INIT_COMPLETION(pAdapter->disconnect_comp_var);
 
                  status = sme_RoamDisconnect( WLAN_HDD_GET_HAL_CTX(pAdapter),
@@ -10963,22 +10969,13 @@ int hdd_register_wext(struct net_device *dev)
 
 int hdd_UnregisterWext(struct net_device *dev)
 {
-#if 0
-   hdd_wext_state_t *wextBuf;
-   hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	hddLog(LOG1, FL("dev(%p)"), dev);
 
-   ENTER();
-   // Set up the pointer to the Wireless Extensions state structure
-   wextBuf = pAdapter->pWextState;
+	if (dev != NULL) {
+		rtnl_lock();
+		dev->wireless_handlers = NULL;
+		rtnl_unlock();
+	}
 
-   // De-allocate the Wireless Extensions state structure
-   kfree(wextBuf);
-
-   // Clear out the pointer to the Wireless Extensions state structure
-   pAdapter->pWextState = NULL;
-
-   EXIT();
-#endif
-   dev->wireless_handlers = NULL;
-   return 0;
+	return 0;
 }

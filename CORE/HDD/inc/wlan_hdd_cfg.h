@@ -1564,18 +1564,28 @@ typedef enum
 #define CFG_ENABLE_PACKET_LOG_MAX        (1)
 #define CFG_ENABLE_PACKET_LOG_DEFAULT    (1)
 
+/* gFwDebugLogType takes values from enum dbglog_process_t,
+ * make default value as DBGLOG_PROCESS_NET_RAW to give the
+ * logs to net link since cnss_diag service is started at boot
+ * time by default.
+ */
 #define CFG_ENABLE_FW_LOG_TYPE            "gFwDebugLogType"
 #define CFG_ENABLE_FW_LOG_TYPE_MIN        ( 0 )
 #define CFG_ENABLE_FW_LOG_TYPE_MAX        ( 255 )
-#define CFG_ENABLE_FW_LOG_TYPE_DEFAULT    ( 0 )
+#define CFG_ENABLE_FW_LOG_TYPE_DEFAULT    ( 3 )
 
-
+/* gFwDebugLogLevel takes values from enum DBGLOG_LOG_LVL,
+ * make default value as DBGLOG_ERR to enable error logs by
+ * default.
+ */
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL          "gFwDebugLogLevel"
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MIN      ( 0 )
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MAX      ( 255 )
-#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_DEFAULT  ( 0 )
+#define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_DEFAULT  ( 5 )
 
-
+/* For valid values of log levels check enum DBGLOG_LOG_LVL and
+ * for valid values of module ids check enum WLAN_MODULE_ID.
+ */
 #define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
 #define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  ""
 
@@ -2573,6 +2583,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_INITIAL_DWELL_TIME_MIN             (0)
 #define CFG_INITIAL_DWELL_TIME_MAX             (100)
 
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_NAME         "gInitialScanNoDFSChnl"
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_DEFAULT      (0)
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_MIN          (0)
+#define CFG_INITIAL_SCAN_NO_DFS_CHNL_MAX          (1)
+
 #define CFG_OVERRIDE_COUNTRY_CODE                "gStaCountryCode"
 #define CFG_OVERRIDE_COUNTRY_CODE_DEFAULT        "000"
 
@@ -2832,6 +2847,39 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ROAM_SCAN_HI_RSSI_UB_DEFAULT           (-30)
 
 
+#define CFG_MULTICAST_HOST_FW_MSGS          "gMulticastHostFwMsgs"
+#define CFG_MULTICAST_HOST_FW_MSGS_MIN      (0)
+#define CFG_MULTICAST_HOST_FW_MSGS_MAX      (1)
+#define CFG_MULTICAST_HOST_FW_MSGS_DEFAULT  (1)
+
+/*
+ * fine timing measurement capability information
+ *
+ * <----- fine_time_meas_cap (in bits) ----->
+ *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ *|   9-31   |  8  |  7  |   5  |   4  |   3   |   2   |  1  |  0  |
+ *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ *| reserved | SAP | SAP |P2P-GO|P2P-GO|P2P-CLI|P2P-CLI| STA | STA |
+ *|          |resp |init |resp  |init  |resp   |init   |resp |init |
+ *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ *
+ * resp - responder role; init- initiator role
+ *
+ * CFG_FINE_TIME_MEAS_CAPABILITY_MAX computed based on the table
+ * +-----------------+-----------------+-----------+
+ * |  Device Role    |   Initiator     | Responder |
+ * +-----------------+-----------------+-----------+
+ * |   Station       |       Y         |     N     |
+ * |   P2P-CLI       |       Y         |     Y     |
+ * |   P2P-GO        |       Y         |     Y     |
+ * |   SAP           |       N         |     Y     |
+ * +-----------------+-----------------+-----------+
+ */
+#define CFG_FINE_TIME_MEAS_CAPABILITY              "gfine_time_meas_cap"
+#define CFG_FINE_TIME_MEAS_CAPABILITY_MIN          (0x0000)
+#define CFG_FINE_TIME_MEAS_CAPABILITY_MAX          (0x00BD)
+#define CFG_FINE_TIME_MEAS_CAPABILITY_DEFAULT      (0x000D)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -2985,6 +3033,7 @@ typedef struct
    v_U32_t        nActiveMaxChnTime;     //in units of milliseconds
 
    v_U32_t        nInitialDwellTime;     //in units of milliseconds
+   bool           initial_scan_no_dfs_chnl;
 
    v_U32_t        nActiveMinChnTimeBtc;     //in units of milliseconds
    v_U32_t        nActiveMaxChnTimeBtc;     //in units of milliseconds
@@ -3436,6 +3485,8 @@ typedef struct
    v_BOOL_t                    gEnableDeauthToDisassocMap;
    bool                        enable_mac_spoofing;
    uint8_t                     sap_dot11mc;
+   uint8_t                     multicast_host_fw_msgs;
+   uint32_t                    fine_time_meas_cap;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

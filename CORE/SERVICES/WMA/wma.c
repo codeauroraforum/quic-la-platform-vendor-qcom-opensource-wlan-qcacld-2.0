@@ -59,7 +59,6 @@
 #include "aniGlobal.h"
 #include "wmi_unified.h"
 #include "wniCfgAp.h"
-#include "wlan_hal_cfg.h"
 #include "cfgApi.h"
 #include "ol_txrx_ctrl_api.h"
 #if defined(CONFIG_HL_SUPPORT)
@@ -183,6 +182,9 @@
 #define LINK_SUPPORT_MIMO	0x8
 
 #define LINK_RATE_VHT		0x3
+
+#define WMA_LOG_COMPLETION_TIMER 10000 /* 10 seconds */
+
 /* Data rate 100KBPS based on IE Index */
 struct index_data_rate_type
 {
@@ -17505,6 +17507,73 @@ static int wma_d0_wow_disable_ack_event(void *handle, u_int8_t *event,
 }
 #endif
 
+/**
+ * wma_flush_complete_evt_handler() - FW log flush complete event handler
+ * @handle: WMI handle
+ * @event:  Event recevied from FW
+ * @len:    Length of the event
+ *
+ */
+static int wma_flush_complete_evt_handler(void *handle,
+		u_int8_t *event,
+		u_int32_t len)
+{
+	VOS_STATUS status;
+	tp_wma_handle wma = (tp_wma_handle) handle;
+
+	WMI_DEBUG_MESG_FLUSH_COMPLETE_EVENTID_param_tlvs *param_buf;
+	wmi_debug_mesg_flush_complete_fixed_param *wmi_event;
+	uint32_t reason_code;
+
+	param_buf = (WMI_DEBUG_MESG_FLUSH_COMPLETE_EVENTID_param_tlvs *) event;
+	if (!param_buf) {
+		WMA_LOGE("Invalid log flush complete event buffer");
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	wmi_event = param_buf->fixed_param;
+	reason_code = wmi_event->reserved0;
+
+	/*
+	 * reason_code = 0; Flush event in response to flush command
+	 * reason_code = other value; Asynchronous flush event for fatal events
+	 */
+	if (!reason_code && (vos_is_log_report_in_progress() == false)) {
+		WMA_LOGE("Received WMI flush event without sending CMD");
+		return -EINVAL;
+	} else if (!reason_code && vos_is_log_report_in_progress() == true) {
+		/* Flush event in response to flush command */
+		WMA_LOGI("Received WMI flush event in response to flush CMD");
+		status = vos_timer_stop(&wma->log_completion_timer);
+		if (status != VOS_STATUS_SUCCESS)
+			WMA_LOGE("Failed to stop the log completion timeout");
+		vos_logging_set_fw_flush_complete();
+	} else if (reason_code && vos_is_log_report_in_progress() == false) {
+		/* Asynchronous flush event for fatal events */
+		WMA_LOGE("Received asynchronous WMI flush event: reason=%d",
+			reason_code);
+		status = vos_set_log_completion(WLAN_LOG_TYPE_FATAL,
+				WLAN_LOG_INDICATOR_FIRMWARE,
+				reason_code);
+		if (VOS_STATUS_SUCCESS != status) {
+			WMA_LOGE("%s: Failed to set log trigger params",
+					__func__);
+			return VOS_STATUS_E_FAILURE;
+		}
+		vos_logging_set_fw_flush_complete();
+		return status;
+	} else {
+		/* Asynchronous flush event for fatal event,
+		 * but, report in progress already
+		 */
+		WMA_LOGI("%s: Bug report already in progress - dropping! type:%d, indicator=%d reason_code=%d",
+				__func__, WLAN_LOG_TYPE_FATAL,
+				WLAN_LOG_INDICATOR_FIRMWARE, reason_code);
+		return VOS_STATUS_E_FAILURE;
+	}
+	return 0;
+}
+
 /*
  * Handler to catch wow wakeup host event. This event will have
  * reason why the firmware has woken the host.
@@ -19183,9 +19252,6 @@ int wma_disable_wow_in_fw(WMA_HANDLE handle)
 	wma_set_wow_bus_suspend(wma, 0);
 	/* Unpause the vdev as we are resuming */
 	wma_unpause_vdev(wma);
-
-	vos_wake_lock_timeout_acquire(&wma->wow_wake_lock, 2000,
-				      WIFI_POWER_EVENT_WAKELOCK_WOW);
 
 	return ret;
 }
@@ -23326,6 +23392,53 @@ void wma_set_wifi_start_logger(void *wma_handle,
 }
 #endif
 
+/**
+ * wma_send_flush_logs_to_fw() - Send log flush command to FW
+ * @wma_handle: WMI handle
+ *
+ * This function is used to send the flush command to the FW,
+ * that will flush the fw logs that are residue in the FW
+ *
+ * Return: None
+ */
+void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle)
+{
+	VOS_STATUS status;
+	wmi_debug_mesg_flush_fixed_param *cmd;
+	wmi_buf_t buf;
+	int len = sizeof(*cmd);
+	int ret;
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGP("%s: wmi_buf_alloc failed", __func__);
+		return;
+	}
+
+	cmd = (wmi_debug_mesg_flush_fixed_param *) wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+			WMITLV_TAG_STRUC_wmi_debug_mesg_flush_fixed_param,
+			WMITLV_GET_STRUCT_TLVLEN(
+				wmi_debug_mesg_flush_fixed_param));
+	cmd->reserved0 = 0;
+
+	ret = wmi_unified_cmd_send(wma_handle->wmi_handle,
+				   buf,
+				   len,
+				   WMI_DEBUG_MESG_FLUSH_CMDID);
+	if (ret != EOK) {
+		WMA_LOGE("Failed to send WMI_DEBUG_MESG_FLUSH_CMDID");
+		wmi_buf_free(buf);
+		return;
+	}
+	WMA_LOGI("Sent WMI_DEBUG_MESG_FLUSH_CMDID to FW");
+
+	status = vos_timer_start(&wma_handle->log_completion_timer,
+				 WMA_LOG_COMPLETION_TIMER);
+	if (status != VOS_STATUS_SUCCESS)
+		WMA_LOGE("Failed to start the log completion timer");
+}
+
 /*
  * function   : wma_mc_process_msg
  * Description :
@@ -23463,6 +23576,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			wma_pktlog_wmi_send_cmd(wma_handle,
 						(struct ath_pktlog_wmi_params *)
 						msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
 			break;
 #endif
 #if defined(QCA_WIFI_FTM)
@@ -23939,6 +24053,10 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			wma_set_wifi_start_logger(wma_handle,
 					(struct sir_wifi_start_log *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
+			break;
+		case SIR_HAL_FLUSH_LOG_TO_FW:
+			wma_send_flush_logs_to_fw(wma_handle);
+			/* Body ptr is NULL here */
 			break;
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
@@ -24904,6 +25022,31 @@ void wma_scan_completion_timeout(void *data)
         return;
 }
 
+/**
+ * wma_log_completion_timeout() - Log completion timeout
+ * @data: Timeout handler data
+ *
+ * This function is called when log completion timer expires
+ *
+ * Return: None
+ */
+void wma_log_completion_timeout(void *data)
+{
+	tp_wma_handle wma_handle;
+
+	WMA_LOGE("%s: Timeout occured for log completion command", __func__);
+
+	wma_handle = (tp_wma_handle) data;
+	if (!wma_handle)
+		WMA_LOGE("%s: Invalid WMA handle", __func__);
+
+	/* Though we did not receive any event from FW,
+	 * we can flush whatever logs we have with us */
+	vos_logging_set_fw_flush_complete();
+
+	return;
+}
+
 /* function   : wma_start
  * Description :
  * Args       :
@@ -25063,6 +25206,26 @@ VOS_STATUS wma_start(v_VOID_t *vos_ctx)
 		goto end;
 	}
 
+	/* Initialize log completion timeout */
+	vos_status = vos_timer_init(&wma_handle->log_completion_timer,
+			VOS_TIMER_TYPE_SW,
+			wma_log_completion_timeout,
+			wma_handle);
+	if (vos_status != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to initialize log completion timeout");
+		goto end;
+	}
+
+	/* Initialize the log flush complete event handler */
+	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
+			WMI_DEBUG_MESG_FLUSH_COMPLETE_EVENTID,
+			wma_flush_complete_evt_handler);
+	if (status != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to register log flush complete event cb");
+		vos_status = VOS_STATUS_E_FAILURE;
+		goto end;
+	}
+
 end:
 	WMA_LOGD("%s: Exit", __func__);
 	return vos_status;
@@ -25077,6 +25240,7 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 {
 	tp_wma_handle wma_handle;
 	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+	int i;
 
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
 
@@ -25113,6 +25277,12 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
                 WMA_LOGE("Failed to destroy the scan completion timer");
         }
 
+	/* Destroy the timer for log completion */
+	vos_status = vos_timer_destroy(&wma_handle->log_completion_timer);
+	if (vos_status != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to destroy the log completion timer");
+	}
+
 	/* There's no need suspend target which is already down during SSR. */
 	if (!vos_is_logp_in_progress(VOS_MODULE_ID_HIF, NULL)) {
 #ifdef HIF_USB
@@ -25124,6 +25294,14 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 		if (wma_suspend_target(wma_handle, 1))
 			WMA_LOGE("Failed to suspend target");
 #endif
+	}
+
+	/* clean up ll-queue for all vdev */
+	for (i = 0; i < wma_handle->max_bssid; i++) {
+		if (wma_handle->interfaces[i].handle &&
+				wma_handle->interfaces[i].vdev_up) {
+			ol_txrx_vdev_flush(wma_handle->interfaces[i].handle);
+		}
 	}
 
 	vos_status = wma_tx_detach(wma_handle);

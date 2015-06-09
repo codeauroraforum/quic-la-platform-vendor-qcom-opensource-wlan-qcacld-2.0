@@ -112,6 +112,8 @@
 
 #include "wlan_hdd_memdump.h"
 
+#include "wlan_logging_sock_svc.h"
+
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
 #define FREQ_BASE_80211G          (2407)
@@ -1405,7 +1407,8 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 	struct nlattr *curr_attr;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX + 1];
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX + 1];
-	int rem,i, buf_len;
+	int rem, i;
+	uint32_t buf_len = 0;
 	uint8_t *buf;
 	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX,
 		data, data_len,
@@ -1459,15 +1462,20 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 			}
 			buf = nla_data(tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID]);
 			buf_len = nla_len(tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID]);
-			nla_strlcpy(roam_params.ssid_allowed_list[i].ssId,
+			if (buf_len) {
+				nla_strlcpy(roam_params.ssid_allowed_list[i].ssId,
 					tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID],
 					buf_len);
-			roam_params.ssid_allowed_list[i].length =
-				buf_len - 1;
-			hddLog(VOS_TRACE_LEVEL_DEBUG,
+				roam_params.ssid_allowed_list[i].length =
+					buf_len - 1;
+				hddLog(VOS_TRACE_LEVEL_DEBUG,
 					FL("SSID[%d]: %s,length = %d"), i,
 					roam_params.ssid_allowed_list[i].ssId,
 					roam_params.ssid_allowed_list[i].length);
+			}
+			else {
+				hddLog(VOS_TRACE_LEVEL_ERROR, FL("Invalid buffer length"));
+			}
 			i++;
 		}
 		sme_update_roam_params(pHddCtx->hHal, session_id,
@@ -6168,7 +6176,7 @@ qca_wlan_vendor_wifi_logger_start_policy
 };
 
 /**
- * wlan_hdd_cfg80211_wifi_logger_start() - This function is used to enable
+ * __wlan_hdd_cfg80211_wifi_logger_start() - This function is used to enable
  * or disable the collection of packet statistics from the firmware
  * @wiphy:    WIPHY structure pointer
  * @wdev:     Wireless device structure pointer
@@ -6180,7 +6188,7 @@ qca_wlan_vendor_wifi_logger_start_policy
  *
  * Return: 0 on success and errno on failure
  */
-static int wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 					       struct wireless_dev *wdev,
 					       const void *data,
 					       int data_len)
@@ -6248,6 +6256,133 @@ static int wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 	return 0;
+}
+
+/**
+ * wlan_hdd_cfg80211_wifi_logger_start() - Wrapper function used to enable
+ * or disable the collection of packet statistics from the firmware
+ * @wiphy:    WIPHY structure pointer
+ * @wdev:     Wireless device structure pointer
+ * @data:     Pointer to the data received
+ * @data_len: Length of the data received
+ *
+ * This function is used to enable or disable the collection of packet
+ * statistics from the firmware
+ *
+ * Return: 0 on success and errno on failure
+ */
+static int wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data,
+					       int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_wifi_logger_start(wiphy,
+			wdev, data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
+
+static const struct
+nla_policy
+qca_wlan_vendor_wifi_logger_get_ring_data_policy
+[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_ID]
+		= {.type = NLA_U32 },
+};
+
+/**
+ * __wlan_hdd_cfg80211_wifi_logger_get_ring_data() - Flush per packet stats
+ * @wiphy:    WIPHY structure pointer
+ * @wdev:     Wireless device structure pointer
+ * @data:     Pointer to the data received
+ * @data_len: Length of the data received
+ *
+ * This function is used to flush or retrieve the per packet statistics from
+ * the driver
+ *
+ * Return: 0 on success and errno on failure
+ */
+static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						const void *data,
+						int data_len)
+{
+	eHalStatus status;
+	VOS_STATUS ret;
+	uint32_t ring_id;
+	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+	struct nlattr *tb
+		    [QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX + 1];
+
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != status) {
+		hddLog(LOGE, FL("HDD context is not valid"));
+		return -EINVAL;
+	}
+
+	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX,
+			data, data_len,
+			qca_wlan_vendor_wifi_logger_get_ring_data_policy)) {
+		hddLog(LOGE, FL("Invalid attribute"));
+		return -EINVAL;
+	}
+
+	/* Parse and fetch ring id */
+	if (!tb[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_ID]) {
+		hddLog(LOGE, FL("attr ATTR failed"));
+		return -EINVAL;
+	}
+
+	ring_id = nla_get_u32(
+			tb[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_ID]);
+
+	if (ring_id == RING_ID_PER_PACKET_STATS) {
+		wlan_logging_set_per_pkt_stats();
+		hddLog(LOG1, FL("Flushing/Retrieving packet stats"));
+	}
+
+	hddLog(LOG1, FL("Bug report triggered by framework"));
+
+	ret = vos_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
+			     WLAN_LOG_INDICATOR_FRAMEWORK,
+			     WLAN_LOG_REASON_CODE_UNUSED);
+	if (VOS_STATUS_SUCCESS != ret) {
+		hddLog(LOGE, FL("Failed to trigger bug report"));
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * wlan_hdd_cfg80211_wifi_logger_get_ring_data() - Wrapper to flush packet stats
+ * @wiphy:    WIPHY structure pointer
+ * @wdev:     Wireless device structure pointer
+ * @data:     Pointer to the data received
+ * @data_len: Length of the data received
+ *
+ * This function is used to flush or retrieve the per packet statistics from
+ * the driver
+ *
+ * Return: 0 on success and errno on failure
+ */
+static int wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						const void *data,
+						int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_wifi_logger_get_ring_data(wiphy,
+			wdev, data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
 }
 
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
@@ -6534,8 +6669,15 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
 			WIPHY_VENDOR_CMD_NEED_NETDEV |
 			WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_get_tdls_capabilities
-	}
+	},
 #endif
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GET_RING_DATA,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV,
+		.doit = (void *)wlan_hdd_cfg80211_wifi_logger_get_ring_data
+	},
 };
 
 
@@ -11940,7 +12082,10 @@ void hdd_select_cbmode( hdd_adapter_t *pAdapter,v_U8_t operationChannel)
        case eHDD_DOT11_MODE_11ac:
        case eHDD_DOT11_MODE_11ac_ONLY:
 #ifdef WLAN_FEATURE_11AC
-          hddDot11Mode = eHDD_DOT11_MODE_11ac;
+          if (sme_IsFeatureSupportedByFW(DOT11AC))
+              hddDot11Mode = eHDD_DOT11_MODE_11ac;
+          else
+              hddDot11Mode = eHDD_DOT11_MODE_11n;
 #else
           hddDot11Mode = eHDD_DOT11_MODE_11n;
 #endif
@@ -12582,7 +12727,16 @@ int wlan_hdd_cfg80211_set_ie( hdd_adapter_t *pAdapter,
                 pWextState->roamProfile.pRSNReqIE = pWextState->WPARSNIE;
                 pWextState->roamProfile.nRSNReqIELength = eLen + 2; //ie_len;
                 break;
-                /* Appending Extended Capabilities with Interworking bit set in Assoc Req */
+                /* Appending Extended Capabilities with Interworking bit set
+                 * in Assoc Req.
+                 *
+                 * In assoc req this EXT Cap will only be taken into account if
+                 * interworkingService bit is set to 1. Currently
+                 * driver is only interested in interworkingService capability
+                 * from supplicant. If in future any other EXT Cap info is
+                 * required from supplicat, it needs to be handled while
+                 * sending Assoc Req in LIM.
+                 */
             case DOT11F_EID_EXTCAP:
                 {
                     v_U16_t curAddIELen = pWextState->assocAddIE.length;
@@ -13027,7 +13181,7 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
                                                   0);
     }
 
-    if (0 > status) {
+    if (0 != status) {
         //ReEnable BMPS if disabled
         // If PS offload is enabled, fw will take care of
 // ps in cae of concurrency.
@@ -14514,7 +14668,8 @@ static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
 #endif //LINUX_VERSION_CODE
 
 static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
-                                           struct net_device *dev, u8 *mac)
+                                      struct net_device *dev,
+                                      struct tagCsrDelStaParams *pDelStaParams)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     hdd_context_t *pHddCtx;
@@ -14538,49 +14693,56 @@ static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
     if ((WLAN_HDD_SOFTAP == pAdapter->device_mode) ||
         (WLAN_HDD_P2P_GO == pAdapter->device_mode)) {
-        if ((NULL == mac) || (vos_is_macaddr_broadcast((v_MACADDR_t *)mac))) {
+        if (vos_is_macaddr_broadcast((v_MACADDR_t *)pDelStaParams->peerMacAddr))
+        {
             v_U16_t i;
             for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
                 if ((pAdapter->aStaInfo[i].isUsed) &&
                     (!pAdapter->aStaInfo[i].isDeauthInProgress)) {
-                    u8 *macAddr = pAdapter->aStaInfo[i].macAddrSTA.bytes;
+                    vos_mem_copy(pDelStaParams->peerMacAddr,
+                                 pAdapter->aStaInfo[i].macAddrSTA.bytes,
+                                 ETHER_ADDR_LEN);
+
 #ifdef IPA_UC_OFFLOAD
                     if (pHddCtx->cfg_ini->IpaUcOffloadEnabled) {
                        hdd_ipa_wlan_evt(pAdapter, pAdapter->aStaInfo[i].ucSTAId,
-                          WLAN_CLIENT_DISCONNECT, macAddr);
+                          WLAN_CLIENT_DISCONNECT, pDelStaParams->peerMacAddr);
                     }
 #endif /* IPA_UC_OFFLOAD */
                     hddLog(VOS_TRACE_LEVEL_INFO,
                            FL("Delete STA with MAC::"MAC_ADDRESS_STR),
-                           MAC_ADDR_ARRAY(macAddr));
+                           MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
 
                     /* Send disassoc and deauth both to avoid some IOT issues */
-                    hdd_softap_sta_disassoc(pAdapter, macAddr);
-                    vos_status = hdd_softap_sta_deauth(pAdapter, macAddr);
+                    hdd_softap_sta_disassoc(pAdapter,
+                                            pDelStaParams->peerMacAddr);
+                    vos_status = hdd_softap_sta_deauth(pAdapter, pDelStaParams);
                     if (VOS_IS_STATUS_SUCCESS(vos_status))
                         pAdapter->aStaInfo[i].isDeauthInProgress = TRUE;
                 }
             }
         } else {
-            vos_status = hdd_softap_GetStaId(pAdapter,(v_MACADDR_t *)mac, &staId);
+            vos_status = hdd_softap_GetStaId(pAdapter,
+                            (v_MACADDR_t *)pDelStaParams->peerMacAddr, &staId);
             if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
                 hddLog(VOS_TRACE_LEVEL_INFO,
                        FL("Skip DEL STA as this is not used::"MAC_ADDRESS_STR),
-                       MAC_ADDR_ARRAY(mac));
+                       MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
                 return -ENOENT;
             }
 
 #ifdef IPA_UC_OFFLOAD
             if (pHddCtx->cfg_ini->IpaUcOffloadEnabled) {
                hdd_ipa_wlan_evt(pAdapter, staId,
-                  WLAN_CLIENT_DISCONNECT, mac);
+                  WLAN_CLIENT_DISCONNECT, pDelStaParams->peerMacAddr);
             }
 #endif /* IPA_UC_OFFLOAD */
 
             if (pAdapter->aStaInfo[staId].isDeauthInProgress == TRUE) {
                 hddLog(VOS_TRACE_LEVEL_INFO,
                        FL("Skip DEL STA as deauth is in progress::"
-                          MAC_ADDRESS_STR), MAC_ADDR_ARRAY(mac));
+                          MAC_ADDRESS_STR),
+                          MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
                 return -ENOENT;
             }
 
@@ -14588,16 +14750,16 @@ static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
             hddLog(VOS_TRACE_LEVEL_INFO,
                    FL("Delete STA with MAC::"MAC_ADDRESS_STR),
-                   MAC_ADDR_ARRAY(mac));
+                   MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
 
             /* Send disassoc and deauth both to avoid some IOT issues */
-            hdd_softap_sta_disassoc(pAdapter, mac);
-            vos_status = hdd_softap_sta_deauth(pAdapter, mac);
+            hdd_softap_sta_disassoc(pAdapter, pDelStaParams->peerMacAddr);
+            vos_status = hdd_softap_sta_deauth(pAdapter, pDelStaParams);
             if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
                 pAdapter->aStaInfo[staId].isDeauthInProgress = FALSE;
                 hddLog(VOS_TRACE_LEVEL_INFO,
                        FL("STA removal failed for ::"MAC_ADDRESS_STR),
-                       MAC_ADDR_ARRAY(mac));
+                       MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
                 return -ENOENT;
             }
         }
@@ -14607,13 +14769,33 @@ static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
     return 0;
 }
 
+#ifdef CFG80211_DEL_STA_V2
+int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
+                                         struct net_device *dev,
+                                         struct station_del_parameters *param)
+#else
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
                                   struct net_device *dev, u8 *mac)
+#endif
 {
     int ret;
+    struct tagCsrDelStaParams delStaParams;
 
     vos_ssr_protect(__func__);
-    ret = __wlan_hdd_cfg80211_del_station(wiphy, dev, mac);
+#ifdef CFG80211_DEL_STA_V2
+    if (NULL == param) {
+        hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Invalid argumet passed", __func__);
+        return -EINVAL;
+    }
+
+    WLANSAP_PopulateDelStaParams(param->mac, param->reason_code,
+                                 param->subtype, &delStaParams);
+
+#else
+    WLANSAP_PopulateDelStaParams(mac, eSIR_MAC_DEAUTH_LEAVING_BSS_REASON,
+                                 (SIR_MAC_MGMT_DEAUTH >> 4), &delStaParams);
+#endif
+    ret = __wlan_hdd_cfg80211_del_station(wiphy, dev, &delStaParams);
     vos_ssr_unprotect(__func__);
 
     return ret;
@@ -14880,7 +15062,7 @@ wlan_hdd_cfg80211_update_ft_ies(struct wiphy *wiphy,
 #endif
 
 #ifdef FEATURE_WLAN_SCAN_PNO
-static int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter)
+int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter)
 {
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     hdd_scaninfo_t *pScanInfo = NULL;
@@ -15992,8 +16174,10 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
                         return -EPERM;
                     }
                     wlan_hdd_tdls_set_peer_link_status(pTdlsPeer,
-                                                       eTDLS_LINK_IDLE,
-                                                       eTDLS_LINK_UNSPECIFIED);
+                                eTDLS_LINK_IDLE,
+                                (pTdlsPeer->link_status == eTDLS_LINK_TEARING)?
+                                eTDLS_LINK_UNSPECIFIED:
+                                eTDLS_LINK_DROPPED_BY_REMOTE);
                 }
                 else
                 {

@@ -733,6 +733,8 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
         return;
     }
 
+    vos_mem_set(( tANI_U8* )&extractedExtCap, sizeof( tDot11fIEExtCap ), 0);
+
     // Fill out 'frm', after which we'll just hand the struct off to
     // 'dot11fPackProbeResponse'.
     vos_mem_set(( tANI_U8* )pFrm, sizeof( tDot11fProbeResponse ), 0);
@@ -907,8 +909,6 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
             return;
         }
 
-       vos_mem_set(( tANI_U8* )&extractedExtCap,
-            sizeof( tDot11fIEExtCap ), 0);
        nSirStatus = limStripOffExtCapIEAndUpdateStruct(pMac,
                                   addIE,
                                   &totalAddnIeLen,
@@ -2193,6 +2193,16 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
                                       extractedExtCap.bytes;
         if (p_ext_cap->interworkingService)
             p_ext_cap->qosMap = 1;
+        else {
+            /* No need to merge the EXT Cap from Supplicant
+             * if interworkingService is not set, as currently
+             * driver is only interested in interworkingService
+             * capability from supplicant. if in
+             * future any other EXT Cap info is required from
+             * supplicant it needs to be handled here.
+             */
+             extractedExtCapFlag = eANI_BOOLEAN_FALSE;
+        }
     }
 
     caps = pMlmAssocReq->capabilityInfo;
@@ -5323,9 +5333,14 @@ tSirRetStatus limSendAddBAReq( tpAniSirGlobal pMac,
                 nStatus );
     }
 
-    limLog( pMac, LOGW,
-      FL( "Sending an ADDBA REQ to " ));
-    limPrintMacAddr( pMac, pMlmAddBAReq->peerMacAddr, LOGW );
+    limLog( pMac, LOG1, FL( "Sending an ADDBA REQ to "MAC_ADDRESS_STR " with"
+                            " tid = %d policy = %d buffsize = %d "
+                            " amsduSupported = %d"),
+                            MAC_ADDR_ARRAY(pMlmAddBAReq->peerMacAddr),
+                            frmAddBAReq.AddBAParameterSet.tid,
+                            frmAddBAReq.AddBAParameterSet.policy,
+                            frmAddBAReq.AddBAParameterSet.bufferSize,
+                            frmAddBAReq.AddBAParameterSet.amsduSupported);
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
@@ -5525,9 +5540,15 @@ tSirRetStatus limSendAddBARsp( tpAniSirGlobal pMac,
                 nStatus);
       }
 
-      limLog( pMac, LOGW,
-          FL( "Sending an ADDBA RSP to " ));
-      limPrintMacAddr( pMac, pMlmAddBARsp->peerMacAddr, LOGW );
+      limLog( pMac, LOG1, FL( "Sending an ADDBA RSP to "MAC_ADDRESS_STR " with"
+                              " tid = %d policy = %d buffsize = %d"
+                              " amsduSupported = %d status %d"),
+                              MAC_ADDR_ARRAY(pMlmAddBARsp->peerMacAddr),
+                              frmAddBARsp.AddBAParameterSet.tid,
+                              frmAddBARsp.AddBAParameterSet.policy,
+                              frmAddBARsp.AddBAParameterSet.bufferSize,
+                              frmAddBARsp.AddBAParameterSet.amsduSupported,
+                              frmAddBARsp.Status.status);
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||

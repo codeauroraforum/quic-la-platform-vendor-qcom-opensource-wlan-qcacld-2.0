@@ -1012,18 +1012,23 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
         }
     }
 
-    if (eCSR_ROAM_IBSS_LEAVE == roamStatus)
-    {
-        sta_id = IBSS_BROADCAST_STAID;
-    }
-    else
-    {
-        sta_id = pHddStaCtx->conn_info.staId[0];
-    }
      hdd_wmm_adapter_clear(pAdapter);
 #if defined(WLAN_FEATURE_VOWIFI_11R)
     sme_FTReset(WLAN_HDD_GET_HAL_CTX(pAdapter), pAdapter->sessionId);
 #endif
+    if (eCSR_ROAM_IBSS_LEAVE == roamStatus) {
+        sta_id = IBSS_BROADCAST_STAID;
+        vstatus = hdd_roamDeregisterSTA(pAdapter, sta_id);
+        if (!VOS_IS_STATUS_SUCCESS(vstatus)) {
+            hddLog(LOGE,
+                   FL("hdd_roamDeregisterSTA() failed for staID %d Status=%d [0x%x]"),
+                   sta_id, status, status);
+            status = eHAL_STATUS_FAILURE;
+        }
+        pHddCtx->sta_to_adapter[sta_id] = NULL;
+    }
+    sta_id = pHddStaCtx->conn_info.staId[0];
+
     //We should clear all sta register with TL, for now, only one.
     vstatus = hdd_roamDeregisterSTA( pAdapter, sta_id );
     if ( !VOS_IS_STATUS_SUCCESS(vstatus ) )
@@ -1200,27 +1205,19 @@ static VOS_STATUS hdd_roamRegisterSTA( hdd_adapter_t *pAdapter,
     * All the traffic routed to WLAN host driver, do not need to
     * route IPA. It should be routed kernel network stack */
 #if defined(IPA_OFFLOAD) && !defined(IPA_UC_OFFLOAD)
-   if (hdd_ipa_is_enabled(pHddCtx)) {
+   if (hdd_ipa_is_enabled(pHddCtx))
       vosStatus = WLANTL_RegisterSTAClient( pHddCtx->pvosContext,
                                          hdd_ipa_process_rxt,
                                          hdd_tx_complete_cbk,
                                          hdd_tx_fetch_packet_cbk, &staDesc,
                                          pBssDesc->rssi );
-   } else {
-      vosStatus = WLANTL_RegisterSTAClient( pHddCtx->pvosContext,
-                                         hdd_rx_mul_packet_cbk,
-                                         hdd_tx_complete_cbk,
-                                         hdd_tx_fetch_packet_cbk, &staDesc,
-                                         pBssDesc->rssi );
-   }
-#else
+   else
+#endif
    vosStatus = WLANTL_RegisterSTAClient( pHddCtx->pvosContext,
                                          hdd_rx_packet_cbk,
                                          hdd_tx_complete_cbk,
                                          hdd_tx_fetch_packet_cbk, &staDesc,
                                          pBssDesc->rssi );
-#endif
-
    if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
    {
       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
@@ -2596,23 +2593,17 @@ VOS_STATUS hdd_roamRegisterTDLSSTA( hdd_adapter_t *pAdapter,
     * All the traffic routed to WLAN host driver, do not need to
     * route IPA. It should be routed kernel network stack */
 #if defined(IPA_OFFLOAD) && !defined(IPA_UC_OFFLOAD)
-    if (hdd_ipa_is_enabled(pHddCtx)) {
+    if (hdd_ipa_is_enabled(pHddCtx))
        vosStatus = WLANTL_RegisterSTAClient( pVosContext,
                                           hdd_ipa_process_rxt,
                                           hdd_tx_complete_cbk,
                                           hdd_tx_fetch_packet_cbk, &staDesc, 0 );
-    } else {
-       vosStatus = WLANTL_RegisterSTAClient( pHddCtx->pvosContext,
-                                          hdd_rx_mul_packet_cbk,
-                                          hdd_tx_complete_cbk,
-                                          hdd_tx_fetch_packet_cbk, &staDesc, 0 );
-   }
-#else
+    else
+#endif
     vosStatus = WLANTL_RegisterSTAClient( pVosContext,
                                           hdd_rx_packet_cbk,
                                           hdd_tx_complete_cbk,
                                           hdd_tx_fetch_packet_cbk, &staDesc, 0 );
-#endif
 
     if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
     {

@@ -1122,6 +1122,7 @@ void limPostFTPreAuthRsp(tpAniSirGlobal pMac, tSirRetStatus status,
 #if defined WLAN_FEATURE_VOWIFI_11R_DEBUG
            PELOGE(limLog(pMac, LOGE, FL("psessionEntry is not in STA mode"));)
 #endif
+           vos_mem_free(pFTPreAuthRsp);
            return;
        }
        pFTPreAuthRsp->smeSessionId = psessionEntry->smeSessionId;
@@ -1760,6 +1761,7 @@ limProcessFTAggrQosReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf )
 #if defined WLAN_FEATURE_VOWIFI_11R_DEBUG
        PELOGE(limLog(pMac, LOGE, FL("psessionEntry is not in STA mode"));)
 #endif
+       vos_mem_free(pAggrAddTsParam);
        return eSIR_FAILURE;
     }
 
