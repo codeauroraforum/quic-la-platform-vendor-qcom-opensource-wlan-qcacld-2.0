@@ -15189,3 +15189,31 @@ uint8_t sme_is_any_session_in_connected_state(tHalHandle h_hal)
 	return ret;
 }
 
+/**
+ * sme_disable_non_fcc_channel() - non-fcc channel disable request
+ * @hal: HAL pointer
+ * @fcc_constraint: true: disable, false; enable
+ *
+ * Return: eHalStatus.
+ */
+eHalStatus sme_disable_non_fcc_channel(tHalHandle hal, bool fcc_constraint)
+{
+	eHalStatus status = eHAL_STATUS_SUCCESS;
+	tpAniSirGlobal mac_ptr  = PMAC_STRUCT(hal);
+
+	status = sme_AcquireGlobalLock(&mac_ptr->sme);
+
+	if (eHAL_STATUS_SUCCESS == status) {
+
+		if (fcc_constraint != mac_ptr->scan.fcc_constraint) {
+			mac_ptr->scan.fcc_constraint = fcc_constraint;
+
+			/* update the channel list to the firmware */
+			status = csrUpdateChannelList(mac_ptr);
+		}
+
+		sme_ReleaseGlobalLock(&mac_ptr->sme);
+	}
+
+	return status;
+}

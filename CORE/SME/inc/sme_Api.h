@@ -4110,4 +4110,8 @@ eHalStatus sme_set_rssi_monitoring(tHalHandle hal,
 					struct rssi_monitor_req *input);
 eHalStatus sme_set_rssi_threshold_breached_cb(tHalHandle hal,
 			void (*cb)(void *, struct rssi_breach_event *));
+
+eHalStatus sme_disable_non_fcc_channel(tHalHandle hHal,
+				       bool fcc_constraint);
+
 #endif //#if !defined( __SME_API_H )
