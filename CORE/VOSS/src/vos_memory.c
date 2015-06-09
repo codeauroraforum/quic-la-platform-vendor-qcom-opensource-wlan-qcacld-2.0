@@ -54,14 +54,13 @@
 #include "vos_memory.h"
 #include "vos_trace.h"
 
-#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
-#else
-#include <wcnss_api.h>
-#endif
 #endif
 
+#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
+#include <net/cnss_prealloc.h>
+#endif
 
 #ifdef MEMORY_DEBUG
 #include "wlan_hdd_dp_utils.h"
