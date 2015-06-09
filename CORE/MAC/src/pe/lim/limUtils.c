@@ -5712,7 +5712,7 @@ limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 
 void
 limDeleteBASessions(tpAniSirGlobal pMac, tpPESession pSessionEntry,
-                    tANI_U32 baDirection, tSirMacReasonCodes baReasonCode)
+                    tANI_U32 baDirection)
 {
     tANI_U32 i;
     tANI_U8 tid;
@@ -5740,14 +5740,14 @@ limDeleteBASessions(tpAniSirGlobal pMac, tpPESession pSessionEntry,
                                        (baDirection & BA_INITIATOR))
                         {
                             limPostMlmDelBAReq(pMac, pSta, eBA_INITIATOR, tid,
-                                               baReasonCode,
+                                               eSIR_MAC_UNSPEC_FAILURE_REASON,
                                                pSessionEntry);
                         }
                         if ((eBA_ENABLE == pSta->tcCfg[tid].fUseBARx) &&
                                         (baDirection & BA_RECIPIENT))
                         {
                             limPostMlmDelBAReq(pMac, pSta, eBA_RECIPIENT, tid,
-                                               baReasonCode,
+                                               eSIR_MAC_UNSPEC_FAILURE_REASON,
                                                pSessionEntry);
                         }
                     }
@@ -5765,14 +5765,14 @@ limDeleteBASessions(tpAniSirGlobal pMac, tpPESession pSessionEntry,
                                     (baDirection & BA_INITIATOR))
                     {
                         limPostMlmDelBAReq(pMac, pSta, eBA_INITIATOR, tid,
-                                           baReasonCode,
+                                           eSIR_MAC_UNSPEC_FAILURE_REASON,
                                            pSessionEntry);
                     }
                     if ((eBA_ENABLE == pSta->tcCfg[tid].fUseBARx) &&
                                     (baDirection & BA_RECIPIENT))
                     {
                         limPostMlmDelBAReq(pMac, pSta, eBA_RECIPIENT, tid,
-                                           baReasonCode,
+                                           eSIR_MAC_UNSPEC_FAILURE_REASON,
                                            pSessionEntry);
                     }
                 }
@@ -5798,8 +5798,7 @@ void limDelAllBASessions(tpAniSirGlobal pMac)
         pSessionEntry = peFindSessionBySessionId(pMac, i);
         if (pSessionEntry)
         {
-            limDeleteBASessions(pMac, pSessionEntry, BA_BOTH_DIRECTIONS,
-                                eSIR_MAC_UNSPEC_FAILURE_REASON);
+            limDeleteBASessions(pMac, pSessionEntry, BA_BOTH_DIRECTIONS);
         }
     }
 }
@@ -5822,8 +5821,7 @@ void limDelPerBssBASessionsBtc(tpAniSirGlobal pMac)
     {
         PELOGW(limLog(pMac, LOGW,
         "Deleting the BA for session %d as host got BTC event", sessionId);)
-        limDeleteBASessions(pMac, pSessionEntry, BA_RECIPIENT,
-                            eSIR_MAC_PEER_TIMEDOUT_REASON);
+        limDeleteBASessions(pMac, pSessionEntry, BA_RECIPIENT);
     }
 }
 
