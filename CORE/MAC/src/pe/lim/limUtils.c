@@ -8179,3 +8179,28 @@ void lim_set_vht_caps(tpAniSirGlobal p_mac, tpPESession p_session_entry,
 }
 #endif /* WLAN_FEATURE_11AC */
 
+/**
+ * lim_check_and_reset_protection_params() - reset protection related parameters
+ *
+ * @mac_ctx: pointer to global mac structure
+ *
+ * resets protection related global parameters if the pe active session count
+ * is zero.
+ *
+ * Return: None
+ */
+void lim_check_and_reset_protection_params(tpAniSirGlobal mac_ctx)
+{
+	if (!pe_get_active_session_count(mac_ctx)) {
+		vos_mem_zero(&mac_ctx->lim.gLimOverlap11gParams,
+			sizeof(mac_ctx->lim.gLimOverlap11gParams));
+		vos_mem_zero(&mac_ctx->lim.gLimOverlap11aParams,
+			sizeof(mac_ctx->lim.gLimOverlap11aParams));
+		vos_mem_zero(&mac_ctx->lim.gLimOverlapHt20Params,
+			sizeof(mac_ctx->lim.gLimOverlapHt20Params));
+		vos_mem_zero(&mac_ctx->lim.gLimOverlapNonGfParams,
+			sizeof(mac_ctx->lim.gLimOverlapNonGfParams));
+
+		mac_ctx->lim.gHTOperMode = eSIR_HT_OP_MODE_PURE;
+	}
+}

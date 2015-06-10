@@ -620,4 +620,5 @@ void peDeleteSession(tpAniSirGlobal pMac, tpPESession psessionEntry);
   --------------------------------------------------------------------------*/
 
 
+int pe_get_active_session_count(tpAniSirGlobal mac_ctx);
 #endif //#if !defined( __LIM_SESSION_H )
