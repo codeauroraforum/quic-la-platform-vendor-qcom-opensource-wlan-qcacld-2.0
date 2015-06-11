@@ -1644,6 +1644,17 @@ int wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 #endif
 
 /**
+ * __hdd_p2p_roc_work_queue() - roc delayed work queue handler
+ * @work: Pointer to work queue struct
+ *
+ * Return: none
+ */
+static void __hdd_p2p_roc_work_queue(struct work_struct *work)
+{
+	wlan_hdd_roc_request_dequeue(work);
+}
+
+/**
  * hdd_p2p_roc_work_queue() - roc delayed work queue handler
  * @work: Pointer to work queue struct
  *
@@ -1651,7 +1662,11 @@ int wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
  */
 void hdd_p2p_roc_work_queue(struct work_struct *work)
 {
-	wlan_hdd_roc_request_dequeue(work);
+	vos_ssr_protect(__func__);
+	__hdd_p2p_roc_work_queue(work);
+	vos_ssr_unprotect(__func__);
+
+	return;
 }
 
 void hdd_sendActionCnf( hdd_adapter_t *pAdapter, tANI_BOOLEAN actionSendSuccess )
