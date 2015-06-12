@@ -244,6 +244,7 @@ enum {
     QCSAP_GET_FW_STATUS,
     QCASAP_DUMP_STATS,
     QCASAP_CLEAR_STATS,
+    QCASAP_SET_RADAR_DBG,
 };
 
 int iw_softap_get_channel_list(struct net_device *dev,

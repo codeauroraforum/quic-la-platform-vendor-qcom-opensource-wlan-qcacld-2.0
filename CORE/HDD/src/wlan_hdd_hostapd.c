@@ -2281,6 +2281,11 @@ static iw_softap_setparam(struct net_device *dev,
 
     switch(sub_cmd)
     {
+        case QCASAP_SET_RADAR_DBG:
+            hddLog(LOG1, FL("QCASAP_SET_RADAR_DBG called with: value: %d"),
+                   set_value);
+            sme_enable_phy_error_logs(hHal, (bool) set_value);
+            break;
 
         case QCSAP_PARAM_CLR_ACL:
             if (VOS_STATUS_SUCCESS != WLANSAP_ClearACL(
@@ -5256,6 +5261,9 @@ static const struct iw_priv_args hostapd_private_args[] = {
         0,
         "crash_inject" },
 #endif
+    {   QCASAP_SET_RADAR_DBG,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,  "setRadarDbg" },
 };
 
 static const iw_handler hostapd_private[] = {

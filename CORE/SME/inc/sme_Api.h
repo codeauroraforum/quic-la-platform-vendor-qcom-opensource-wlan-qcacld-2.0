@@ -53,7 +53,7 @@
 #include "btcApi.h"
 #include "vos_nvitem.h"
 #include "p2p_Api.h"
-#include "smeInternal.h" 
+#include "smeInternal.h"
 #include "regdomain.h"
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -4136,4 +4136,6 @@ bool sme_validate_sap_channel_switch(tHalHandle hal,
 					eCsrPhyMode sap_phy_mode,
 					uint8_t cc_switch_mode,
 					uint32_t session_id);
+
+void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
 #endif //#if !defined( __SME_API_H )

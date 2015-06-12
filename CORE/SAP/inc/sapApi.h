@@ -629,6 +629,7 @@ typedef struct tagSapStruct
     //Information Required for SAP DFS Master mode
     tSapDfsInfo         SapDfsInfo;
     tSapCtxList         sapCtxList[SAP_MAX_NUM_SESSION];
+    bool enable_dfs_phy_error_logs;
 } tSapStruct, *tpSapStruct;
 
 #define WPS_PROBRSP_VER_PRESENT                          0x00000001

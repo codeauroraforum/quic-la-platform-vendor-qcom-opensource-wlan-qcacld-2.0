@@ -14974,3 +14974,21 @@ bool sme_validate_sap_channel_switch(tHalHandle hal,
 	return (intf_channel == 0)? true : false;
 }
 #endif
+
+/**
+ * sme_enable_phy_error_logs() - Enable DFS phy error logs
+ * @hal:        global hal handle
+ * @enable_log: value to set
+ *
+ * Since the frequency of DFS phy error is very high, enabling logs for them
+ * all the times can cause crash and will also create lot of useless logs
+ * causing difficulties in debugging other issue. This function will be called
+ * from iwpriv cmd to eanble such logs temporarily.
+ *
+ * Return: void
+ */
+void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log)
+{
+    tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+    mac_ctx->sap.enable_dfs_phy_error_logs = enable_log;
+}
