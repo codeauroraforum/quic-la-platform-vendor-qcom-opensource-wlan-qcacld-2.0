@@ -4386,6 +4386,10 @@ static int wma_unified_phyerr_rx_event_handler(void * handle,
     A_UINT64 tsf64 = 0;
     int phy_err_code = 0;
     int error = 0;
+    tpAniSirGlobal mac_ctx = (tpAniSirGlobal)vos_get_context(VOS_MODULE_ID_PE,
+                                                              wma->vos_context);
+    bool enable_log = mac_ctx->sap.enable_dfs_phy_error_logs;
+
     param_tlvs = (WMI_PHYERR_EVENTID_param_tlvs *)data;
 
     if (!param_tlvs)
@@ -4490,7 +4494,7 @@ static int wma_unified_phyerr_rx_event_handler(void * handle,
                             /* Extension RSSI */
                             WMI_UNIFIED_RSSI_COMB_GET(&ev->hdr) & 0xff,
                             ev->hdr.tsf_timestamp,
-                            tsf64);
+                            tsf64, enable_log);
             }
         }
 

@@ -53,7 +53,7 @@
 #include "btcApi.h"
 #include "vos_nvitem.h"
 #include "p2p_Api.h"
-#include "smeInternal.h" 
+#include "smeInternal.h"
 #include "regdomain.h"
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -4270,4 +4270,6 @@ eHalStatus sme_set_mas(tANI_U32 val);
  *
  */
 eHalStatus sme_set_miracast(tHalHandle hal, uint8_t filter_type);
+
+void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
 #endif //#if !defined( __SME_API_H )
