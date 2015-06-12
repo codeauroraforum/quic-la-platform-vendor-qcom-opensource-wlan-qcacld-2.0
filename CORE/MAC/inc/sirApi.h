@@ -5653,4 +5653,21 @@ typedef struct sir_ocb_set_sched_request
 /* Max number of rates allowed in Supported Rates IE */
 #define MAX_NUM_SUPPORTED_RATES (8)
 
+/**
+ * struct vdev_ie_info - IE info
+ * @vdev_i - vdev for which the IE is being sent
+ * @ie_id - ID of the IE
+ * @length - length of the IE data
+ * @data - IE data
+ *
+ * This structure is used to store the IE information.
+ */
+struct vdev_ie_info
+{
+	uint32_t vdev_id;
+	uint32_t ie_id;
+	uint32_t length;
+	uint8_t *data;
+};
+
 #endif /* __SIR_API_H */
