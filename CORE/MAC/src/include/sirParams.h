@@ -697,6 +697,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_SET_MAS                    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 311)
 #define SIR_HAL_SET_MIRACAST               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 312)
 
+#define SIR_HAL_SET_IE_INFO                 (SIR_HAL_ITC_MSG_TYPES_BEGIN + 331)
 #define SIR_HAL_UPDATE_WEP_DEFAULT_KEY      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 337)
 
 #define SIR_HAL_GET_RSSI                   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 338)

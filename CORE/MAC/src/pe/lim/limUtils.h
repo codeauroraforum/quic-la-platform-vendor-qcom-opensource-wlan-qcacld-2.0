@@ -600,4 +600,6 @@ void lim_sap_offload_del_sta(tpAniSirGlobal pmac,
                             tpSirMsgQ lim_msgq);
 #endif /* SAP_AUTH_OFFLOAD */
 
+eHalStatus lim_send_ext_cap_ie(tpAniSirGlobal mac_ctx,
+			       uint32_t session_id);
 #endif /* __LIM_UTILS_H */
