@@ -401,6 +401,14 @@
 #endif
 #define SIR_MAC_MAX_SUPPORTED_MCS_SET    16
 
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
+
+#define VHT_MCS_1x1 0xFFFC
+#define VHT_MCS_2x2 0xFFF3
+
 /// Workaround IE to change beacon length when it is 4*n+1
 #define SIR_MAC_ANI_WORKAROUND_EID     255
 #define SIR_MAC_ANI_WORKAROUND_EID_MIN     0

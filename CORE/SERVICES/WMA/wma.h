@@ -385,6 +385,8 @@ typedef struct {
 	u_int32_t pwrgating;
 	u_int32_t burst_enable;
 	u_int32_t burst_dur;
+	u_int32_t chainmask_2g;
+	u_int32_t chainmask_5g;
 } pdev_cli_config_t;
 
 typedef struct {
@@ -541,6 +543,8 @@ struct wma_txrx_node {
 	v_BOOL_t roam_synch_in_progress;
 	void *plink_status_req;
 	void *psnr_req;
+	uint8_t nss_2g;
+	uint8_t nss_5g;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -745,6 +749,8 @@ typedef struct wma_handle {
 
 	/* OCB request contexts */
 	struct sir_ocb_config *ocb_config_req;
+	uint32_t txrx_chainmask;
+	uint8_t per_band_chainmask_supp;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {

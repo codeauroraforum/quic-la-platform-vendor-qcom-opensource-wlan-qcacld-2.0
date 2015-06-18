@@ -537,6 +537,8 @@ typedef struct
     tANI_U16 smpsMode;
     tANI_U8 dot11_mode;
     tANI_U8 nonRoamReassoc;
+    uint8_t nss_2g;
+    uint8_t nss_5g;
 } tAddBssParams, * tpAddBssParams;
 
 typedef struct
@@ -1420,8 +1422,31 @@ typedef struct sAddStaSelfParams
    tANI_U32        type;
    tANI_U32        subType;
    tANI_U8         sessionId;
-   tANI_U32 status;
+   tANI_U32        status;
+   uint8_t         nss_2g;
+   uint8_t         nss_5g;
 }tAddStaSelfParams, *tpAddStaSelfParams;
+
+/**
+ * struct set_ie_param - set IE params structure
+ * @pdev_id: pdev id
+ * @ie_type: IE type
+ * @nss: Nss value
+ * @ie_len: IE length
+ * @*ie_ptr: Pointer to IE data
+ *
+ * Holds the set pdev IE req data.
+ */
+struct set_ie_param {
+   uint8_t pdev_id;
+   uint8_t ie_type;
+   uint8_t nss;
+   uint8_t ie_len;
+   uint8_t *ie_ptr;
+};
+
+#define DOT11_HT_IE     1
+#define DOT11_VHT_IE    2
 
 #ifdef FEATURE_WLAN_TDLS
 

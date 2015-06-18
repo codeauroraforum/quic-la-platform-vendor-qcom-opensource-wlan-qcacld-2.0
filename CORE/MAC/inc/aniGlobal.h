@@ -149,6 +149,27 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #define HIGH_SEQ_NUM_MASK				0x0FF0
 #define HIGH_SEQ_NUM_OFFSET				4
 
+/*
+ * NSS cfg bit definition.
+ * STA          BIT[0:1]
+ * SAP          BIT[2:3]
+ * P2P_GO       BIT[4:5]
+ * P2P_CLIENT   BIT[6:7]
+ * IBSS         BIT[8:9]
+ * TDLS         BIT[10:11]
+ * P2P_DEVICE   BIT[12:13]
+ * OCB          BIT[14:15]
+ */
+
+#define CFG_STA_NSS(_x)     ((((_x) >> 0) & 0x3) ? (((_x) >> 0) & 0x3) : 1)
+#define CFG_SAP_NSS(_x)     ((((_x) >> 2) & 0x3) ? (((_x) >> 2) & 0x3) : 1)
+#define CFG_P2P_GO_NSS(_x)  ((((_x) >> 4) & 0x3) ? (((_x) >> 4) & 0x3) : 1)
+#define CFG_P2P_CLI_NSS(_x) ((((_x) >> 6) & 0x3) ? (((_x) >> 6) & 0x3) : 1)
+#define CFG_P2P_DEV_NSS(_x) ((((_x) >> 8) & 0x3) ? (((_x) >> 8) & 0x3) : 1)
+#define CFG_IBSS_NSS(_x)    ((((_x) >> 10) & 0x3) ? (((_x) >> 10) & 0x3) : 1)
+#define CFG_TDLS_NSS(_x)    ((((_x) >> 12) & 0x3) ? (((_x) >> 12) & 0x3) : 1)
+#define CFG_OCB_NSS(_x)     ((((_x) >> 14) & 0x3) ? (((_x) >> 14) & 0x3) : 1)
+
 // -------------------------------------------------------------------
 // Change channel generic scheme
 typedef void (*CHANGE_CHANNEL_CALLBACK)(tpAniSirGlobal pMac, eHalStatus status, tANI_U32 *data,
@@ -965,10 +986,33 @@ typedef struct sHalMacStartParameters
 
 } tHalMacStartParameters;
 
+/**
+ * struct vdev_type_nss - vdev type nss structure
+ *
+ * @sta: STA Nss value.
+ * @sap: SAP Nss value.
+ * @p2p_go: P2P GO Nss value.
+ * @p2p_cli: P2P CLI Nss value.
+ * @p2p_dev: P2P device Nss value.
+ * @ibss: IBSS Nss value.
+ * @tdls: TDLS Nss value.
+ * @ocb: OCB Nss value.
+ *
+ * Holds the Nss values of different vdev types.
+ */
+struct vdev_type_nss {
+    uint8_t sta;
+    uint8_t sap;
+    uint8_t p2p_go;
+    uint8_t p2p_cli;
+    uint8_t p2p_dev;
+    uint8_t ibss;
+    uint8_t tdls;
+    uint8_t ocb;
+};
 // -------------------------------------------------------------------
 /// MAC Sirius parameter structure
 typedef struct sAniSirGlobal
-
 {
     tDriverType  gDriverType;
 
@@ -1049,6 +1093,10 @@ typedef struct sAniSirGlobal
     /* 802.11p enable */
     bool enable_dot11p;
     uint8_t f_prefer_non_dfs_on_radar;
+    /* per band chain mask support */
+    bool per_band_chainmask_supp;
+    struct vdev_type_nss vdev_type_nss_2g;
+    struct vdev_type_nss vdev_type_nss_5g;
 } tAniSirGlobal;
 
 typedef enum
