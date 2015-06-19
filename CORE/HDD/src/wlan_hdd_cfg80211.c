@@ -2290,8 +2290,6 @@ static int wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 	return ret;
 }
 
-
-
 /*
  * define short names for the global vendor params
  * used by wlan_hdd_cfg80211_extscan_get_cached_results()
