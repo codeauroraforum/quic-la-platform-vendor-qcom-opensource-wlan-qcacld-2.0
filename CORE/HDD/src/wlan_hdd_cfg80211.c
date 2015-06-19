@@ -12468,8 +12468,7 @@ static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
                            MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
 
                     /* Send disassoc and deauth both to avoid some IOT issues */
-                    hdd_softap_sta_disassoc(pAdapter,
-                                            pDelStaParams->peerMacAddr);
+                    hdd_softap_sta_disassoc(pAdapter, pDelStaParams);
                     vos_status = hdd_softap_sta_deauth(pAdapter, pDelStaParams);
                     if (VOS_IS_STATUS_SUCCESS(vos_status))
                         pAdapter->aStaInfo[i].isDeauthInProgress = TRUE;
@@ -12507,7 +12506,7 @@ static int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
                    MAC_ADDR_ARRAY(pDelStaParams->peerMacAddr));
 
             /* Send disassoc and deauth both to avoid some IOT issues */
-            hdd_softap_sta_disassoc(pAdapter, pDelStaParams->peerMacAddr);
+            hdd_softap_sta_disassoc(pAdapter, pDelStaParams);
             vos_status = hdd_softap_sta_deauth(pAdapter, pDelStaParams);
             if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
                 pAdapter->aStaInfo[staId].isDeauthInProgress = FALSE;
