@@ -358,6 +358,7 @@ void hdd_mon_tx_mgmt_pkt(hdd_adapter_t* pAdapter)
    struct sk_buff* skb;
    hdd_adapter_t* pMonAdapter = NULL;
    struct ieee80211_hdr *hdr;
+   struct tagCsrDelStaParams delStaParams;
 
    if (pAdapter == NULL)
    {
@@ -415,8 +416,6 @@ void hdd_mon_tx_mgmt_pkt(hdd_adapter_t* pAdapter)
        if( (hdr->frame_control & HDD_FRAME_SUBTYPE_MASK)
                                        == HDD_FRAME_SUBTYPE_DEAUTH )
        {
-          struct tagCsrDelStaParams delStaParams;
-
           WLANSAP_PopulateDelStaParams(hdr->addr1, eCsrForcedDeauthSta,
                                     (SIR_MAC_MGMT_DEAUTH >> 4), &delStaParams);
           hdd_softap_sta_deauth (pAdapter, &delStaParams);
@@ -425,7 +424,11 @@ void hdd_mon_tx_mgmt_pkt(hdd_adapter_t* pAdapter)
        else if( (hdr->frame_control & HDD_FRAME_SUBTYPE_MASK)
                                       == HDD_FRAME_SUBTYPE_DISASSOC )
        {
-          hdd_softap_sta_disassoc( pAdapter, hdr->addr1 );
+           WLANSAP_PopulateDelStaParams(hdr->addr1,
+                                        eSIR_MAC_DEAUTH_LEAVING_BSS_REASON,
+                                        (SIR_MAC_MGMT_DISASSOC >> 4),
+                                        &delStaParams);
+          hdd_softap_sta_disassoc( pAdapter, &delStaParams );
           goto mgmt_handled;
        }
    }
