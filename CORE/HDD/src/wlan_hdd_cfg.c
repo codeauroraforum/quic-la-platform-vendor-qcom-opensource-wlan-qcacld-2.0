@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2116,6 +2116,15 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_ENABLE_HOST_SSDP_MIN,
                  CFG_ENABLE_HOST_SSDP_MAX ),
 
+#ifdef FEATURE_SECURE_FIRMWARE
+   REG_VARIABLE(CFG_ENABLE_FW_HASH_CHECK_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, enable_fw_hash_check,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_ENABLE_FW_HASH_CHECK_DEFAULT,
+                CFG_ENABLE_FW_HASH_CHECK_MIN,
+                CFG_ENABLE_FW_HASH_CHECK_MAX),
+#endif
+
    REG_VARIABLE( CFG_ENABLE_HOST_NSOFFLOAD_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, fhostNSOffload,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3538,12 +3547,12 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_ADVERTISE_CONCURRENT_OPERATION_MIN,
                  CFG_ADVERTISE_CONCURRENT_OPERATION_MAX ),
 
-   REG_VARIABLE( CFG_ENABLE_HYSTERETIC_MODE, WLAN_PARAM_Integer,
-                 hdd_config_t, enableHystereticMode,
+   REG_VARIABLE( CFG_ENABLE_MEMORY_DEEP_SLEEP, WLAN_PARAM_Integer,
+                 hdd_config_t, enableMemDeepSleep,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-                 CFG_ENABLE_HYSTERETIC_MODE_DEFAULT,
-                 CFG_ENABLE_HYSTERETIC_MODE_MIN,
-                 CFG_ENABLE_HYSTERETIC_MODE_MAX ),
+                 CFG_ENABLE_MEMORY_DEEP_SLEEP_DEFAULT,
+                 CFG_ENABLE_MEMORY_DEEP_SLEEP_MIN,
+                 CFG_ENABLE_MEMORY_DEEP_SLEEP_MAX ),
 
    REG_VARIABLE( CFG_DEFAULT_RATE_INDEX_24GH, WLAN_PARAM_Integer,
                  hdd_config_t, defaultRateIndex24Ghz,
@@ -3980,6 +3989,12 @@ REG_TABLE_ENTRY mbssid_sap_dyn_ini_reg_table[] =
                  CFG_SAP_FORCE_11AC_FOR_11N_MIN,
                  CFG_SAP_FORCE_11AC_FOR_11N_MAX ),
 
+   REG_VARIABLE(CFG_P2P_LISTEN_DEFER_INTERVAL_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, p2p_listen_defer_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_P2P_LISTEN_DEFER_INTERVAL_DEFAULT,
+                CFG_P2P_LISTEN_DEFER_INTERVAL_MIN,
+                CFG_P2P_LISTEN_DEFER_INTERVAL_MAX),
 };
 #endif
 
@@ -4307,6 +4322,10 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [mcastBcastFilterSetting] Value = [%u] ",pHddCtx->cfg_ini->mcastBcastFilterSetting);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [fhostArpOffload] Value = [%u] ",pHddCtx->cfg_ini->fhostArpOffload);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ssdp] Value = [%u] ", pHddCtx->cfg_ini->ssdp);
+#ifdef FEATURE_SECURE_FIRMWARE
+  hddLog(LOG2, "Name = [enable_fw_hash_check] Value = [%u]",
+         pHddCtx->cfg_ini->enable_fw_hash_check);
+#endif
 #ifdef FEATURE_WLAN_RA_FILTERING
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [RArateLimitInterval] Value = [%u] ", pHddCtx->cfg_ini->RArateLimitInterval);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [IsRArateLimitEnabled] Value = [%u] ", pHddCtx->cfg_ini->IsRArateLimitEnabled);
@@ -4526,7 +4545,8 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
            "Name = [gExtWoWApp2TcpRxTimeout] Value = [%u]",
                    pHddCtx->cfg_ini->extWowApp2TcpRxTimeout);
 #endif
-
+  hddLog(LOG2, "Name = [gP2PListenDeferInterval] Value = [%u]",
+                   pHddCtx->cfg_ini->p2p_listen_defer_interval);
 }
 
 #define CFG_VALUE_MAX_LEN 256

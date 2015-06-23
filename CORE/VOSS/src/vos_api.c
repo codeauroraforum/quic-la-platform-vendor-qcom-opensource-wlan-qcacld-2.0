@@ -224,6 +224,23 @@ VOS_STATUS vos_preClose( v_CONTEXT_t *pVosContext )
 
 } /* vos_preClose()*/
 
+#if defined (FEATURE_SECURE_FIRMWARE) && defined (FEATURE_FW_HASH_CHECK)
+static inline void vos_fw_hash_check_config(struct ol_softc *scn,
+					hdd_context_t *pHddCtx)
+{
+	scn->enable_fw_hash_check = pHddCtx->cfg_ini->enable_fw_hash_check;
+}
+#elif defined (FEATURE_SECURE_FIRMWARE)
+static inline void vos_fw_hash_check_config(struct ol_softc *scn,
+					hdd_context_t *pHddCtx)
+{
+	scn->enable_fw_hash_check = true;
+}
+#else
+static inline void vos_fw_hash_check_config(struct ol_softc *scn,
+					hdd_context_t *pHddCtx) { }
+#endif
+
 /*---------------------------------------------------------------------------
 
   \brief vos_open() - Open the vOSS Module
@@ -357,6 +374,8 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
 #ifdef WLAN_FEATURE_LPSS
    scn->enablelpasssupport = pHddCtx->cfg_ini->enablelpasssupport;
 #endif
+
+   vos_fw_hash_check_config(scn, pHddCtx);
 
    /* Initialize BMI and Download firmware */
    if (bmi_download_firmware(scn)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1344,6 +1344,13 @@ typedef enum
 #define CFG_ENABLE_HOST_SSDP_MAX               ( 1 )
 #define CFG_ENABLE_HOST_SSDP_DEFAULT           ( 1 )
 
+#ifdef FEATURE_SECURE_FIRMWARE
+#define CFG_ENABLE_FW_HASH_CHECK_NAME          "gEnableFWHashCheck"
+#define CFG_ENABLE_FW_HASH_CHECK_MIN           ( 0 )
+#define CFG_ENABLE_FW_HASH_CHECK_MAX           ( 1 )
+#define CFG_ENABLE_FW_HASH_CHECK_DEFAULT       ( 1 )
+#endif
+
 #define CFG_ENABLE_HOST_NSOFFLOAD_NAME         "hostNSOffload"
 #define CFG_ENABLE_HOST_NSOFFLOAD_MIN          ( 0 )
 #define CFG_ENABLE_HOST_NSOFFLOAD_MAX          ( 1 )
@@ -1543,10 +1550,10 @@ typedef enum
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_MAX     ( 1 )
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_DEFAULT ( 0 )
 
-#define CFG_ENABLE_HYSTERETIC_MODE            "gEnableHystereticMode"
-#define CFG_ENABLE_HYSTERETIC_MODE_MIN        ( 0 )
-#define CFG_ENABLE_HYSTERETIC_MODE_MAX        ( 1 )
-#define CFG_ENABLE_HYSTERETIC_MODE_DEFAULT    ( 0 )
+#define CFG_ENABLE_MEMORY_DEEP_SLEEP          "gEnableMemDeepSleep"
+#define CFG_ENABLE_MEMORY_DEEP_SLEEP_MIN      ( 0 )
+#define CFG_ENABLE_MEMORY_DEEP_SLEEP_MAX      ( 1 )
+#define CFG_ENABLE_MEMORY_DEEP_SLEEP_DEFAULT  ( 1 )
 
 /* In cfg.dat 1=1MBPS, 2=2MBPS, 3=5_5MBPS, 4=11MBPS, 5=6MBPS, 6=9MBPS,
  * 7=12MBPS, 8=18MBPS, 9=24MBPS. But 6=9MBPS and 8=18MBPS are not basic
@@ -2829,6 +2836,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_INFORM_BSS_RSSI_RAW_MAX                (1)
 #define CFG_INFORM_BSS_RSSI_RAW_DEFAULT            (1)
 
+#define CFG_P2P_LISTEN_DEFER_INTERVAL_NAME        "gP2PListenDeferInterval"
+#define CFG_P2P_LISTEN_DEFER_INTERVAL_MIN         (100)
+#define CFG_P2P_LISTEN_DEFER_INTERVAL_MAX         (200)
+#define CFG_P2P_LISTEN_DEFER_INTERVAL_DEFAULT     (100)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3339,7 +3351,7 @@ typedef struct
    v_U8_t                      apMaxOffloadPeers;
    v_U8_t                      apMaxOffloadReorderBuffs;
    v_BOOL_t                    advertiseConcurrentOperation;
-   v_BOOL_t                    enableHystereticMode;
+   v_BOOL_t                    enableMemDeepSleep;
 
    v_U32_t                     defaultRateIndex24Ghz;
    char                        overrideCountryCode[4];
@@ -3431,6 +3443,10 @@ typedef struct
    bool                        enable_mac_spoofing;
    uint8_t                     sap_dot11mc;
    uint8_t                     inform_bss_rssi_raw;
+#ifdef FEATURE_SECURE_FIRMWARE
+   bool                        enable_fw_hash_check;
+#endif
+   uint16_t                    p2p_listen_defer_interval;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

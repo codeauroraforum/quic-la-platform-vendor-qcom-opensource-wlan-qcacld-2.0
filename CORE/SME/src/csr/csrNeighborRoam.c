@@ -2210,6 +2210,10 @@ csrNeighborRoamProcessScanResults(tpAniSirGlobal pMac,
                     VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_WARN,
                                FL("Skipping because received AP "
                                "(probe rsp/beacon) is old."));
+                    if (pBssInfo->pBssDescription)
+                        vos_mem_free(pBssInfo->pBssDescription);
+                    if (pBssInfo)
+                        vos_mem_free(pBssInfo);
                     continue;
                 }
             }
