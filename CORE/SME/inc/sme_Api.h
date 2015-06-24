@@ -4106,4 +4106,8 @@ eHalStatus sme_update_nss(tHalHandle h_hal, uint8_t nss);
 
 uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
 
+eHalStatus sme_set_rssi_monitoring(tHalHandle hal,
+					struct rssi_monitor_req *input);
+eHalStatus sme_set_rssi_threshold_breached_cb(tHalHandle hal,
+			void (*cb)(void *, struct rssi_breach_event *));
 #endif //#if !defined( __SME_API_H )
