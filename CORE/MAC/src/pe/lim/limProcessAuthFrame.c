@@ -157,7 +157,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
     tANI_U8                 challengeTextArray[SIR_MAC_AUTH_CHALLENGE_LENGTH];
     tpDphHashNode           pStaDs = NULL;
     tANI_U16                assocId = 0;
-    /* Added For BT -AMP support */
+    tANI_U16                currSeqNum = 0;
+
     // Get pointer to Authentication frame header and body
 
 
@@ -185,7 +186,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
 
         return;
     }
-
+    currSeqNum = (pHdr->seqControl.seqNumHi << 4) |
+                    (pHdr->seqControl.seqNumLo);
     limLog(pMac, LOG1,
                FL("Sessionid: %d System role : %d limMlmState: %d :Auth "
                "Frame Received: BSSID: "MAC_ADDRESS_STR " (RSSI %d)"),
@@ -621,7 +623,7 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
             if (pAuthNode)
             {
                 /// Pre-auth context exists for the STA
-                if (pHdr->fc.retry == 0)
+                if (pHdr->fc.retry == 0 || pAuthNode->seqNum != currSeqNum)
                 {
                     /**
                      * STA is initiating brand-new Authentication
@@ -754,6 +756,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                                               pRxAuthFrameBody->authAlgoNumber;
                         pAuthNode->fSeen = 0;
                         pAuthNode->fTimerStarted = 0;
+                        pAuthNode->seqNum = ((pHdr->seqControl.seqNumHi << 4) |
+                                                (pHdr->seqControl.seqNumLo));
                         limAddPreAuthNode(pMac, pAuthNode);
 
                         /**
@@ -858,6 +862,9 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                             pRxAuthFrameBody->authAlgoNumber;
                             pAuthNode->fSeen = 0;
                             pAuthNode->fTimerStarted = 0;
+                            pAuthNode->seqNum =
+                                    ((pHdr->seqControl.seqNumHi << 4) |
+                                     (pHdr->seqControl.seqNumLo));
                             limAddPreAuthNode(pMac, pAuthNode);
 
                             PELOG1(limLog(pMac, LOG1, FL("Alloc new data: %x id %d peer "),
@@ -1122,6 +1129,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                                  pMac->lim.gpLimMlmAuthReq->peerMacAddr,
                                  sizeof(tSirMacAddr));
                     pAuthNode->fTimerStarted = 0;
+                    pAuthNode->seqNum = ((pHdr->seqControl.seqNumHi << 4) |
+                                    (pHdr->seqControl.seqNumLo));
                     pAuthNode->authType = pMac->lim.gpLimMlmAuthReq->authType;
                     limAddPreAuthNode(pMac, pAuthNode);
 
@@ -1655,6 +1664,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                              sizeof(tSirMacAddr));
                 pAuthNode->fTimerStarted = 0;
                 pAuthNode->authType = pMac->lim.gpLimMlmAuthReq->authType;
+                pAuthNode->seqNum = ((pHdr->seqControl.seqNumHi << 4) |
+                                (pHdr->seqControl.seqNumLo));
                 limAddPreAuthNode(pMac, pAuthNode);
 
                 limRestoreFromAuthState(pMac, eSIR_SME_SUCCESS,
