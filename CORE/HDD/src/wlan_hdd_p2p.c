@@ -435,12 +435,13 @@ void wlan_hdd_cleanup_remain_on_channel_ctx(hdd_adapter_t *pAdapter)
                      pAdapter->is_roc_inprogress = FALSE;
                 }
                 mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
-
             }
+            /* hold the lock before break from the loop */
+            mutex_lock(&cfgState->remain_on_chan_ctx_lock);
             break;
        }
        mutex_lock(&cfgState->remain_on_chan_ctx_lock);
-   }
+   } /* end of while */
    mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
 
 }
@@ -737,11 +738,12 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
                                    rem_on_channel_request_type_t request_type )
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
+    hdd_context_t *pHddCtx = NULL;
     hdd_remain_on_chan_ctx_t *pRemainChanCtx;
     v_BOOL_t isBusy = VOS_FALSE;
     v_SIZE_t size = 0;
     hdd_adapter_t *sta_adapter;
+    int ret = 0;
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: device_mode = %d",
                                  __func__, pAdapter->device_mode);
@@ -762,17 +764,11 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
      * and which is resulting in crash. So not allowing any remain on
      * channel requets when Load/Unload is in progress
      */
-    if (((hdd_context_t*)pAdapter->pHddCtx)->isLoadInProgress ||
-        ((hdd_context_t*)pAdapter->pHddCtx)->isUnloadInProgress) {
-        hddLog( LOGE,
-                "%s: Wlan Load/Unload is in progress", __func__);
-        return -EBUSY;
-    }
-
-    if (((hdd_context_t*)pAdapter->pHddCtx)->isLogpInProgress) {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                "%s:LOGP in Progress. Ignore!!!", __func__);
-        return -EAGAIN;
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (0 != ret) {
+        hddLog(LOGE, FL("HDD context is not valid"));
+        return ret;
     }
 
     if (hdd_isConnectionInProgress((hdd_context_t *)pAdapter->pHddCtx)) {
@@ -1644,6 +1640,17 @@ int wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 #endif
 
 /**
+ * __hdd_p2p_roc_work_queue() - roc delayed work queue handler
+ * @work: Pointer to work queue struct
+ *
+ * Return: none
+ */
+static void __hdd_p2p_roc_work_queue(struct work_struct *work)
+{
+	wlan_hdd_roc_request_dequeue(work);
+}
+
+/**
  * hdd_p2p_roc_work_queue() - roc delayed work queue handler
  * @work: Pointer to work queue struct
  *
@@ -1651,7 +1658,11 @@ int wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
  */
 void hdd_p2p_roc_work_queue(struct work_struct *work)
 {
-	wlan_hdd_roc_request_dequeue(work);
+	vos_ssr_protect(__func__);
+	__hdd_p2p_roc_work_queue(work);
+	vos_ssr_unprotect(__func__);
+
+	return;
 }
 
 void hdd_sendActionCnf( hdd_adapter_t *pAdapter, tANI_BOOLEAN actionSendSuccess )

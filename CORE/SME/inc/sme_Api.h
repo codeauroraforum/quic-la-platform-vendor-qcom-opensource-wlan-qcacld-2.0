@@ -4127,4 +4127,7 @@ uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
 
 bool smeNeighborRoamIsHandoffInProgress(tHalHandle hHal, tANI_U8 sessionId);
 
+eHalStatus sme_disable_non_fcc_channel(tHalHandle hHal,
+				       bool fcc_constraint);
+
 #endif //#if !defined( __SME_API_H )

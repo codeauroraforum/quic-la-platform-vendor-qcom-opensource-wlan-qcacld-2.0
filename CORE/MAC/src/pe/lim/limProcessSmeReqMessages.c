@@ -3062,15 +3062,17 @@ __limProcessSmeDeauthReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
                     break;
                 case eLIM_SME_WT_DEAUTH_STATE:
+                case eLIM_SME_WT_DISASSOC_STATE:
                     /*
-                     * PE Recieved a Deauth frame. Normally it gets
-                     * DEAUTH_CNF but it received DEAUTH_REQ. Which
+                     * PE Recieved a Deauth/Disassoc frame. Normally it gets
+                     * DEAUTH_CNF/DISASSOC_CNF but it received DEAUTH_REQ. Which
                      * means host is also trying to disconnect.
                      * PE can continue processing DEAUTH_REQ and send
                      * the response instead of failing the request.
-                     * SME will anyway ignore DEAUTH_IND that was sent
-                     * for deauth frame.
+                     * SME will anyway ignore DEAUTH_IND/DISASSOC_IND that
+                     * was sent for deauth/disassoc frame.
                      */
+                    psessionEntry->limSmeState = eLIM_SME_WT_DEAUTH_STATE;
                     limLog(pMac, LOG1, FL("Rcvd SME_DEAUTH_REQ while in "
                        "SME_WT_DEAUTH_STATE. "));
                     break;
@@ -6500,7 +6502,8 @@ limProcessSmeDfsCsaIeRequest(tpAniSirGlobal pMac, tANI_U32 *pMsg)
         /* Channel switch announcement needs to be included in beacon */
         psessionEntry->dfsIncludeChanSwIe = VOS_TRUE;
         psessionEntry->gLimChannelSwitch.switchCount = LIM_MAX_CSA_IE_UPDATES;
-        psessionEntry->gLimChannelSwitch.switchMode = 1;
+        if (pMac->sap.SapDfsInfo.disable_dfs_ch_switch == VOS_FALSE)
+            psessionEntry->gLimChannelSwitch.switchMode = 1;
 
         /* Validate if SAP is operating HT or VHT
          * mode and set the Channel Switch Wrapper

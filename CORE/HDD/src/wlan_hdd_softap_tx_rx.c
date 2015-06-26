@@ -253,7 +253,7 @@ int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
       not be reinitialized at this time which will lead crash. */
    if (pHddCtx->isLogpInProgress)
    {
-      VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
+      VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_INFO_HIGH,
                 "%s: LOGP in Progress. Ignore!!!", __func__);
       goto drop_pkt;
    }
@@ -1225,8 +1225,8 @@ VOS_STATUS hdd_softap_rx_packet_cbk(v_VOID_t *vosContext,
    }
 
    pAdapter = pHddCtx->sta_to_adapter[staId];
-   if( NULL == pAdapter )
-   {
+   if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
+      hddLog(LOGE, FL("invalid adapter or adapter has invalid magic"));
       return VOS_STATUS_E_FAILURE;
    }
 

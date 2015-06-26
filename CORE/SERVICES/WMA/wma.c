@@ -18334,8 +18334,6 @@ int wma_disable_wow_in_fw(WMA_HANDLE handle)
 	/* Unpause the vdev as we are resuming */
 	wma_unpause_vdev(wma);
 
-	vos_wake_lock_timeout_acquire(&wma->wow_wake_lock, 2000);
-
 	return ret;
 }
 
@@ -25298,7 +25296,9 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 			adf_nbuf_unmap_single(pdev->osdev, skb, ADF_OS_DMA_TO_DEVICE);
 			/* Call Download Cb so that umac can free the buffer */
 			if (tx_frm_download_comp_cb)
-				tx_frm_download_comp_cb(wma_handle->mac_context, tx_frame, 1);
+				tx_frm_download_comp_cb(wma_handle->mac_context,
+						tx_frame,
+						WMA_TX_FRAME_BUFFER_FREE);
 			wma_handle->umac_data_ota_ack_cb = NULL;
 			wma_handle->last_umac_data_nbuf = NULL;
 			return VOS_STATUS_E_FAILURE;
@@ -25306,7 +25306,9 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 
 		/* Call Download Callback if passed */
 		if (tx_frm_download_comp_cb)
-			tx_frm_download_comp_cb(wma_handle->mac_context, tx_frame, 0);
+			tx_frm_download_comp_cb(wma_handle->mac_context,
+						tx_frame,
+						WMA_TX_FRAME_BUFFER_NO_FREE);
 
 		return VOS_STATUS_SUCCESS;
 	}
@@ -25396,9 +25398,13 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 
 	/*
 	 * Failed to send Tx Mgmt Frame
-	 * Return Failure so that umac can freeup the buf
 	 */
 	if (status) {
+	/* Call Download Cb so that umac can free the buffer */
+		if (tx_frm_download_comp_cb)
+			tx_frm_download_comp_cb(wma_handle->mac_context,
+						tx_frame,
+						WMA_TX_FRAME_BUFFER_FREE);
 		WMA_LOGP("%s: Failed to send Mgmt Frame", __func__);
 		goto error;
 	}
@@ -25438,7 +25444,8 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 		 * callback once the frame is successfully
 		 * given to txrx module
 		 */
-		tx_frm_download_comp_cb(wma_handle->mac_context, tx_frame, 0);
+		tx_frm_download_comp_cb(wma_handle->mac_context, tx_frame,
+					WMA_TX_FRAME_BUFFER_NO_FREE);
 	}
 
 	return VOS_STATUS_SUCCESS;

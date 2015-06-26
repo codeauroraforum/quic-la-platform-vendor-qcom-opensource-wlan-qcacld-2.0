@@ -1325,6 +1325,7 @@ void hdd_suspend_wlan(void (*callback)(void *callbackContext, boolean suspended)
 send_suspend_ind:
        //stop all TX queues before suspend
        netif_tx_disable(pAdapter->dev);
+       WLANTL_PauseUnPauseQs(pVosContext, true);
 
       /* Keep this suspend indication at the end (before processing next adaptor)
        * for discrete. This indication is considered as trigger point to start
@@ -1649,6 +1650,9 @@ void hdd_resume_wlan(void)
 
 send_resume_ind:
       //wake the tx queues
+      hddLog(LOG1, FL("Enabling queues"));
+      WLANTL_PauseUnPauseQs(pVosContext, false);
+
       netif_tx_wake_all_queues(pAdapter->dev);
 
       hdd_conf_resume_ind(pAdapter);
