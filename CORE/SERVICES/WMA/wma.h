@@ -1557,4 +1557,7 @@ VOS_STATUS wma_vdev_start(tp_wma_handle wma, struct wma_vdev_start_req *req,
 
 void wma_remove_vdev_req(tp_wma_handle wma, u_int8_t vdev_id, u_int8_t type);
 
+struct wma_txrx_node *wma_get_interface_by_vdev_id(uint8_t vdev_id);
+bool wma_is_vdev_up(uint8_t vdev_id);
+
 #endif
