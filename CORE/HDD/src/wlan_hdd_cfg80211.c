@@ -6660,6 +6660,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
             switch (channel_type) {
             case NL80211_CHAN_HT20:
             case NL80211_CHAN_NO_HT:
+                smeConfig.csrConfig.obssEnabled = VOS_FALSE;
                 if (channel <= 14)
                     smeConfig.csrConfig.channelBondingMode24GHz =
                                            eCSR_INI_SINGLE_CHANNEL_CENTERED;
