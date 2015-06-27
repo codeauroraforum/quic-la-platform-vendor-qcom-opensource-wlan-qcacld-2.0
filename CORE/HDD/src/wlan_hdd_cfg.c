@@ -4069,6 +4069,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_FINE_TIME_MEAS_CAPABILITY_DEFAULT,
                 CFG_FINE_TIME_MEAS_CAPABILITY_MIN,
                 CFG_FINE_TIME_MEAS_CAPABILITY_MAX),
+
+   REG_VARIABLE(CFG_DROPPED_PKT_DISCONNECT_TH_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, pkt_err_disconn_th,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_DROPPED_PKT_DISCONNECT_TH_DEFAULT,
+                CFG_DROPPED_PKT_DISCONNECT_TH_MIN,
+                CFG_DROPPED_PKT_DISCONNECT_TH_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -6512,6 +6519,8 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
 
    vos_set_multicast_logging(pHddCtx->cfg_ini->multicast_host_fw_msgs);
    hdd_set_fine_time_meas_cap(pHddCtx, smeConfig);
+   smeConfig->csrConfig.pkt_err_disconn_th =
+                   pHddCtx->cfg_ini->pkt_err_disconn_th;
 
    halStatus = sme_UpdateConfig( pHddCtx->hHal, smeConfig);
    if ( !HAL_STATUS_SUCCESS( halStatus ) )
