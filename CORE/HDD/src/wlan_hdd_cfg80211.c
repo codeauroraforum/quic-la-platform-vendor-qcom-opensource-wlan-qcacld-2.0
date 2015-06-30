@@ -3670,7 +3670,8 @@ wlan_hdd_tdls_config_get_status_policy[
     [QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_REASON] = {.type = NLA_S32 },
 
 };
-static int wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
+
+static int __wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
                                                 struct wireless_dev *wdev,
                                                 const void *data,
                                                 int data_len)
@@ -3745,6 +3746,30 @@ nla_put_failure:
     return -EINVAL;
 }
 
+/**
+ * wlan_hdd_cfg80211_exttdls_get_status() - get ext tdls status
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the data to be passed via vendor interface
+ * @data_len:Length of the data to be passed
+ *
+ * Return:   Return the Success or Failure code.
+ */
+static int wlan_hdd_cfg80211_exttdls_get_status(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_exttdls_get_status(wiphy, wdev, data,
+							data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
+
 static int wlan_hdd_cfg80211_exttdls_callback(tANI_U8* mac,
                                               tANI_S32 state,
                                               tANI_S32 reason,
@@ -3795,7 +3820,7 @@ nla_put_failure:
     return -EINVAL;
 }
 
-static int wlan_hdd_cfg80211_exttdls_enable(struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_exttdls_enable(struct wiphy *wiphy,
                                             struct wireless_dev *wdev,
                                             const void *data,
                                             int data_len)
@@ -3886,7 +3911,30 @@ static int wlan_hdd_cfg80211_exttdls_enable(struct wiphy *wiphy,
                                  pReqMsg.min_bandwidth_kbps));
 }
 
-static int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
+/**
+ * wlan_hdd_cfg80211_exttdls_enable() - enable ext tdls
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the data to be passed via vendor interface
+ * @data_len:Length of the data to be passed
+ *
+ * Return:   Return the Success or Failure code.
+ */
+static int wlan_hdd_cfg80211_exttdls_enable(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_exttdls_enable(wiphy, wdev, data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
+
+static int __wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
                                              struct wireless_dev *wdev,
                                              const void *data,
                                              int data_len)
@@ -3928,6 +3976,28 @@ static int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
     return (wlan_hdd_tdls_extctrl_deconfig_peer(pAdapter, peer));
 }
 
+/**
+ * wlan_hdd_cfg80211_exttdls_disable() - disable ext tdls
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the data to be passed via vendor interface
+ * @data_len:Length of the data to be passed
+ *
+ * Return:   Return the Success or Failure code.
+ */
+static int wlan_hdd_cfg80211_exttdls_disable(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_exttdls_disable(wiphy, wdev, data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
 
 static const struct nla_policy
 wlan_hdd_set_no_dfs_flag_config_policy[QCA_WLAN_VENDOR_ATTR_SET_NO_DFS_FLAG_MAX
@@ -13541,21 +13611,6 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
                     {
                         tANI_U8 i;
 
-                        if (pTdlsPeer->is_responder == 0)
-                        {
-                            v_U8_t staId = (v_U8_t)pTdlsPeer->staId;
-
-                            wlan_hdd_tdls_timer_restart(pAdapter,
-                                                        &pTdlsPeer->initiatorWaitTimeoutTimer,
-                                                       WAIT_TIME_TDLS_INITIATOR);
-                            /*
-                             * Suspend initiator TX until it receives direct
-                             * packet from the responder or
-                             * WAIT_TIME_TDLS_INITIATOR timer expires
-                             */
-                            WLANTL_SuspendDataTx( (WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
-                                                   &staId, NULL);
-                        }
                         vos_mem_zero(&smeTdlsPeerStateParams,
                                      sizeof(tSmeTdlsPeerStateParams));
 
