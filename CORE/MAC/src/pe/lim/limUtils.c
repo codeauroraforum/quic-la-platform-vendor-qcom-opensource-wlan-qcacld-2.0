@@ -4104,12 +4104,15 @@ limEnable11gProtection(tpAniSirGlobal pMac, tANI_U8 enable,
                         {
                             limEnableHtRifsProtection(pMac, false, overlap, pBeaconParams,psessionEntry);
                             limEnableHtOBSSProtection(pMac,  false, overlap, pBeaconParams,psessionEntry);
-                            if(psessionEntry->gLimHt20Params.protectionEnabled){
-                                //Commenting out beacuse of CR 258588 WFA cert
-                                //psessionEntry->htOperMode = eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
-                                psessionEntry->htOperMode = eSIR_HT_OP_MODE_PURE;
-                            }
-                            else
+                            if (psessionEntry->gLimHt20Params.protectionEnabled) {
+                                if (eHT_CHANNEL_WIDTH_20MHZ ==
+                                      psessionEntry->htSupportedChannelWidthSet)
+                                    psessionEntry->htOperMode =
+                                        eSIR_HT_OP_MODE_PURE;
+                                else
+                                    psessionEntry->htOperMode =
+                                        eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
+                            } else
                                 psessionEntry->htOperMode = eSIR_HT_OP_MODE_PURE;
                         }
                     }
@@ -4676,7 +4679,10 @@ limEnableHT20Protection(tpAniSirGlobal pMac, tANI_U8 enable,
                psessionEntry->gLimHt20Params.protectionEnabled = true;
                 if(eSIR_HT_OP_MODE_PURE == psessionEntry->htOperMode)
                 {
-                    psessionEntry->htOperMode = eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
+                    if (psessionEntry->htSupportedChannelWidthSet !=
+                            eHT_CHANNEL_WIDTH_20MHZ)
+                        psessionEntry->htOperMode =
+                            eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
                     limEnableHtRifsProtection(pMac, false, overlap, pBeaconParams,psessionEntry);
                     limEnableHtOBSSProtection(pMac,  false, overlap, pBeaconParams,psessionEntry);
                 }
@@ -4736,9 +4742,11 @@ limEnableHT20Protection(tpAniSirGlobal pMac, tANI_U8 enable,
                     {
                         if(psessionEntry->gLimHt20Params.protectionEnabled)
                         {
-                            //Commented beacuse of CR 258588 for WFA Cert
-                            //psessionEntry->htOperMode = eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
-                            psessionEntry->htOperMode = eSIR_HT_OP_MODE_PURE;
+                            if (psessionEntry->htSupportedChannelWidthSet ==
+                                    eHT_CHANNEL_WIDTH_20MHZ)
+                               psessionEntry->htOperMode = eSIR_HT_OP_MODE_PURE;
+                            else
+                               psessionEntry->htOperMode = eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
                             limEnableHtRifsProtection(pMac, false, overlap, pBeaconParams,psessionEntry);
                             limEnableHtOBSSProtection(pMac,  false, overlap, pBeaconParams,psessionEntry);
                         }
