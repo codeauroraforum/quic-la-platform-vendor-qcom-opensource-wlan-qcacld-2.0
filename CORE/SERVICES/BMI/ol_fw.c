@@ -440,51 +440,6 @@ end:
 }
 #endif
 
-/* Max File Name length in 8.3 File Format */
-#define MAX_BOARD_FILE_SIZE 13
-
-/**
- * ol_board_id_to_filename() - Auto BDF board_id to filename conversion
- * @scn:		ol_softc structure for board_id and chip_id info
- * @board_file:	o/p filename based on board_id and chip_id
- *
- * The API return board filname by reference based on the board_id and chip_id.
- * The API uses 8.3 Filename Format and return NULL by reference if input
- * string literal length is greater than 12 chars.
- * The Logic is to strip of last two char's from the input string literal and
- * append the board_id.
- * eg: input = "bdwlan30.bin", board_id = 0x01, board_file = "bdwlan30.b01"
- */
-
-static void ol_board_id_to_filename(struct ol_softc *scn, char *board_file)
-{
-	int input_len;
-	char *src, *dest, *temp, *input;
-
-	if (vos_get_conparam() == VOS_FTM_MODE)
-		input = scn->fw_files.utf_board_data;
-	else
-		input = scn->fw_files.board_data;
-
-	input_len = adf_os_str_len(input);
-
-	if (input_len > MAX_BOARD_FILE_SIZE - 1) {
-		pr_err("%s: input is not in 8.3 format; len:%d\n",
-					__func__, input_len);
-		return;
-	}
-
-	adf_os_mem_set(board_file, 0, input_len);
-
-	src = &input[0];
-	dest = &board_file[0];
-	temp = dest + input_len - 2;
-
-	adf_os_mem_copy(dest, src, input_len - 2);
-	sprintf(temp, "0%x", scn->board_id);
-	dest[input_len] = '\0';
-}
-
 static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 				u_int32_t address, bool compressed)
 {
@@ -500,7 +455,6 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 	SIGN_HEADER_T *sign_header;
 #endif
 	int ret;
-	char buf[MAX_BOARD_FILE_SIZE];
 
 	if (scn->enablesinglebinary && file != ATH_BOARD_DATA_FILE) {
 		/*
@@ -570,11 +524,10 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 		printk("%s: no Patch file defined\n", __func__);
 		return EOK;
 	case ATH_BOARD_DATA_FILE:
-		ol_board_id_to_filename(scn, buf);
 #ifdef QCA_WIFI_FTM
 		if (vos_get_conparam() == VOS_FTM_MODE) {
 #if defined(CONFIG_CNSS) || defined(HIF_SDIO)
-			filename = buf;
+			filename = scn->fw_files.utf_board_data;
 #else
 			filename = QCA_BOARD_DATA_FILE;
 #endif
@@ -587,7 +540,7 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 	}
 #endif /* QCA_WIFI_FTM */
 #if defined(CONFIG_CNSS) || defined(HIF_SDIO)
-		filename = buf;
+		filename = scn->fw_files.board_data;
 #else
 		filename = QCA_BOARD_DATA_FILE;
 #endif
@@ -627,20 +580,20 @@ static int __ol_transfer_bin_file(struct ol_softc *scn, ATH_BIN_FILE file,
 		if (file == ATH_OTP_FILE)
 			return -ENOENT;
 
-#if (defined(CONFIG_CNSS) || defined(HIF_SDIO))
-
-		if (file == ATH_BOARD_DATA_FILE) {
-			if (filename != scn->fw_files.board_data)
-				filename = scn->fw_files.board_data;
-			else
-				return -1;
-		}
-
-		pr_info("%s: Trying to load default %s\n", __func__, filename);
-
-		if (request_firmware(&fw_entry, filename,
+#if defined(QCA_WIFI_FTM) && (defined(CONFIG_CNSS) || defined(HIF_SDIO))
+		/* Try default board data file if FTM specific
+		 * board data file is not present. */
+		if (filename == scn->fw_files.utf_board_data) {
+			filename = scn->fw_files.board_data;
+			printk("%s: Trying to load default %s\n",
+				__func__, filename);
+			if (request_firmware(&fw_entry, filename,
 				scn->sc_osdev->device) != 0) {
-			pr_err("%s: Failed to get %s\n", __func__, filename);
+				printk("%s: Failed to get %s\n",
+					__func__, filename);
+				return -1;
+			}
+		} else {
 			return -1;
 		}
 #else
@@ -1932,8 +1885,7 @@ void ol_transfer_codeswap_struct(struct ol_softc *scn) {
 
 int ol_download_firmware(struct ol_softc *scn)
 {
-	uint32_t param, address = 0;
-	uint8_t bdf_ret = 0;
+	u_int32_t param, address = 0;
 	int status = !EOK;
 #if defined(HIF_PCI) || defined(HIF_SDIO)
 	A_STATUS ret;
@@ -1985,6 +1937,18 @@ int ol_download_firmware(struct ol_softc *scn)
 					offsetof(struct host_interest_s, hi_board_data_initialized)),
 				(u_int8_t *)&param, 4, scn);
 	} else {
+		/* Flash is either not available or invalid */
+		if (ol_transfer_bin_file(scn, ATH_BOARD_DATA_FILE, address, FALSE) != EOK) {
+			return -1;
+		}
+
+		/* Record the fact that Board Data is initialized */
+		param = 1;
+		BMIWriteMemory(scn->hif_hdl,
+				host_interest_item_address(scn->target_type,
+					offsetof(struct host_interest_s, hi_board_data_initialized)),
+				(u_int8_t *)&param, 4, scn);
+
 		/* Transfer One Time Programmable data */
 		address = BMI_SEGMENTED_WRITE_ADDR;
 		printk("%s: Using 0x%x for the remainder of init\n", __func__, address);
@@ -1998,51 +1962,13 @@ int ol_download_firmware(struct ol_softc *scn)
 						      address, TRUE);
 			if (status == EOK) {
 				/* Execute the OTP code only if entry found and downloaded */
-				param = 0x10;
+				param = 0;
 				BMIExecute(scn->hif_hdl, address, &param, scn);
-				bdf_ret = param & 0xff;
-				if (!bdf_ret)
-					scn->board_id = (param >> 8) & 0xffff;
-				pr_debug("%s: chip_id:0x%0x board_id:0x%0x\n",
-						__func__, scn->target_version,
-							scn->board_id);
 			} else if (status < 0) {
 				return status;
 			}
 		}
-
-		BMIReadMemory(scn->hif_hdl,
-			host_interest_item_address(scn->target_type,
-				offsetof(struct host_interest_s,
-						hi_board_data)),
-				(u_int8_t *)&address, 4, scn);
-
-		if (!address) {
-			address = AR6004_REV5_BOARD_DATA_ADDRESS;
-			pr_err("%s: Target address not known! Using 0x%x\n",
-							__func__, address);
-		}
-
-		/* Flash is either not available or invalid */
-		if (ol_transfer_bin_file(scn, ATH_BOARD_DATA_FILE,
-					address, FALSE) != EOK) {
-			pr_err("%s: Board Data Download Failed\n", __func__);
-			return -1;
-		}
-
-		/* Record the fact that Board Data is initialized */
-		param = 1;
-		BMIWriteMemory(scn->hif_hdl,
-				host_interest_item_address(scn->target_type,
-					offsetof(struct host_interest_s,
-						hi_board_data_initialized)),
-				(u_int8_t *)&param, 4, scn);
-
-		address = BMI_SEGMENTED_WRITE_ADDR;
-		param = 0x0;
-		BMIExecute(scn->hif_hdl, address, &param, scn);
 	}
-
 	if (scn->target_version == AR6320_REV1_1_VERSION){
 		/* To disable PCIe use 96 AXI memory as internal buffering,
 		 *  highest bit of PCIE_TXBUF_ADDRESS need be set as 1
@@ -2058,7 +1984,6 @@ int ol_download_firmware(struct ol_softc *scn)
 		printk("Disable PCIe use AXI memory:0x%08X-0x%08X\n", addr, value);
 	}
 
-	address = BMI_SEGMENTED_WRITE_ADDR;
 	if (scn->enablesinglebinary == FALSE) {
 		if (ol_transfer_bin_file(scn, ATH_SETUP_FILE,
 					BMI_SEGMENTED_WRITE_ADDR, TRUE) == EOK) {
@@ -2069,6 +1994,7 @@ int ol_download_firmware(struct ol_softc *scn)
 	}
 
 	/* Download Target firmware - TODO point to target specific files in runtime */
+	address = BMI_SEGMENTED_WRITE_ADDR;
 	if (ol_transfer_bin_file(scn, ATH_FIRMWARE_FILE, address, TRUE) != EOK) {
 		return -1;
 	}
