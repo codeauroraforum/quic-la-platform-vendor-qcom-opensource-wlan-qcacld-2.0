@@ -1621,6 +1621,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
 
     if(pParam)
     {
+        pMac->roam.configParam.pkt_err_disconn_th = pParam->pkt_err_disconn_th;
         pMac->roam.configParam.WMMSupportMode = pParam->WMMSupportMode;
         pMac->roam.configParam.Is11eSupportEnabled = pParam->Is11eSupportEnabled;
         pMac->roam.configParam.FragmentationThreshold = pParam->FragmentationThreshold;
@@ -5932,6 +5933,15 @@ static tANI_BOOLEAN csrRoamProcessResults( tpAniSirGlobal pMac, tSmeCmd *pComman
                        roamInfo.pbFrames = pSession->connectedInfo.pbFrames;
                    }
                 }
+
+                /* Update the staId from the previous connected profile info
+                   as the reassociation is triggred at SME/HDD */
+                if ((eCsrHddIssuedReassocToSameAP ==
+                                    pCommand->u.roamCmd.roamReason) ||
+                    (eCsrSmeIssuedReassocToSameAP ==
+                                    pCommand->u.roamCmd.roamReason))
+                    roamInfo.staId = pSession->connectedInfo.staId;
+
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
                 // Indicate SME-QOS with reassoc success event, only after
                 // copying the frames
@@ -14957,7 +14967,7 @@ eHalStatus csrSendMBAddSelfStaReqMsg( tpAniSirGlobal pMac,
       pMsg->type = pAddStaReq->type;
       pMsg->subType = pAddStaReq->subType;
       pMsg->sessionId = sessionId;
-
+      pMsg->pkt_err_disconn_th = pMac->roam.configParam.pkt_err_disconn_th;
       smsLog( pMac, LOG1, FL("selfMac="MAC_ADDRESS_STR),
               MAC_ADDR_ARRAY(pMsg->selfMacAddr));
       status = palSendMBMessage(pMac->hHdd, pMsg);

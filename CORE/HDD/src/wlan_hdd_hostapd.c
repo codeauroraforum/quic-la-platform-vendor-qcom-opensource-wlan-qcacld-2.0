@@ -4963,6 +4963,11 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
 
     ENTER();
 
+    if (pHddCtx->isLogpInProgress) {
+        hddLog(LOG1, FL("LOGP in Progress. Ignore!!!"));
+        return VOS_STATUS_E_FAILURE;
+    }
+
 #ifdef WLAN_FEATURE_MBSSID
     sapContext = WLANSAP_Open(pVosContext);
     if (sapContext == NULL)

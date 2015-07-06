@@ -37,12 +37,12 @@
 #define __WLANDEFS_H__
 
 #include <a_osapi.h> /* A_COMPILE_TIME_ASSERT */
+#include <osdep.h>
 
 /*
  * This file contains WLAN definitions that may be used across both
  * Host and Target software.
  */
-
 /*
  * MAX_SPATIAL_STREAM should be defined in a fwconfig_xxx.h file,
  * but for now provide a default value here in case it's not defined
@@ -160,29 +160,30 @@ typedef enum {
 
 
 enum {
-    REGDMN_MODE_11A              = 0x00001,      /* 11a channels */
-    REGDMN_MODE_TURBO            = 0x00002,      /* 11a turbo-only channels */
-    REGDMN_MODE_11B              = 0x00004,      /* 11b channels */
-    REGDMN_MODE_PUREG            = 0x00008,      /* 11g channels (OFDM only) */
-    REGDMN_MODE_11G              = 0x00008,      /* XXX historical */
-    REGDMN_MODE_108G             = 0x00020,      /* 11g+Turbo channels */
-    REGDMN_MODE_108A             = 0x00040,      /* 11a+Turbo channels */
-    REGDMN_MODE_XR               = 0x00100,      /* XR channels */
-    REGDMN_MODE_11A_HALF_RATE    = 0x00200,      /* 11A half rate channels */
-    REGDMN_MODE_11A_QUARTER_RATE = 0x00400,      /* 11A quarter rate channels */
-    REGDMN_MODE_11NG_HT20        = 0x00800,      /* 11N-G HT20 channels */
-    REGDMN_MODE_11NA_HT20        = 0x01000,      /* 11N-A HT20 channels */
-    REGDMN_MODE_11NG_HT40PLUS    = 0x02000,      /* 11N-G HT40 + channels */
-    REGDMN_MODE_11NG_HT40MINUS   = 0x04000,      /* 11N-G HT40 - channels */
-    REGDMN_MODE_11NA_HT40PLUS    = 0x08000,      /* 11N-A HT40 + channels */
-    REGDMN_MODE_11NA_HT40MINUS   = 0x10000,      /* 11N-A HT40 - channels */
-    REGDMN_MODE_11AC_VHT20       = 0x20000,      /* 5Ghz, VHT20 */
-    REGDMN_MODE_11AC_VHT40PLUS   = 0x40000,      /* 5Ghz, VHT40 + channels */
-    REGDMN_MODE_11AC_VHT40MINUS  = 0x80000,      /* 5Ghz  VHT40 - channels */
-    REGDMN_MODE_11AC_VHT80       = 0x100000,     /* 5Ghz, VHT80 channels */
-    REGDMN_MODE_11AC_VHT20_2G    = 0x200000,     /* 2Ghz, VHT20 */
-    REGDMN_MODE_11AC_VHT40_2G    = 0x400000,     /* 2Ghz, VHT40 */
-    REGDMN_MODE_11AC_VHT80_2G    = 0x800000,     /* 2Ghz, VHT80 */
+    REGDMN_MODE_11A              = 0x00000001,  /* 11a channels */
+    REGDMN_MODE_TURBO            = 0x00000002,  /* 11a turbo-only channels */
+    REGDMN_MODE_11B              = 0x00000004,  /* 11b channels */
+    REGDMN_MODE_PUREG            = 0x00000008,  /* 11g channels (OFDM only) */
+    REGDMN_MODE_11G              = 0x00000008,  /* XXX historical */
+    REGDMN_MODE_108G             = 0x00000020,  /* 11g+Turbo channels */
+    REGDMN_MODE_108A             = 0x00000040,  /* 11a+Turbo channels */
+    REGDMN_MODE_XR               = 0x00000100,  /* XR channels */
+    REGDMN_MODE_11A_HALF_RATE    = 0x00000200,  /* 11A half rate channels */
+    REGDMN_MODE_11A_QUARTER_RATE = 0x00000400,  /* 11A quarter rate channels */
+    REGDMN_MODE_11NG_HT20        = 0x00000800,  /* 11N-G HT20 channels */
+    REGDMN_MODE_11NA_HT20        = 0x00001000,  /* 11N-A HT20 channels */
+    REGDMN_MODE_11NG_HT40PLUS    = 0x00002000,  /* 11N-G HT40 + channels */
+    REGDMN_MODE_11NG_HT40MINUS   = 0x00004000,  /* 11N-G HT40 - channels */
+    REGDMN_MODE_11NA_HT40PLUS    = 0x00008000,  /* 11N-A HT40 + channels */
+    REGDMN_MODE_11NA_HT40MINUS   = 0x00010000,  /* 11N-A HT40 - channels */
+    REGDMN_MODE_11AC_VHT20       = 0x00020000,  /* 5Ghz, VHT20 */
+    REGDMN_MODE_11AC_VHT40PLUS   = 0x00040000,  /* 5Ghz, VHT40 + channels */
+    REGDMN_MODE_11AC_VHT40MINUS  = 0x00080000,  /* 5Ghz  VHT40 - channels */
+    REGDMN_MODE_11AC_VHT80       = 0x000100000, /* 5Ghz, VHT80 channels */
+    REGDMN_MODE_11AC_VHT20_2G    = 0x000200000, /* 2Ghz, VHT20 */
+    REGDMN_MODE_11AC_VHT40_2G    = 0x000400000, /* 2Ghz, VHT40 */
+    REGDMN_MODE_11AC_VHT80_2G    = 0x000800000, /* 2Ghz, VHT80 */
+    REGDMN_MODE_11AC_VHT160      = 0x001000000, /* 5Ghz, VHT160 */
 };
 
 #define REGDMN_MODE_ALL       (0xFFFFFFFF)       /* REGDMN_MODE_ALL is defined out of the enum
@@ -297,6 +298,8 @@ typedef A_UINT8 A_RATE;
 #error "Extend rate table module first"
 #endif
 
+#define MAX_IBSS_PEERS 32
+
 #if defined(CONFIG_AR900B_SUPPORT) || defined(AR900B)
 typedef struct{
     A_UINT32    psdu_len    [NUM_DYN_BW * NUM_SCHED_ENTRIES];
@@ -362,6 +365,7 @@ typedef struct{
     A_UINT8     sh_pream;
     A_UINT8     bw_in_service;
     A_RATE      probe_rix;
+    A_UINT8     dd_profile;
 } RC_TX_RATE_INFO;
 
 /*

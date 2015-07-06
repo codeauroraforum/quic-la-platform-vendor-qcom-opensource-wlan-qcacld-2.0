@@ -862,6 +862,7 @@ int pktlogmod_init(void *context)
 
 attach_fail:
 	remove_proc_entry(PKTLOG_PROC_DIR, NULL);
+	g_pktlog_pde = NULL;
 	return ret;
 }
 
@@ -870,7 +871,7 @@ void pktlogmod_exit(void *context)
 	struct ol_softc *scn = (struct ol_softc *)context;
 	struct ol_pktlog_dev_t *pl_dev = get_pl_handle(scn);
 
-	if (!pl_dev)
+	if (!pl_dev || g_pktlog_pde == NULL)
 		return;
 
 	/*

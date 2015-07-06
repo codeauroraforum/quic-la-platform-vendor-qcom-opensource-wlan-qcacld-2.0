@@ -651,9 +651,14 @@ end:
 
 static int hdd_netdev_notifier_call(struct notifier_block * nb,
                                          unsigned long state,
-                                         void *ndev)
+                                         void *data)
 {
-   struct net_device *dev = ndev;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0))
+   struct netdev_notifier_info *dev_notif_info = data;
+   struct net_device *dev = dev_notif_info->dev;
+#else
+   struct net_device *dev = data;
+#endif
    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
    hdd_context_t *pHddCtx;
 #ifdef WLAN_BTAMP_FEATURE
@@ -665,11 +670,15 @@ static int hdd_netdev_notifier_call(struct notifier_block * nb,
       return NOTIFY_DONE;
 
    if ((pAdapter->magic != WLAN_HDD_ADAPTER_MAGIC) &&
-      (pAdapter->dev != dev))
+      (pAdapter->dev != dev)) {
+      hddLog(LOGE, FL("device adapter is not matching!!!"));
       return NOTIFY_DONE;
+   }
 
-   if (!dev->ieee80211_ptr)
+   if (!dev->ieee80211_ptr) {
+      hddLog(LOGE, FL("ieee80211_ptr is NULL!!!"));
       return NOTIFY_DONE;
+   }
 
    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    if (NULL == pHddCtx)
@@ -7163,8 +7172,10 @@ void hdd_update_tgt_cfg(void *context, void *param)
                FL("ini BandCapability not supported by the target"));
     }
 
-    hdd_ctx->reg.reg_domain = cfg->reg_domain;
-    hdd_ctx->reg.eeprom_rd_ext = cfg->eeprom_rd_ext;
+    if (!hdd_ctx->isLogpInProgress) {
+        hdd_ctx->reg.reg_domain = cfg->reg_domain;
+        hdd_ctx->reg.eeprom_rd_ext = cfg->eeprom_rd_ext;
+    }
 
     /* This can be extended to other configurations like ht, vht cap... */
 
@@ -9554,6 +9565,11 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
    unsigned long rc;
 
    ENTER();
+
+   if (pHddCtx->isLogpInProgress) {
+       hddLog(LOG1, FL("LOGP in Progress. Ignore!!!"));
+       return VOS_STATUS_E_FAILURE;
+   }
 
    netif_tx_disable(pAdapter->dev);
    netif_carrier_off(pAdapter->dev);

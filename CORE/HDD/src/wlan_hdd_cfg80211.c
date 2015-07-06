@@ -1092,7 +1092,7 @@ static int is_driver_dfs_capable(struct wiphy *wiphy,
 }
 
 static int
-wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
+__wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
                                          struct wireless_dev *wdev,
                                          const void *data,
                                          int data_len)
@@ -1100,6 +1100,13 @@ wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
     hdd_context_t *pHddCtx      = wiphy_priv(wiphy);
     struct sk_buff *skb         = NULL;
     tANI_U32       fset         = 0;
+    int ret;
+
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (0 != ret) {
+        hddLog(LOGE, FL("Hdd context not valid"));
+        return -EINVAL;
+    }
 
     if (wiphy->interface_modes & BIT(NL80211_IFTYPE_STATION)) {
         hddLog(LOG1, FL("Infra Station mode is supported by driver"));
@@ -1207,6 +1214,30 @@ nla_put_failure:
     return -EINVAL;
 }
 
+/**
+ * wlan_hdd_cfg80211_get_supported_features() - get supported features
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the data to be passed via vendor interface
+ * @data_len:Length of the data to be passed
+ *
+ * Return:   Return the Success or Failure code.
+ */
+static int
+wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_get_supported_features(wiphy, wdev,
+						data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
+
 static int
 wlan_hdd_cfg80211_set_scanning_mac_oui(struct wiphy *wiphy,
                                        struct wireless_dev *wdev,
@@ -1273,7 +1304,7 @@ fail:
 }
 
 static int
-wlan_hdd_cfg80211_get_concurrency_matrix(struct wiphy *wiphy,
+__wlan_hdd_cfg80211_get_concurrency_matrix(struct wiphy *wiphy,
                                          struct wireless_dev *wdev,
                                          const void *data,
                                          int data_len)
@@ -1282,8 +1313,16 @@ wlan_hdd_cfg80211_get_concurrency_matrix(struct wiphy *wiphy,
     uint8_t i, feature_sets, max_feature_sets;
     struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_GET_CONCURRENCY_MATRIX_MAX + 1];
     struct sk_buff *reply_skb;
+    hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+    int ret;
 
     ENTER();
+
+    ret = wlan_hdd_validate_context(hdd_ctx);
+    if (0 != ret) {
+        hddLog(LOGE, FL("HDD context is not valid"));
+        return ret;
+    }
 
     if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_GET_CONCURRENCY_MATRIX_MAX,
                   data, data_len, NULL)) {
@@ -1341,6 +1380,28 @@ max_buffer_err:
     return -EINVAL;
 }
 
+/**
+ * wlan_hdd_cfg80211_get_concurrency_matrix() - get concurrency matrix
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the data to be passed via vendor interface
+ * @data_len:Length of the data to be passed
+ *
+ * Return:   Return the Success or Failure code.
+ */
+static int
+wlan_hdd_cfg80211_get_concurrency_matrix(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_get_concurrency_matrix(wiphy, wdev, data,
+                                                     data_len);
+	vos_ssr_unprotect(__func__);
+	return ret;
+}
 
 #ifdef WLAN_FEATURE_STATS_EXT
 static int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
@@ -1447,7 +1508,7 @@ void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx)
 #endif
 
 #ifdef FEATURE_WLAN_EXTSCAN
-static int wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
+static int __wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
                                                 struct wireless_dev *wdev,
                                                 const void *data,
                                                 int data_len)
@@ -1458,8 +1519,16 @@ static int wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
     hdd_context_t *pHddCtx                     = wiphy_priv(wiphy);
     struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX + 1];
     eHalStatus status;
+    int ret;
 
     ENTER();
+
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (0 != ret) {
+        hddLog(LOGE, FL("HDD context is not valid"));
+        return -EINVAL;
+    }
+
     if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
                     data, data_len,
                     wlan_hdd_extscan_config_policy)) {
@@ -1499,6 +1568,29 @@ static int wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 fail:
     vos_mem_free(pReqMsg);
     return -EINVAL;
+}
+
+/**
+ * wlan_hdd_cfg80211_extscan_get_capabilities() - get ext scan capabilities
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wdev
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+static int wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						const void *data, int data_len)
+{
+	int ret = 0;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_extscan_get_capabilities(wiphy, wdev, data,
+		data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
 }
 
 static int wlan_hdd_cfg80211_extscan_get_cached_results(struct wiphy *wiphy,

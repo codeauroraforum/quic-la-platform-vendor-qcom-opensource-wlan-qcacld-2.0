@@ -1370,6 +1370,8 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 			return -EINVAL;
 		}
 
+		del_sta_ctx->is_tdls = true;
+		del_sta_ctx->vdev_id = vdev_id;
 		del_sta_ctx->staId = peer_id;
 		vos_mem_copy(del_sta_ctx->addr2, macaddr, IEEE80211_ADDR_LEN);
 		vos_mem_copy(del_sta_ctx->bssId, wma->interfaces[vdev_id].bssid,
@@ -1431,6 +1433,7 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 		break;
 
 	    case WMI_PEER_STA_KICKOUT_REASON_INACTIVITY:
+		/* This could be for STA or SAP role */
 	    default:
 		break;
 	}
@@ -1444,6 +1447,8 @@ static int wma_peer_sta_kickout_event_handler(void *handle, u8 *event, u32 len)
 		return -EINVAL;
 	}
 
+	del_sta_ctx->is_tdls = false;
+	del_sta_ctx->vdev_id = vdev_id;
 	del_sta_ctx->staId = peer_id;
 	vos_mem_copy(del_sta_ctx->addr2, macaddr, IEEE80211_ADDR_LEN);
 	vos_mem_copy(del_sta_ctx->bssId, wma->interfaces[vdev_id].addr,
@@ -5327,6 +5332,12 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 		goto err_event_init;
 	}
 
+	vos_status = vos_event_init(&wma_handle->recovery_event);
+	if (vos_status != VOS_STATUS_SUCCESS) {
+		WMA_LOGP("%s: recovery event initialization failed", __func__);
+		goto err_event_init;
+	}
+
 	INIT_LIST_HEAD(&wma_handle->vdev_resp_queue);
 	adf_os_spinlock_init(&wma_handle->vdev_respq_lock);
 	adf_os_spinlock_init(&wma_handle->vdev_detach_lock);
@@ -5780,6 +5791,8 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
                 WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed",
                     vdev_id);
                 adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+		vos_mem_free(pdel_sta_self_req_param);
+		pdel_sta_self_req_param = NULL;
 		return status;
         }
 
@@ -6346,7 +6359,7 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 		(struct sAniSirGlobal*)vos_get_context(VOS_MODULE_ID_PE,
 						      wma_handle->vos_context);
 	tANI_U32 cfg_val;
-    tANI_U16 val16;
+        tANI_U16 val16;
 	int ret;
 	tSirMacHTCapabilityInfo *phtCapInfo;
 
@@ -6461,6 +6474,12 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 					self_sta_req->sessionId);
 		}
 	}
+	ret = wmi_unified_vdev_set_param_send(wma_handle->wmi_handle,
+					      self_sta_req->sessionId,
+					      WMI_VDEV_PARAM_DISCONNECT_TH,
+					      self_sta_req->pkt_err_disconn_th);
+	if (ret)
+		WMA_LOGE("Failed to set WMI_VDEV_PARAM_DISCONNECT_TH");
 
 	if (wlan_cfgGetInt(mac, WNI_CFG_RTS_THRESHOLD,
 			&cfg_val) == eSIR_SUCCESS) {
@@ -9396,6 +9415,12 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 	WLAN_PHY_MODE chanmode;
 	u_int8_t *buf_ptr;
 	struct wma_txrx_node *intr = wma->interfaces;
+	tpAniSirGlobal pmac = NULL;
+	struct ath_dfs *dfs;
+
+	pmac = (tpAniSirGlobal)
+		vos_get_context(VOS_MODULE_ID_PE, wma->vos_context);
+	dfs = (struct ath_dfs *)wma->dfs_ic->ic_dfs;
 
 	WMA_LOGD("%s: Enter isRestart=%d vdev=%d", __func__, isRestart,req->vdev_id);
 	len = sizeof(*cmd) + sizeof(wmi_channel) +
@@ -9515,6 +9540,8 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 				wma_dfs_configure_channel(wma->dfs_ic,chan,chanmode,req);
 
 			wma_unified_dfs_phyerr_filter_offload_enable(wma);
+			dfs->disable_dfs_ch_switch =
+				pmac->sap.SapDfsInfo.disable_dfs_ch_switch;
 		}
 	}
 
@@ -11027,6 +11054,24 @@ static int wmi_crash_inject(wmi_unified_t wmi_handle, u_int32_t type,
 	}
 
 	return ret;
+}
+
+/**
+ * wma_crash_inject() - sends command to FW to simulate crash
+ * @wma_handle:         pointer of WMA context
+ * @type:               subtype of the command
+ * @delay_time_ms:      time in milliseconds for FW to delay the crash
+ *
+ * This function will send a command to FW in order to simulate different
+ * kinds of FW crashes.
+ *
+ * Return: 0 for success or reasons for failure
+ */
+
+int wma_crash_inject(tp_wma_handle wma_handle, uint32_t type,
+			uint32_t delay_time_ms)
+{
+	return wmi_crash_inject(wma_handle->wmi_handle, type, delay_time_ms);
 }
 
 static int32_t wmi_unified_set_sta_ps_param(wmi_unified_t wmi_handle,
@@ -24216,6 +24261,7 @@ VOS_STATUS wma_close(v_VOID_t *vos_ctx)
 	vos_event_destroy(&wma_handle->target_suspend);
 	vos_event_destroy(&wma_handle->wma_resume_event);
 	vos_event_destroy(&wma_handle->wow_tx_complete);
+	vos_event_destroy(&wma_handle->recovery_event);
 	wma_cleanup_vdev_resp(wma_handle);
 	for(idx = 0; idx < wma_handle->num_mem_chunks; ++idx) {
 		adf_os_mem_free_consistent(
