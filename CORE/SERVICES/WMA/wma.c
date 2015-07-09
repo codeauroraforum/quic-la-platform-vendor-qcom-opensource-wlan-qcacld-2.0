@@ -21383,29 +21383,28 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 }
 
 
-/* function   : wma_process_set_thermal_level
- * Description : This function set the new thermal throttle level in the
-                txrx module and sends down the corresponding temperature
-                thresholds to the firmware
- * Args       :
-                wma            : Pointer to WMA handle
- *              pThermalLevel  : Pointer to thermal level
- * Returns    :
- *              VOS_STATUS_SUCCESS for success otherwise failure
+/**
+ * wma_process_set_thermal_level() - Sets new thermal throttle level
+ * wma:			Pointer to wma handle
+ * thermal_level:	Thermal level to set
+ *
+ * This function sets new thermal throttle level in the txrx module and sends
+ * down the corresponding temperature thresholds to the firmware.
+ *
+ * Return: VOS_STATUS_SUCCESS for success otherwise failure.
+ *
  */
 VOS_STATUS wma_process_set_thermal_level(tp_wma_handle wma,
-					u_int8_t *pThermalLevel)
+					 uint8_t thermal_level)
 {
-	u_int8_t thermal_level;
 	ol_txrx_pdev_handle curr_pdev;
 
 
-        if (NULL == wma || NULL == pThermalLevel) {
-                WMA_LOGE("TM Invalid input");
-                return VOS_STATUS_E_FAILURE;
-        }
+	if (NULL == wma) {
+		WMA_LOGE("TM Invalid input");
+		return VOS_STATUS_E_FAILURE;
+	}
 
-	thermal_level = (*pThermalLevel);
 
 	curr_pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
 	if (NULL == curr_pdev) {
@@ -21417,7 +21416,7 @@ VOS_STATUS wma_process_set_thermal_level(tp_wma_handle wma,
 
 	/* Check if thermal mitigation is enabled */
 	if (!wma->thermal_mgmt_info.thermalMgmtEnabled) {
-		WMA_LOGE("Thermal mgmt is not enabled, ignoring set level command");
+		WMA_LOGE("Thermal mgmt is not enabled, ignoring set level cmd");
 		return VOS_STATUS_E_FAILURE;
 	}
 
@@ -21428,7 +21427,7 @@ VOS_STATUS wma_process_set_thermal_level(tp_wma_handle wma,
 
 	if (thermal_level == wma->thermal_mgmt_info.thermalCurrLevel) {
 		WMA_LOGD("Current level %d is same as the set level, ignoring",
-				  wma->thermal_mgmt_info.thermalCurrLevel);
+			 wma->thermal_mgmt_info.thermalCurrLevel);
 		return VOS_STATUS_SUCCESS;
 	}
 
@@ -24216,7 +24215,7 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			break;
 
 		case WDA_SET_THERMAL_LEVEL:
-			wma_process_set_thermal_level(wma_handle, (u_int8_t *) msg->bodyptr);
+			wma_process_set_thermal_level(wma_handle, msg->bodyval);
 			break;
 
 		case WDA_SET_P2P_GO_NOA_REQ:
