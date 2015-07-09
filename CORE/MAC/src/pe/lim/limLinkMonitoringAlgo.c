@@ -186,7 +186,8 @@ limDeleteStaContext(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
                     PELOGW(limLog(pMac, LOGW, FL("lim Delete Station Context (staId: %d, assocId: %d) "),
                                 pMsg->staId, pMsg->assocId);)
 
-                    pStaDs->mlmStaContext.disassocReason = eSIR_MAC_UNSPEC_FAILURE_REASON;
+                    pStaDs->mlmStaContext.disassocReason =
+                            eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON;
                     pStaDs->mlmStaContext.cleanupTrigger = eLIM_LINK_MONITORING_DEAUTH;
 
                     // Issue Deauth Indication to SME.
