@@ -153,6 +153,21 @@ sysBbtProcessMessageCore(tpAniSirGlobal pMac, tpSirMsgQ pMsg, tANI_U32 type,
                     goto fail;
                 }
             }
+
+	    /*
+             * Drop beacon frames in deferred state to avoid VOSS run out of
+             * message wrappers.
+             */
+            if ((subType == SIR_MAC_MGMT_BEACON) &&
+                (!limIsSystemInScanState(pMac)) &&
+                (true != GET_LIM_PROCESS_DEFD_MESGS(pMac)) &&
+                !pMac->lim.gLimSystemInScanLearnMode) {
+                VOS_TRACE(VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_INFO_HIGH,
+                          FL("dropping received beacon in deffered state"));
+                goto fail;
+            }
+
+
             if ((subType == SIR_MAC_MGMT_DEAUTH) && (pMac->sys.gSysFrameCount[type][subType] >= MAX_DEAUTH_ALLOWED))
             {
                 tANI_U32 timeNow = adf_os_ticks();
