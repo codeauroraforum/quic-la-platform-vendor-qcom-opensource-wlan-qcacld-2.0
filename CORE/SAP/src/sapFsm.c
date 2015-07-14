@@ -1406,6 +1406,7 @@ static v_U8_t sapRandomChannelSel(ptSapContext sapContext)
         pMac->sap.SapDfsInfo.orig_cbMode = sme_SelectCBMode(hHal,
                                          sapContext->csrRoamProfile.phyMode,
                                          sapContext->channel,
+                                         sapContext->secondary_ch,
                                          &sapContext->vht_channel_width,
                                          sapContext->ch_width_orig);
         pMac->sap.SapDfsInfo.orig_cbMode = csrConvertCBIniValueToPhyCBState(
@@ -2171,7 +2172,7 @@ sapGotoChannelSel
                   Else take whatever comes from configuartion*/
             sapContext->channel = con_ch;
             sme_SelectCBMode(hHal, sapContext->csrRoamProfile.phyMode,
-                                con_ch, &sapContext->vht_channel_width,
+                                con_ch, 0, &sapContext->vht_channel_width,
                                 sapContext->ch_width_orig);
         }
 #endif
@@ -3478,6 +3479,7 @@ sapFsm
                  cbMode = sme_SelectCBMode(hHal,
                                         sapContext->csrRoamProfile.phyMode,
                                         sapContext->channel,
+                                        sapContext->secondary_ch,
                                         &sapContext->vht_channel_width,
                                         sapContext->ch_width_orig);
 
@@ -3518,6 +3520,7 @@ sapFsm
                      sapContext->channel = ch;
                      sme_SelectCBMode(hHal, sapContext->csrRoamProfile.phyMode,
                                        sapContext->channel,
+                                       sapContext->secondary_ch,
                                        &sapContext->vht_channel_width,
                                        sapContext->ch_width_orig);
                  }
@@ -3613,7 +3616,7 @@ sapFsm
                 {
                    sme_SelectCBMode(hHal, phyMode,
                                     pMac->sap.SapDfsInfo.target_channel,
-                                    &sapContext->vht_channel_width,
+                                    0, &sapContext->vht_channel_width,
                                     sapContext->ch_width_orig);
                 }
 
