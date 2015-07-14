@@ -871,8 +871,10 @@ void pktlogmod_exit(void *context)
 	struct ol_softc *scn = (struct ol_softc *)context;
 	struct ol_pktlog_dev_t *pl_dev = get_pl_handle(scn);
 
-	if (!pl_dev || g_pktlog_pde == NULL)
+	if (!pl_dev || g_pktlog_pde == NULL) {
+		printk("%s: pldev or g_pktlog_pde is NULL\n", __func__);
 		return;
+	}
 
 	/*
 	 *  Disable firmware side pktlog function
