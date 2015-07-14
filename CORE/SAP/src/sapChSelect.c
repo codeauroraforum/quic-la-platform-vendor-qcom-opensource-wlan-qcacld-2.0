@@ -2625,6 +2625,7 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
             else if (bestChNum ==14)
                 pSapCtx->acs_cfg->ht_sec_ch = 0;
         }
+        pSapCtx->secondary_ch = pSapCtx->acs_cfg->ht_sec_ch;
     }
 
     // Free all the allocated memory
