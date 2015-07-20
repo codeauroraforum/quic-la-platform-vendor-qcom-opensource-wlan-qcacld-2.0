@@ -497,15 +497,16 @@ static int regd_init_wiphy(hdd_context_t *pHddCtx, struct regulatory *reg,
 {
    const struct ieee80211_regdomain *regd;
 
-   if  (pHddCtx->cfg_ini->fRegChangeDefCountry) {
-       regd = vos_custom_world_regdomain();
-       wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
-   }
-   else if (is_world_regd(reg->reg_domain))
+   if (is_world_regd(reg->reg_domain))
    {
        regd = vos_world_regdomain(reg);
        wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
    }
+   else if  (pHddCtx->cfg_ini->fRegChangeDefCountry) {
+       regd = vos_custom_world_regdomain();
+       wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
+   }
+
    else
    {
        regd = vos_default_world_regdomain();
@@ -841,9 +842,6 @@ static int bw20_ch_index_to_bw40_ch_index(int k)
    return m;
 }
 
-static int create_linux_regulatory_entry(struct wiphy *wiphy,
-                                         v_U8_t nBandCapability);
-
 /**------------------------------------------------------------------------
   \brief vos_nv_setRegDomain -
   \param clientCtxt  - Client Context, Not used for PRIMA
@@ -1009,7 +1007,8 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
 
 /* create_linux_regulatory_entry to populate internal structures from wiphy */
 static int create_linux_regulatory_entry(struct wiphy *wiphy,
-                v_U8_t nBandCapability)
+					 v_U8_t nBandCapability,
+					 bool reset)
 {
     int i, j, m;
     int k = 0, n = 0;
@@ -1086,26 +1085,41 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
              * require a passive scan on a frequency, lift the passive
              * scan restriction
              */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-            reg_rule = freq_reg_info(wiphy,
-                                     MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq));
+	    if ((!reset) &&
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(WITH_BACKPORTS)
+                (wiphy->regulatory_flags & REGULATORY_CUSTOM_REG)) {
 #else
-            err = freq_reg_info(wiphy,
-                                MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq),
-                                0, &reg_rule);
+	        (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY)) {
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-            if (!IS_ERR(reg_rule))
+	      reg_rule = freq_reg_info(wiphy,
+				       MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq));
 #else
-            if (0 == err)
+	      err = freq_reg_info(wiphy,
+				  MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq),
+				  0, &reg_rule);
 #endif
-            {
-                if  (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY) {
 
-                    if (!(reg_rule->flags & NL80211_RRF_PASSIVE_SCAN))
-                    {
-                        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+	      if (!IS_ERR(reg_rule)) {
+#else
+	      if (0 == err) {
+#endif
+
+		wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_DISABLED;
+
+		if (!(reg_rule->flags & NL80211_RRF_DFS)) {
+
+		  VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+			    "%s: Remove passive scan restriction for %u",
+			    __func__, wiphy->bands[i]->channels[j].center_freq);
+		  wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_RADAR;
+		}
+
+		if (!(reg_rule->flags & NL80211_RRF_PASSIVE_SCAN))
+		  {
+		    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                                   "%s: Remove passive scan restriction for %u",
                                   __func__, wiphy->bands[i]->channels[j].center_freq);
                         wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
@@ -1239,6 +1253,35 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
     return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)) && !defined(WITH_BACKPORTS)
+/* restore_custom_reg_settings() - restore custom reg settings
+ *
+ * @wiphy: wiphy structure
+ *
+ * Return: void
+ */
+static void restore_custom_reg_settings(struct wiphy *wiphy)
+{
+
+	struct ieee80211_supported_band *sband;
+	enum ieee80211_band band;
+	struct ieee80211_channel *chan;
+	int i;
+
+	for (band = 0; band < IEEE80211_NUM_BANDS; band++) {
+		sband = wiphy->bands[band];
+		if (!sband)
+			continue;
+		for (i = 0; i < sband->n_channels; i++) {
+			chan = &sband->channels[i];
+			chan->flags = chan->orig_flags;
+			chan->max_antenna_gain = chan->orig_mag;
+			chan->max_power = chan->orig_mpwr;
+		}
+	}
+}
+#endif
+
 /*
  * Function: wlan_hdd_linux_reg_notifier
  * This function is called from cfg80211 core to provide regulatory settings
@@ -1259,6 +1302,7 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     v_COUNTRYCODE_t country_code;
     int i,j;
     v_BOOL_t isVHT80Allowed;
+    bool reset = false;
 
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                "cfg80211 reg notifier callback for country for initiator %d", request->initiator);
@@ -1308,7 +1352,8 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
         if ( VOS_TRUE == init_by_driver)
         {
             isVHT80Allowed = pHddCtx->isVHT80Allowed;
-            if (create_linux_regulatory_entry(wiphy, nBandCapability) == 0)
+            if (create_linux_regulatory_entry(wiphy, nBandCapability,
+					      reset) == 0)
             {
                 VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                           (" regulatory entry created"));
@@ -1333,11 +1378,21 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
         pHddCtx->reg.alpha2[0] = request->alpha2[0];
         pHddCtx->reg.alpha2[1] = request->alpha2[1];
 
-        if (NL80211_REGDOM_SET_BY_CORE == request->initiator)
+        if (NL80211_REGDOM_SET_BY_CORE == request->initiator) {
             pHddCtx->reg.cc_src = COUNTRY_CODE_SET_BY_CORE;
-        else if (NL80211_REGDOM_SET_BY_DRIVER == request->initiator)
+	    if (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY)
+	      reset = true;
+	} else if (NL80211_REGDOM_SET_BY_DRIVER == request->initiator)
             pHddCtx->reg.cc_src = COUNTRY_CODE_SET_BY_DRIVER;
-        else pHddCtx->reg.cc_src = COUNTRY_CODE_SET_BY_USER;
+        else {
+	  pHddCtx->reg.cc_src = COUNTRY_CODE_SET_BY_USER;
+	  if ((request->alpha2[0] == '0') &&
+	      (request->alpha2[1] == '0') &&
+	      (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY)) {
+	    restore_custom_reg_settings(wiphy);
+	    reset = true;
+	  }
+	}
 
         vos_update_reg_info(pHddCtx);
 
@@ -1360,7 +1415,8 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
 
         isVHT80Allowed = pHddCtx->isVHT80Allowed;
         if (create_linux_regulatory_entry(wiphy,
-                                          nBandCapability) == 0)
+                                          nBandCapability,
+					  reset) == 0)
         {
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                       (" regulatory entry created"));
@@ -1461,7 +1517,8 @@ VOS_STATUS vos_init_wiphy_from_eeprom(void)
    if (is_world_regd(pHddCtx->reg.reg_domain)) {
       temp_reg_domain = REGDOMAIN_WORLD;
       if (create_linux_regulatory_entry(wiphy,
-               pHddCtx->cfg_ini->nBandCapability) != 0) {
+					pHddCtx->cfg_ini->nBandCapability,
+					true) != 0) {
          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                ("Error while creating regulatory entry"));
          return VOS_STATUS_E_FAULT;
