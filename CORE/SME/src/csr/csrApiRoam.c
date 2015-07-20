@@ -11329,6 +11329,7 @@ eHalStatus csrRoamLostLink( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U32 ty
                      sizeof(tSirMacAddr));
         roamInfo.staId = (tANI_U8)pDeauthIndMsg->staId;
         roamInfo.reasonCode = pDeauthIndMsg->reasonCode;
+        roamInfo.rxRssi = pDeauthIndMsg->rssi;
     }
     smsLog(pMac, LOGW, FL("roamInfo.staId (%d)"), roamInfo.staId);
 
@@ -15510,7 +15511,6 @@ static void csrRoamLinkDown(tpAniSirGlobal pMac, tANI_U32 sessionId)
         smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
         return;
     }
-
    //Only to handle the case for Handover on infra link
    if( eCSR_BSS_TYPE_INFRASTRUCTURE != pSession->connectedProfile.BSSType )
    {
