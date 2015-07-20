@@ -2602,6 +2602,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_RA_RATE_LIMIT_INTERVAL_DEFAULT         (60)/*60 SEC*/
 #endif
 
+#define CFG_IGNORE_PEER_ERP_INFO_NAME      "gIgnorePeerErpInfo"
+#define CFG_IGNORE_PEER_ERP_INFO_MIN       ( 0 )
+#define CFG_IGNORE_PEER_ERP_INFO_MAX       ( 1 )
+#define CFG_IGNORE_PEER_ERP_INFO_DEFAULT   ( 0 )
+
 #define CFG_INITIAL_DWELL_TIME_NAME            "gInitialDwellTime"
 #define CFG_INITIAL_DWELL_TIME_DEFAULT         (0)
 #define CFG_INITIAL_DWELL_TIME_MIN             (0)
@@ -3470,6 +3475,7 @@ typedef struct
    bool                        enable_fw_hash_check;
 #endif
    uint16_t                    p2p_listen_defer_interval;
+   v_BOOL_t                    ignorePeerErpInfo;
    uint16_t                    pkt_err_disconn_th;
 } hdd_config_t;
 
