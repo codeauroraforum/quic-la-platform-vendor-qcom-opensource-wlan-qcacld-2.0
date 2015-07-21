@@ -5786,6 +5786,10 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
             ret = process_wma_set_command((int)pAdapter->sessionId,
                                           (int)GEN_VDEV_PARAM_AMSDU,
                                           set_value, GEN_CMD);
+            if (!ret) {
+                /* Update the stored ini value */
+                pHddCtx->cfg_ini->max_amsdu_num = set_value;
+            }
             break;
          }
 

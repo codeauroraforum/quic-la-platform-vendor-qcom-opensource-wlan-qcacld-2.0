@@ -310,6 +310,7 @@ typedef struct
     tANI_U8  atimIePresent;
     tANI_U32 peerAtimWindowLength;
     tANI_U8  nonRoamReassoc;
+    tANI_U8  max_amsdu_num;
 } tAddStaParams, *tpAddStaParams;
 
 
