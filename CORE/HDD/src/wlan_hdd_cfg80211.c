@@ -5741,10 +5741,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
     wiphy->max_ap_assoc_sta = pCfg->maxNumberOfPeers;
 
-#ifdef QCA_HT_2040_COEX
-    if (pCfg->ht2040CoexEnabled)
-        wiphy->features |= NL80211_FEATURE_AP_MODE_CHAN_WIDTH_CHANGE;
-#endif
+    wiphy->features |= NL80211_FEATURE_AP_MODE_CHAN_WIDTH_CHANGE;
 
     EXIT();
     return 0;
@@ -6148,6 +6145,26 @@ static void wlan_hdd_check_11gmode(u8 *pIe, u8* require_ht, u8* require_vht,
         }
     }
     return;
+}
+
+static bool wlan_hdd_get_sap_obss(hdd_adapter_t *pHostapdAdapter)
+{
+    uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
+    tDot11fIEHTCaps dot11_ht_cap_ie = {0};
+    hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
+    beacon_data_t *beacon = pHostapdAdapter->sessionCtx.ap.beacon;
+    uint8_t *ie = NULL;
+
+    ie = wlan_hdd_cfg80211_get_ie_ptr(beacon->tail, beacon->tail_len,
+                                                        WLAN_EID_HT_CAPABILITY);
+    if (ie && ie[1]) {
+        vos_mem_copy(ht_cap_ie, &ie[2], DOT11F_IE_HTCAPS_MAX_LEN);
+        dot11fUnpackIeHTCaps((tpAniSirGlobal)hdd_ctx->hHal, ht_cap_ie, ie[1],
+                                                           &dot11_ht_cap_ie);
+        return dot11_ht_cap_ie.supportedChannelWidthSet;
+    }
+
+    return false;
 }
 
 static void wlan_hdd_set_sapHwmode(hdd_adapter_t *pHostapdAdapter)
@@ -6674,7 +6691,6 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
             switch (channel_type) {
             case NL80211_CHAN_HT20:
             case NL80211_CHAN_NO_HT:
-                smeConfig.csrConfig.obssEnabled = VOS_FALSE;
                 if (channel <= 14)
                     smeConfig.csrConfig.channelBondingMode24GHz =
                                            eCSR_INI_SINGLE_CHANNEL_CENTERED;
@@ -6689,7 +6705,6 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                 break;
 
             case NL80211_CHAN_HT40MINUS:
-                smeConfig.csrConfig.obssEnabled = VOS_TRUE;
                 if (channel <= 14)
                     smeConfig.csrConfig.channelBondingMode24GHz =
                             eCSR_INI_DOUBLE_CHANNEL_HIGH_PRIMARY;
@@ -6700,7 +6715,6 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                 sap_config->sec_ch = sap_config->channel - 4;
                 break;
             case NL80211_CHAN_HT40PLUS:
-                smeConfig.csrConfig.obssEnabled = VOS_TRUE;
                 if (channel <= 14)
                     smeConfig.csrConfig.channelBondingMode24GHz =
                             eCSR_INI_DOUBLE_CHANNEL_LOW_PRIMARY;
@@ -6716,6 +6730,7 @@ static int wlan_hdd_cfg80211_set_channel( struct wiphy *wiphy, struct net_device
                           __func__);
                 return -EINVAL;
             }
+            smeConfig.csrConfig.obssEnabled = wlan_hdd_get_sap_obss(pAdapter);
             sme_UpdateConfig (pHddCtx->hHal, &smeConfig);
         }
     }
@@ -15858,9 +15873,6 @@ int wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
         hddLog(LOGE, FL("HDD context is not valid"));
         return status;
     }
-
-    if (!pHddCtx->cfg_ini->ht2040CoexEnabled)
-        return -EOPNOTSUPP;
 
     vos_mem_zero(&smeConfig, sizeof (tSmeConfigParams));
     sme_GetConfigParam(pHddCtx->hHal, &smeConfig);
