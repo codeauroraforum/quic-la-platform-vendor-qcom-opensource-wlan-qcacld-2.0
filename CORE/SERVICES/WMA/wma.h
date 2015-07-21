@@ -759,7 +759,6 @@ typedef struct {
 #ifdef FEATURE_WLAN_D0WOW
 	atomic_t in_d0wow;
 #endif
-
 	uint32_t wow_pno_match_wake_up_count;
 	uint32_t wow_pno_complete_wake_up_count;
 	uint32_t wow_gscan_wake_up_count;
@@ -773,6 +772,7 @@ typedef struct {
 	uint32_t wow_ipv6_mcast_ns_stats;
 	uint32_t wow_ipv6_mcast_na_stats;
 
+	bool  tx_chain_mask_cck;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
