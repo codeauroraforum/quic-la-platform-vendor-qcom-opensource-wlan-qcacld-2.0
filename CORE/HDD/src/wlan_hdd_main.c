@@ -3496,13 +3496,13 @@ static int hdd_set_app_type2_parser(hdd_adapter_t *pAdapter,
 
     memset(&params, 0, sizeof(tSirAppType2Params));
 
-    ret = sscanf(arg, "%17s %16s %x %x %x %u %u %u %u %u %u %u %u %u %u",
+    ret = sscanf(arg, "%17s %16s %x %x %x %u %u %hu %hu %u %u %u %u %u %u",
         mac_addr, rc4_key, (unsigned int *)&params.ip_id,
         (unsigned int*)&params.ip_device_ip,
         (unsigned int*)&params.ip_server_ip,
         (unsigned int*)&params.tcp_seq, (unsigned int*)&params.tcp_ack_seq,
-        (unsigned int*)&params.tcp_src_port,
-        (unsigned int*)&params.tcp_dst_port,
+        (uint16_t *)&params.tcp_src_port,
+        (uint16_t *)&params.tcp_dst_port,
         (unsigned int*)&params.keepalive_init,
         (unsigned int*)&params.keepalive_min,
         (unsigned int*)&params.keepalive_max,
@@ -5351,7 +5351,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                                        &modProfileFields);
                sme_RoamReassoc(hHal, pAdapter->sessionId,
                             NULL, modProfileFields, &roamId, 1);
-               return 0;
+               ret = 0;
+               goto exit;
            }
 
            /* Check channel number is a valid channel number */
@@ -5360,7 +5361,9 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            {
                hddLog(VOS_TRACE_LEVEL_ERROR,
                       "%s: Invalid Channel [%d] \n", __func__, channel);
-               return -EINVAL;
+
+               ret = -EINVAL;
+               goto exit;
            }
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
            if (pHddCtx->cfg_ini->isRoamOffloadEnabled) {
@@ -6128,17 +6131,29 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            int set_value;
            /* Move pointer to point the string */
            value += 14;
-           sscanf(value, "%d", &set_value);
+           ret = sscanf(value, "%d", &set_value);
+           if (ret != 1) {
+               VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                     "Wrong value is given for hdd_set_tdls_offchannel");
+               ret = -EINVAL;
+               goto exit;
+           }
+
            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                     FL("Tdls offchannel num: %d"),
-                     set_value);
+                FL("Tdls offchannel num: %d"), set_value);
            ret = hdd_set_tdls_offchannel(pHddCtx, set_value);
        } else if (strncmp(command, "TDLSSCAN", 8) == 0) {
            uint8_t *value = command;
            int set_value;
            /* Move pointer to point the string */
            value += 8;
-           sscanf(value, "%d", &set_value);
+           ret = sscanf(value, "%d", &set_value);
+           if (ret != 1) {
+               VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                     "Wrong value is given for tdls_scan_type");
+               ret = -EINVAL;
+               goto exit;
+           }
            hddLog(LOG1, FL("Tdls scan type val: %d"),
                   set_value);
            ret = hdd_set_tdls_scan_type(pHddCtx, set_value);
