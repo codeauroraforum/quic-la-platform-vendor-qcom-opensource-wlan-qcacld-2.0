@@ -123,6 +123,8 @@ void pktlog_callback(void *pdev, enum WDI_EVENT event, void *log_data);
 		}				\
 	} while (0)
 
+int pktlogmod_init(void *context);
+void pktlogmod_exit(void *context);
 #else /* REMOVE_PKT_LOG */
 #define ol_pktlog_attach(_scn)	({ (void)_scn; })
 #define ol_pktlog_detach(_scn)	({ (void)_scn; })

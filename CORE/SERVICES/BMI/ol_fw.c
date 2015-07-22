@@ -54,6 +54,11 @@
 #include <net/cnss.h>
 #endif
 
+#ifndef REMOVE_PKT_LOG
+#include "ol_txrx_types.h"
+#include "pktlog_ac.h"
+#endif
+
 #include "qwlan_version.h"
 
 #ifdef FEATURE_SECURE_FIRMWARE
@@ -2499,5 +2504,31 @@ ol_target_ready(struct ol_softc *scn, void *cfg_ctx)
 		ol_cfg_set_tx_free_at_download(cfg_ctx);
 
 	}
+}
+#endif
+
+/**
+ * ol_pktlog_init()- Pktlog Module initialization
+ * @hif_sc:	ol_softc structure.
+ *
+ * The API is used to initialize pktlog module for
+ * all bus types.
+ *
+ */
+
+#ifndef REMOVE_PKT_LOG
+void ol_pktlog_init(void *hif_sc)
+{
+	struct ol_softc *ol_sc = (struct ol_softc *)hif_sc;
+	int ret;
+
+	ol_pl_sethandle(&ol_sc->pdev_txrx_handle->pl_dev, ol_sc);
+
+	ret = pktlogmod_init(ol_sc);
+
+	if (ret)
+		pr_err("%s: pktlogmod_init failed ret:%d\n", __func__, ret);
+	else
+		pr_info("%s: pktlogmod_init successfull\n", __func__);
 }
 #endif

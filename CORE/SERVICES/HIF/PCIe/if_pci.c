@@ -52,7 +52,6 @@
 #endif
 #include "epping_main.h"
 
-
 #ifndef REMOVE_PKT_LOG
 #include "ol_txrx_types.h"
 #include "pktlog_ac_api.h"
@@ -952,20 +951,6 @@ again:
     /* Re-enable ASPM after firmware/OTP download is complete */
     pci_write_config_dword(pdev, 0x80, lcr_val);
 
-#ifndef REMOVE_PKT_LOG
-    if (vos_get_conparam() != VOS_FTM_MODE &&
-        !WLAN_IS_EPPING_ENABLED(vos_get_conparam())) {
-        /*
-         * pktlog initialization
-         */
-        ol_pl_sethandle(&ol_sc->pdev_txrx_handle->pl_dev, ol_sc);
-
-        if (pktlogmod_init(ol_sc))
-            printk(KERN_ERR "%s: pktlogmod_init failed\n", __func__);
-    }
-#endif
-
-
     return 0;
 
 err_config:
@@ -1293,20 +1278,6 @@ again:
         hif_nointrs(sc);
         goto err_config;
     }
-
-#ifndef REMOVE_PKT_LOG
-    if (vos_get_conparam() != VOS_FTM_MODE &&
-        !WLAN_IS_EPPING_ENABLED(vos_get_conparam())) {
-        /*
-         * pktlog initialization
-         */
-        ol_pl_sethandle(&ol_sc->pdev_txrx_handle->pl_dev, ol_sc);
-
-        if (pktlogmod_init(ol_sc))
-            printk(KERN_ERR "%s: pktlogmod_init failed!\n", __func__);
-    }
-#endif
-
 
     printk("%s: WLAN host driver reinitiation completed!\n", __func__);
     return 0;
