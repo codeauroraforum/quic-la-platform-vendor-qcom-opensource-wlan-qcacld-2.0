@@ -130,6 +130,7 @@ void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #include "if_ath_sdio.h"
 #endif
 #include "wma.h"
+#include "ol_fw.h"
 
 #if defined(LINUX_QCMBR)
 #define SIOCIOCTLTX99 (SIOCDEVPRIVATE+13)
@@ -12850,6 +12851,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    INIT_WORK(&pHddCtx->rocReqWork, wlan_hdd_roc_request_dequeue);
 #endif
 
+   ol_pktlog_init(hif_sc);
    pHddCtx->isLoadInProgress = FALSE;
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    complete(&wlan_start_comp);
