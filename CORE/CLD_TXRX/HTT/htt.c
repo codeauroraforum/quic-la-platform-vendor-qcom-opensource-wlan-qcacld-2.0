@@ -170,6 +170,7 @@ htt_attach(
     if (!pdev) {
         goto fail1;
     }
+    adf_os_mem_set(pdev, 0, sizeof(*pdev));
 
     pdev->osdev = osdev;
     pdev->ctrl_pdev = ctrl_pdev;
@@ -371,6 +372,10 @@ htt_detach(htt_pdev_handle pdev)
 #endif
     HTT_TX_MUTEX_DESTROY(&pdev->htt_tx_mutex);
     HTT_TX_NBUF_QUEUE_MUTEX_DESTROY(pdev);
+#ifdef DEBUG_RX_RING_BUFFER
+    if (pdev->rx_buff_list)
+        adf_os_mem_free(pdev->rx_buff_list);
+#endif
     adf_os_mem_free(pdev);
 }
 
