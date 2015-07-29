@@ -5109,7 +5109,6 @@ static int wma_unified_dfs_radar_rx_event_handler(void *handle,
 	}
 
 	dfs = (struct ath_dfs *)ic->ic_dfs;
-	chan = ic->ic_curchan;
 	param_tlvs = (WMI_DFS_RADAR_EVENTID_param_tlvs *) data;
 
 	if (NULL == dfs) {
@@ -5131,11 +5130,16 @@ static int wma_unified_dfs_radar_rx_event_handler(void *handle,
 
 	radar_event = param_tlvs->fixed_param;
 
+	vos_lock_acquire(&ic->chan_lock);
+	chan = ic->ic_curchan;
 	if (NV_CHANNEL_DFS != vos_nv_getChannelEnabledState(chan->ic_ieee)) {
 		WMA_LOGE("%s: Invalid DFS Phyerror event. Channel=%d is Non-DFS",
 			 __func__, chan->ic_ieee);
+		vos_lock_release(&ic->chan_lock);
 		return 0;
 	}
+
+	vos_lock_release(&ic->chan_lock);
 	dfs->ath_dfs_stats.total_phy_errors++;
 
 	if (dfs->dfs_caps.ath_chip_is_bb_tlv) {
@@ -10424,6 +10428,7 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 				return VOS_STATUS_E_FAILURE;
 			}
 
+			vos_lock_acquire(&wma->dfs_ic->chan_lock);
 			if (wma->dfs_ic->ic_curchan)
 			{
 				OS_FREE(wma->dfs_ic->ic_curchan);
@@ -10433,6 +10438,7 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 			/* provide the current channel to DFS */
 			wma->dfs_ic->ic_curchan =
 				wma_dfs_configure_channel(wma->dfs_ic,chan,chanmode,req);
+			vos_lock_release(&wma->dfs_ic->chan_lock);
 
 			wma_unified_dfs_phyerr_filter_offload_enable(wma);
 		}
@@ -25931,6 +25937,7 @@ static void wma_dfs_detach(struct ieee80211com *dfs_ic)
 {
 	dfs_detach(dfs_ic);
 
+        vos_lock_destroy(&dfs_ic->chan_lock);
 	if (NULL != dfs_ic->ic_curchan) {
 		OS_FREE(dfs_ic->ic_curchan);
 		dfs_ic->ic_curchan = NULL;
@@ -28487,7 +28494,7 @@ struct ieee80211com* wma_dfs_attach(struct ieee80211com *dfs_ic)
      * and shared DFS code
      */
     dfs_ic->ic_dfs_notify_radar = ieee80211_mark_dfs;
-
+    vos_lock_init(&dfs_ic->chan_lock);
     /* Initializes DFS Data Structures and queues*/
     dfs_attach(dfs_ic);
 
