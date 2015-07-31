@@ -764,7 +764,6 @@ typedef struct {
 #endif
 	vos_timer_t log_completion_timer;
 	uint16_t self_gen_frm_pwr;
-	bool tx_chain_mask_cck;
 
 	uint32_t num_of_diag_events_logs;
 	uint32_t *events_logs_list;
@@ -781,7 +780,6 @@ typedef struct {
 	uint32_t wow_ipv6_mcast_ra_stats;
 	uint32_t wow_ipv6_mcast_ns_stats;
 	uint32_t wow_ipv6_mcast_na_stats;
-
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {

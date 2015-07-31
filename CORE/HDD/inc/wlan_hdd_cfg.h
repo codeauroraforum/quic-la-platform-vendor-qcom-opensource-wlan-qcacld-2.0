@@ -2926,16 +2926,6 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_P2P_LISTEN_DEFER_INTERVAL_MAX         (200)
 #define CFG_P2P_LISTEN_DEFER_INTERVAL_DEFAULT     (100)
 
-#define CFG_TX_CHAIN_MASK_CCK          "gCckChainMaskEnable"
-#define CFG_TX_CHAIN_MASK_CCK_MIN      (0)
-#define CFG_TX_CHAIN_MASK_CCK_MAX      (1)
-#define CFG_TX_CHAIN_MASK_CCK_DEFAULT  (0)
-
-#define CFG_TX_CHAIN_MASK_1SS       "gTxChainMask1ss"
-#define CFG_TX_CHAIN_MASK_1SS_MIN      (0)
-#define CFG_TX_CHAIN_MASK_1SS_MAX      (3)
-#define CFG_TX_CHAIN_MASK_1SS_DEFAULT  (1)
-
 #ifdef FEATURE_WLAN_EXTSCAN
 #define CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_NAME      "gExtScanPassiveMaxChannelTime"
 #define CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_MIN       (110)
@@ -3593,8 +3583,6 @@ typedef struct
 #endif
    v_BOOL_t                    ignorePeerErpInfo;
    uint16_t                    pkt_err_disconn_th;
-   bool                        tx_chain_mask_cck;
-   uint8_t                     tx_chain_mask_1ss;
    uint16_t                    self_gen_frm_pwr;
 
 #ifdef FEATURE_WLAN_EXTSCAN

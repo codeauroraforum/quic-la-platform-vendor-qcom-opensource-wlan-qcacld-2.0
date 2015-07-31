@@ -104,7 +104,6 @@
 
 #include "dfs.h"
 #include "radar_filters.h"
-#include "regdomain_common.h"
 /* ################### defines ################### */
 /*
  * TODO: Following constant should be shared by firwmare in
@@ -5905,7 +5904,6 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 	olCfg.uc_tx_partition_base = mac_params->ucTxPartitionBase;
 #endif /* IPA_UC_OFFLOAD*/
 
-	wma_handle->tx_chain_mask_cck = mac_params->tx_chain_mask_cck;
 	wma_handle->self_gen_frm_pwr = mac_params->self_gen_frm_pwr;
 
 	/* Allocate cfg handle */
@@ -12265,7 +12263,6 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			wma_update_txrx_chainmask(wma->num_rf_chains,
 						&privcmd->param_value);
 		}
-
 		ret = wmi_unified_pdev_set_param(wma->wmi_handle,
 						privcmd->param_id,
 						privcmd->param_value);
@@ -12285,6 +12282,7 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			WMA_LOGE("%s:Invalid vdev handle", __func__);
 			return;
                 }
+
 		WMA_LOGD("gen pid %d pval %d", privcmd->param_id,
 				privcmd->param_value);
 
@@ -28406,8 +28404,6 @@ void wma_send_regdomain_info(u_int32_t reg_dmn, u_int16_t regdmn2G,
 	int32_t len = sizeof(*cmd);
 	void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
 	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA, vos_context);
-	int32_t cck_mask_val = 0;
-	int ret = 0;
 
 	if (NULL == wma) {
 		WMA_LOGE("%s: wma context is NULL", __func__);
@@ -28437,21 +28433,6 @@ void wma_send_regdomain_info(u_int32_t reg_dmn, u_int16_t regdmn2G,
 				__func__);
 		adf_nbuf_free(buf);
 	}
-
-	if ((((reg_dmn & ~COUNTRY_ERD_FLAG) == CTRY_JAPAN) ||
-	     ((reg_dmn & ~COUNTRY_ERD_FLAG) == CTRY_KOREA_ROC)) &&
-	    (true == wma->tx_chain_mask_cck))
-		cck_mask_val = 1;
-
-	cck_mask_val |= (wma->self_gen_frm_pwr << 16);
-	ret = wmi_unified_pdev_set_param(wma->wmi_handle,
-					 WMI_PDEV_PARAM_TX_CHAIN_MASK_CCK,
-					 cck_mask_val);
-	if (ret) {
-		WMA_LOGE("failed to set PDEV tx_chain_mask_cck %d",
-			 ret);
-	}
-
 	return;
 }
 
