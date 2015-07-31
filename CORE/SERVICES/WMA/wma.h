@@ -744,7 +744,6 @@ typedef struct {
 #ifdef FEATURE_WLAN_D0WOW
 	atomic_t in_d0wow;
 #endif
-	bool  tx_chain_mask_cck;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
