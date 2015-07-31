@@ -1655,13 +1655,13 @@ eHalStatus csrGetPhyModeFromBss(tpAniSirGlobal pMac, tSirBssDescription *pBSSDes
         if(pIes->HTCaps.present && (eCSR_DOT11_MODE_TAURUS != phyMode))
         {
             phyMode = eCSR_DOT11_MODE_11n;
+#ifdef WLAN_FEATURE_11AC
+            if (IS_BSS_VHT_CAPABLE(pIes->VHTCaps)) {
+                 phyMode = eCSR_DOT11_MODE_11ac;
+            }
+#endif
         }
 
-#ifdef WLAN_FEATURE_11AC
-        if (IS_BSS_VHT_CAPABLE(pIes->VHTCaps)) {
-             phyMode = eCSR_DOT11_MODE_11ac;
-        }
-#endif
         *pPhyMode = phyMode;
     }
 
