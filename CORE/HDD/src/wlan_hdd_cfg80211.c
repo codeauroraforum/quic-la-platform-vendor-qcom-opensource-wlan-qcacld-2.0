@@ -11198,6 +11198,7 @@ static int __wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
                                eCSR_SCAN_ABORT_DEFAULT);
         }
 
+        wlan_hdd_cleanup_remain_on_channel_ctx(pAdapter);
 #ifdef FEATURE_WLAN_TDLS
         /* First clean up the tdls peers if any */
         for (staIdx = 0 ; staIdx < HDD_MAX_NUM_TDLS_STA; staIdx++) {
