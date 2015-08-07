@@ -7332,7 +7332,6 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
     int status;
     hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-    eConnectionState connState;
 #ifdef FEATURE_WLAN_TDLS
     tANI_U8 staIdx;
 #endif
@@ -7367,7 +7366,6 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
                                        eCSR_DISCONNECT_REASON_UNSPECIFIED;
             hdd_scaninfo_t *pScanInfo;
 
-            connState = pHddStaCtx->conn_info.connState;
             switch(reason)
             {
                 case WLAN_REASON_MIC_FAILURE:
@@ -7425,7 +7423,6 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
                 hddLog(VOS_TRACE_LEVEL_ERROR,
                         "%s wlan_hdd_disconnect failure, returned %d",
                         __func__, (int)status );
-                pHddStaCtx->conn_info.connState = connState;
                 return -EINVAL;
             }
         }
