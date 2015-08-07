@@ -409,6 +409,9 @@
 #define VHT_MCS_1x1 0xFFFC
 #define VHT_MCS_2x2 0xFFF3
 
+#define NSS_1x1_MODE 1
+#define NSS_2x2_MODE 2
+
 /// Workaround IE to change beacon length when it is 4*n+1
 #define SIR_MAC_ANI_WORKAROUND_EID     255
 #define SIR_MAC_ANI_WORKAROUND_EID_MIN     0
