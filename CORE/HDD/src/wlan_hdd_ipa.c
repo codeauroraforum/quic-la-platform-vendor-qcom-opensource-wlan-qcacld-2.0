@@ -445,6 +445,7 @@ struct hdd_ipa_priv {
 	struct ipa_wdi_in_params prod_pipe_in;
 	v_BOOL_t uc_loaded;
 	v_BOOL_t wdi_enabled;
+	bool ipa_pipes_down;
 #endif /* IPA_UC_OFFLOAD */
 };
 
@@ -777,12 +778,15 @@ static int hdd_ipa_uc_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 	WLANTL_SetUcActive(hdd_ipa->hdd_ctx->pvosContext,
 		VOS_TRUE, VOS_FALSE);
 
+	hdd_ipa->ipa_pipes_down = false;
 	return 0;
 }
 
 static int hdd_ipa_uc_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
 	int result;
+
+	hdd_ipa->ipa_pipes_down = true;
 
 	HDD_IPA_LOG(VOS_TRACE_LEVEL_INFO,
 		"%s: Disable RX PIPE", __func__);
@@ -1535,6 +1539,33 @@ static VOS_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 	}
 
 	return VOS_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_ipa_uc_force_pipe_shutdown() - Force shutdown IPA pipe
+ * @hdd_ctx: hdd main context
+ *
+ * Force shutdown IPA pipe
+ * Independent of FW pipe status, IPA pipe shutdonw progress
+ * in case, any STA does not leave properly, IPA HW pipe should cleaned up
+ * independent from FW pipe status
+ *
+ * Return: NONE
+ */
+void hdd_ipa_uc_force_pipe_shutdown(hdd_context_t *hdd_ctx)
+{
+	struct hdd_ipa_priv *hdd_ipa = (struct hdd_ipa_priv *)hdd_ctx->hdd_ipa;
+
+	if (false == hdd_ipa->ipa_pipes_down) {
+		HDD_IPA_LOG(VOS_TRACE_LEVEL_ERROR,
+			"IPA pipes are not down yet, force shutdown");
+		hdd_ipa_uc_disable_pipes(hdd_ipa);
+	} else {
+		HDD_IPA_LOG(VOS_TRACE_LEVEL_INFO,
+			"IPA pipes are down, do nothing");
+	}
+
+	return;
 }
 
 /**
@@ -4090,6 +4121,7 @@ VOS_STATUS hdd_ipa_init(hdd_context_t *hdd_ctx)
 #endif
 		hdd_ipa->wdi_enabled = VOS_FALSE;
 		hdd_ipa->uc_loaded = VOS_FALSE;
+		hdd_ipa->ipa_pipes_down = true;
 		uc_ready_param.priv = (void *)hdd_ipa;
 		uc_ready_param.notify = hdd_ipa_uc_loaded_uc_cb;
 		if (ipa_uc_reg_rdyCB(&uc_ready_param)) {
