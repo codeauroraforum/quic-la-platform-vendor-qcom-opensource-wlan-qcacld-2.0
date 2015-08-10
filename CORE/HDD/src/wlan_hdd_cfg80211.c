@@ -7054,7 +7054,7 @@ static int hdd_map_req_id_to_pattern_id(hdd_context_t *hdd_ctx,
 
 	mutex_lock(&hdd_ctx->op_ctx.op_lock);
 	for (i = 0; i < MAXNUM_PERIODIC_TX_PTRNS; i++) {
-		if (hdd_ctx->op_ctx.op_table[i].request_id == 0) {
+		if (hdd_ctx->op_ctx.op_table[i].request_id == MAX_REQUEST_ID) {
 			hdd_ctx->op_ctx.op_table[i].request_id = request_id;
 			*pattern_id = hdd_ctx->op_ctx.op_table[i].pattern_id;
 			mutex_unlock(&hdd_ctx->op_ctx.op_lock);
@@ -7091,7 +7091,7 @@ static int hdd_unmap_req_id_to_pattern_id(hdd_context_t *hdd_ctx,
 	mutex_lock(&hdd_ctx->op_ctx.op_lock);
 	for (i = 0; i < MAXNUM_PERIODIC_TX_PTRNS; i++) {
 		if (hdd_ctx->op_ctx.op_table[i].request_id == request_id) {
-			hdd_ctx->op_ctx.op_table[i].request_id = 0;
+			hdd_ctx->op_ctx.op_table[i].request_id = MAX_REQUEST_ID;
 			*pattern_id = hdd_ctx->op_ctx.op_table[i].pattern_id;
 			mutex_unlock(&hdd_ctx->op_ctx.op_lock);
 			return 0;
@@ -7158,11 +7158,12 @@ wlan_hdd_add_tx_ptrn(hdd_adapter_t *adapter, hdd_context_t *hdd_ctx,
 	}
 
 	request_id = nla_get_u32(tb[PARAM_REQUEST_ID]);
-	hddLog(LOG1, FL("Request Id: %u"), request_id);
-	if (request_id == 0) {
-		hddLog(LOGE, FL("request_id cannot be zero"));
+	if (request_id == MAX_REQUEST_ID) {
+		hddLog(LOGE, FL("request_id cannot be MAX"));
 		return -EINVAL;
 	}
+
+	hddLog(LOG1, FL("Request Id: %u"), request_id);
 
 	if (!tb[PARAM_PERIOD]) {
 		hddLog(LOGE, FL("attr period failed"));
@@ -7281,9 +7282,10 @@ wlan_hdd_del_tx_ptrn(hdd_adapter_t *adapter, hdd_context_t *hdd_ctx,
 		hddLog(LOGE, FL("attr request id failed"));
 		return -EINVAL;
 	}
+
 	request_id = nla_get_u32(tb[PARAM_REQUEST_ID]);
-	if (request_id == 0) {
-		hddLog(LOGE, FL("request_id cannot be zero"));
+	if (request_id == MAX_REQUEST_ID) {
+		hddLog(LOGE, FL("request_id cannot be MAX"));
 		return -EINVAL;
 	}
 
