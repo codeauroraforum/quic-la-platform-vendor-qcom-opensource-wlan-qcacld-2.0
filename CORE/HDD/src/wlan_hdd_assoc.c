@@ -967,8 +967,8 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
             (pHddCtx->isUnloadInProgress != TRUE))
         {
             hddLog(VOS_TRACE_LEVEL_INFO_HIGH,
-                    "%s: sent disconnected event to nl80211",
-                    __func__);
+                   FL("sent disconnected event to nl80211, rssi: %d"),
+                   pAdapter->rssi);
 #ifdef WLAN_FEATURE_P2P_DEBUG
             if(pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
             {
