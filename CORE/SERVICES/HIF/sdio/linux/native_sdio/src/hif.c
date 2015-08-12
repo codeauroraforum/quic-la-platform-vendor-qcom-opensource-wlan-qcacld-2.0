@@ -249,7 +249,9 @@ ATH_DEBUG_INSTANTIATE_MODULE_VAR(hif,
 A_STATUS HIFInit(OSDRV_CALLBACKS *callbacks)
 {
     int status;
-    AR_DEBUG_ASSERT(callbacks != NULL);
+
+    if (callbacks == NULL)
+        return A_ERROR;
 
     A_REGISTER_MODULE_DEBUG_INFO(hif);
 
@@ -292,8 +294,8 @@ __HIFReadWrite(HIF_DEVICE *device,
     A_UINT8 *tbuffer;
     A_BOOL   bounced = FALSE;
 
-    AR_DEBUG_ASSERT(device != NULL);
-    AR_DEBUG_ASSERT(device->func != NULL);
+    if (device == NULL || device->func == NULL)
+        return A_ERROR;
     AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("__HIFReadWrite, addr:0X%06X, len:%08d, %s, %s\n",
                     address,
                     length,
@@ -393,8 +395,7 @@ __HIFReadWrite(HIF_DEVICE *device,
 
         if (request & HIF_WRITE) {
 #if HIF_USE_DMA_BOUNCE_BUFFER
-            if (BUFFER_NEEDS_BOUNCE(buffer)) {
-                AR_DEBUG_ASSERT(device->dma_buffer != NULL);
+            if (BUFFER_NEEDS_BOUNCE(buffer) && device->dma_buffer != NULL) {
                 tbuffer = device->dma_buffer;
                     /* copy the write data to the dma buffer */
                 AR_DEBUG_ASSERT(length <= HIF_DMA_BUFFER_SIZE);
@@ -406,7 +407,7 @@ __HIFReadWrite(HIF_DEVICE *device,
 #else
             tbuffer = buffer;
 #endif
-            if (opcode == CMD53_FIXED_ADDRESS) {
+            if (opcode == CMD53_FIXED_ADDRESS && tbuffer != NULL) {
                 ret = sdio_writesb(device->func, address, tbuffer, length);
                 AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: writesb ret=%d address: 0x%X, len: %d, 0x%X\n",
                           ret, address, length, *(int *)tbuffer));
@@ -417,8 +418,7 @@ __HIFReadWrite(HIF_DEVICE *device,
             }
         } else if (request & HIF_READ) {
 #if HIF_USE_DMA_BOUNCE_BUFFER
-            if (BUFFER_NEEDS_BOUNCE(buffer)) {
-                AR_DEBUG_ASSERT(device->dma_buffer != NULL);
+            if (BUFFER_NEEDS_BOUNCE(buffer) && device->dma_buffer != NULL) {
                 AR_DEBUG_ASSERT(length <= HIF_DMA_BUFFER_SIZE);
                 tbuffer = device->dma_buffer;
                 bounced = TRUE;
@@ -428,7 +428,7 @@ __HIFReadWrite(HIF_DEVICE *device,
 #else
             tbuffer = buffer;
 #endif
-            if (opcode == CMD53_FIXED_ADDRESS) {
+            if (opcode == CMD53_FIXED_ADDRESS && tbuffer != NULL) {
                 ret = sdio_readsb(device->func, tbuffer, address, length);
                 AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: readsb ret=%d address: 0x%X, len: %d, 0x%X\n",
                           ret, address, length, *(int *)tbuffer));
@@ -498,8 +498,8 @@ HIFSyncRead(HIF_DEVICE *device,
 {
        A_STATUS status;
 
-       AR_DEBUG_ASSERT(device != NULL);
-       AR_DEBUG_ASSERT(device->func != NULL);
+       if (device == NULL || device->func == NULL)
+           return A_ERROR;
 
        sdio_claim_host(device->func);
        status = __HIFReadWrite(device, address, buffer, length, request & ~HIF_SYNCHRONOUS, NULL);
@@ -520,8 +520,8 @@ HIFReadWrite(HIF_DEVICE *device,
     BUS_REQUEST *busrequest;
 
 
-    AR_DEBUG_ASSERT(device != NULL);
-    AR_DEBUG_ASSERT(device->func != NULL);
+    if (device == NULL || device->func == NULL)
+        return A_ERROR;
     AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
         ("AR6000: device 0x%p addr 0x%X buffer 0x%p len %d req 0x%X context 0x%p",
         device, address, buffer, length, request, context));
@@ -1459,8 +1459,8 @@ HIFUnMaskInterrupt(HIF_DEVICE *device)
 {
     int ret;;
 
-    AR_DEBUG_ASSERT(device != NULL);
-    AR_DEBUG_ASSERT(device->func != NULL);
+    if (device == NULL || device->func == NULL)
+        return;
 
     ENTER();
     /*
@@ -1483,9 +1483,9 @@ HIFUnMaskInterrupt(HIF_DEVICE *device)
 void HIFMaskInterrupt(HIF_DEVICE *device)
 {
     int ret;
-    AR_DEBUG_ASSERT(device != NULL);
-    AR_DEBUG_ASSERT(device->func != NULL);
 
+    if (device == NULL || device->func == NULL)
+        return;
     ENTER();
 
     /* Mask our function IRQ */
@@ -1534,7 +1534,8 @@ hifFreeBusRequest(HIF_DEVICE *device, BUS_REQUEST *busrequest)
 {
     unsigned long flag;
 
-    AR_DEBUG_ASSERT(busrequest != NULL);
+    if (busrequest == NULL)
+       return;
     //AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: hifFreeBusRequest: 0x%p\n", busrequest));
     /* Acquire lock */
     spin_lock_irqsave(&device->lock, flag);
@@ -1996,6 +1997,10 @@ static int hifDeviceResume(struct device *dev)
     }
 
     device = getHifDevice(func);
+    if (device == NULL) {
+        AR_DEBUG_PRINTF(ATH_DEBUG_ERROR, ("%s: device is NULL\n", __func__));
+        return (-1);
+    }
 
     if(device->DeviceState == HIF_DEVICE_STATE_CUTPOWER){
         config = HIF_DEVICE_POWER_UP;
@@ -2138,9 +2143,12 @@ addHifDevice(struct sdio_func *func)
     HIF_DEVICE *hifdevice = NULL;
     int ret = 0;
     ENTER();
-    AR_DEBUG_ASSERT(func != NULL);
+    if (func == NULL)
+        return NULL;
+
     hifdevice = (HIF_DEVICE *)A_MALLOC(sizeof(HIF_DEVICE));
-    AR_DEBUG_ASSERT(hifdevice != NULL);
+    if (hifdevice == NULL)
+        return NULL;
     A_MEMZERO(hifdevice, sizeof(*hifdevice));
 #if HIF_USE_DMA_BOUNCE_BUFFER
     hifdevice->dma_buffer = A_MALLOC(HIF_DMA_BUFFER_SIZE);
@@ -2169,7 +2177,8 @@ getHifDevice(struct sdio_func *func)
 static void
 delHifDevice(HIF_DEVICE * device)
 {
-    AR_DEBUG_ASSERT(device!= NULL);
+    if (device == NULL)
+        return;
     AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: delHifDevice; 0x%p\n", device));
     if (device->dma_buffer != NULL) {
         A_FREE(device->dma_buffer);
