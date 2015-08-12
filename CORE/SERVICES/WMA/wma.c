@@ -16830,18 +16830,8 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 		wake_lock_duration = WMA_PNO_WAKE_LOCK_TIMEOUT;
 		node = &wma->interfaces[wake_info->vdev_id];
 		if (node) {
-			VOS_STATUS ret = VOS_STATUS_SUCCESS;
 			WMA_LOGD("NLO match happened");
 			node->nlo_match_evt_received = TRUE;
-
-			/* Configure pno scan complete wakeup */
-			ret = wma_add_wow_wakeup_event(wma,
-						WOW_NLO_SCAN_COMPLETE_EVENT,
-						true);
-			if (ret != VOS_STATUS_SUCCESS)
-				WMA_LOGE("Failed to configure pno scan complete wakeup");
-			else
-				WMA_LOGD("PNO scan complete wakeup is enabled in fw");
 		}
 		break;
 
@@ -17750,8 +17740,9 @@ end:
  * wakeup trigger events.
  */
 static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
-					    v_BOOL_t pno_in_progress,
-					    bool runtime_pm)
+				v_BOOL_t pno_in_progress,
+				bool pno_matched,
+				bool runtime_pm)
 {
 	struct wma_txrx_node *iface;
 	VOS_STATUS ret = VOS_STATUS_SUCCESS;
@@ -17941,6 +17932,16 @@ static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
 	} else
 		WMA_LOGD("PNO based wakeup is %s in fw",
 			pno_in_progress ? "enabled" : "disabled");
+
+	/* Configure pno scan complete wakeup */
+	ret = wma_add_wow_wakeup_event(wma,
+				WOW_NLO_SCAN_COMPLETE_EVENT, pno_matched);
+	if (ret != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("Failed to configure pno scan complete wakeup");
+		goto end;
+	} else
+		WMA_LOGD("PNO scan complete wakeup is %s in fw",
+			pno_matched ? "enabled" : "disabled");
 #endif
 
 	/* Configure roaming scan better AP based wakeup */
@@ -18133,6 +18134,7 @@ static VOS_STATUS wma_suspend_req(tp_wma_handle wma, tpSirWlanSuspendParam info)
 	v_BOOL_t connected = FALSE, pno_in_progress = FALSE;
 	VOS_STATUS ret;
 	u_int8_t i;
+	bool pno_matched = false;
 	struct wma_txrx_node *iface;
 
 	if (info == NULL) {
@@ -18219,6 +18221,8 @@ suspend_all_iface:
 		if (wma->interfaces[i].pno_in_progress) {
 			WMA_LOGD("PNO is in progress, enabling wow");
 			pno_in_progress = TRUE;
+			if (wma->interfaces[i].nlo_match_evt_received)
+				pno_matched = true;
 			break;
 		}
 #endif
@@ -18261,7 +18265,8 @@ enable_wow:
 #endif
 
 	ret = wma_feed_wow_config_to_fw(wma, pno_in_progress,
-			info ? true: false);
+				pno_matched,
+				info ? true: false);
 	if (ret != VOS_STATUS_SUCCESS) {
 		wma_send_status_to_suspend_ind(wma, FALSE, info == NULL);
 		vos_mem_free(info);
