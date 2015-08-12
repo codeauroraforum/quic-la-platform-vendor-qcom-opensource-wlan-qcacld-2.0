@@ -25607,6 +25607,10 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 			 * we didn't get Download Complete for almost
 			 * WMA_TX_FRAME_COMPLETE_TIMEOUT (1 sec)
 			 */
+#ifdef CONFIG_HL_SUPPORT
+			 /* display scheduler stats */
+			 wdi_in_display_stats(txrx_pdev, WLAN_SCHEDULER_STATS);
+#endif
 		}
 	} else {
 		/*
