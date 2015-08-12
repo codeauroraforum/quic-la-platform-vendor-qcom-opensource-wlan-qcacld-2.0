@@ -1421,7 +1421,7 @@ static eHalStatus csrNeighborRoamIssuePreauthReq(tpAniSirGlobal pMac,
                 sizeof(tCsrBssid));
             csrRoamCallCallback(pMac, sessionId, roamInfo, 0,
                                 eCSR_ROAM_PREAUTH_INIT_NOTIFY, 0);
-            vos_mem_free(pRoamInfo);
+            vos_mem_free(roamInfo);
         }
 #endif
 
@@ -1546,7 +1546,7 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac,
                 sizeof(tCsrBssid));
             csrRoamCallCallback(pMac, sessionId, roamInfo, 0,
                                 eCSR_ROAM_PREAUTH_STATUS_SUCCESS, 0);
-            vos_mem_free(pRoamInfo);
+            vos_mem_free(roamInfo);
         }
 #endif
 
@@ -1609,7 +1609,7 @@ eHalStatus csrNeighborRoamPreauthRspHandler(tpAniSirGlobal pMac,
                         sizeof(tCsrBssid));
                     csrRoamCallCallback(pMac, sessionId, roamInfo, 0,
                                         eCSR_ROAM_PREAUTH_STATUS_FAILURE, 0);
-                    vos_mem_free(pRoamInfo);
+                    vos_mem_free(roamInfo);
                 }
 #endif
 
@@ -5580,7 +5580,7 @@ void csrNeighborRoamRequestHandoff(tpAniSirGlobal pMac, tANI_U8 sessionId)
             (void *)&handoffNode.pBssDescription->bssId, sizeof(tCsrBssid));
         csrRoamCallCallback(pMac, sessionId, roamInfoMetrics, 0,
                             eCSR_ROAM_HANDOVER_SUCCESS, 0);
-        vos_mem_free(pRoamInfo);
+        vos_mem_free(roamInfoMetrics);
     }
 #endif
 
