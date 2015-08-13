@@ -1798,26 +1798,66 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 }
 
 #ifdef WLAN_FEATURE_STATS_EXT
-static int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
-                                        struct wireless_dev *wdev,
-                                        const void *data,
-                                        int data_len)
+/**
+ * __wlan_hdd_cfg80211_stats_ext_request() - ext stats request
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wdev
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: int
+ */
+static int __wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
+						 struct wireless_dev *wdev,
+						 const void *data,
+						 int data_len)
 {
     tStatsExtRequestReq stats_ext_req;
     struct net_device *dev = wdev->netdev;
     hdd_adapter_t *pAdapter =  WLAN_HDD_GET_PRIV_PTR(dev);
-    int ret_val = -1;
+    int ret_val;
     eHalStatus status;
+    hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+
+    ENTER();
+
+    ret_val = wlan_hdd_validate_context(hdd_ctx);
+    if (ret_val)
+        return ret_val;
 
     stats_ext_req.request_data_len = data_len;
     stats_ext_req.request_data = (void *)data;
 
     status = sme_StatsExtRequest(pAdapter->sessionId, &stats_ext_req);
 
-    if (eHAL_STATUS_SUCCESS == status)
-        ret_val = 0;
+    if (eHAL_STATUS_SUCCESS != status)
+        ret_val = -EINVAL;
 
     return ret_val;
+}
+
+/**
+ * wlan_hdd_cfg80211_stats_ext_request() - ext stats request
+ * @wiphy: Pointer to wiphy
+ * @wdev: Pointer to wdev
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Return: int
+ */
+static int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data,
+					       int data_len)
+{
+	int ret;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_stats_ext_request(wiphy, wdev,
+						    data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
 }
 
 static void wlan_hdd_cfg80211_stats_ext_callback(void* ctx, tStatsExtEvent* msg)
