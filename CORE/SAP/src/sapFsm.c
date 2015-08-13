@@ -3876,6 +3876,8 @@ eCsrPhyMode sapConvertSapPhyModeToCsrPhyMode( eSapPhyMode sapPhyMode )
          return eCSR_DOT11_MODE_11n_ONLY;
       case (eSAP_DOT11_MODE_11b_ONLY):
          return eCSR_DOT11_MODE_11b_ONLY;
+      case (eSAP_DOT11_MODE_11a):
+         return eCSR_DOT11_MODE_11a;
 #ifdef WLAN_FEATURE_11AC
       case (eSAP_DOT11_MODE_11ac_ONLY):
          return eCSR_DOT11_MODE_11ac_ONLY;
