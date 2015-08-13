@@ -530,6 +530,8 @@ typedef enum {
     WMI_EXTWOW_SET_APP_TYPE1_PARAMS_CMDID,
     /* Extend WoW command to configure app type2 parameter */
     WMI_EXTWOW_SET_APP_TYPE2_PARAMS_CMDID,
+    /* enable ICMPv6 Network advertisement filtering */
+    WMI_WOW_ENABLE_ICMPV6_NA_FLT_CMDID,
 
     /* RTT measurement related cmd */
     /** reques to make an RTT measurement */
@@ -5418,6 +5420,10 @@ typedef struct {
     A_UINT32 hirssi_scan_delta;
     /** 5G scan upper bound */
     A_UINT32 hirssi_upper_bound;
+    /* The TLVs will follow.
+     * wmi_roam_scan_extended_threshold_param extended_param;
+     * wmi_roam_earlystop_rssi_thres_param earlystop_param;
+     */
 } wmi_roam_scan_rssi_threshold_fixed_param;
 
 #define WMI_ROAM_5G_BOOST_PENALIZE_ALGO_FIXED  0x0
@@ -5562,6 +5568,21 @@ typedef struct {
     /** mcast/group management frames cipher set */
     A_UINT32               rsn_mcastmgmtcipherset;
 } wmi_ap_profile;
+
+/** Support early stop roaming scanning when finding a strong candidate AP
+ * A 'strong' candidate is
+ * 1) Is eligible candidate
+ *    (all conditions are met in existing candidate selection).
+ * 2) Its rssi is better than earlystop threshold.
+ *    Earlystop threshold will be relaxed as each channel is scanned.
+ */
+typedef struct {
+    A_UINT32 tlv_header;
+    /* Minimum RSSI threshold value for early stop, unit is dB above NF. */
+    A_UINT32 roam_earlystop_thres_min;
+    /* Maminum RSSI threshold value for early stop, unit is dB above NF. */
+    A_UINT32 roam_earlystop_thres_max;
+} wmi_roam_earlystop_rssi_thres_param;
 
 /** Beacon filter wmi command info */
 
@@ -6183,6 +6204,10 @@ when comparing wifi header.*/
 #define WOW_DEFAULT_IOAC_RANDOM_SIZE_DWORD 2
 #define WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_SIZE   120
 #define WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_SIZE_DWORD 30
+#define WOW_DEFAULT_IOAC_SOCKET_PATTERN_SIZE  32
+#define WOW_DEFAULT_IOAC_SOCKET_PATTERN_SIZE_DWORD 8
+#define WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_REV_SIZE       32
+#define WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_REV_SIZE_DWORD 8
 
 typedef enum pattern_type_e {
     WOW_PATTERN_MIN = 0,
@@ -6195,6 +6220,7 @@ typedef enum pattern_type_e {
     WOW_IPV6_RA_PATTERN,
     WOW_IOAC_PKT_PATTERN,
     WOW_IOAC_TMR_PATTERN,
+    WOW_IOAC_SOCK_PATTERN,
     WOW_PATTERN_MAX
 }WOW_PATTERN_TYPE;
 
@@ -6225,6 +6251,8 @@ typedef enum event_type_e {
     WOW_CLIENT_KICKOUT_EVENT,
     WOW_NAN_EVENT,
     WOW_EXTSCAN_EVENT,
+    WOW_IOAC_REV_KA_FAIL_EVENT,
+    WOW_IOAC_SOCK_EVENT,
 } WOW_WAKE_EVENT_TYPE;
 
 typedef enum wake_reason_e {
@@ -6260,6 +6288,8 @@ typedef enum wake_reason_e {
     WOW_REASON_NAN_EVENT,
     WOW_REASON_EXTSCAN,
     WOW_REASON_RSSI_BREACH_EVENT,
+    WOW_REASON_IOAC_REV_KA_FAIL_EVENT,
+    WOW_REASON_IOAC_SOCK_EVENT,
     WOW_REASON_DEBUG_TEST = 0xFF,
 } WOW_WAKE_REASON_TYPE;
 
@@ -6279,6 +6309,15 @@ typedef struct {
     /** Reserved for future use */
     A_UINT32    reserved0;
 } wmi_wow_hostwakeup_from_sleep_cmd_fixed_param;
+
+#define WOW_ICMPV6_NA_FILTER_DISABLE 0
+#define WOW_ICMPV6_NA_FILTER_ENABLE 1
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_wow_enable_icmpv6_na_flt_cmd_fixed_param  */
+    A_UINT32 vdev_id;
+    A_UINT32 enable; /* WOW_ICMPV6_NA_FILTER_ENABLE/DISABLE */
+} wmi_wow_enable_icmpv6_na_flt_cmd_fixed_param;
 
 typedef struct bitmap_pattern_s {
     A_UINT32     tlv_header;     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_BITMAP_PATTERN_T */
@@ -6318,6 +6357,17 @@ typedef enum wow_ioac_pattern_type {
     WOW_IOAC_EXTEND_PATTERN,
 } WOW_IOAC_PATTERN_TYPE;
 
+typedef struct ioac_sock_pattern_s {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_IOAC_SOCK_PATTERN_T */
+    A_UINT32 id;
+    A_UINT32 local_ipv4;
+    A_UINT32 remote_ipv4;
+    A_UINT32 local_port;
+    A_UINT32 remote_port;
+    A_UINT32 pattern_len; /* units = bytes */
+    A_UINT32 pattern[WOW_DEFAULT_IOAC_SOCKET_PATTERN_SIZE_DWORD];
+} WOW_IOAC_SOCK_PATTERN_T;
+
 typedef struct ioac_pkt_pattern_s {
     A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WOW_IOAC_PKT_PATTERN_T */
     A_UINT32 pattern_type;
@@ -6349,6 +6399,14 @@ typedef struct ioac_keepalive_s {
     A_UINT32 keepalive_pkt_len;
     A_UINT32 period_in_ms;
     A_UINT32 vdev_id;
+    A_UINT32 max_loss_cnt;
+    A_UINT32 local_ipv4;
+    A_UINT32 remote_ipv4;
+    A_UINT32 local_port;
+    A_UINT32 remote_port;
+    A_UINT32 recv_period_in_ms;
+    A_UINT32 rev_ka_size;
+    A_UINT32 rev_ka_data[WOW_DEFAULT_IOAC_KEEP_ALIVE_PKT_REV_SIZE_DWORD];
 } WMI_WOW_IOAC_KEEPALIVE_T;
 
 typedef struct {
@@ -6368,6 +6426,7 @@ typedef struct {
     A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param */
     A_UINT32 vdev_id;
     A_UINT32 pattern_type;
+    A_UINT32 pattern_id;
 } WMI_WOW_IOAC_DEL_PATTERN_CMD_fixed_param;
 
 typedef struct {
@@ -6881,6 +6940,28 @@ typedef struct nlo_configured_parameters {
     wmi_nlo_bcast_nw_param bcast_nw_type; /* indicates if the SSID is hidden or not */
 } nlo_configured_parameters;
 
+/* Support channel prediction for PNO scan after scanning top_k_num channels
+ * if stationary_threshold is met.
+ */
+typedef struct nlo_channel_prediction_cfg {
+    /* Enable or disable this feature. */
+    A_UINT32 enable;
+    /* Top K channels will be scanned before deciding whether to further scan
+     * or stop. Minimum value is 3 and maximum is 5. */
+    A_UINT32 top_k_num;
+    /* Preconfigured stationary threshold.
+     * Lesser value means more conservative. Bigger value means more aggressive.
+     * Maximum is 100 and mininum is 0. */
+    A_UINT32 stationary_threshold;
+    /* Periodic full channel scan in milliseconds unit.
+     * After full_scan_period_ms since last full scan, channel prediction
+     * scan is suppressed and will do full scan.
+     * This is to help detecting sudden AP power-on or -off. Value 0 means no
+     * full scan at all (not recommended).
+     */
+    A_UINT32 full_scan_period_ms;
+} nlo_channel_prediction_cfg;
+
 typedef struct wmi_nlo_config {
     A_UINT32    tlv_header;     /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_nlo_config_cmd_fixed_param */
     A_UINT32    flags;
@@ -6900,6 +6981,7 @@ typedef struct wmi_nlo_config {
     /* The TLVs will follow.
         * nlo_configured_parameters nlo_list[];
         * A_UINT32 channel_list[];
+        * nlo_channel_prediction_cfg ch_prediction_cfg;
         */
 
 } wmi_nlo_config_cmd_fixed_param;
@@ -8541,6 +8623,9 @@ typedef struct {
 
     /** For 4-byte aligment padding */
     A_UINT8 reserved;
+
+    /** index of peak magnitude bin (signed) */
+    A_INT32 peak_sidx;
 
 } wmi_dfs_radar_event_fixed_param;
 
