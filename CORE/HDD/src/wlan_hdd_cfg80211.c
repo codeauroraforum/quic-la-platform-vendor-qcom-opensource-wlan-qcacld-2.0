@@ -13046,8 +13046,14 @@ __wlan_hdd_cfg80211_update_ft_ies(struct wiphy *wiphy,
                                   struct net_device *dev,
                                   struct cfg80211_update_ft_ies_params *ftie)
 {
+    hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+    int status;
+
+    status = wlan_hdd_validate_context(hdd_ctx);
+    if (status)
+        return status;
 
     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
                      TRACE_CODE_HDD_CFG80211_UPDATE_FT_IES,
