@@ -13349,6 +13349,12 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 		iface->aid = params->assocId;
 		goto out;
 	}
+	if (wma->interfaces[params->smesessionId].vdev_up == true) {
+		WMA_LOGE("%s: vdev id %d is already UP for %pM", __func__,
+			params->smesessionId, params->bssId);
+		status = VOS_STATUS_E_FAILURE;
+		goto out;
+	}
 	if (peer != NULL && peer->state == ol_txrx_peer_state_disc) {
 		/*
 		 * This is the case for reassociation.
@@ -18282,8 +18288,6 @@ int wma_disable_wow_in_fw(WMA_HANDLE handle)
 	wma_set_wow_bus_suspend(wma, 0);
 	/* Unpause the vdev as we are resuming */
 	wma_unpause_vdev(wma);
-
-	vos_wake_lock_timeout_acquire(&wma->wow_wake_lock, 2000);
 
 	return ret;
 }
@@ -26888,6 +26892,7 @@ int wma_dfs_indicate_radar(struct ieee80211com *ic,
 	struct wma_dfs_radar_indication *radar_event;
 	struct hdd_dfs_radar_ind hdd_radar_event;
 	void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
+	tpAniSirGlobal pmac = NULL;
 
 	wma = (tp_wma_handle) vos_get_context(VOS_MODULE_ID_WDA, vos_context);
 
@@ -26898,6 +26903,9 @@ int wma_dfs_indicate_radar(struct ieee80211com *ic,
 	}
 
 	hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD,wma->vos_context);
+	pmac = (tpAniSirGlobal)
+		vos_get_context(VOS_MODULE_ID_PE, wma->vos_context);
+
 	if (wma->dfs_ic != ic)
 	{
 		WMA_LOGE("%s:DFS- Invalid WMA handle",__func__);
@@ -26913,8 +26921,11 @@ int wma_dfs_indicate_radar(struct ieee80211com *ic,
 
 	/*
 	 * Do not post multiple Radar events on the same channel.
+	 * But, when DFS test mode is enabled, allow multiple dfs
+	 * radar events to be posted on the same channel.
 	 */
-	if ( ichan->ic_ieee  != (wma->dfs_ic->last_radar_found_chan) )
+	if ((ichan->ic_ieee  != (wma->dfs_ic->last_radar_found_chan)) ||
+	    ( pmac->sap.SapDfsInfo.disable_dfs_ch_switch == VOS_TRUE) )
 	{
 		wma->dfs_ic->last_radar_found_chan = ichan->ic_ieee;
 		/* Indicate the radar event to HDD to stop the netif Tx queues*/
