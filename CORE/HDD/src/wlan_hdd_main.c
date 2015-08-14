@@ -5353,7 +5353,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                                        &modProfileFields);
                sme_RoamReassoc(hHal, pAdapter->sessionId,
                             NULL, modProfileFields, &roamId, 1);
-               return 0;
+               ret = 0;
+               goto exit;
            }
 
            /* Check channel number is a valid channel number */
@@ -5362,7 +5363,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            {
                hddLog(VOS_TRACE_LEVEL_ERROR,
                       "%s: Invalid Channel [%d] \n", __func__, channel);
-               return -EINVAL;
+               ret = -EINVAL;
+               goto exit;
            }
 
            /* Proceed with reassoc */
