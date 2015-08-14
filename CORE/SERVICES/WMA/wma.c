@@ -189,6 +189,10 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 					u_int32_t len);
 #endif
 
+#ifdef FEATURE_WLAN_EXTSCAN
+#define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION    (5 * 1000) /* in msec */
+#endif
+
 /* Data rate 100KBPS based on IE Index */
 struct index_data_rate_type
 {
@@ -2624,16 +2628,19 @@ static int wma_extscan_operations_event_handler(void *handle,
 		oprn_ind->status = 0;
 		break;
 	case WMI_EXTSCAN_CYCLE_STARTED_EVENT:
-		vos_wake_lock_acquire(&wma->extscan_wake_lock,
-				      WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
 		WMA_LOGD("%s: received WMI_EXTSCAN_CYCLE_STARTED_EVENT",
 			 __func__);
+		vos_wake_lock_timeout_acquire(&wma->extscan_wake_lock,
+				      WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION,
+				      WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
+		vos_runtime_pm_prevent_suspend();
 		goto exit_handler;
 	case WMI_EXTSCAN_CYCLE_COMPLETED_EVENT:
-		vos_wake_lock_release(&wma->extscan_wake_lock,
-				      WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
 		WMA_LOGD("%s: received WMI_EXTSCAN_CYCLE_COMPLETED_EVENT",
 			__func__);
+		vos_wake_lock_release(&wma->extscan_wake_lock,
+					WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
+		vos_runtime_pm_allow_suspend();
 		goto exit_handler;
 	default:
 		WMA_LOGE("%s: Unknown event(%d) from target",
