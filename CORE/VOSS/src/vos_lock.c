@@ -49,7 +49,7 @@
 #include "vos_memory.h"
 #include "vos_trace.h"
 #include "hif.h"
-#include "i_vos_diag_core_event.h"
+#include "vos_diag_core_event.h"
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
 #endif
@@ -548,6 +548,9 @@ VOS_STATUS vos_wake_lock_acquire(vos_wake_lock_t *pLock,
     vos_log_wlock_diag(reason, vos_wake_lock_name(pLock),
                        WIFI_POWER_EVENT_DEFAULT_WAKELOCK_TIMEOUT,
                        WIFI_POWER_EVENT_WAKELOCK_TAKEN);
+
+    if (reason != WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT)
+        vos_runtime_pm_prevent_suspend();
 #if defined CONFIG_CNSS
     cnss_pm_wake_lock(pLock);
 #elif defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
@@ -570,6 +573,7 @@ VOS_STATUS vos_wake_lock_timeout_acquire(vos_wake_lock_t *pLock, v_U32_t msec,
 {
     vos_log_wlock_diag(reason, vos_wake_lock_name(pLock), msec,
                        WIFI_POWER_EVENT_WAKELOCK_TAKEN);
+    vos_runtime_pm_prevent_suspend_timeout(msec);
 #if defined CONFIG_CNSS
     cnss_pm_wake_lock_timeout(pLock, msec);
 #elif defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
@@ -597,6 +601,8 @@ VOS_STATUS vos_wake_lock_release(vos_wake_lock_t *pLock, uint32_t reason)
 #elif defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
     wake_unlock(pLock);
 #endif
+    if (reason != WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT)
+        vos_runtime_pm_allow_suspend();
     return VOS_STATUS_SUCCESS;
 }
 
