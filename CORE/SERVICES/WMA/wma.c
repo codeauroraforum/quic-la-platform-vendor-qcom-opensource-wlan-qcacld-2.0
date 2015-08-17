@@ -211,6 +211,8 @@ enum extscan_report_events_type {
 	EXTSCAN_REPORT_EVENTS_NO_BATCH      = 0x04,
 };
 
+#define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION    (5 * 1000) /* in msec */
+
 #endif
 
 /* Data rate 100KBPS based on IE Index */
@@ -2729,31 +2731,35 @@ static int wma_extscan_start_stop_event_handler(void *handle,
 	return 0;
 }
 
-
-static int wma_extscan_operations_event_handler(void *handle,
-		u_int8_t *cmd_param_info, u_int32_t len)
+/**
+ * wma_extscan_operations_ind_handler() - extscan operations handler
+ * @wma: WMA global handle
+ * @buf: command event data
+ *
+ * This function extracts the event data, fill in appropriate structures
+ * and invoke upper layer callback.
+ *
+ * Return: 0 on success, error number otherwise
+ */
+static int wma_extscan_operations_ind_handler(tp_wma_handle wma, uint8_t *buf)
 {
-	tp_wma_handle wma = (tp_wma_handle)handle;
-	WMI_EXTSCAN_OPERATION_EVENTID_param_tlvs *param_buf;
-	wmi_extscan_operation_event_fixed_param *oprn_event;
+	wmi_extscan_operation_event_fixed_param *event;
 	tSirExtScanOnScanEventIndParams   *oprn_ind;
-	tpAniSirGlobal pMac = (tpAniSirGlobal)vos_get_context(
+	tpAniSirGlobal mac_ctx = (tpAniSirGlobal)vos_get_context(
 					VOS_MODULE_ID_PE, wma->vos_context);
-	if (!pMac) {
-		WMA_LOGE("%s: Invalid pMac", __func__);
+	if (!mac_ctx) {
+		WMA_LOGE("%s: Invalid mac_ctx", __func__);
 		return -EINVAL;
 	}
-	if (!pMac->sme.pExtScanIndCb) {
+	if (!mac_ctx->sme.pExtScanIndCb) {
 		WMA_LOGE("%s: Callback not registered", __func__);
 		return -EINVAL;
         }
-	param_buf = (WMI_EXTSCAN_OPERATION_EVENTID_param_tlvs *)
-					cmd_param_info;
-	if (!param_buf) {
-		WMA_LOGE("%s: Invalid scan operation event", __func__);
+	if (!buf) {
+		WMA_LOGE("%s: Invalid event buffer", __func__);
 		return -EINVAL;
 	}
-	oprn_event = param_buf->fixed_param;
+	event = (wmi_extscan_operation_event_fixed_param *)buf;
 	oprn_ind = vos_mem_malloc(sizeof(*oprn_ind));
 	if (!oprn_ind) {
 		WMA_LOGE("%s: extscan memory allocation failed", __func__);
@@ -2761,32 +2767,35 @@ static int wma_extscan_operations_event_handler(void *handle,
 		return -EINVAL;
 	}
 
-	oprn_ind->requestId = oprn_event->request_id;
+	oprn_ind->requestId = event->request_id;
 
-	switch (oprn_event->event) {
+	switch (event->event) {
 	case WMI_EXTSCAN_BUCKET_COMPLETED_EVENT:
 		oprn_ind->scanEventType =  WIFI_SCAN_COMPLETE;
 		oprn_ind->status = 0;
 		break;
 	case WMI_EXTSCAN_CYCLE_STARTED_EVENT:
-		vos_wake_lock_acquire(&wma->extscan_wake_lock,
-				      WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
 		WMA_LOGD("%s: received WMI_EXTSCAN_CYCLE_STARTED_EVENT",
 			 __func__);
+		vos_wake_lock_timeout_acquire(&wma->extscan_wake_lock,
+				      WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION,
+				      WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
+		vos_runtime_pm_prevent_suspend();
 		goto exit_handler;
 	case WMI_EXTSCAN_CYCLE_COMPLETED_EVENT:
-		vos_wake_lock_release(&wma->extscan_wake_lock,
-				      WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
 		WMA_LOGD("%s: received WMI_EXTSCAN_CYCLE_COMPLETED_EVENT",
 			__func__);
+		vos_wake_lock_release(&wma->extscan_wake_lock,
+					WIFI_POWER_EVENT_WAKELOCK_EXT_SCAN);
+		vos_runtime_pm_allow_suspend();
 		goto exit_handler;
 	default:
 		WMA_LOGE("%s: Unknown event %d from target",
-			__func__, oprn_event->event);
+			__func__, event->event);
 		vos_mem_free(oprn_ind);
 		return -EINVAL;
 	}
-	pMac->sme.pExtScanIndCb(pMac->hHdd,
+	mac_ctx->sme.pExtScanIndCb(mac_ctx->hHdd,
 				eSIR_EXTSCAN_SCAN_PROGRESS_EVENT_IND,
 				oprn_ind);
 	WMA_LOGD("%s: sending scan progress event to hdd", __func__);
@@ -2795,6 +2804,56 @@ exit_handler:
 	vos_mem_free(oprn_ind);
 	return 0;
 }
+
+/**
+ * wma_extscan_operations_event_handler() - extscan operations event handler
+ * @handle: WMA global handle
+ * @cmd_param_info: command event data
+ * @len: Length of @cmd_param_info
+ *
+ * Return: 0 on success, error number otherwise
+ */
+static int wma_extscan_operations_event_handler(void *handle,
+					uint8_t *cmd_param_info, uint32_t len)
+{
+	WMI_EXTSCAN_OPERATION_EVENTID_param_tlvs *param_buf;
+	wmi_extscan_operation_event_fixed_param *event, *buf;
+	int buf_len = sizeof(*event);
+	vos_msg_t vos_msg = {0};
+
+	WMA_LOGI("%s: Enter", __func__);
+	param_buf = (WMI_EXTSCAN_OPERATION_EVENTID_param_tlvs *)
+					cmd_param_info;
+	if (!param_buf) {
+		WMA_LOGE("%s: Invalid extscan event", __func__);
+		return -EINVAL;
+	}
+
+	event = param_buf->fixed_param;
+	buf = vos_mem_malloc(buf_len);
+	if (!buf) {
+		WMA_LOGE("%s: extscan memory allocation failed", __func__);
+		return -ENOMEM;
+	}
+
+	*buf = *event;
+
+	vos_msg.type = WDA_EXTSCAN_OPERATION_IND;
+	vos_msg.bodyptr = buf;
+	vos_msg.bodyval = 0;
+
+	if (VOS_STATUS_SUCCESS !=
+	    vos_mq_post_message(VOS_MQ_ID_WDA, &vos_msg)) {
+		WMA_LOGP("%s: Failed to post WDA_EXTSCAN_OPERATION_IND msg",
+			__func__);
+		vos_mem_free(buf);
+		return -EINVAL;
+	}
+	WMA_LOGI("WDA_EXTSCAN_OPERATION_IND posted");
+
+	return 0;
+}
+
 
 static int wma_extscan_table_usage_event_handler (void *handle,
 		u_int8_t  *cmd_param_info, u_int32_t len)
@@ -18066,11 +18125,14 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 #endif
 #ifdef FEATURE_WLAN_SCAN_PNO
 	case WOW_REASON_NLOD:
-		wake_lock_duration = WMA_PNO_WAKE_LOCK_TIMEOUT;
 		node = &wma->interfaces[wake_info->vdev_id];
 		if (node) {
 			WMA_LOGD("NLO match happened");
 			node->nlo_match_evt_received = TRUE;
+
+			vos_wake_lock_timeout_acquire(&wma->pno_wake_lock,
+					      WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT,
+					      WIFI_POWER_EVENT_WAKELOCK_PNO);
 		}
 		break;
 
@@ -22352,12 +22414,6 @@ static VOS_STATUS wma_process_ll_stats_getReq
 
 	uint32_t base_period = pstart->basePeriod;
 
-	WMA_LOGD("%s: Extscan start:num_Channels is %d",
-		__func__, src_bucket->numChannels);
-
-	WMA_LOGD("%s: Extscan start:num_Buckets is %d",
-		__func__, pstart->numBuckets);
-
 	/* TLV placeholder for ssid_list (NULL) */
 	len += WMI_TLV_HDR_SIZE;
 	len += num_ssid * sizeof(wmi_ssid);
@@ -22380,6 +22436,8 @@ static VOS_STATUS wma_process_ll_stats_getReq
 		nchannels +=  src_bucket->numChannels;
 		src_bucket++;
 	}
+	WMA_LOGD("%s: Total buckets: %d total #of channels is %d",
+		__func__, nbuckets, nchannels);
 	len += nchannels * sizeof(wmi_extscan_bucket_channel);
 	/* Allocate the memory */
 	*buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
@@ -22387,7 +22445,7 @@ static VOS_STATUS wma_process_ll_stats_getReq
 		WMA_LOGP("%s: failed to allocate memory"
 			" for start extscan cmd",
 			__func__);
-		return VOS_STATUS_E_FAILURE;
+		return VOS_STATUS_E_NOMEM;
 	}
 	buf_ptr = (u_int8_t *)wmi_buf_data(*buf);
 	cmd = (wmi_extscan_start_cmd_fixed_param *) buf_ptr;
@@ -24763,6 +24821,11 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			wma_extscan_rsp_handler(wma_handle, msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 		break;
+		case WDA_EXTSCAN_OPERATION_IND:
+			wma_extscan_operations_ind_handler(wma_handle,
+							   msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+		break;
 #endif
 		case WDA_SET_SCAN_MAC_OUI_REQ:
 			wma_scan_probe_setoui(wma_handle, msg->bodyptr);
@@ -25355,7 +25418,7 @@ static int wma_nlo_match_evt_handler(void *handle, u_int8_t *event,
 		node->nlo_match_evt_received = TRUE;
 
 	vos_wake_lock_timeout_acquire(&wma->pno_wake_lock,
-				      WMA_PNO_WAKE_LOCK_TIMEOUT,
+				      WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT,
 				      WIFI_POWER_EVENT_WAKELOCK_PNO);
 
 	return 0;
@@ -25390,6 +25453,8 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 		nlo_event->vdev_id);
 		goto skip_pno_cmp_ind;
 	}
+	vos_wake_lock_release(&wma->pno_wake_lock,
+			      WIFI_POWER_EVENT_WAKELOCK_PNO);
 
 	scan_event = (tSirScanOffloadEvent *) vos_mem_malloc(
 					      sizeof(tSirScanOffloadEvent));
@@ -25397,6 +25462,9 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 		/* Posting scan completion msg would take scan cache result
 		 * from LIM module and update in scan cache maintained in SME.*/
 		WMA_LOGD("Posting Scan completion to umac");
+		vos_wake_lock_timeout_acquire(&wma->pno_wake_lock,
+				      WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT,
+				      WIFI_POWER_EVENT_WAKELOCK_PNO);
 		vos_mem_zero(scan_event, sizeof(tSirScanOffloadEvent));
 		scan_event->reasonCode = eSIR_SME_SUCCESS;
 		scan_event->event = SCAN_EVENT_COMPLETED;
