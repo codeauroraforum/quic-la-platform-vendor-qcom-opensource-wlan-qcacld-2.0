@@ -4280,10 +4280,10 @@ wlan_hdd_set_no_dfs_flag_config_policy[QCA_WLAN_VENDOR_ATTR_SET_NO_DFS_FLAG_MAX
 };
 
 
-static int wlan_hdd_cfg80211_disable_dfs_chan_scan(struct wiphy *wiphy,
-                                                  struct wireless_dev *wdev,
-                                                  const void *data,
-                                                  int data_len)
+static int __wlan_hdd_cfg80211_disable_dfs_chan_scan(struct wiphy *wiphy,
+						     struct wireless_dev *wdev,
+						     const void *data,
+						     int data_len)
 {
     struct net_device *dev = wdev->netdev;
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -4402,6 +4402,34 @@ static int wlan_hdd_cfg80211_disable_dfs_chan_scan(struct wiphy *wiphy,
     return ret_val;
 }
 
+/**
+ * wlan_hdd_cfg80211_disable_dfs_chan_scan () - DFS scan vendor command
+ *
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendof command data buffer
+ * @data_len: Buffer length
+ *
+ * Handles QCA_WLAN_VENDOR_ATTR_SET_NO_DFS_FLAG_MAX. Validate it and
+ * call wlan_hdd_disable_dfs_chan_scan to send it to firmware.
+ *
+ * Return: EOK or other error codes.
+ */
+
+static int wlan_hdd_cfg80211_disable_dfs_chan_scan(struct wiphy *wiphy,
+						   struct wireless_dev *wdev,
+						   const void *data,
+						   int data_len)
+{
+	int ret;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_disable_dfs_chan_scan(wiphy, wdev,
+							data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
 
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
 {
