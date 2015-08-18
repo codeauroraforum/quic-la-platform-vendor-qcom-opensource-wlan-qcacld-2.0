@@ -190,6 +190,8 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_DCC_CLEAR_STATS = 98,
 	QCA_NL80211_VENDOR_SUBCMD_DCC_UPDATE_NDL = 99,
 	QCA_NL80211_VENDOR_SUBCMD_DCC_STATS_EVENT = 100,
+
+        QCA_NL80211_VENDOR_SUBCMD_SETBAND = 105,
 };
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -303,6 +305,10 @@ enum qca_wlan_vendor_attr {
     /* used by QCA_NL80211_VENDOR_SUBCMD_STATS_EXT */
     QCA_WLAN_VENDOR_ATTR_STATS_EXT = 3,
     QCA_WLAN_VENDOR_ATTR_IFINDEX = 4,
+
+    /* Unsigned 32-bit value from enum qca_set_band */
+    QCA_WLAN_VENDOR_ATTR_SETBAND_VALUE = 12,
+
     /* keep last */
     QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
     QCA_WLAN_VENDOR_ATTR_MAX =
