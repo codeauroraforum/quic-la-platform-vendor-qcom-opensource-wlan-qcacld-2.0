@@ -118,8 +118,6 @@ CONFIG_ATH_PERF_PWR_OFFLOAD := 1
 #Disable packet log
 CONFIG_REMOVE_PKT_LOG := 0
 
-CONFIG_BUS_AUTO_SUSPEND := 1
-
 #Enable 11AC TX
 ifeq ($(CONFIG_ROME_IF),pci)
 	CONFIG_ATH_11AC_TXCOMPACT := 1
@@ -1287,7 +1285,7 @@ CDEFINES += -DFEATURE_WLAN_D0WOW
 endif
 
 # Flag to enable bus auto suspend
-ifeq ($(CONFIG_BUS_AUTO_SUSPEND), 1)
+ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
 CDEFINES += -DFEATURE_RUNTIME_PM
 endif
 # Some kernel include files are being moved.  Check to see if
