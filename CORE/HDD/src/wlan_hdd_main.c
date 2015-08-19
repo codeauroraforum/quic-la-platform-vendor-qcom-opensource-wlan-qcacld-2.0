@@ -121,9 +121,7 @@ void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #include "wlan_hdd_debugfs.h"
 #include "epping_main.h"
 
-#ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
-#endif
 #if defined(HIF_PCI)
 #include "if_pci.h"
 #elif defined(HIF_USB)
