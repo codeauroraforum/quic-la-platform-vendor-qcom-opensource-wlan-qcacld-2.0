@@ -549,8 +549,18 @@ VOS_STATUS vos_wake_lock_acquire(vos_wake_lock_t *pLock,
                        WIFI_POWER_EVENT_DEFAULT_WAKELOCK_TIMEOUT,
                        WIFI_POWER_EVENT_WAKELOCK_TAKEN);
 
-    if (reason != WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT)
+    /*
+     * Dont prevent Autosuspend for these reasons, either it is not required to
+     * do so or runtime functionality is not available at this time
+     */
+    switch(reason) {
+    case WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT:
+    case WIFI_POWER_EVENT_WAKELOCK_DRIVER_REINIT:
+        break;
+    default:
         vos_runtime_pm_prevent_suspend();
+        break;
+    }
 #if defined CONFIG_CNSS
     cnss_pm_wake_lock(pLock);
 #elif defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
@@ -601,8 +611,19 @@ VOS_STATUS vos_wake_lock_release(vos_wake_lock_t *pLock, uint32_t reason)
 #elif defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
     wake_unlock(pLock);
 #endif
-    if (reason != WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT)
+    /*
+     * Dont allow autosuspend for these reasons, these reasons doesn't prevent
+     * the autosuspend so no need to call allow.
+     */
+    switch(reason) {
+    case WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT:
+    case WIFI_POWER_EVENT_WAKELOCK_DRIVER_REINIT:
+        break;
+    default:
         vos_runtime_pm_allow_suspend();
+        break;
+    }
+
     return VOS_STATUS_SUCCESS;
 }
 
