@@ -13449,6 +13449,19 @@ bool hdd_is_memdump_supported(void)
 	return false;
 }
 
+/**
+ * hdd_get_fwpath() - get framework path
+ *
+ * This function is used to get the string written by
+ * userspace to start the wlan driver
+ *
+ * Return: string
+ */
+const char *hdd_get_fwpath(void)
+{
+	return fwpath.string;
+}
+
 //Register the module init/exit functions
 module_init(hdd_module_init);
 module_exit(hdd_module_exit);
