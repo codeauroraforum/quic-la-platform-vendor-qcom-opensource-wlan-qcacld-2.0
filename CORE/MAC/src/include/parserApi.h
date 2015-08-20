@@ -170,7 +170,7 @@ typedef struct sSirProbeRespBeacon
     tDot11fIEWiderBWChanSwitchAnn WiderBWChanSwitchAnn;
 #endif
     tANI_U8                   Vendor1IEPresent;
-    tANI_U8                   Vendor2IEPresent;
+    tDot11fIEvendor2_ie       vendor2_ie;
     tANI_U8                   Vendor3IEPresent;
     tDot11fIEIBSSParams       IBSSParams;
 
@@ -310,6 +310,7 @@ typedef struct sSirAssocRsp
 #ifdef WLAN_FEATURE_11W
     tDot11fIETimeoutInterval  TimeoutInterval;
 #endif
+    tDot11fIEvendor2_ie       vendor2_ie;
 } tSirAssocRsp, *tpSirAssocRsp;
 
 #if defined(FEATURE_WLAN_ESE_UPLOAD)
