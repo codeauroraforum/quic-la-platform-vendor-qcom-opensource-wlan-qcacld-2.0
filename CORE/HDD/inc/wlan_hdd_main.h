@@ -1694,4 +1694,9 @@ bool hdd_is_memdump_supported(void);
 
 const char *hdd_get_fwpath(void);
 
+void hdd_connect_result(struct net_device *dev, const u8 *bssid,
+			const u8 *req_ie, size_t req_ie_len,
+			const u8 * resp_ie, size_t resp_ie_len,
+			u16 status, gfp_t gfp);
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
