@@ -13497,7 +13497,7 @@ void hdd_select_cbmode( hdd_adapter_t *pAdapter,v_U8_t operationChannel)
  * Time in msec
  * Time for complete association including DHCP
  */
-#define WLAN_HDD_CONNECTION_TIME 30
+#define WLAN_HDD_CONNECTION_TIME (30 * 1000)
 
 /*
  * FUNCTION: wlan_hdd_cfg80211_connect_start
