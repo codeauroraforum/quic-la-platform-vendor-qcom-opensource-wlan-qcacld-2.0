@@ -15827,6 +15827,19 @@ fail:
     return;
 
 }
+
+/**
+ * wlan_hdd_cfg80211_extscan_hotlist_match_ind() - hotlist match callback
+ * @hddctx: HDD context
+ * @data: event data
+ *
+ * This function reads the hotlist matched event %data and fill in the skb with
+ * NL attributes and send up the NL event.
+ * This callback execute in atomic context and must not invoke any
+ * blocking calls.
+ *
+ * Return: none
+ */
 static void
 wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
                                             tpSirWifiScanResultEvent pData)
@@ -15834,6 +15847,7 @@ wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
     hdd_context_t *pHddCtx         = (hdd_context_t *)ctx;
     struct sk_buff *skb            = NULL;
     tANI_U32 i;
+    int flags = vos_get_gfp_flags();
 
     ENTER();
 
@@ -15846,7 +15860,7 @@ wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
                       EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                       QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_HOTLIST_AP_FOUND_INDEX,
-                      GFP_KERNEL);
+                      flags);
 
     if (!skb) {
         hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -15933,7 +15947,7 @@ wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
             goto fail;
     }
 
-    cfg80211_vendor_event(skb, GFP_KERNEL);
+    cfg80211_vendor_event(skb, flags);
     return;
 
 fail:
@@ -15942,6 +15956,18 @@ fail:
 
 }
 
+/**
+ * wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind() - results callback
+ * @hddctx: HDD context
+ * @data: event data
+ *
+ * This function reads the event %data and fill in the skb with
+ * NL attributes and send up the NL event.
+ * This callback execute in atomic context and must not invoke any
+ * blocking calls.
+ *
+ * Return: none
+ */
 static void
 wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
                                           void *ctx,
@@ -15952,6 +15978,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
     tSirWifiSignificantChange *ap_info;
     tANI_S32                  *rssi;
     tANI_U32 i, j;
+    int flags = vos_get_gfp_flags();
 
     ENTER();
 
@@ -15964,7 +15991,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
                     EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                     QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SIGNIFICANT_CHANGE_INDEX,
-                    GFP_KERNEL);
+                    flags);
 
     if (!skb) {
         hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -16042,7 +16069,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
             goto fail;
     }
 
-    cfg80211_vendor_event(skb, GFP_KERNEL);
+    cfg80211_vendor_event(skb, flags);
     return;
 
 fail:
@@ -16051,12 +16078,25 @@ fail:
 
 }
 
+/**
+ * wlan_hdd_cfg80211_extscan_full_scan_result_event() - full scan results event
+ * @hddctx: HDD context
+ * @data: event data
+ *
+ * This function reads the event %data and fill in the skb with
+ * NL attributes and send up the NL event.
+ * This callback execute in atomic context and must not invoke any
+ * blocking calls.
+ *
+ * Return: none
+ */
 static void
 wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
                                              tpSirWifiFullScanResultEvent pData)
 {
     hdd_context_t *pHddCtx  = (hdd_context_t *)ctx;
     struct sk_buff *skb     = NULL;
+    int flags = vos_get_gfp_flags();
 
     ENTER();
 
@@ -16077,7 +16117,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
                   EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                   QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_FULL_SCAN_RESULT_INDEX,
-                  GFP_KERNEL);
+                  flags);
 
     if (!skb) {
         hddLog(LOGE, FL("cfg80211_vendor_event_alloc failed"));
@@ -16153,7 +16193,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
             goto nla_put_failure;
     }
 
-    cfg80211_vendor_event(skb, GFP_KERNEL);
+    cfg80211_vendor_event(skb, flags);
     return;
 
 nla_put_failure:
@@ -16161,12 +16201,25 @@ nla_put_failure:
     return;
 }
 
+/**
+ * wlan_hdd_cfg80211_extscan_scan_res_available_event() - scan available event
+ * @hddctx: HDD context
+ * @data: event data
+ *
+ * This function reads the event %data and fill in the skb with
+ * NL attributes and send up the NL event.
+ * This callback execute in atomic context and must not invoke any
+ * blocking calls.
+ *
+ * Return: none
+ */
 static void
 wlan_hdd_cfg80211_extscan_scan_res_available_event(void *ctx,
                                     tpSirExtScanResultsAvailableIndParams pData)
 {
     hdd_context_t *pHddCtx  = (hdd_context_t *)ctx;
     struct sk_buff *skb     = NULL;
+    int flags = vos_get_gfp_flags();
 
     ENTER();
 
@@ -16179,7 +16232,7 @@ wlan_hdd_cfg80211_extscan_scan_res_available_event(void *ctx,
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
                 EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                 QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_RESULTS_AVAILABLE_INDEX,
-                GFP_KERNEL);
+                flags);
 
     if (!skb) {
         hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -16199,7 +16252,7 @@ wlan_hdd_cfg80211_extscan_scan_res_available_event(void *ctx,
         goto nla_put_failure;
     }
 
-    cfg80211_vendor_event(skb, GFP_KERNEL);
+    cfg80211_vendor_event(skb, flags);
     return;
 
 nla_put_failure:
@@ -16207,12 +16260,25 @@ nla_put_failure:
     return;
 }
 
+/**
+ * wlan_hdd_cfg80211_extscan_scan_progress_event() - scan progress event
+ * @hddctx: HDD context
+ * @data: event data
+ *
+ * This function reads the event %data and fill in the skb with
+ * NL attributes and send up the NL event.
+ * This callback execute in atomic context and must not invoke any
+ * blocking calls.
+ *
+ * Return: none
+ */
 static void
 wlan_hdd_cfg80211_extscan_scan_progress_event(void *ctx,
                                          tpSirExtScanOnScanEventIndParams pData)
 {
     hdd_context_t *pHddCtx  = (hdd_context_t *)ctx;
     struct sk_buff *skb     = NULL;
+    int flags = vos_get_gfp_flags();
 
     ENTER();
 
@@ -16225,7 +16291,7 @@ wlan_hdd_cfg80211_extscan_scan_progress_event(void *ctx,
     skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
                             EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
                             QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_EVENT_INDEX,
-                            GFP_KERNEL);
+                            flags);
 
     if (!skb) {
         hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -16247,7 +16313,7 @@ wlan_hdd_cfg80211_extscan_scan_progress_event(void *ctx,
         goto nla_put_failure;
     }
 
-    cfg80211_vendor_event(skb, GFP_KERNEL);
+    cfg80211_vendor_event(skb, flags);
     return;
 
 nla_put_failure:
