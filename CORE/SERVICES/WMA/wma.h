@@ -760,6 +760,11 @@ typedef struct {
 	atomic_t in_d0wow;
 #endif
 
+	uint32_t wow_pno_match_wake_up_count;
+	uint32_t wow_pno_complete_wake_up_count;
+	uint32_t wow_gscan_wake_up_count;
+	uint32_t wow_low_rssi_wake_up_count;
+	uint32_t wow_rssi_breach_wake_up_count;
 	uint32_t wow_ucast_wake_up_count;
 	uint32_t wow_bcast_wake_up_count;
 	uint32_t wow_ipv4_mcast_wake_up_count;
