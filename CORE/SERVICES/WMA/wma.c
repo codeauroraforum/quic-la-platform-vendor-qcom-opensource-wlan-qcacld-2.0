@@ -13626,7 +13626,7 @@ out:
 static void wma_add_pm_vote(tp_wma_handle wma)
 {
 	if (++wma->ap_client_cnt == 1) {
-		vos_runtime_pm_prevent_suspend();
+		htc_pm_runtime_get(wma->htc_handle);
 		vos_pm_control(DISABLE_PCIE_POWER_COLLAPSE);
 	}
 }
@@ -13634,7 +13634,7 @@ static void wma_add_pm_vote(tp_wma_handle wma)
 static void wma_del_pm_vote(tp_wma_handle wma)
 {
 	if (--wma->ap_client_cnt == 0) {
-		vos_runtime_pm_allow_suspend();
+		htc_pm_runtime_put(wma->htc_handle);
 		vos_pm_control(ENABLE_PCIE_POWER_COLLAPSE);
 	}
 }
