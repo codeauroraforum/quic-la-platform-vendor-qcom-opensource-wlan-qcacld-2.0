@@ -2731,13 +2731,6 @@ static void hdd_ipa_w2i_cb(void *priv, enum ipa_dp_evt_type evt,
 			 */
 			fw_desc = (uint8_t)skb->cb[1];
 
-			if (fw_desc & FW_RX_DESC_DISCARD_M) {
-				hdd_ipa->ipa_rx_internel_drop_count++;
-				hdd_ipa->ipa_rx_discard++;
-				adf_nbuf_free(skb);
-				break;
-			}
-
 			if (fw_desc & FW_RX_DESC_FORWARD_M) {
 				HDD_IPA_LOG(
 					VOS_TRACE_LEVEL_DEBUG,
@@ -2761,6 +2754,14 @@ static void hdd_ipa_w2i_cb(void *priv, enum ipa_dp_evt_type evt,
 					}
 				}
 			}
+
+			if (fw_desc & FW_RX_DESC_DISCARD_M) {
+				hdd_ipa->ipa_rx_internel_drop_count++;
+				hdd_ipa->ipa_rx_discard++;
+				adf_nbuf_free(skb);
+				break;
+			}
+
 		}
 		else
 		{
