@@ -2281,6 +2281,9 @@ HIF_sleep_entry(void *arg)
 	struct hif_pci_softc *sc = hif_state->sc;
 	u_int32_t idle_ms;
 
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_HIF, NULL))
+		return;
+
 	if (sc->recovery)
 		return;
 
@@ -3037,46 +3040,199 @@ int hif_pm_runtime_put(HIF_DEVICE *hif_device)
 	return 0;
 }
 
+static inline int __hif_pm_runtime_prevent_suspend(struct hif_pci_softc *hif_sc)
+{
+	int ret = 0;
+
+	if (atomic_inc_return(&hif_sc->prevent_suspend_cnt) == 1) {
+		ret = __hif_pm_runtime_get(hif_sc->dev);
+
+		VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
+				"%s: in pm_state:%d ret: %d\n", __func__,
+				adf_os_atomic_read(&hif_sc->pm_state), ret);
+	}
+
+	return ret;
+}
+
+static inline int __hif_pm_runtime_allow_suspend(struct hif_pci_softc *hif_sc)
+{
+	int ret = 0;
+
+	if (atomic_read(&hif_sc->prevent_suspend_cnt) == 0)
+		return ret;
+
+	if (atomic_dec_return(&hif_sc->prevent_suspend_cnt) == 0) {
+		if (hif_sc->runtime_timer_expires > 0) {
+			del_timer(&hif_sc->runtime_timer);
+			hif_sc->runtime_timer_expires = 0;
+		}
+
+		hif_pm_runtime_mark_last_busy(hif_sc->dev);
+		ret = hif_pm_runtime_put_auto(hif_sc->dev);
+
+		VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
+				"%s: in pm_state:%d ret: %d\n", __func__,
+				adf_os_atomic_read(&hif_sc->pm_state), ret);
+	}
+
+	return ret;
+}
+
+void hif_pci_runtime_pm_timeout_fn(unsigned long data)
+{
+	struct hif_pci_softc *hif_sc = (struct hif_pci_softc *)data;
+	unsigned long flags;
+	unsigned long timer_expires;
+
+	spin_lock_irqsave(&hif_sc->runtime_lock, flags);
+
+	timer_expires = hif_sc->runtime_timer_expires;
+
+	/* Make sure we are not called too early, this should take care of
+	 * following case
+	 *
+	 * CPU0                         CPU1 (timeout function)
+         * ----                         ----------------------
+	 * spin_lock_irq
+	 *                              timeout function called
+	 *
+	 * mod_timer()
+	 *
+	 * spin_unlock_irq
+	 *                              spin_lock_irq
+	 */
+	if (timer_expires > 0 && !time_after(timer_expires, jiffies)) {
+
+		hif_sc->runtime_timer_expires = 0;
+		__hif_pm_runtime_allow_suspend(hif_sc);
+		hif_sc->pm_stats.allow_suspend_timeout++;
+	}
+
+	spin_unlock_irqrestore(&hif_sc->runtime_lock, flags);
+}
+
+
 int hif_pm_runtime_prevent_suspend(void *ol_sc)
 {
 	struct ol_softc *sc = (struct ol_softc *)ol_sc;
 	struct hif_pci_softc *hif_sc = sc->hif_sc;
-	int ret = 0;
+	unsigned long flags;
+
+	if (!sc->enable_runtime_pm)
+		return 0;
 
 	hif_sc->pm_stats.prevent_suspend++;
 
-	ret = __hif_pm_runtime_get(hif_sc->dev);
+	spin_lock_irqsave(&hif_sc->runtime_lock, flags);
+	__hif_pm_runtime_prevent_suspend(hif_sc);
+	spin_unlock_irqrestore(&hif_sc->runtime_lock, flags);
 
-	VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
-			"%s: request resume:%pS in pm_state:%d ret: %d\n",
-			__func__, (void *)_RET_IP_,
-			adf_os_atomic_read(&hif_sc->pm_state), ret);
 	return 0;
-
 }
+
 int hif_pm_runtime_allow_suspend(void *ol_sc)
 {
 	struct ol_softc *sc = (struct ol_softc *)ol_sc;
 	struct hif_pci_softc *hif_sc = sc->hif_sc;
-	int ret = 0;
+	unsigned long flags;
+
+	if (!sc->enable_runtime_pm)
+		return 0;
 
 	hif_sc->pm_stats.allow_suspend++;
 
-	hif_pm_runtime_mark_last_busy(hif_sc->dev);
-	ret = hif_pm_runtime_put_auto(hif_sc->dev);
+	spin_lock_irqsave(&hif_sc->runtime_lock, flags);
+	__hif_pm_runtime_allow_suspend(hif_sc);
+	spin_unlock_irqrestore(&hif_sc->runtime_lock, flags);
+
+
+	return 0;
+}
+
+/**
+ * hif_pm_runtime_prevent_suspend_timeout() - Prevent runtime suspend timeout
+ * @ol_sc:	HIF context
+ * delay:	Timeout in milliseconds
+ *
+ * Prevent runtime suspend with a timeout after which runtime suspend would be
+ * allowed. This API uses a single timer to allow the suspend and timer is
+ * modified if the timeout is changed before timer fires.
+ * If the timeout is less than autosuspend_delay then use mark_last_busy instead
+ * of starting the timer.
+ *
+ * It is wise to try not to use this API and correct the design if possible.
+ *
+ * Return: 0 on success and negative error code on failure
+ */
+int hif_pm_runtime_prevent_suspend_timeout(void *ol_sc, unsigned int delay)
+{
+	struct ol_softc *sc = (struct ol_softc *)ol_sc;
+	struct hif_pci_softc *hif_sc = sc->hif_sc;
+	int ret = 0;
+	unsigned long expires;
+	unsigned long flags;
+
+	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_HIF, NULL)) {
+		VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_ERROR,
+			  "%s: Load/unload in progress, ignore!\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!sc->enable_runtime_pm)
+		return 0;
+
+	/*
+	 * Don't use internal timer if the timeout is less than auto suspend
+	 * delay.
+	 */
+	if (delay <= hif_sc->dev->power.autosuspend_delay) {
+		hif_pm_request_resume(hif_sc->dev);
+		hif_pm_runtime_mark_last_busy(hif_sc->dev);
+		return ret;
+	}
+
+	expires = jiffies + msecs_to_jiffies(delay);
+	expires += !expires;
+
+	spin_lock_irqsave(&hif_sc->runtime_lock, flags);
+
+	/* Runtime Get only if timer is not running */
+	if (hif_sc->runtime_timer_expires == 0) {
+		__hif_pm_runtime_prevent_suspend(hif_sc);
+
+		hif_sc->pm_stats.prevent_suspend_timeout++;
+	}
+
+	/* Modify the timer only if new timeout is after already configured
+	 * timeout
+	 */
+	if (time_after(expires, hif_sc->runtime_timer_expires)) {
+		mod_timer(&hif_sc->runtime_timer, expires);
+		hif_sc->runtime_timer_expires = expires;
+	}
+
+	spin_unlock_irqrestore(&hif_sc->runtime_lock, flags);
 
 	VOS_TRACE(VOS_MODULE_ID_HIF, VOS_TRACE_LEVEL_INFO,
-			"%s: %pS in pm_state:%d ret: %d\n",
-			__func__, (void *)_RET_IP_,
-			adf_os_atomic_read(&hif_sc->pm_state), ret);
-	return 0;
+		  "%s: pm_state: %d delay: %dms ret: %d\n", __func__,
+		  adf_os_atomic_read(&hif_sc->pm_state), delay, ret);
+
+	return ret;
+
 }
 #else
 int hif_pm_runtime_prevent_suspend(void *ol_sc)
 {
 	return 0;
 }
+
 int hif_pm_runtime_allow_suspend(void *ol_sc)
+{
+	return 0;
+}
+
+int hif_pm_runtime_prevent_suspend_timeout(void *ol_sc, unsigned int msec)
 {
 	return 0;
 }

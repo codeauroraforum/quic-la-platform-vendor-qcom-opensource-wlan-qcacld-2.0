@@ -152,7 +152,7 @@ void pe_reset_protection_callback(void *ptr)
                  sizeof(mac_ctx->lim.gLimOverlapNonGfParams));
 
     /* index 0, is self node, peers start from 1 */
-    for(i = 1 ; i < mac_ctx->lim.gLimAssocStaLimit ; i++)
+    for(i = 1 ; i <= mac_ctx->lim.gLimAssocStaLimit ; i++)
     {
         station_hash_node = dphGetHashEntry(mac_ctx, i,
                               &pe_session_entry->dph.dphHashTable);
@@ -319,6 +319,7 @@ tpPESession peCreateSession(tpAniSirGlobal pMac,
                MAC_ADDRESS_STR " Max No. of STA %d",
                pMac->lim.gpSession[i].peSessionId,
                MAC_ADDR_ARRAY(bssid), numSta);
+            pMac->lim.gpSession[i].roaming_in_progress = false;
 
             /* Initialize PMM Ps Offload Module */
             if(pMac->psOffloadEnabled)

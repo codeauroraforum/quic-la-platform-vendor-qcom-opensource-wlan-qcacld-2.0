@@ -481,6 +481,9 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
     macOpenParms.ucTxPartitionBase = pHddCtx->cfg_ini->IpaUcTxPartitionBase;
 #endif /* IPA_UC_OFFLOAD */
 
+    macOpenParms.tx_chain_mask_cck = pHddCtx->cfg_ini->tx_chain_mask_cck;
+    macOpenParms.self_gen_frm_pwr = pHddCtx->cfg_ini->self_gen_frm_pwr;
+
    vStatus = WDA_open( gpVosContext, gpVosContext->pHDDContext,
                        hdd_update_tgt_cfg,
                        hdd_dfs_indicate_radar,
@@ -2626,6 +2629,12 @@ void vos_set_ring_log_level(uint32_t ring_id, uint32_t log_level)
 	} else if (ring_id == RING_ID_PER_PACKET_STATS) {
 		vos_context->packet_stats_log_level = log_val;
 		return;
+	} else if (ring_id == RIND_ID_DRIVER_DEBUG) {
+		vos_context->driver_debug_log_level = log_val;
+		return;
+	} else if (ring_id == RING_ID_FIRMWARE_DEBUG) {
+		vos_context->fw_debug_log_level = log_val;
+		return;
 	}
 }
 
@@ -2654,6 +2663,10 @@ enum wifi_driver_log_level vos_get_ring_log_level(uint32_t ring_id)
 		return vos_context->connectivity_log_level;
 	else if (ring_id == RING_ID_PER_PACKET_STATS)
 		return vos_context->packet_stats_log_level;
+	else if (ring_id == RIND_ID_DRIVER_DEBUG)
+		return vos_context->driver_debug_log_level;
+	else if (ring_id == RING_ID_FIRMWARE_DEBUG)
+		return vos_context->fw_debug_log_level;
 
 	return WLAN_LOG_LEVEL_OFF;
 }

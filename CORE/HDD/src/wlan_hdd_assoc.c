@@ -202,6 +202,12 @@ v_BOOL_t hdd_connIsConnected( hdd_station_ctx_t *pHddStaCtx )
    return( hdd_connGetConnectionState( pHddStaCtx, NULL ) );
 }
 
+bool hdd_is_connecting(hdd_station_ctx_t *hdd_sta_ctx)
+{
+	return (hdd_sta_ctx->conn_info.connState ==
+		eConnectionState_Connecting);
+}
+
 eCsrBand hdd_connGetConnectedBand( hdd_station_ctx_t *pHddStaCtx )
 {
    v_U8_t staChannel = 0;
@@ -989,6 +995,11 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
                 /* To avoid wpa_supplicant sending "HANGED" CMD to ICS UI */
                 if( eCSR_ROAM_LOSTLINK == roamStatus )
                 {
+                    if (pRoamInfo->reasonCode ==
+                               eSIR_MAC_PEER_STA_REQ_LEAVING_BSS_REASON)
+                       pr_info(
+                       "wlan: disconnected due to poor signal, rssi is %d dB\n",
+                       pRoamInfo->rxRssi);
                     cfg80211_disconnected(dev, pRoamInfo->reasonCode, NULL, 0, GFP_KERNEL);
                 }
                 else
@@ -1484,9 +1495,10 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
     /* HDD has initiated disconnect, do not send connect result indication
      * to kernel as it will be handled by __cfg80211_disconnect.
      */
-    if(( eConnectionState_Disconnecting == pHddStaCtx->conn_info.connState) &&
-        (( eCSR_ROAM_RESULT_ASSOCIATED == roamResult) ||
-        ( eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus)) )
+    if(((eConnectionState_Disconnecting == pHddStaCtx->conn_info.connState) ||
+         (eConnectionState_NotConnected == pHddStaCtx->conn_info.connState)) &&
+        ((eCSR_ROAM_RESULT_ASSOCIATED == roamResult) ||
+        (eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus)))
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                 FL(" Disconnect from HDD in progress "));

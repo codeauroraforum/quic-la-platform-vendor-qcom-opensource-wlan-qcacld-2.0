@@ -103,7 +103,7 @@ typedef tANI_U8 tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #ifdef FEATURE_WLAN_EXTSCAN
 
-#define WLAN_EXTSCAN_MAX_CHANNELS                 40
+#define WLAN_EXTSCAN_MAX_CHANNELS                 36
 #define WLAN_EXTSCAN_MAX_BUCKETS                  16
 #define WLAN_EXTSCAN_MAX_HOTLIST_APS              128
 #define WLAN_EXTSCAN_MAX_SIGNIFICANT_CHANGE_APS   64
@@ -753,7 +753,7 @@ typedef struct sSirBssDescription
     // Please keep the structure 4 bytes aligned above the ieFields
 
     tANI_U8              fProbeRsp; //whether it is from a probe rsp
-    tANI_U8              reservedPadding1;
+    tANI_S8              rssi_raw;
     tANI_U8              reservedPadding2;
     tANI_U8              reservedPadding3;
     tANI_U32             WscIeLen;
@@ -1723,6 +1723,7 @@ typedef struct sSirSmeDeauthInd
 
     tANI_U16            staId;
     tANI_U32            reasonCode;
+    tANI_S8             rssi;
 } tSirSmeDeauthInd, *tpSirSmeDeauthInd;
 
 /// Definition for Deauthentication confirm

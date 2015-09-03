@@ -790,11 +790,6 @@ typedef struct hdd_scaninfo_s
 
    hdd_scan_pending_option_e scan_pending_option;
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-   /* The PNO scan pending  */
-   v_BOOL_t mPnoScanPending;
-#endif
-
 }hdd_scaninfo_t;
 
 #define WLAN_HDD_MAX_MC_ADDR_LIST 10
@@ -820,13 +815,9 @@ struct hdd_adapter_s
    struct net_device *dev;
 
    /** IPv4 notifier callback for handling ARP offload on change in IP */
-   struct notifier_block ipv4_notifier;
-   bool ipv4_notifier_registered;
    struct work_struct  ipv4NotifierWorkQueue;
 #ifdef WLAN_NS_OFFLOAD
    /** IPv6 notifier callback for handling NS offload on change in IP */
-   struct notifier_block ipv6_notifier;
-   bool ipv6_notifier_registered;
    struct work_struct  ipv6NotifierWorkQueue;
 #endif
 
@@ -1486,6 +1477,13 @@ struct hdd_context_s
 #ifdef WLAN_FEATURE_OFFLOAD_PACKETS
     struct hdd_offloaded_packets_ctx op_ctx;
 #endif
+
+#ifdef WLAN_NS_OFFLOAD
+    /* IPv6 notifier callback for handling NS offload on change in IP */
+    struct notifier_block ipv6_notifier;
+#endif
+    /* IPv4 notifier callback for handling ARP offload on change in IP */
+    struct notifier_block ipv4_notifier;
 };
 
 /*---------------------------------------------------------------------------
@@ -1699,5 +1697,7 @@ void hdd_get_fw_version(hdd_context_t *hdd_ctx,
 			uint32_t *siid, uint32_t *crmid);
 
 bool hdd_is_memdump_supported(void);
+
+const char *hdd_get_fwpath(void);
 
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

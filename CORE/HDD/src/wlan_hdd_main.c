@@ -663,7 +663,7 @@ end:
 }
 #endif
 
-static int hdd_netdev_notifier_call(struct notifier_block * nb,
+static int __hdd_netdev_notifier_call(struct notifier_block * nb,
                                          unsigned long state,
                                          void *ndev)
 {
@@ -768,6 +768,27 @@ static int hdd_netdev_notifier_call(struct notifier_block * nb,
    return NOTIFY_DONE;
 }
 
+/**
+ * hdd_netdev_notifier_call() - netdev notifier callback function
+ * @nb: pointer to notifier block
+ * @state: state
+ * @ndev: ndev pointer
+ *
+ * Return: 0 on success, error number otherwise.
+ */
+static int hdd_netdev_notifier_call(struct notifier_block * nb,
+					unsigned long state,
+					void *ndev)
+{
+	int ret;
+
+	vos_ssr_protect(__func__);
+	ret = __hdd_netdev_notifier_call(nb, state, ndev);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
+
 struct notifier_block hdd_netdev_notifier = {
    .notifier_call = hdd_netdev_notifier_call,
 };
@@ -838,21 +859,20 @@ static void hdd_vos_trace_enable(VOS_MODULE_ID moduleId, v_U32_t bitmask)
  */
 int wlan_hdd_validate_context(hdd_context_t *pHddCtx)
 {
-    ENTER();
 
     if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini) {
-        hddLog(LOGE, FL("HDD context is Null"));
+        hddLog(LOG1, FL("HDD context is Null"));
         return -ENODEV;
     }
 
     if (pHddCtx->isLogpInProgress) {
-        hddLog(LOGE, FL("LOGP in Progress. Ignore!!!"));
+        hddLog(LOG1, FL("LOGP in Progress. Ignore!!!"));
         return -EAGAIN;
     }
 
     if ((pHddCtx->isLoadInProgress) ||
         (pHddCtx->isUnloadInProgress)) {
-        hddLog(LOGE, FL("Unloading/Loading in Progress. Ignore!!!"));
+        hddLog(LOG1, FL("Unloading/Loading in Progress. Ignore!!!"));
         return -EAGAIN;
     }
     return 0;
@@ -3786,8 +3806,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3845,8 +3865,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3902,8 +3922,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, wesMode);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3946,8 +3966,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3988,8 +4008,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -4353,7 +4373,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
 
            len = scnprintf(extra, sizeof(extra), "%s %d",
                    command, roamScanControl);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len))
            {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
@@ -4429,7 +4450,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
 
            memset(extra, 0, sizeof(extra));
            ret = hdd_get_dwell_time(pCfg, command, extra, sizeof(extra), &len);
-           if (ret != 0 || copy_to_user(priv_data.buf, &extra, len + 1))
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (ret != 0 || copy_to_user(priv_data.buf, &extra, len))
            {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
@@ -4642,8 +4664,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                            tsmMetrics.UplinkPktCount,
                            tsmMetrics.RoamingCount,
                            tsmMetrics.RoamingDly);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -5085,8 +5107,6 @@ static int __hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    ret = wlan_hdd_validate_context(pHddCtx);
    if (ret) {
-      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                "%s: invalid context", __func__);
       ret = -EBUSY;
       goto exit;
    }
@@ -7579,6 +7599,9 @@ void hdd_cleanup_actionframe( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s HDD Wait for Action Confirmation Failed!!",
                    __func__);
+         /* Inform tx status as FAILURE to upper layer and free
+          * cfgState->buf */
+         hdd_sendActionCnf( pAdapter, FALSE );
       }
    }
    return;
@@ -8570,7 +8593,8 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
       case WLAN_HDD_INFRA_STATION:
       case WLAN_HDD_P2P_CLIENT:
       case WLAN_HDD_P2P_DEVICE:
-         if( hdd_connIsConnected( WLAN_HDD_GET_STATION_CTX_PTR( pAdapter )) )
+         if (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)) ||
+            hdd_is_connecting(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))
          {
             if (pWextState->roamProfile.BSSType == eCSR_BSS_TYPE_START_IBSS)
                 halStatus = sme_RoamDisconnect(pHddCtx->hHal,
@@ -8614,12 +8638,6 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 #endif
          }
 
-         if (pAdapter->ipv4_notifier_registered)
-         {
-             hddLog(LOG1, FL("Unregistered IPv4 notifier"));
-             unregister_inetaddr_notifier(&pAdapter->ipv4_notifier);
-             pAdapter->ipv4_notifier_registered = false;
-         }
 #ifdef WLAN_OPEN_SOURCE
          cancel_work_sync(&pAdapter->ipv4NotifierWorkQueue);
 #endif
@@ -8640,12 +8658,6 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 #ifdef WLAN_OPEN_SOURCE
          cancel_work_sync(&pAdapter->ipv6NotifierWorkQueue);
 #endif
-         if (pAdapter->ipv6_notifier_registered)
-         {
-            hddLog(LOG1, FL("Unregistered IPv6 notifier"));
-            unregister_inet6addr_notifier(&pAdapter->ipv6_notifier);
-            pAdapter->ipv6_notifier_registered = false;
-         }
 #endif
          /* It is possible that the caller of this function does not
           * wish to close the session
@@ -9538,10 +9550,15 @@ v_U8_t hdd_get_operating_channel( hdd_context_t *pHddCtx, device_mode_t mode )
   --------------------------------------------------------------------------*/
 static void hdd_set_multicast_list(struct net_device *dev)
 {
+   static const uint8_t ipv6_router_solicitation[] =
+                         {0x33, 0x33, 0x00, 0x00, 0x00, 0x02};
    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
    int mc_count;
    int i = 0;
    struct netdev_hw_addr *ha;
+
+   /* Delete already configured multicast address list */
+   wlan_hdd_set_mc_addr_list(pAdapter, false);
 
    if (dev->flags & IFF_ALLMULTI)
    {
@@ -9567,6 +9584,12 @@ static void hdd_set_multicast_list(struct net_device *dev)
       netdev_for_each_mc_addr(ha, dev) {
          if (i == mc_count)
             break;
+         /* Skip IPv6 router solicitation address */
+         if (!memcmp(ha->addr, ipv6_router_solicitation, ETH_ALEN)) {
+             hddLog(LOG1, FL("skip ipv6 router solicitation address"));
+             pAdapter->mc_addr_list.mc_cnt--;
+             continue;
+         }
          memset(&(pAdapter->mc_addr_list.addr[i][0]), 0, ETH_ALEN);
          memcpy(&(pAdapter->mc_addr_list.addr[i][0]), ha->addr, ETH_ALEN);
          hddLog(VOS_TRACE_LEVEL_INFO, "%s: mlist[%d] = "MAC_ADDRESS_STR,
@@ -9575,6 +9598,9 @@ static void hdd_set_multicast_list(struct net_device *dev)
          i++;
       }
    }
+
+   /* Configure the updated multicast address list */
+   wlan_hdd_set_mc_addr_list(pAdapter, true);
    return;
 }
 #endif
@@ -9781,6 +9807,60 @@ VOS_STATUS hdd_abort_mac_scan_all_adapters(hdd_context_t *pHddCtx)
     return VOS_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_NS_OFFLOAD
+/**
+ * hdd_wlan_unregister_ip6_notifier() - unregister IP6 change notifier
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: None
+ */
+static void hdd_wlan_unregister_ip6_notifier(hdd_context_t *hdd_ctx)
+{
+	unregister_inet6addr_notifier(&hdd_ctx->ipv6_notifier);
+
+	return;
+}
+
+/**
+ * hdd_wlan_register_ip6_notifier() - register IP6 change notifier
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: None
+ */
+static void hdd_wlan_register_ip6_notifier(hdd_context_t *hdd_ctx)
+{
+	int ret;
+
+	hdd_ctx->ipv6_notifier.notifier_call = wlan_hdd_ipv6_changed;
+	ret = register_inet6addr_notifier(&hdd_ctx->ipv6_notifier);
+	if (ret)
+		hddLog(LOGE, FL("Failed to register IPv6 notifier"));
+	else
+		hddLog(LOGE, FL("Registered IPv6 notifier"));
+
+	return;
+}
+#else
+/**
+ * hdd_wlan_unregister_ip6_notifier() - unregister IP6 change notifier
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: None
+ */
+static void hdd_wlan_unregister_ip6_notifier(hdd_context_t *hdd_ctx)
+{
+}
+/**
+ * hdd_wlan_register_ip6_notifier() - register IP6 change notifier
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: None
+ */
+static void hdd_wlan_register_ip6_notifier(hdd_context_t *hdd_ctx)
+{
+}
+#endif
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_wlan_exit() - HDD WLAN exit function
@@ -9803,6 +9883,11 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    hdd_config_t *pConfig = pHddCtx->cfg_ini;
 
    ENTER();
+
+   hddLog(LOGE, FL("Unregister IPv6 notifier"));
+   hdd_wlan_unregister_ip6_notifier(pHddCtx);
+   hddLog(LOGE, FL("Unregister IPv4 notifier"));
+   unregister_inetaddr_notifier(&pHddCtx->ipv4_notifier);
 
    if (VOS_FTM_MODE != hdd_get_conparam())
    {
@@ -10676,7 +10761,7 @@ static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
 
 	mutex_init(&hdd_ctx->op_ctx.op_lock);
 	for (i = 0; i < MAXNUM_PERIODIC_TX_PTRNS; i++) {
-		hdd_ctx->op_ctx.op_table[i].request_id = 0;
+		hdd_ctx->op_ctx.op_table[i].request_id = MAX_REQUEST_ID;
 		hdd_ctx->op_ctx.op_table[i].pattern_id = i;
 	}
 }
@@ -11005,6 +11090,15 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Failed hdd_set_sme_config", __func__);
       goto err_wiphy_unregister;
+   }
+
+   ret = process_wma_set_command(0, WMI_PDEV_PARAM_TX_CHAIN_MASK_1SS,
+                                 pHddCtx->cfg_ini->tx_chain_mask_1ss,
+                                 PDEV_CMD);
+   if (0 != ret) {
+       hddLog(VOS_TRACE_LEVEL_ERROR,
+              "%s: WMI_PDEV_PARAM_TX_CHAIN_MASK_1SS failed %d",
+              __func__, ret);
    }
 
    status = hdd_set_sme_chan_list(pHddCtx);
@@ -11510,6 +11604,23 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 #else
    INIT_WORK(&pHddCtx->rocReqWork, wlan_hdd_roc_request_dequeue);
 #endif
+
+   /*
+    * Register IPv6 notifier to notify if any change in IP
+    * So that we can reconfigure the offload parameters
+    */
+   hdd_wlan_register_ip6_notifier(pHddCtx);
+
+   /*
+    * Register IPv4 notifier to notify if any change in IP
+    * So that we can reconfigure the offload parameters
+    */
+   pHddCtx->ipv4_notifier.notifier_call = wlan_hdd_ipv4_changed;
+   ret = register_inetaddr_notifier(&pHddCtx->ipv4_notifier);
+   if (ret)
+      hddLog(LOGE, FL("Failed to register IPv4 notifier"));
+   else
+      hddLog(LOGE, FL("Registered IPv4 notifier"));
 
    complete(&wlan_start_comp);
    goto success;
@@ -12719,11 +12830,24 @@ void hdd_ch_avoid_cb
    }
 
 #ifdef CONFIG_CNSS
-   cnss_set_wlan_unsafe_channel(hdd_ctxt->unsafe_channel_list,
-                                hdd_ctxt->unsafe_channel_count);
    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-             "%s : number of unsafe channels is %d ",
-             __func__,  hdd_ctxt->unsafe_channel_count);
+            "%s : number of unsafe channels is %d ",
+            __func__,  hdd_ctxt->unsafe_channel_count);
+
+   if (cnss_set_wlan_unsafe_channel(hdd_ctxt->unsafe_channel_list,
+                                hdd_ctxt->unsafe_channel_count)) {
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "%s: Failed to set unsafe channel",
+                __func__);
+
+       /* clear existing unsafe channel cache */
+       hdd_ctxt->unsafe_channel_count = 0;
+       vos_mem_zero(hdd_ctxt->unsafe_channel_list,
+           sizeof(v_U16_t) * NUM_20MHZ_RF_CHANNELS);
+
+       return;
+   }
+
    for (channel_loop = 0;
         channel_loop < hdd_ctxt->unsafe_channel_count;
         channel_loop++)
@@ -13337,6 +13461,19 @@ bool hdd_is_memdump_supported(void)
 	return true;
 #endif
 	return false;
+}
+
+/**
+ * hdd_get_fwpath() - get framework path
+ *
+ * This function is used to get the string written by
+ * userspace to start the wlan driver
+ *
+ * Return: string
+ */
+const char *hdd_get_fwpath(void)
+{
+	return fwpath.string;
 }
 
 //Register the module init/exit functions

@@ -2605,9 +2605,14 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 
 #define CFG_RA_RATE_LIMIT_INTERVAL_NAME            "gRArateLimitInterval"
 #define CFG_RA_RATE_LIMIT_INTERVAL_MIN             (60)
-#define CFG_RA_RATE_LIMIT_INTERVAL_MAX             (300)
+#define CFG_RA_RATE_LIMIT_INTERVAL_MAX             (3600)
 #define CFG_RA_RATE_LIMIT_INTERVAL_DEFAULT         (60)/*60 SEC*/
 #endif
+
+#define CFG_IGNORE_PEER_ERP_INFO_NAME      "gIgnorePeerErpInfo"
+#define CFG_IGNORE_PEER_ERP_INFO_MIN       ( 0 )
+#define CFG_IGNORE_PEER_ERP_INFO_MAX       ( 1 )
+#define CFG_IGNORE_PEER_ERP_INFO_DEFAULT   ( 0 )
 
 #define CFG_INITIAL_DWELL_TIME_NAME            "gInitialDwellTime"
 #define CFG_INITIAL_DWELL_TIME_DEFAULT         (0)
@@ -2748,7 +2753,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_NAME    "wlanLoggingFEToConsole"
 #define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_ENABLE  ( 1 )
 #define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DISABLE ( 0 )
-#define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DEFAULT ( 0 )
+#define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DEFAULT ( 1 )
 
 /* Number of buffers to be used for WLAN logging */
 #define CFG_WLAN_LOGGING_NUM_BUF_NAME               "wlanLoggingNumBuf"
@@ -2883,6 +2888,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_MULTICAST_HOST_FW_MSGS_MAX      (1)
 #define CFG_MULTICAST_HOST_FW_MSGS_DEFAULT  (1)
 
+#define CFG_SELF_GEN_FRM_PWR        "gSelfGenFrmPwr"
+#define CFG_SELF_GEN_FRM_PWR_MIN      (0)
+#define CFG_SELF_GEN_FRM_PWR_MAX      (0xffff)
+#define CFG_SELF_GEN_FRM_PWR_DEFAULT  (0)
+
 /*
  * fine timing measurement capability information
  *
@@ -2915,6 +2925,47 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_P2P_LISTEN_DEFER_INTERVAL_MIN         (100)
 #define CFG_P2P_LISTEN_DEFER_INTERVAL_MAX         (200)
 #define CFG_P2P_LISTEN_DEFER_INTERVAL_DEFAULT     (100)
+
+#define CFG_TX_CHAIN_MASK_CCK          "gCckChainMaskEnable"
+#define CFG_TX_CHAIN_MASK_CCK_MIN      (0)
+#define CFG_TX_CHAIN_MASK_CCK_MAX      (1)
+#define CFG_TX_CHAIN_MASK_CCK_DEFAULT  (0)
+
+#define CFG_TX_CHAIN_MASK_1SS       "gTxChainMask1ss"
+#define CFG_TX_CHAIN_MASK_1SS_MIN      (0)
+#define CFG_TX_CHAIN_MASK_1SS_MAX      (3)
+#define CFG_TX_CHAIN_MASK_1SS_DEFAULT  (1)
+
+#ifdef FEATURE_WLAN_EXTSCAN
+#define CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_NAME      "gExtScanPassiveMaxChannelTime"
+#define CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_MIN       (110)
+#define CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_MAX       (500)
+#define CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_DEFAULT   (110)
+
+#define CFG_EXTSCAN_PASSIVE_MIN_CHANNEL_TIME_NAME      "gExtScanPassiveMinChannelTime"
+#define CFG_EXTSCAN_PASSIVE_MIN_CHANNEL_TIME_MIN       (60)
+#define CFG_EXTSCAN_PASSIVE_MIN_CHANNEL_TIME_MAX       (500)
+#define CFG_EXTSCAN_PASSIVE_MIN_CHANNEL_TIME_DEFAULT   (60)
+
+#define CFG_EXTSCAN_ACTIVE_MAX_CHANNEL_TIME_NAME       "gExtScanActiveMaxChannelTime"
+#define CFG_EXTSCAN_ACTIVE_MAX_CHANNEL_TIME_MIN        (40)
+#define CFG_EXTSCAN_ACTIVE_MAX_CHANNEL_TIME_MAX        (110)
+#define CFG_EXTSCAN_ACTIVE_MAX_CHANNEL_TIME_DEFAULT    (40)
+
+#define CFG_EXTSCAN_ACTIVE_MIN_CHANNEL_TIME_NAME       "gExtScanActiveMinChannelTime"
+#define CFG_EXTSCAN_ACTIVE_MIN_CHANNEL_TIME_MIN        (20)
+#define CFG_EXTSCAN_ACTIVE_MIN_CHANNEL_TIME_MAX        (110)
+#define CFG_EXTSCAN_ACTIVE_MIN_CHANNEL_TIME_DEFAULT    (20)
+#endif
+
+/* Option to report rssi in cfg80211_inform_bss_frame()
+ * 0 = use rssi value based on noise floor = -96 dBm
+ * 1 = use rssi value based on actual noise floor in hardware
+ */
+#define CFG_INFORM_BSS_RSSI_RAW_NAME               "gInformBssRssiRaw"
+#define CFG_INFORM_BSS_RSSI_RAW_MIN                (0)
+#define CFG_INFORM_BSS_RSSI_RAW_MAX                (1)
+#define CFG_INFORM_BSS_RSSI_RAW_DEFAULT            (1)
 
 /*---------------------------------------------------------------------------
   Type declarations
@@ -3540,7 +3591,19 @@ typedef struct
 #ifdef FEATURE_SECURE_FIRMWARE
    bool                        enable_fw_hash_check;
 #endif
+   v_BOOL_t                    ignorePeerErpInfo;
    uint16_t                    pkt_err_disconn_th;
+   bool                        tx_chain_mask_cck;
+   uint8_t                     tx_chain_mask_1ss;
+   uint16_t                    self_gen_frm_pwr;
+
+#ifdef FEATURE_WLAN_EXTSCAN
+   uint32_t                    extscan_passive_max_chn_time;
+   uint32_t                    extscan_passive_min_chn_time;
+   uint32_t                    extscan_active_max_chn_time;
+   uint32_t                    extscan_active_min_chn_time;
+#endif
+   uint8_t                     inform_bss_rssi_raw;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

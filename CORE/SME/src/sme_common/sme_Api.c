@@ -681,9 +681,16 @@ tANI_BOOLEAN smeProcessScanQueue(tpAniSirGlobal pMac)
 {
     tListElem *pEntry;
     tSmeCmd *pCommand;
-    tListElem *pSmeEntry;
-    tSmeCmd *pSmeCommand;
+    tListElem *pSmeEntry = NULL;
+    tSmeCmd *pSmeCommand = NULL;
     tANI_BOOLEAN status = eANI_BOOLEAN_TRUE;
+
+    if ((!csrLLIsListEmpty(&pMac->sme.smeCmdActiveList, LL_ACCESS_LOCK ))) {
+        pSmeEntry = csrLLPeekHead(&pMac->sme.smeCmdActiveList,
+                        LL_ACCESS_LOCK);
+        if (pSmeEntry)
+            pSmeCommand = GET_BASE_ADDR(pSmeEntry, tSmeCmd, Link) ;
+    }
 
     csrLLLock( &pMac->sme.smeScanCmdActiveList );
     if (csrLLIsListEmpty( &pMac->sme.smeScanCmdActiveList,
@@ -694,9 +701,25 @@ tANI_BOOLEAN smeProcessScanQueue(tpAniSirGlobal pMac)
         {
             pEntry = csrLLPeekHead( &pMac->sme.smeScanCmdPendingList,
                     LL_ACCESS_LOCK );
-            if (pEntry)
-            {
+            if (pEntry) {
                 pCommand = GET_BASE_ADDR( pEntry, tSmeCmd, Link );
+                if (pSmeCommand != NULL) {
+                    /*
+                    * if scan is running on one interface and SME receives
+                    * the next command on the same interface then
+                    * dont the allow the command to be queued to
+                    * smeCmdPendingList. If next scan is allowed on
+                    * the same interface the CSR state machine will
+                    * get screwed up.
+                    */
+                     if (pSmeCommand->sessionId == pCommand->sessionId) {
+                          smsLog(pMac, LOGE,
+                                "SME command is pending on session %d",
+                                pSmeCommand->sessionId);
+                            status = eANI_BOOLEAN_FALSE;
+                          goto end;
+                      }
+                }
                 //We cannot execute any command in wait-for-key state until setKey is through.
                 if (CSR_IS_WAIT_FOR_KEY( pMac, pCommand->sessionId))
                 {
@@ -707,30 +730,6 @@ tANI_BOOLEAN smeProcessScanQueue(tpAniSirGlobal pMac)
                                 pCommand->command);
                         status = eANI_BOOLEAN_FALSE;
                         goto end;
-                    }
-                }
-
-                if ((!csrLLIsListEmpty(&pMac->sme.smeCmdActiveList,
-                                       LL_ACCESS_LOCK )))
-                {
-                    pSmeEntry = csrLLPeekHead(&pMac->sme.smeCmdActiveList,
-                                              LL_ACCESS_LOCK);
-                    if (pEntry)
-                    {
-                       pSmeCommand = GET_BASE_ADDR(pEntry, tSmeCmd,
-                                                   Link) ;
-
-                       /* if scan is running on one interface and SME recei
-                          ves the next command on the same interface then
-                          dont the allow the command to be queued to
-                          smeCmdPendingList. If next scan is allowed on
-                          the same interface the CSR state machine will
-                          get screwed up. */
-                          if (pSmeCommand->sessionId == pCommand->sessionId)
-                          {
-                              status = eANI_BOOLEAN_FALSE;
-                              goto end;
-                          }
                     }
                 }
                 if ( csrLLRemoveEntry( &pMac->sme.smeScanCmdPendingList,
@@ -5855,6 +5854,7 @@ eHalStatus sme_GenericChangeCountryCode( tHalHandle hHal,
         pMsg->msgType = pal_cpu_to_be16((tANI_U16)eWNI_SME_GENERIC_CHANGE_COUNTRY_CODE);
         pMsg->msgLen = (tANI_U16)sizeof(tAniGenericChangeCountryCodeReq);
         vos_mem_copy(pMsg->countryCode, pCountry, 2);
+        pMsg->countryCode[2] = ' '; /* For ASCII space */
         pMsg->domain_index = reg_domain;
 
         msg.type = eWNI_SME_GENERIC_CHANGE_COUNTRY_CODE;
@@ -13066,51 +13066,39 @@ eHalStatus sme_InitThermalInfo( tHalHandle hHal,
     return eHAL_STATUS_FAILURE;
 }
 
-/* ---------------------------------------------------------------------------
-    \fn sme_InitThermalInfo
-    \brief  SME API to set the thermal mitigation level
-    \param  hHal
-    \param  level : thermal mitigation level
-    \- return eHalStatus
-    -------------------------------------------------------------------------*/
+/**
+ * sme_SetThermalLevel() - SME API to set the thermal mitigation level
+ * hHal:	Handler to HAL
+ * level:	Thermal mitigation level
+ *
+ * Return: HAL status code
+ */
 eHalStatus sme_SetThermalLevel( tHalHandle hHal, tANI_U8 level )
 {
-    vos_msg_t msg;
-    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-    u_int8_t *pLevel = vos_mem_malloc(sizeof(*pLevel));
+	vos_msg_t msg;
+	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+	VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
 
-    pLevel = vos_mem_malloc(sizeof(*pLevel));
-    if (NULL == pLevel)
-    {
-       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                 "%s: could not allocate pLevel", __func__);
-       return eHAL_STATUS_E_MALLOC_FAILED;
-    }
+	if (eHAL_STATUS_SUCCESS == sme_AcquireGlobalLock(&pMac->sme)) {
+		vos_mem_set(&msg, sizeof(msg), 0);
+		msg.type = WDA_SET_THERMAL_LEVEL;
+		msg.bodyval = level;
 
-    *pLevel = level;
-
-    if (eHAL_STATUS_SUCCESS == sme_AcquireGlobalLock(&pMac->sme))
-    {
-        msg.type = WDA_SET_THERMAL_LEVEL;
-        msg.reserved = 0;
-        msg.bodyptr = pLevel;
-
-        if (!VOS_IS_STATUS_SUCCESS(
-           vos_mq_post_message(VOS_MODULE_ID_WDA, &msg)))
-        {
-            VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                       "%s: Not able to post WDA_SET_THERMAL_LEVEL to WDA!",
-                       __func__);
-            vos_mem_free(pLevel);
-            sme_ReleaseGlobalLock(&pMac->sme);
-            return eHAL_STATUS_FAILURE;
-        }
-        sme_ReleaseGlobalLock(&pMac->sme);
-        return eHAL_STATUS_SUCCESS;
-    }
-    vos_mem_free(pLevel);
-    return eHAL_STATUS_FAILURE;
+		vosStatus =  vos_mq_post_message(VOS_MODULE_ID_WDA, &msg);
+		if (!VOS_IS_STATUS_SUCCESS(vosStatus)) {
+			VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+				   "%s: Not able to post WDA_SET_THERMAL_LEVEL to WDA!",
+				   __func__);
+			sme_ReleaseGlobalLock(&pMac->sme);
+			return eHAL_STATUS_FAILURE;
+		}
+		sme_ReleaseGlobalLock(&pMac->sme);
+		return eHAL_STATUS_SUCCESS;
+	}
+	return eHAL_STATUS_FAILURE;
 }
+
+
 /* ---------------------------------------------------------------------------
    \fn sme_TxpowerLimit
    \brief SME API to set txpower limits
@@ -15035,47 +15023,40 @@ eHalStatus sme_wifi_start_logger(tHalHandle hal,
 	struct sir_wifi_start_log *req_msg;
 	uint32_t len;
 
-	if (start_log.ring_id == RING_ID_PER_PACKET_STATS) {
-		len = sizeof(*req_msg);
-		req_msg = vos_mem_malloc(len);
-		if (!req_msg) {
-			smsLog(mac, LOGE, FL("vos_mem_malloc failed"));
-			return eHAL_STATUS_FAILED_ALLOC;
-		}
+	len = sizeof(*req_msg);
+	req_msg = vos_mem_malloc(len);
+	if (!req_msg) {
+		smsLog(mac, LOGE, FL("vos_mem_malloc failed"));
+		return eHAL_STATUS_FAILED_ALLOC;
+	}
 
-		vos_mem_zero(req_msg, len);
+	vos_mem_zero(req_msg, len);
 
-		req_msg->verbose_level = start_log.verbose_level;
-		req_msg->flag = start_log.flag;
-		req_msg->ring_id = start_log.ring_id;
+	req_msg->verbose_level = start_log.verbose_level;
+	req_msg->flag = start_log.flag;
+	req_msg->ring_id = start_log.ring_id;
 
-		status = sme_AcquireGlobalLock(&mac->sme);
-		if (status != eHAL_STATUS_SUCCESS) {
-			smsLog(mac, LOGE,
+	status = sme_AcquireGlobalLock(&mac->sme);
+	if (status != eHAL_STATUS_SUCCESS) {
+		smsLog(mac, LOGE,
 				FL("sme_AcquireGlobalLock failed!(status=%d)"),
 				status);
-			vos_mem_free(req_msg);
-			return status;
-		}
+		vos_mem_free(req_msg);
+		return status;
+	}
 
-		/* Serialize the req through MC thread */
-		vos_message.bodyptr = req_msg;
-		vos_message.type    = SIR_HAL_START_STOP_PACKET_STATS;
-		vos_status = vos_mq_post_message(VOS_MQ_ID_WDA, &vos_message);
-		if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
-			smsLog(mac, LOGE,
+	/* Serialize the req through MC thread */
+	vos_message.bodyptr = req_msg;
+	vos_message.type    = SIR_HAL_START_STOP_LOGGING;
+	vos_status = vos_mq_post_message(VOS_MQ_ID_WDA, &vos_message);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+		smsLog(mac, LOGE,
 				FL("vos_mq_post_message failed!(err=%d)"),
 				vos_status);
-			vos_mem_free(req_msg);
-			status = eHAL_STATUS_FAILURE;
-		}
-		sme_ReleaseGlobalLock(&mac->sme);
-	} else if (start_log.ring_id == RING_ID_CONNECTIVITY) {
-		/* Start/stop connectivity events */
-		/* No handling for now */
-	} else {
-		smsLog(mac, LOGE, FL("Invalid parameter"));
+		vos_mem_free(req_msg);
+		status = eHAL_STATUS_FAILURE;
 	}
+	sme_ReleaseGlobalLock(&mac->sme);
 	return status;
 }
 
@@ -15148,13 +15129,7 @@ eHalStatus sme_update_nss(tHalHandle h_hal, uint8_t nss)
 
 		for (i = 0; i < CSR_ROAM_SESSION_MAX; i++) {
 			if (CSR_IS_SESSION_VALID(mac_ctx, i)) {
-				csr_session = CSR_GET_SESSION(mac_ctx, i);
-				if (!csr_session) {
-					smsLog(mac_ctx, LOGE,
-					       FL("Session does not exist for interface %d"),
-					       i);
-					continue;
-				}
+				csr_session = &mac_ctx->roam.roamSession[i];
 				csr_session->htConfig.ht_tx_stbc =
 					uHTCapabilityInfo.ht_cap_info.txSTBC;
 			}

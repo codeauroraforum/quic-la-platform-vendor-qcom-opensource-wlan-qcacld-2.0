@@ -1901,6 +1901,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
 
         pMac->roam.configParam.isAmsduSupportInAMPDU = pParam->isAmsduSupportInAMPDU;
         pMac->roam.configParam.nSelect5GHzMargin = pParam->nSelect5GHzMargin;
+        pMac->roam.configParam.ignorePeerErpInfo = pParam->ignorePeerErpInfo;
         pMac->roam.configParam.isCoalesingInIBSSAllowed =
                                pParam->isCoalesingInIBSSAllowed;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -2048,6 +2049,7 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 
         pParam->isAmsduSupportInAMPDU = pMac->roam.configParam.isAmsduSupportInAMPDU;
         pParam->nSelect5GHzMargin = pMac->roam.configParam.nSelect5GHzMargin;
+        pParam->ignorePeerErpInfo = pMac->roam.configParam.ignorePeerErpInfo;
 
         pParam->isCoalesingInIBSSAllowed =
                                 pMac->roam.configParam.isCoalesingInIBSSAllowed;
@@ -11381,6 +11383,7 @@ eHalStatus csrRoamLostLink( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U32 ty
                      sizeof(tSirMacAddr));
         roamInfo.staId = (tANI_U8)pDeauthIndMsg->staId;
         roamInfo.reasonCode = pDeauthIndMsg->reasonCode;
+        roamInfo.rxRssi = pDeauthIndMsg->rssi;
     }
     smsLog(pMac, LOGW, FL("roamInfo.staId (%d)"), roamInfo.staId);
 
@@ -11658,55 +11661,36 @@ static eCsrCfgDot11Mode csrRoamGetPhyModeBandForBss( tpAniSirGlobal pMac, tCsrRo
                 break;
 #endif
             case eCSR_CFG_DOT11_MODE_AUTO:
-                eBand = pMac->roam.configParam.eBand;
-                if (eCSR_BAND_24 == eBand)
-                {
-                    // WiFi tests require IBSS networks to start in 11b mode
-                    // without any change to the default parameter settings
-                    // on the adapter.  We use ACU to start an IBSS through
-                    // creation of a startIBSS profile. This startIBSS profile
-                    // has Auto MACProtocol and the adapter property setting
-                    // for dot11Mode is also AUTO.   So in this case, let's
-                    // start the IBSS network in 11b mode instead of 11g mode.
-                    // So this is for Auto=profile->MacProtocol && Auto=Global.
-                    // dot11Mode && profile->channel is < 14, then start the IBSS
-                    // in b mode.
-                    //
-                    // Note:  we used to have this start as an 11g IBSS for best
-                    // performance... now to specify that the user will have to
-                    // set the do11Mode in the property page to 11g to force it.
-                    cfgDot11Mode = eCSR_CFG_DOT11_MODE_11B;
-                }
-                else
-                {
 #ifdef WLAN_FEATURE_11AC
-                    if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+                if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+                {
+                    /* If the operating channel is in 2.4 GHz band, check for
+                     * INI item to disable VHT operation in 2.4 GHz band
+                     */
+                    if (CSR_IS_CHANNEL_24GHZ(operationChn) &&
+                         !pMac->roam.configParam.enableVhtFor24GHz)
                     {
-                        /* If the operating channel is in 2.4 GHz band, check for
-                         * INI item to disable VHT operation in 2.4 GHz band
-                         */
-                        if (CSR_IS_CHANNEL_24GHZ(operationChn) &&
-                            !pMac->roam.configParam.enableVhtFor24GHz)
-                        {
-                           /* Disable 11AC operation */
-                           cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
-                        }
-                        else
-                        {
-                           cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AC;
-                        }
-                        eBand = CSR_IS_CHANNEL_24GHZ(operationChn) ? eCSR_BAND_24 : eCSR_BAND_5G;
+                       /* Disable 11AC operation */
+                       cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
                     }
                     else
                     {
-                        cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
-                        eBand = CSR_IS_CHANNEL_24GHZ(operationChn) ? eCSR_BAND_24 : eCSR_BAND_5G;
+                       cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AC;
                     }
-#else
-                    cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
-                    eBand = CSR_IS_CHANNEL_24GHZ(operationChn) ? eCSR_BAND_24 : eCSR_BAND_5G;
-#endif
+                    eBand = CSR_IS_CHANNEL_24GHZ(operationChn) ?
+                                           eCSR_BAND_24 : eCSR_BAND_5G;
                 }
+                else
+                {
+                        cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
+                        eBand = CSR_IS_CHANNEL_24GHZ(operationChn) ?
+                                           eCSR_BAND_24 : eCSR_BAND_5G;
+                }
+#else
+                cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
+                eBand = CSR_IS_CHANNEL_24GHZ(operationChn) ?
+                                           eCSR_BAND_24 : eCSR_BAND_5G;
+#endif
                 break;
             default:
                 // Global dot11 Mode setting is 11a/b/g.
@@ -15598,7 +15582,6 @@ static void csrRoamLinkDown(tpAniSirGlobal pMac, tANI_U32 sessionId)
         smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
         return;
     }
-
    //Only to handle the case for Handover on infra link
    if( eCSR_BSS_TYPE_INFRASTRUCTURE != pSession->connectedProfile.BSSType )
    {
@@ -17141,6 +17124,9 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
             pRequestBuf->ChannelCacheType = CHANNEL_LIST_STATIC;
     } else {
         ChannelList = pMac->scan.occupiedChannels[sessionId].channelList;
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+               "Num of channels before filtering=%d",
+                pMac->scan.occupiedChannels[sessionId].numChannels);
         for (i = 0;
              i < pMac->scan.occupiedChannels[sessionId].numChannels;
              i++) {
@@ -17151,6 +17137,13 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
                 pRequestBuf->ConnectedNetwork.ChannelCache[num_channels++] =
                                                                    *ChannelList;
               }
+              if (*ChannelList)
+                  VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+                       "DFSRoam=%d, ChnlState=%d, Chnl=%d, num_ch=%d",
+                       pMac->roam.configParam.allowDFSChannelRoam,
+                       vos_nv_getChannelEnabledState(*ChannelList),
+                       *ChannelList,
+                       num_channels);
               ChannelList++;
         }
         pRequestBuf->ConnectedNetwork.ChannelCount = num_channels;

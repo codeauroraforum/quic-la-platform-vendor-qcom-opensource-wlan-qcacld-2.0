@@ -1747,7 +1747,7 @@ static int VosTlshimRxThread(void *arg)
                              &pSchedContext->tlshimRxEvtFlg);
                    complete(&pSchedContext->SuspndTlshimRxEvent);
                }
-               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                          "%s: Shutting down tl shim Tlshim rx thread", __func__);
                shutdown = true;
                break;
@@ -1769,7 +1769,7 @@ static int VosTlshimRxThread(void *arg)
        }
    }
 
-   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
              "%s: Exiting VOSS Tlshim rx thread", __func__);
    complete_and_exit(&pSchedContext->TlshimRxShutdown, 0);
 }
@@ -2524,4 +2524,20 @@ bool vos_is_ssr_ready(const char *caller_func)
              "Allowing SSR for %s", caller_func);
 
     return true;
+}
+
+/**
+ * vos_get_gfp_flags(): get GFP flags
+ *
+ * Based on the scheduled context, return GFP flags
+ * Return: gfp flags
+ */
+int vos_get_gfp_flags(void)
+{
+	int flags = GFP_KERNEL;
+
+	if (in_interrupt() || in_atomic() || irqs_disabled())
+		flags = GFP_ATOMIC;
+
+	return flags;
 }
