@@ -774,6 +774,8 @@ typedef struct {
 
 	bool  tx_chain_mask_cck;
 	uint16_t self_gen_frm_pwr;
+	uint32_t wow_wakeup_enable_mask;
+	uint32_t wow_wakeup_disable_mask;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
