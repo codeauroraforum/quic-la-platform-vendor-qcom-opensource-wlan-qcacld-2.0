@@ -968,9 +968,6 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
         if ((pHddCtx->isLoadInProgress != TRUE) &&
             (pHddCtx->isUnloadInProgress != TRUE))
         {
-            hddLog(VOS_TRACE_LEVEL_INFO_HIGH,
-                    "%s: sent disconnected event to nl80211",
-                    __func__);
 #ifdef WLAN_FEATURE_P2P_DEBUG
             if(pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
             {
@@ -1006,6 +1003,9 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
                 {
                     cfg80211_disconnected(dev, WLAN_REASON_UNSPECIFIED, NULL, 0, GFP_KERNEL);
                  }
+                hddLog(LOG2,
+                       FL("sent disconnected event to nl80211, rssi: %d"),
+                       pAdapter->rssi);
             }
             //If the Device Mode is Station
             // and the P2P Client is Connected
