@@ -61,6 +61,7 @@
 #define HTT_TX_EXT_TID_INVALID             31
 #define HTT_TX_EXT_TID_NONPAUSE            19
 
+#define HTT_HTC_PKT_MISCLIST_SIZE           6
 /**
  * @brief General specification of the tx frame contents
  *
