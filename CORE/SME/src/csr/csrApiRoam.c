@@ -1929,7 +1929,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         pMac->roam.configParam.htSmps= pParam->htSmps;
         pMac->roam.configParam.txLdpcEnable = pParam->enableTxLdpc;
 
-        pMac->roam.configParam.isAmsduSupportInAMPDU = pParam->isAmsduSupportInAMPDU;
+        pMac->roam.configParam.max_amsdu_num = pParam->max_amsdu_num;
         pMac->roam.configParam.nSelect5GHzMargin = pParam->nSelect5GHzMargin;
         pMac->roam.configParam.isCoalesingInIBSSAllowed =
                                pParam->isCoalesingInIBSSAllowed;
@@ -2085,7 +2085,7 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 #endif
         pParam->enableTxLdpc = pMac->roam.configParam.txLdpcEnable;
 
-        pParam->isAmsduSupportInAMPDU = pMac->roam.configParam.isAmsduSupportInAMPDU;
+        pParam->max_amsdu_num = pMac->roam.configParam.max_amsdu_num;
         pParam->nSelect5GHzMargin = pMac->roam.configParam.nSelect5GHzMargin;
 
         pParam->isCoalesingInIBSSAllowed =
@@ -13746,7 +13746,7 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
         *pBuf = (tANI_U8)pMac->roam.configParam.htSmps;
         pBuf++;
 
-        *pBuf = (tANI_U8)pMac->roam.configParam.isAmsduSupportInAMPDU;
+        *pBuf = (tANI_U8)pMac->roam.configParam.max_amsdu_num;
         pBuf++;
 
         // WME

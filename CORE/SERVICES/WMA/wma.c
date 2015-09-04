@@ -9663,6 +9663,12 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 	WLAN_PHY_MODE chanmode;
 	u_int8_t *buf_ptr;
 	struct wma_txrx_node *intr = wma->interfaces;
+	tpAniSirGlobal pmac = NULL;
+	struct ath_dfs *dfs;
+
+	pmac = (tpAniSirGlobal)
+		vos_get_context(VOS_MODULE_ID_PE, wma->vos_context);
+	dfs = (struct ath_dfs *)wma->dfs_ic->ic_dfs;
 
 	WMA_LOGD("%s: Enter isRestart=%d vdev=%d", __func__, isRestart,req->vdev_id);
 	len = sizeof(*cmd) + sizeof(wmi_channel) +
@@ -9792,6 +9798,8 @@ static VOS_STATUS wma_vdev_start(tp_wma_handle wma,
 			vos_lock_release(&wma->dfs_ic->chan_lock);
 
 			wma_unified_dfs_phyerr_filter_offload_enable(wma);
+			dfs->disable_dfs_ch_switch =
+				pmac->sap.SapDfsInfo.disable_dfs_ch_switch;
 		}
 	}
 
@@ -25616,6 +25624,7 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 {
 	tp_wma_handle wma_handle;
 	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+	int i;
 
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
 
@@ -25663,6 +25672,14 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 		if (wma_suspend_target(wma_handle, 1))
 			WMA_LOGE("Failed to suspend target");
 #endif
+	}
+
+	/* clean up ll-queue for all vdev */
+	for (i = 0; i < wma_handle->max_bssid; i++) {
+		if (wma_handle->interfaces[i].handle &&
+				wma_handle->interfaces[i].vdev_up) {
+			ol_txrx_vdev_flush(wma_handle->interfaces[i].handle);
+		}
 	}
 
 	vos_status = wma_tx_detach(wma_handle);

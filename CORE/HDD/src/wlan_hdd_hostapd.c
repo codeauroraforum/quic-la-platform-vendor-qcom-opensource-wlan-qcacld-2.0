@@ -475,7 +475,6 @@ static int hdd_hostapd_ioctl(struct net_device *dev,
    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    ret = wlan_hdd_validate_context(pHddCtx);
    if (ret) {
-      hddLog(VOS_TRACE_LEVEL_ERROR, "%s: invalid context", __func__);
       ret = -EBUSY;
       goto exit;
    }
@@ -2780,13 +2779,14 @@ static iw_softap_setparam(struct net_device *dev,
         case QCSAP_IPA_UC_STAT:
             {
                 /* If input value is non-zero get stats */
-                if (set_value) {
+                if (1 == set_value)
                     hdd_ipa_uc_stat_request(pHostapdAdapter, set_value);
-                }
-                else {
+                else if (3 == set_value)
+                    hdd_ipa_uc_rt_debug_host_dump(
+                      WLAN_HDD_GET_CTX(pHostapdAdapter));
+                else
                     /* place holder for stats clean up
                      * Stats clean not implemented yet on firmware and ipa */
-                }
                 return ret;
             }
 #endif /* IPA_UC_OFFLOAD */

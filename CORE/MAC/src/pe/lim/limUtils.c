@@ -3117,6 +3117,10 @@ tSirMacASCapabilityInfo macASCapabilityInfo = {0};
       retVal = (tANI_U8) macHTCapabilityInfo.maximalAMSDUsize;
       break;
 
+    case eHT_MAX_AMSDU_NUM:
+      retVal = (tANI_U8) psessionEntry->max_amsdu_num;
+      break;
+
     case eHT_DELAYED_BA:
       retVal = (tANI_U8) macHTCapabilityInfo.delayedBA;
       break;
@@ -3297,7 +3301,7 @@ limEnable11aProtection(tpAniSirGlobal pMac, tANI_U8 enable,
             else
             {
                 psessionEntry->gLim11aParams.protectionEnabled = true;
-                if(eSIR_HT_OP_MODE_MIXED != pMac->lim.gHTOperMode)
+                if(eSIR_HT_OP_MODE_MIXED != psessionEntry->htOperMode)
                 {
                     pMac->lim.gHTOperMode = eSIR_HT_OP_MODE_MIXED;
                     psessionEntry->htOperMode = eSIR_HT_OP_MODE_MIXED;

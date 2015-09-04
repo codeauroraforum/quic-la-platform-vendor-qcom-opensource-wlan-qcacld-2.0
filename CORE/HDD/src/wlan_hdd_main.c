@@ -121,9 +121,7 @@ void hdd_ch_avoid_cb(void *hdd_context,void *indi_param);
 #include "wlan_hdd_debugfs.h"
 #include "epping_main.h"
 
-#ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
-#endif
 #if defined(HIF_PCI)
 #include "if_pci.h"
 #elif defined(HIF_USB)
@@ -1193,21 +1191,20 @@ static void hdd_vos_trace_enable(VOS_MODULE_ID moduleId, v_U32_t bitmask)
  */
 int wlan_hdd_validate_context(hdd_context_t *pHddCtx)
 {
-    ENTER();
 
     if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini) {
-        hddLog(LOGE, FL("HDD context is Null"));
+        hddLog(LOG1, FL("HDD context is Null"));
         return -ENODEV;
     }
 
     if (pHddCtx->isLogpInProgress) {
-        hddLog(LOGE, FL("LOGP in Progress. Ignore!!!"));
+        hddLog(LOG1, FL("LOGP in Progress. Ignore!!!"));
         return -EAGAIN;
     }
 
     if ((pHddCtx->isLoadInProgress) ||
         (pHddCtx->isUnloadInProgress)) {
-        hddLog(LOGE, FL("Unloading/Loading in Progress. Ignore!!!"));
+        hddLog(LOG1, FL("Unloading/Loading in Progress. Ignore!!!"));
         return -EAGAIN;
     }
     return 0;
@@ -7600,8 +7597,6 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    ret = wlan_hdd_validate_context(pHddCtx);
    if (ret) {
-      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                "%s: invalid context", __func__);
       ret = -EBUSY;
       goto exit;
    }
@@ -9987,6 +9982,18 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
                                  " failed %d", __func__, ret);
            goto err_free_netdev;
        }
+
+        hddLog(LOG1, FL("SET AMSDU num %d"), pHddCtx->cfg_ini->max_amsdu_num);
+
+        ret = process_wma_set_command((int)pAdapter->sessionId,
+                        (int)GEN_VDEV_PARAM_AMSDU,
+                        (int)pHddCtx->cfg_ini->max_amsdu_num,
+                        GEN_CMD);
+        if (ret != 0) {
+                hddLog(VOS_TRACE_LEVEL_ERROR,
+                        FL("GEN_VDEV_PARAM_AMSDU set failed %d"), ret);
+                goto err_free_netdev;
+        }
   }
 
 
@@ -13561,6 +13568,12 @@ static void hdd_driver_exit(void)
    }
    else
    {
+      /*
+       * Check IPA HW pipe shutdown properly or not
+       * If not, force shut down HW pipe
+       */
+      hdd_ipa_uc_force_pipe_shutdown(pHddCtx);
+
 #ifdef QCA_PKT_PROTO_TRACE
       vos_pkt_proto_trace_close();
 #endif /* QCA_PKT_PROTO_TRACE */

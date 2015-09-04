@@ -229,6 +229,7 @@ typedef enum {
     WMI_GRP_SAP_OFL,
     WMI_GRP_OCB,
     WMI_GRP_SOC,
+    WMI_GRP_PKT_FILTER,
 } WMI_GRP_ID;
 
 #define WMI_CMD_GRP_START_ID(grp_id) (((grp_id) << 12) | 0x1)
@@ -567,6 +568,9 @@ typedef enum {
     /** Request to flush of the buffered debug messages */
     WMI_DEBUG_MESG_FLUSH_CMDID,
 
+    /** Cmd to configure the verbose level */
+    WMI_DIAG_EVENT_LOG_CONFIG_CMDID,
+
     /** ARP OFFLOAD REQUEST*/
     WMI_SET_ARP_NS_OFFLOAD_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_ARP_NS_OFL),
 
@@ -785,6 +789,7 @@ typedef enum {
 
     /* enable/disable AP Authentication offload */
     WMI_SAP_OFL_ENABLE_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_SAP_OFL),
+    WMI_SAP_SET_BLACKLIST_PARAM_CMDID,
 
     /** Out-of-context-of-BSS (OCB) commands */
     WMI_OCB_SET_CONFIG_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_OCB),
@@ -799,6 +804,11 @@ typedef enum {
     WMI_SOC_SET_PCL_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_SOC),
     WMI_SOC_SET_HW_MODE_CMDID,
     WMI_SOC_SET_DUAL_MAC_CONFIG_CMDID,
+
+    /* packet filter commands */
+    WMI_PACKET_FILTER_CONFIG_CMDID = WMI_CMD_GRP_START_ID(WMI_GRP_PKT_FILTER),
+    WMI_PACKET_FILTER_ENABLE_CMDID,
+
 } WMI_CMD_ID;
 
 typedef enum {
@@ -945,7 +955,10 @@ typedef enum {
     /**  Firmware memory dump Complete event*/
     WMI_UPDATE_FW_MEM_DUMP_EVENTID,
 
-    /*NLO specific events*/
+    /** Event indicating the DIAG logs/events supported by FW */
+    WMI_DIAG_EVENT_LOG_SUPPORTED_EVENTID,
+
+    /* NLO specific events */
     /** NLO match event after the first match */
     WMI_NLO_MATCH_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_NLO_OFL),
 
@@ -1471,6 +1484,11 @@ typedef struct {
      * default Dual Band Simultaneous (DBS) hardware mode
      */
     A_UINT32 default_dbs_hw_mode_index;
+
+    /*
+     * Number of msdu descriptors target would use
+     */
+    A_UINT32 num_msdu_desc;
 
     /* The TLVs for hal_reg_capabilities, wmi_service_bitmap and mem_reqs[] will follow this TLV.
          *     HAL_REG_CAPABILITIES   hal_reg_capabilities;
@@ -2440,6 +2458,7 @@ typedef struct {
     A_UINT32 tsf_l32;
     A_UINT32 tsf_u32;
     A_UINT32 buf_len;
+    A_UINT32 pmac_id;
     /* This TLV is followed by array of bytes:
          * // frame buffer - contains multiple payloads in the order:
          * // header - payload, header - payload...
@@ -3166,6 +3185,39 @@ typedef struct {
 
 /** Default value for stats if the stats collection has not started */
 #define WMI_STATS_VALUE_INVALID       0xffffffff
+
+#define WMI_DIAG_ID_GET(diag_events_logs)                         WMI_GET_BITS(diag_events_logs, 0, 16)
+#define WMI_DIAG_ID_SET(diag_events_logs, value)                  WMI_SET_BITS(diag_events_logs, 0, 16, value)
+#define WMI_DIAG_TYPE_GET(diag_events_logs)                       WMI_GET_BITS(diag_events_logs, 16, 1)
+#define WMI_DIAG_TYPE_SET(diag_events_logs, value)                WMI_SET_BITS(diag_events_logs, 16, 1, value)
+#define WMI_DIAG_ID_ENABLED_DISABLED_GET(diag_events_logs)        WMI_GET_BITS(diag_events_logs, 17, 1)
+#define WMI_DIAG_ID_ENABLED_DISABLED_SET(diag_events_logs, value) WMI_SET_BITS(diag_events_logs, 17, 1, value)
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_diag_event_log_config_fixed_param */
+    A_UINT32 num_of_diag_events_logs;
+/* The TLVs will follow.
+ *    A_UINT32 diag_events_logs_list[]; 0-15 Bits Diag EVENT/LOG ID,
+ *                                      Bit 16 - DIAG type EVENT/LOG, 0 - Event, 1 - LOG
+ *                                      Bit 17 Indicate if the DIAG type is Enabled/Disabled.
+ */
+} wmi_diag_event_log_config_fixed_param;
+
+#define WMI_DIAG_FREQUENCY_GET(diag_events_logs)          WMI_GET_BITS(diag_events_logs, 17, 1)
+#define WMI_DIAG_FREQUENCY_SET(diag_events_logs, value)   WMI_SET_BITS(diag_events_logs, 17, 1, value)
+#define WMI_DIAG_EXT_FEATURE_GET(diag_events_logs)        WMI_GET_BITS(diag_events_logs, 18, 1)
+#define WMI_DIAG_EXT_FEATURE_SET(diag_events_logs, value) WMI_SET_BITS(diag_events_logs, 18, 1, value)
+
+typedef struct {
+    A_UINT32 tlv_header;
+    A_UINT32 num_of_diag_events_logs;
+/* The TLVs will follow.
+ *    A_UINT32 diag_events_logs_list[]; 0-15 Bits Diag EVENT/LOG ID,
+ *                                      Bit 16 - DIAG type EVENT/LOG, 0 - Event, 1 - LOG
+ *                                      Bit 17 - Frequncy of the DIAG EVENT/LOG High Frequency -1, Low Frequency - 0
+ *                                      Bit 18 - Set if the EVENTS/LOGs are used for EXT DEBUG Framework
+ */
+} wmi_diag_event_log_supported_event_fixed_params;
 
 typedef struct {
     A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_debug_mesg_flush_fixed_param*/
@@ -6253,6 +6305,7 @@ typedef enum event_type_e {
     WOW_EXTSCAN_EVENT,
     WOW_IOAC_REV_KA_FAIL_EVENT,
     WOW_IOAC_SOCK_EVENT,
+    WOW_NLO_SCAN_COMPLETE_EVENT,
 } WOW_WAKE_EVENT_TYPE;
 
 typedef enum wake_reason_e {
@@ -6290,6 +6343,7 @@ typedef enum wake_reason_e {
     WOW_REASON_RSSI_BREACH_EVENT,
     WOW_REASON_IOAC_REV_KA_FAIL_EVENT,
     WOW_REASON_IOAC_SOCK_EVENT,
+    WOW_REASON_NLO_SCAN_COMPLETE,
     WOW_REASON_DEBUG_TEST = 0xFF,
 } WOW_WAKE_REASON_TYPE;
 
@@ -8298,9 +8352,11 @@ typedef enum {
    WMI_LPI_STATUS_REQ_ABORTED = 4,
    /** Request Timed Out */
    WMI_LPI_STATUS_REQ_TIME_OUT = 5,
-   /** Medium Bussy, already there
+   /** Medium Busy, already there
     * is a scan is going on */
    WMI_LPI_STATUS_MEDIUM_BUSY = 6,
+   /** Extscan is the scan client whose scan complete event is triggered */
+   WMI_LPI_STATUS_EXTSCAN_CYCLE_AND_SCAN_REQ_COMPLETED = 7,
 }wmi_lpi_staus;
 
 typedef struct
@@ -8621,8 +8677,8 @@ typedef struct {
     /** extened RSSI info */
     A_UINT8  rssi_ext;
 
-    /** For 4-byte aligment padding */
-    A_UINT8 reserved;
+    /** pmac_id for the radar event */
+    A_UINT8 pmac_id;
 
     /** index of peak magnitude bin (signed) */
     A_INT32 peak_sidx;
@@ -10160,6 +10216,17 @@ typedef struct {
 } wmi_sap_ofl_del_sta_event_fixed_param;
 
 typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_sap_set_blacklist_param_cmd_fixed_param */
+    A_UINT32 vdev_id;
+    /* Number of client failure connection attempt */
+    A_UINT32 num_retry;
+    /* Time in milliseconds to record the client's failure connection attempts */
+    A_UINT32 retry_allow_time_ms;
+    /* Time in milliseconds to drop the connection request if client is blacklisted */
+    A_UINT32 blackout_time_ms;
+} wmi_sap_set_blacklist_param_cmd_fixed_param;
+
+typedef struct {
     A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_apfind_cmd_param */
     A_UINT32 data_len; /** length in byte of data[]. */
     /** This structure is used to send REQ binary blobs
@@ -11138,6 +11205,84 @@ typedef struct {
     A_UINT32 status;
 
 } wmi_soc_set_dual_mac_config_response_event_fixed_param;
+
+#define WMI_PACKET_FILTER_COMPARE_DATA_LEN_DWORD     2
+#define WMI_PACKET_FILTER_MAX_CMP_PER_PACKET_FILTER  10
+
+typedef enum {
+    PACKET_FILTER_TYPE_INVALID = 0,
+    PACKET_FILTER_TYPE_FILTER_PKT,
+    PACKET_FILTER_TYPE_RESERVE_PKT, // not used
+    PACKET_FILTER_TYPE_MAX_ENUM_SIZE
+} WMI_PACKET_FILTER_FILTER_TYPE;
+
+typedef enum {
+    PACKET_FILTER_PROTO_TYPE_INVALID = 0,
+
+    /* L2 header */
+    PACKET_FILTER_PROTO_TYPE_MAC,
+    PACKET_FILTER_PROTO_TYPE_SNAP,
+
+    /* L3 header (EtherType) */
+    PACKET_FILTER_PROTO_TYPE_IPV4,
+    PACKET_FILTER_PROTO_TYPE_IPV6,
+
+    /* L4 header (IP protocol) */
+    PACKET_FILTER_PROTO_TYPE_UDP,
+    PACKET_FILTER_PROTO_TYPE_TCP,
+    PACKET_FILTER_PROTO_TYPE_ICMPV6,
+
+    PACKET_FILTER_PROTO_TYPE_MAX
+} WMI_PACKET_FILTER_PROTO_TYPE;
+
+typedef enum {
+    PACKET_FILTER_CMP_TYPE_INVALID = 0,
+    PACKET_FILTER_CMP_TYPE_EQUAL,
+    PACKET_FILTER_CMP_TYPE_MASK_EQUAL,
+    PACKET_FILTER_CMP_TYPE_NOT_EQUAL,
+    PACKET_FILTER_CMP_TYPE_MASK_NOT_EQUAL,
+    PACKET_FILTER_CMP_TYPE_ADDRTYPE,
+    PACKET_FILTER_CMP_TYPE_MAX
+} WMI_PACKET_FILTER_CMP_TYPE;
+
+typedef enum {
+    PACKET_FILTER_SET_INACTIVE = 0,
+    PACKET_FILTER_SET_ACTIVE
+} WMI_PACKET_FILTER_ACTION;
+
+typedef enum {
+    PACKET_FILTER_SET_DISABLE = 0,
+    PACKET_FILTER_SET_ENABLE
+} WMI_PACKET_FILTER_RUNTIME_ENABLE;
+
+typedef struct {
+    A_UINT32  proto_type;
+    A_UINT32  cmp_type;
+    A_UINT32  data_length; /* Length of the data to compare (units = bytes) */
+    A_UINT32  data_offset; /* from start of the respective frame header (
+units = bytes) */
+    A_UINT32  compareData[WMI_PACKET_FILTER_COMPARE_DATA_LEN_DWORD]; /* Data to compare, little-endian order */
+    A_UINT32  dataMask[WMI_PACKET_FILTER_COMPARE_DATA_LEN_DWORD]; /* Mask to be applied on rcvd packet data before compare, little-endian order */
+} WMI_PACKET_FILTER_PARAMS_TYPE;
+
+typedef struct {
+    A_UINT32  tlv_header;
+    A_UINT32  vdev_id;
+    A_UINT32  filter_id;
+    A_UINT32  filter_action; /* WMI_PACKET_FILTER_ACTION */
+    A_UINT32  filter_type;
+    A_UINT32  num_params; /* how many entries in paramsData are valid */
+    A_UINT32  coalesce_time; // not currently used - fill with 0x0
+    WMI_PACKET_FILTER_PARAMS_TYPE  paramsData[
+WMI_PACKET_FILTER_MAX_CMP_PER_PACKET_FILTER];
+} WMI_PACKET_FILTER_CONFIG_CMD_fixed_param;
+
+/* enable / disable all filters within the specified vdev */
+typedef struct {
+    A_UINT32  tlv_header;
+    A_UINT32  vdev_id;
+    A_UINT32  enable; /* WMI_PACKET_FILTER_RUNTIME_ENABLE */
+} WMI_PACKET_FILTER_ENABLE_CMD_fixed_param;
 
 /* ADD NEW DEFS HERE */
 

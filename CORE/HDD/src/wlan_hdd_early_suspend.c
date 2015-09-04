@@ -99,7 +99,8 @@
 #elif defined(HIF_SDIO)
 #include "if_ath_sdio.h"
 #endif
-#define HDD_SSR_BRING_UP_TIME 10000
+
+#define HDD_SSR_BRING_UP_TIME 15000
 
 static eHalStatus g_full_pwr_status;
 static eHalStatus g_standby_status;
