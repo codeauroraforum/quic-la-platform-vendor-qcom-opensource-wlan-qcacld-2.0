@@ -1214,8 +1214,10 @@ ifeq ($(CONFIG_SMP),y)
 CDEFINES += -DQCA_CONFIG_SMP
 endif
 
-#Enable Channel Matrix restriction for all targets
-CDEFINES += -DWLAN_ENABLE_CHNL_MATRIX_RESTRICTION
+#rps feature
+ifeq ($(CONFIG_RPS),y)
+CDEFINES += -DQCA_FEATURE_RPS
+endif
 
 #features specific to mdm9630
 ifeq ($(CONFIG_ARCH_MDM9630), y)
