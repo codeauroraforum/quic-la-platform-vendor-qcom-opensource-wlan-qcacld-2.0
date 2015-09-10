@@ -3974,6 +3974,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_TX_CHAIN_MASK_1SS_DEFAULT,
                 CFG_TX_CHAIN_MASK_1SS_MIN,
                 CFG_TX_CHAIN_MASK_1SS_MAX),
+
+   REG_VARIABLE(CFG_SELF_GEN_FRM_PWR, WLAN_PARAM_Integer,
+                hdd_config_t, self_gen_frm_pwr,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_SELF_GEN_FRM_PWR_DEFAULT,
+                CFG_SELF_GEN_FRM_PWR_MIN,
+                CFG_SELF_GEN_FRM_PWR_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID

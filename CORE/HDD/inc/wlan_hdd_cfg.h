@@ -2877,6 +2877,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_TX_CHAIN_MASK_1SS_MAX      (3)
 #define CFG_TX_CHAIN_MASK_1SS_DEFAULT  (1)
 
+#define CFG_SELF_GEN_FRM_PWR        "gSelfGenFrmPwr"
+#define CFG_SELF_GEN_FRM_PWR_MIN      (0)
+#define CFG_SELF_GEN_FRM_PWR_MAX      (0xffff)
+#define CFG_SELF_GEN_FRM_PWR_DEFAULT  (0)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3494,6 +3499,7 @@ typedef struct
    v_BOOL_t                    sendDeauthBeforeCon;
    bool                        tx_chain_mask_cck;
    uint8_t                     tx_chain_mask_1ss;
+   uint16_t                    self_gen_frm_pwr;
 
 } hdd_config_t;
 
