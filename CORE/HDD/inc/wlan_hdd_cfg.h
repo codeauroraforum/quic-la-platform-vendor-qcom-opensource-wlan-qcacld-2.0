@@ -2875,7 +2875,7 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_TX_CHAIN_MASK_1SS       "gTxChainMask1ss"
 #define CFG_TX_CHAIN_MASK_1SS_MIN      (0)
 #define CFG_TX_CHAIN_MASK_1SS_MAX      (3)
-#define CFG_TX_CHAIN_MASK_1SS_DEFAULT  (0)
+#define CFG_TX_CHAIN_MASK_1SS_DEFAULT  (1)
 
 /*---------------------------------------------------------------------------
   Type declarations

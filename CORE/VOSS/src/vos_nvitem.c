@@ -1584,9 +1584,10 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
             (request->initiator != NL80211_REGDOM_SET_BY_CORE))
             init_by_reg_core = VOS_TRUE;
 
-
         /* send CTL info to firmware */
-        regdmn_set_regval(&pHddCtx->reg);
+        regdmn_set_regval(&pHddCtx->reg,
+			  pHddCtx->cfg_ini->tx_chain_mask_cck);
+
     default:
         break;
     }
@@ -1664,7 +1665,8 @@ VOS_STATUS vos_init_wiphy_from_eeprom(void)
    init_completion(&pHddCtx->reg_init);
 
    /* send CTL info to firmware */
-   regdmn_set_regval(&pHddCtx->reg);
+   regdmn_set_regval(&pHddCtx->reg,
+		     pHddCtx->cfg_ini->tx_chain_mask_cck);
 
    return VOS_STATUS_SUCCESS;
 }
