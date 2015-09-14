@@ -1666,7 +1666,7 @@ limDetectChangeInApCapabilities(tpAniSirGlobal pMac,
             (newChannel != 0) )
           ) ) )
     {
-        if( false == psessionEntry->fWaitForProbeRsp )
+        if (false == psessionEntry->fWaitForProbeRsp)
         {
             /* If Beacon capabilities is not matching with the current capability,
              * then send unicast probe request to AP and take decision after
