@@ -1281,7 +1281,7 @@ CDEFINES += -DFEATURE_WLAN_D0WOW
 endif
 
 # Flag to enable bus auto suspend
-ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
+ifeq ($(CONFIG_BUS_AUTO_SUSPEND), 1)
 CDEFINES += -DFEATURE_RUNTIME_PM
 endif
 # Some kernel include files are being moved.  Check to see if
