@@ -17231,7 +17231,6 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
     int responder;
     unsigned long rc;
     tANI_U16 numCurrTdlsPeers;
-    hddTdlsPeer_t *pTdlsPeer;
 #if !(TDLS_MGMT_VERSION2)
     u32 peer_capability;
     peer_capability = 0;
@@ -17328,6 +17327,7 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
         }
         else
         {
+            hddTdlsPeer_t *pTdlsPeer;
             pTdlsPeer = wlan_hdd_tdls_find_peer(pAdapter, peer, TRUE);
             if (pTdlsPeer && TDLS_IS_CONNECTED(pTdlsPeer))
             {
@@ -17352,7 +17352,8 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
     if (SIR_MAC_TDLS_TEARDOWN == action_code)
     {
 
-       pTdlsPeer = wlan_hdd_tdls_find_peer(pAdapter, peerMac, TRUE);
+       hddTdlsPeer_t *pTdlsPeer;
+       pTdlsPeer = wlan_hdd_tdls_find_peer(pAdapter, peer, TRUE);
 
        if(pTdlsPeer && TDLS_IS_CONNECTED(pTdlsPeer))
             responder = pTdlsPeer->is_responder;
@@ -17364,20 +17365,6 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
                      dialog_token, status_code, len);
            return -EPERM;
        }
-    }
-
-    /* Discard TDLS setup if peer is removed by user app */
-    if ((pHddCtx->cfg_ini->fTDLSExternalControl) &&
-        ((SIR_MAC_TDLS_SETUP_REQ == action_code) ||
-         (SIR_MAC_TDLS_SETUP_CNF == action_code) ||
-         (SIR_MAC_TDLS_DIS_REQ == action_code))) {
-        pTdlsPeer = wlan_hdd_tdls_find_peer(pAdapter, peer, TRUE);
-        if (pTdlsPeer && (FALSE == pTdlsPeer->isForcedPeer)) {
-            hddLog(LOGE, FL("TDLS External Control enabled, but peer "
-                   MAC_ADDRESS_STR " is not forced, so reject the action code %d"),
-                   MAC_ADDR_ARRAY(peer), action_code);
-            return -EINVAL;
-        }
     }
 
     /* For explicit trigger of DIS_REQ come out of BMPS for
