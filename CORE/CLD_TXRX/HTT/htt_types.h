@@ -197,6 +197,13 @@ struct htt_tx_credit_t
     adf_os_atomic_t target_delta;
 };
 
+struct htt_tx_desc_page_t
+{
+	char* page_v_addr_start;
+	char* page_v_addr_end;
+	adf_os_dma_addr_t page_p_addr;
+};
+
 struct htt_pdev_t {
     ol_pdev_handle ctrl_pdev;
     ol_txrx_pdev_handle txrx_pdev;
@@ -353,6 +360,10 @@ struct htt_pdev_t {
 #endif /* IPA_UC_OFFLOAD */
 
     struct htt_tx_credit_t htt_tx_credit;
+
+    int num_pages;
+    int num_desc_per_page;
+    struct htt_tx_desc_page_t *desc_pages;
 };
 
 #endif /* _HTT_TYPES__H_ */
