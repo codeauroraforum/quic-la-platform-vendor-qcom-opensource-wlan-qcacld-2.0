@@ -4581,6 +4581,10 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 #endif
 #endif
 
+#ifdef CHANNEL_SWITCH_SUPPORTED
+    wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
+#endif
+
     EXIT();
     return 0;
 }
@@ -14785,8 +14789,73 @@ int wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
 }
 #endif
 
-#ifdef FEATURE_WLAN_EXTSCAN
+#ifdef CHANNEL_SWITCH_SUPPORTED
+/**
+ * __wlan_hdd_cfg80211_channel_switch()- function to switch
+ * channel in SAP/GO
+ * @wiphy:  wiphy pointer
+ * @dev: dev pointer.
+ * @csa_params: Change channel params
+ *
+ * This function is called to switch channel in SAP/GO
+ *
+ * Return: 0 if success else return non zero
+ */
+static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
+				struct net_device *dev,
+				struct cfg80211_csa_settings *csa_params)
+{
+	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	hdd_context_t *hdd_ctx;
+	v_U8_t channel;
+	v_U16_t freq;
+	int ret;
 
+	hddLog(LOG1, FL(" Set Freq %d"), csa_params->chandef.chan->center_freq);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+
+	if (0 != ret) {
+		return ret;
+	}
+
+	if ((WLAN_HDD_P2P_GO != adapter->device_mode) &&
+		(WLAN_HDD_SOFTAP != adapter->device_mode))
+		return -ENOTSUPP;
+
+	freq = csa_params->chandef.chan->center_freq;
+	channel = vos_freq_to_chan(freq);
+
+	ret = hdd_softap_set_channel_change(dev, channel);
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_channel_switch()- function to switch
+ * channel in SAP/GO
+ * @wiphy:  wiphy pointer
+ * @dev: dev pointer.
+ * @csa_params: Change channel params
+ *
+ * This function is called to switch channel in SAP/GO
+ *
+ * Return: 0 if success else return non zero
+ */
+static int wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
+				struct net_device *dev,
+				struct cfg80211_csa_settings *csa_params)
+{
+	int ret;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_channel_switch(wiphy, dev, csa_params);
+	vos_ssr_unprotect(__func__);
+	return ret;
+}
+#endif
+
+#ifdef FEATURE_WLAN_EXTSCAN
 static void
 wlan_hdd_cfg80211_extscan_get_capabilities_ind(void *ctx,
                                             tpSirExtScanCapabilitiesEvent pData)
@@ -15861,5 +15930,8 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops =
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
      .key_mgmt_set_pmk = wlan_hdd_cfg80211_key_mgmt_set_pmk,
 #endif
+#endif
+#ifdef CHANNEL_SWITCH_SUPPORTED
+     .channel_switch = wlan_hdd_cfg80211_channel_switch,
 #endif
 };

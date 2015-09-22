@@ -101,4 +101,7 @@ void hdd_restart_softap (hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter);
 VOS_STATUS hdd_set_sap_ht2040_mode(hdd_adapter_t *pHostapdAdapter,
                                    tANI_U8 channel_type);
 #endif
+
+int hdd_softap_set_channel_change(struct net_device *dev, int target_channel);
+
 #endif    // end #if !defined( WLAN_HDD_HOSTAPD_H )

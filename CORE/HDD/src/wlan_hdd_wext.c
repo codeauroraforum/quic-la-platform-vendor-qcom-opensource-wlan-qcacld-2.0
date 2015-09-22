@@ -240,6 +240,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_EARLY_RX_DRIFT_SAMPLE          82
 /* Private ioctl for packet power save */
 #define WE_PPS_5G_EBT                         83
+#define WE_SET_CHANNEL                        87
+
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
@@ -4607,6 +4609,7 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
     int set_value = value[1];
     int ret = 0; /* success */
     int enable_pbm, enable_mp;
+    eHalStatus status;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
     v_U8_t nEnableSuspendOld;
@@ -5964,6 +5967,24 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
                             set_value, VDEV_CMD);
             break;
        }
+       case WE_SET_CHANNEL:
+       {
+          hddLog(LOG1, "Set Channel %d Session ID %d mode = %d", set_value,
+                     pAdapter->sessionId, pAdapter->device_mode);
+
+          if ((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) ||
+              (WLAN_HDD_P2P_CLIENT == pAdapter->device_mode)) {
+
+               status = sme_ext_change_channel(pHddCtx->hHal,
+                              set_value, pAdapter->sessionId);
+
+               if (status != eHAL_STATUS_SUCCESS)
+                   ret = -EINVAL;
+          } else {
+               ret = -EINVAL;
+          }
+          break;
+        }
         default:
         {
            hddLog(LOGE, "%s: Invalid sub command %d", __func__, sub_cmd);
@@ -10075,6 +10096,10 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "" },
+
+    {   WE_SET_CHANNEL,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "setChanChange" },
 
     /* handlers for sub-ioctl */
     {   WE_GET_11D_STATE,
