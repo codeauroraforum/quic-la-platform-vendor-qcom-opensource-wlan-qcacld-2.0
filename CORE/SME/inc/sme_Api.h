@@ -3717,7 +3717,7 @@ eHalStatus sme_set_auto_shutdown_timer(tHalHandle hHal, tANI_U32 timer_value);
 #endif
 
 eHalStatus sme_RoamChannelChangeReq( tHalHandle hHal, tCsrBssid bssid,
-                                tANI_U8 targetChannel, eCsrPhyMode phyMode );
+                                tCsrRoamProfile *pprofile);
 
 eHalStatus sme_RoamStartBeaconReq( tHalHandle hHal,
                    tCsrBssid bssid, tANI_U8 dfsCacWaitStatus);

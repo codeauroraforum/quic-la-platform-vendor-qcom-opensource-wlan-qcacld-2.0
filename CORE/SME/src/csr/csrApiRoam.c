@@ -12130,7 +12130,6 @@ tANI_U8 csrRoamGetIbssStartChannelNumber24( tpAniSirGlobal pMac )
 static void csrRoamGetBssStartParms( tpAniSirGlobal pMac, tCsrRoamProfile *pProfile,
                                       tCsrRoamStartBssParams *pParam )
 {
-    eCsrCfgDot11Mode cfgDot11Mode;
     eCsrBand eBand;
     tANI_U8 channel = 0;
     tSirNwType nwType;
@@ -12141,11 +12140,12 @@ static void csrRoamGetBssStartParms( tpAniSirGlobal pMac, tCsrRoamProfile *pProf
        operationChannel = pProfile->ChannelInfo.ChannelList[0];
     }
 
-    cfgDot11Mode = csrRoamGetPhyModeBandForBss( pMac, pProfile, operationChannel, &eBand );
+    pParam->uCfgDot11Mode =
+        csrRoamGetPhyModeBandForBss( pMac, pProfile, operationChannel, &eBand );
 
     if( ( (pProfile->csrPersona == VOS_P2P_CLIENT_MODE) ||
           (pProfile->csrPersona == VOS_P2P_GO_MODE) )
-     && ( cfgDot11Mode == eCSR_CFG_DOT11_MODE_11B)
+     && ( pParam->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11B)
       )
     {
         /* This should never happen */
@@ -12154,7 +12154,8 @@ static void csrRoamGetBssStartParms( tpAniSirGlobal pMac, tCsrRoamProfile *pProf
               pProfile->csrPersona);
         VOS_ASSERT(0);
     }
-    switch( cfgDot11Mode )
+
+    switch( pParam->uCfgDot11Mode )
     {
         case eCSR_CFG_DOT11_MODE_11G:
             nwType = eSIR_11G_NW_TYPE;
@@ -12244,7 +12245,7 @@ static void csrRoamGetBssStartParms( tpAniSirGlobal pMac, tCsrRoamProfile *pProf
             /* For P2P Client and P2P GO, disable 11b rates */
             if( (pProfile->csrPersona == VOS_P2P_CLIENT_MODE) ||
                 (pProfile->csrPersona == VOS_P2P_GO_MODE) ||
-                (eCSR_CFG_DOT11_MODE_11G_ONLY == cfgDot11Mode)
+                (eCSR_CFG_DOT11_MODE_11G_ONLY == pParam->uCfgDot11Mode)
               )
             {
                 pParam->operationalRateSet.numRates = 8;
@@ -18413,12 +18414,14 @@ VOS_STATUS csrRoamReadTSF(tpAniSirGlobal pMac, tANI_U8 *pTimestamp,
  */
 eHalStatus
 csrRoamChannelChangeReq( tpAniSirGlobal pMac, tCsrBssid bssid,
-                          tANI_U8 targetChannel, tANI_U8 cbMode )
+                         tANI_U8 cbMode,  tCsrRoamProfile *pprofile )
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tSirChanChangeRequest *pMsg;
     tANI_U32 vhtChannelWidth;
+    tCsrRoamStartBssParams param;
 
+    csrRoamGetBssStartParms(pMac, pprofile, &param);
     pMsg = vos_mem_malloc( sizeof(tSirChanChangeRequest) );
     if (!pMsg)
     {
@@ -18435,29 +18438,28 @@ csrRoamChannelChangeReq( tpAniSirGlobal pMac, tCsrBssid bssid,
     vhtChannelWidth = pMac->sap.SapDfsInfo.new_chanWidth;
 
 #ifdef WLAN_FEATURE_11AC
-    // cbMode = 1 in cfg.ini is mapped to PHY_DOUBLE_CHANNEL_HIGH_PRIMARY = 3
-    // in function csrConvertCBIniValueToPhyCBState()
-    // So, max value for cbMode in 40MHz mode is 3 (MAC\src\include\sirParams.h)
-    if(cbMode > PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
-    {
-        if(!WDA_getFwWlanFeatCaps(DOT11AC)) {
-            cbMode = csrGetHTCBStateFromVHTCBState(cbMode);
-        }
-        else
-        {
-            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_MED,
+    if(!WDA_getFwWlanFeatCaps(DOT11AC)) {
+         cbMode = csrGetHTCBStateFromVHTCBState(cbMode);
+    } else {
+         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_MED,
                       FL("sapdfs: channel width is [%d]"), vhtChannelWidth);
-            ccmCfgSetInt(pMac, WNI_CFG_VHT_CHANNEL_WIDTH,
+         ccmCfgSetInt(pMac, WNI_CFG_VHT_CHANNEL_WIDTH,
                          vhtChannelWidth, NULL, eANI_BOOLEAN_FALSE);
-        }
     }
 #endif
 
     pMsg->messageType = pal_cpu_to_be16((tANI_U16)eWNI_SME_CHANNEL_CHANGE_REQ);
     pMsg->messageLen = sizeof(tSirChanChangeRequest);
-    pMsg->targetChannel = targetChannel;
+    pMsg->targetChannel = pprofile->ChannelInfo.ChannelList[0];
     pMsg->cbMode = cbMode;
+    pMsg->dot11mode =
+       csrTranslateToWNICfgDot11Mode(pMac,pMac->roam.configParam.uCfgDot11Mode);
+
     vos_mem_copy(pMsg->bssid, bssid, VOS_MAC_ADDR_SIZE);
+    vos_mem_copy((void*)&pMsg->operational_rateset,
+                 (void*)&param.operationalRateSet, sizeof(tSirMacRateSet));
+    vos_mem_copy((void*)&pMsg->extended_rateset, (void*)&param.extendedRateSet,
+                 sizeof(tSirMacRateSet));
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 

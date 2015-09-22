@@ -12785,31 +12785,35 @@ eHalStatus sme_ChAvoidUpdateReq
    \fn sme_RoamChannelChangeReq
    \brief API to Indicate Channel change to new target channel
    \param hHal - The handle returned by macOpen
-   \param targetChannel - New Channel to move the SAP to.
    \return eHalStatus
 ---------------------------------------------------------------------------*/
 eHalStatus sme_RoamChannelChangeReq( tHalHandle hHal, tCsrBssid bssid,
-                                tANI_U8 targetChannel, eCsrPhyMode phyMode )
+                                tCsrRoamProfile *pprofile )
 {
     eHalStatus status = eHAL_STATUS_FAILURE;
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
     tANI_U32 cbMode;
-
+    u_int8_t ch_mode;
     /*
      * We are getting channel bonding mode from sapDfsInfor structure
      * because we've implemented channel width fallback mechanism for DFS
      * which will result in channel width changing dynamically.
      */
     cbMode = pMac->sap.SapDfsInfo.new_cbMode;
+    ch_mode = (pprofile->ChannelInfo.ChannelList[0] <= 14) ?
+                      pMac->roam.configParam.channelBondingMode24GHz :
+                      pMac->roam.configParam.channelBondingMode5GHz;
     status = sme_AcquireGlobalLock( &pMac->sme );
     if ( HAL_STATUS_SUCCESS( status ) )
     {
-        sme_SelectCBMode(hHal, phyMode, targetChannel);
+        sme_SelectCBMode(hHal,
+        sapConvertSapPhyModeToCsrPhyMode(pprofile->phyMode) ,
+        pprofile->ChannelInfo.ChannelList[0]);
 
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_MED,
-                  FL("sapdfs: channel bonding mode is [%d]"), cbMode);
-        status = csrRoamChannelChangeReq(pMac, bssid, targetChannel,
-                                         cbMode);
+         FL("sapdfs: channel bonding mode is [%d]& new negotiated CBmode=%d"),
+         cbMode,ch_mode);
+        status = csrRoamChannelChangeReq(pMac, bssid, ch_mode, pprofile);
         sme_ReleaseGlobalLock( &pMac->sme );
     }
     return (status);

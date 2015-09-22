@@ -1558,28 +1558,14 @@ WLANSAP_SetChannelChangeWithCsa(v_PVOID_t pvosGCtx, v_U32_t targetChannel)
     pMac = PMAC_STRUCT( hHal );
 
     /*
-     * Validate if the new target channel is a valid
-     * 5 Ghz Channel. We prefer to move to another
-     * channel in 5 Ghz band.
-     */
-    if ( (targetChannel < rfChannels[RF_CHAN_36].channelNum)
-                             ||
-         (targetChannel > rfChannels[RF_CHAN_165].channelNum) )
-    {
-        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
-                   "%s: Invalid Channel = %d passed,Channel not in 5GHz band",
-                    __func__, targetChannel);
-
-        return VOS_STATUS_E_FAULT;
-    }
-
-    /*
      * Now, validate if the passed channel is valid in the
      * current regulatory domain.
      */
-    if ( (vos_nv_getChannelEnabledState(targetChannel) == NV_CHANNEL_ENABLE)
+    if ( sapContext->channel != targetChannel &&
+         ((vos_nv_getChannelEnabledState(targetChannel) == NV_CHANNEL_ENABLE)
                                     ||
-         (vos_nv_getChannelEnabledState(targetChannel) == NV_CHANNEL_DFS) )
+         (vos_nv_getChannelEnabledState(targetChannel) == NV_CHANNEL_DFS &&
+          !vos_concurrent_open_sessions_running())) )
     {
         /*
          * Post a CSA IE request to SAP state machine with
@@ -2840,10 +2826,10 @@ WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, tANI_U8 tArgetChannel)
                    "%s: Invalid HAL pointer from pvosGCtx", __func__);
         return VOS_STATUS_E_FAULT;
     }
+    sapContext->csrRoamProfile.ChannelInfo.ChannelList[0] = tArgetChannel;
 
     halStatus = sme_RoamChannelChangeReq( hHal, sapContext->bssid,
-       tArgetChannel,
-       sapConvertSapPhyModeToCsrPhyMode(sapContext->csrRoamProfile.phyMode) );
+                                        &sapContext->csrRoamProfile);
 
     if (halStatus == eHAL_STATUS_SUCCESS)
     {
