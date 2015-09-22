@@ -4063,6 +4063,12 @@ REG_TABLE_ENTRY mbssid_sap_dyn_ini_reg_table[] =
                  CFG_SAP_FORCE_11AC_FOR_11N_MIN,
                  CFG_SAP_FORCE_11AC_FOR_11N_MAX ),
 
+   REG_VARIABLE(CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, max_mgmt_tx_fail_count,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_DEFAULT,
+                CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_MIN,
+                CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_MAX),
 };
 #endif
 
@@ -4607,6 +4613,8 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
             "Name = [gEnableDumpCollect] Value = [%u]",
                      pHddCtx->cfg_ini->is_ramdump_enabled);
 
+  hddLog(LOG2, "Name = [gmax_mgmt_tx_failure_count] Value = [%u]",
+                   pHddCtx->cfg_ini->max_mgmt_tx_fail_count);
 }
 
 #define CFG_VALUE_MAX_LEN 256

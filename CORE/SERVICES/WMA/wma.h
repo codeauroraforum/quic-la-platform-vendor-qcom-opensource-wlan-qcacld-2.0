@@ -751,6 +751,7 @@ typedef struct wma_handle {
 	struct sir_ocb_config *ocb_config_req;
 	uint32_t txrx_chainmask;
 	uint8_t per_band_chainmask_supp;
+	uint16_t max_mgmt_tx_fail_count;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {

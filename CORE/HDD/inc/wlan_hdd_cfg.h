@@ -2902,6 +2902,16 @@ enum dot11p_mode {
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX       (1)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT   (0)
 
+/*
+ * Debug configuration variable to inject firmware crash on
+ * consecutive management tx failure.
+ * Value set as 0 will disable the feature.
+ */
+#define CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_NAME    "gmax_mgmt_tx_failure_count"
+#define CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_MIN     (0)
+#define CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_MAX     (500)
+#define CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_DEFAULT (0)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3516,6 +3526,7 @@ typedef struct
    bool                        is_ramdump_enabled;
    uint8_t                     sap_dot11mc;
    uint8_t                     prefer_non_dfs_on_radar;
+   uint16_t                    max_mgmt_tx_fail_count;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

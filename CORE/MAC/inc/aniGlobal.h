@@ -976,7 +976,7 @@ typedef struct sMacOpenParameters
     /* IPA Micro controller data path offload TX partition base */
     tANI_U32 ucTxPartitionBase;
 #endif /* IPA_UC_OFFLOAD */
-
+    uint16_t  max_mgmt_tx_fail_count;
 } tMacOpenParameters;
 
 typedef struct sHalMacStartParameters
