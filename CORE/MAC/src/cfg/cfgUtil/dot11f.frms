@@ -432,6 +432,15 @@ FF VhtUserPositionArray(16)                    // 8.4.1.52
     userPositionArray[16];
 }
 
+FF ext_chan_switch_ann_action(4)
+{
+   {
+     switch_mode: 8;
+     op_class: 8;
+     new_channel: 8;
+     switch_count: 8;
+   }
+}
 /////////////////////////////////////////////////////////////////////////////
 //                                  TLVs                                   //
 /////////////////////////////////////////////////////////////////////////////
@@ -4248,6 +4257,13 @@ FRAME HT2040BSSCoexistenceManagementActionFrame
     FF     Action;
     MANDIE HT2040BSSCoexistence;
     MANDIE HT2040BSSIntolerantReport;
+}
+
+FRAME ext_channel_switch_action_frame
+{
+    FF     Category;
+    FF     Action;
+    FF     ext_chan_switch_ann_action;
 }
 
 // Local Variables:

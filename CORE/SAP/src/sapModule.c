@@ -2840,7 +2840,7 @@ VOS_STATUS WLANSAP_DeRegisterMgmtFrame
   SIDE EFFECTS
 ============================================================================*/
 VOS_STATUS
-WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, tANI_U8 tArgetChannel)
+WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, uint8_t target_channel)
 {
     ptSapContext sapContext = NULL;
     eHalStatus halStatus = eHAL_STATUS_FAILURE;
@@ -2861,7 +2861,11 @@ WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, tANI_U8 tArgetChannel)
                    "%s: Invalid HAL pointer from pvosGCtx", __func__);
         return VOS_STATUS_E_FAULT;
     }
-    sapContext->csrRoamProfile.ChannelInfo.ChannelList[0] = tArgetChannel;
+    sapContext->csrRoamProfile.ChannelInfo.ChannelList[0] = target_channel;
+    /* Update the channel as this will be used to
+     * send event to supplicant
+     */
+    sapContext->channel = target_channel;
 
     halStatus = sme_RoamChannelChangeReq( hHal, sapContext->bssid,
                                         &sapContext->csrRoamProfile);

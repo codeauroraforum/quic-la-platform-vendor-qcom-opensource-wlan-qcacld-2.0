@@ -5623,4 +5623,30 @@ typedef struct sAniGetLinkStatus
 /* Max number of rates allowed in Supported Rates IE */
 #define MAX_NUM_SUPPORTED_RATES (8)
 
+/**
+ * struct sir_sme_ext_change_chan_req - channel change request
+ * @message_type: message id
+ * @length: msg length
+ * @new_channel: new channel
+ * @session_id: session id
+ */
+struct sir_sme_ext_cng_chan_req
+{
+	uint16_t  message_type; /* eWNI_SME_EXT_CHANGE_CHANNEL */
+	uint16_t  length;
+	uint32_t  new_channel;
+	uint8_t   session_id;
+};
+
+/**
+ * struct sir_sme_ext_change_chan_ind.
+ * @session_id: session id
+ * @new_channel: new channel to change
+ */
+struct sir_sme_ext_cng_chan_ind
+{
+	uint8_t  session_id;
+	uint8_t  new_channel;
+};
+
 #endif /* __SIR_API_H */

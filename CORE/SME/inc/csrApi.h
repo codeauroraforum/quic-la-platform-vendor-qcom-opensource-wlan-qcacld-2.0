@@ -526,8 +526,9 @@ typedef enum
     // Channel sw update notification
     eCSR_ROAM_DFS_CHAN_SW_NOTIFY,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-    eCSR_ROAM_AUTHORIZED_EVENT
+    eCSR_ROAM_AUTHORIZED_EVENT,
 #endif
+    eCSR_ROAM_EXT_CHG_CHNL_IND,
 }eRoamCmdStatus;
 
 
@@ -625,6 +626,7 @@ typedef enum
     eCSR_ROAM_RESULT_CHANNEL_CHANGE_FAILURE,
     eCSR_ROAM_RESULT_DFS_CHANSW_UPDATE_SUCCESS,
     eCSR_ROAM_RESULT_DFS_CHANSW_UPDATE_FAILURE,
+    eCSR_ROAM_EXT_CHG_CHNL_UPDATE_IND,
 }eCsrRoamResult;
 
 
@@ -1347,6 +1349,7 @@ typedef struct tagCsrRoamInfo
     tANI_U8 replay_ctr[SIR_REPLAY_CTR_LEN];
 #endif
     tSirSmeChanInfo chan_info;
+    uint8_t target_channel;
 }tCsrRoamInfo;
 
 

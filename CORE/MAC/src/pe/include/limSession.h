@@ -536,6 +536,9 @@ tpPESession peCreateSession(tpAniSirGlobal pMac,
   --------------------------------------------------------------------------*/
 tpPESession peFindSessionByBssid(tpAniSirGlobal pMac,  tANI_U8*  bssid,    tANI_U8* sessionId);
 
+tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,
+						tANI_U8 sme_session_id);
+
 
 
 /*--------------------------------------------------------------------------
