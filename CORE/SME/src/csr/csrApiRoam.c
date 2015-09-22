@@ -18644,11 +18644,13 @@ csrRoamUpdateAddIEs(tpAniSirGlobal pMac,
  \param  pMac - pMac global structure
  \param  sessionId - SME session id
  \param  pDfsCacInd - CAC indication data to PE/LIM
+ \param  ch_bandwidth - Channel offset
  \- return Success or failure
 -----------------------------------------------------------------------------*/
 eHalStatus
 csrRoamSendChanSwIERequest(tpAniSirGlobal pMac, tCsrBssid bssid,
-                       tANI_U8 targetChannel, tANI_U8 csaIeReqd)
+                       tANI_U8 targetChannel, tANI_U8 csaIeReqd,
+                       u_int8_t ch_bandwidth)
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tSirDfsCsaIeRequest *pMsg;
@@ -18667,6 +18669,7 @@ csrRoamSendChanSwIERequest(tpAniSirGlobal pMac, tCsrBssid bssid,
     pMsg->targetChannel = targetChannel;
     pMsg->csaIeRequired = csaIeReqd;
     vos_mem_copy(pMsg->bssid, bssid, VOS_MAC_ADDR_SIZE);
+    pMsg->ch_bandwidth = ch_bandwidth;
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 
