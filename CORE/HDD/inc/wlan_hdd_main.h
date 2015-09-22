@@ -1488,6 +1488,11 @@ struct hdd_context_s
 
     /* Time since boot up to WiFi turn ON (in micro seconds) */
     v_U64_t wifi_turn_on_time_since_boot;
+    /* Dfs lock used to syncronize on sap channel switch during
+     * radar found indication and application triggered channel
+     * switch
+     */
+    struct mutex dfs_lock;
 };
 
 /*---------------------------------------------------------------------------
