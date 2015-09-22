@@ -1683,7 +1683,7 @@ sapGotoChannelSel
     }
 
 #ifdef WLAN_FEATURE_MBSSID
-    if (vos_concurrent_sap_sessions_running()) {
+    if (vos_concurrent_beaconing_sessions_running()) {
         v_U16_t con_sap_ch = sme_GetConcurrentOperationChannel(hHal);
 
         if (con_sap_ch && sapContext->channel == AUTO_CHANNEL_SELECT) {
@@ -2467,7 +2467,8 @@ ptSapContext sap_find_valid_concurrent_session (tHalHandle hHal)
 
     for (intf = 0; intf < SAP_MAX_NUM_SESSION; intf++)
     {
-         if (VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona &&
+         if (((VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona) ||
+             (VOS_P2P_GO_MODE == pMac->sap.sapCtxList [intf].sapPersona)) &&
              pMac->sap.sapCtxList[intf].pSapContext != NULL)
          {
              return pMac->sap.sapCtxList[intf].pSapContext;
@@ -2568,7 +2569,8 @@ void sap_CacResetNotify(tHalHandle hHal)
     {
          ptSapContext pSapContext =
                     (ptSapContext)pMac->sap.sapCtxList [intf].pSapContext;
-         if (VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona &&
+         if (((VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona) ||
+             (VOS_P2P_GO_MODE == pMac->sap.sapCtxList [intf].sapPersona)) &&
              pMac->sap.sapCtxList [intf].pSapContext != NULL)
          {
               pSapContext->isCacStartNotified = VOS_FALSE;
@@ -2600,7 +2602,8 @@ VOS_STATUS sap_CacStartNotify(tHalHandle hHal)
     {
          ptSapContext pSapContext =
                     (ptSapContext)pMac->sap.sapCtxList [intf].pSapContext;
-         if (VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona &&
+         if (((VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona) ||
+             (VOS_P2P_GO_MODE == pMac->sap.sapCtxList [intf].sapPersona)) &&
              pMac->sap.sapCtxList [intf].pSapContext != NULL &&
              (VOS_FALSE == pSapContext->isCacStartNotified))
          {
@@ -2653,7 +2656,8 @@ VOS_STATUS sap_CacEndNotify(tHalHandle hHal, tCsrRoamInfo *roamInfo)
      {
            ptSapContext pSapContext =
                (ptSapContext)pMac->sap.sapCtxList [intf].pSapContext;
-           if (VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona &&
+           if (((VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona) ||
+               (VOS_P2P_GO_MODE == pMac->sap.sapCtxList [intf].sapPersona)) &&
                pMac->sap.sapCtxList [intf].pSapContext != NULL &&
                (VOS_FALSE == pSapContext->isCacEndNotified))
            {
@@ -2984,7 +2988,7 @@ sapFsm
                   * ACS check if AP1 ACS resulting channel is DFS and if yes
                   * override AP2 ACS scan result with AP1 DFS channel
                   */
-                 if (vos_concurrent_sap_sessions_running()) {
+                 if (vos_concurrent_beaconing_sessions_running()) {
                      v_U16_t con_ch;
 
                      con_ch = sme_GetConcurrentOperationChannel(hHal);
@@ -3065,8 +3069,10 @@ sapFsm
                 for (intf = 0; intf < SAP_MAX_NUM_SESSION; intf++)
                 {
                      ptSapContext sapContext;
-                     if (VOS_STA_SAP_MODE ==
-                           pMac->sap.sapCtxList[intf].sapPersona &&
+                     if (((VOS_STA_SAP_MODE ==
+                           pMac->sap.sapCtxList[intf].sapPersona) ||
+                          (VOS_P2P_GO_MODE ==
+                           pMac->sap.sapCtxList[intf].sapPersona)) &&
                            pMac->sap.sapCtxList [intf].pSapContext != NULL)
                      {
                          sapContext = pMac->sap.sapCtxList [intf].pSapContext;
@@ -3262,7 +3268,10 @@ sapFsm
                     {
                          ptSapContext pSapContext;
 
-                        if (VOS_STA_SAP_MODE == pMac->sap.sapCtxList [intf].sapPersona &&
+                        if (((VOS_STA_SAP_MODE ==
+                                pMac->sap.sapCtxList [intf].sapPersona) ||
+                             (VOS_P2P_GO_MODE ==
+                                pMac->sap.sapCtxList [intf].sapPersona)) &&
                           pMac->sap.sapCtxList [intf].pSapContext != NULL )
                         {
                             pSapContext = pMac->sap.sapCtxList [intf].pSapContext;
