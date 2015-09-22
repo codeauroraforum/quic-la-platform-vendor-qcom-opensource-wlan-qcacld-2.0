@@ -1002,6 +1002,7 @@ typedef struct tagCsrRoamSession
     uint8_t join_bssid_count; /* This count represents the number of
                                * bssid's we are trying to join.
                                */
+    bool ch_switch_in_progress;
 } tCsrRoamSession;
 
 typedef struct tagCsrRoamStruct

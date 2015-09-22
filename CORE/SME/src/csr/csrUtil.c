@@ -835,6 +835,8 @@ v_U16_t csrCheckConcurrentChannelOverlap(tpAniSirGlobal pMac, v_U16_t sap_ch,
                             VOS_STA_SAP_MODE)) &&
                        (pSession->connectState !=
                              eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED)) {
+                if (pSession->ch_switch_in_progress)
+                          continue;
                 if (sap_ch  == 0) {
                     sap_ch = pSession->connectedProfile.operationChannel;
                     csrGetChFromHTProfile(pMac,

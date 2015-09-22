@@ -4123,4 +4123,9 @@ eHalStatus sme_SetLedFlashing (tHalHandle hHal, tANI_U8 type,
     -------------------------------------------------------------------------*/
 eHalStatus sme_handle_dfs_chan_scan(tHalHandle hHal, tANI_U8 dfs_flag);
 
+bool sme_validate_sap_channel_switch(tHalHandle hal,
+					uint16_t sap_ch,
+					eCsrPhyMode sap_phy_mode,
+					uint8_t cc_switch_mode,
+					uint32_t session_id);
 #endif //#if !defined( __SME_API_H )
