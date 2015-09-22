@@ -96,6 +96,7 @@ typedef struct sSirProbeRespBeacon
     tDot11fIETPCReport        tpcReport;
     tDot11fIEChanSwitchAnn    channelSwitchIE;
     tDot11fIEsec_chan_offset_ele sec_chan_offset;
+    tDot11fIEext_chan_switch_ann ext_chan_switch;
     tSirMacAddr               bssid;
     tDot11fIEQuiet            quietIE;
     tDot11fIEHTCaps           HTCaps;
@@ -127,6 +128,7 @@ typedef struct sSirProbeRespBeacon
     tANI_U8                   erpPresent;
     tANI_U8                   channelSwitchPresent;
     uint8_t                   sec_chan_offset_present;
+    uint8_t                   ext_chan_switch_present;
     tANI_U8                   quietIEPresent;
     tANI_U8                   tpcReportPresent;
     tANI_U8                   powerConstraintPresent;
@@ -582,11 +584,22 @@ PopulateDot11fChanSwitchAnn(tpAniSirGlobal          pMac,
                             tDot11fIEChanSwitchAnn *pDot11f,
                             tpPESession psessionEntry);
 
-/// Populate a tDot11fIEChanSwitchAnn
+/**
+ * populate_dot_11_f_ext_chann_switch_ann() - Function to populate ECS
+ * @mac_ptr:            Pointer to PMAC structure
+ * @dot_11_ptr:         ECS element
+ * @session_entry:      PE session entry
+ *
+ * This function is used to populate the extended channel switch element
+ *
+ * Return: None
+ *
+ */
 void
-PopulateDot11fExtChanSwitchAnn(tpAniSirGlobal          pMac,
-                             tDot11fIEsec_chan_offset_ele *pDot11f,
-                             tpPESession psessionEntry);
+populate_dot_11_f_ext_chann_switch_ann(tpAniSirGlobal mac_ptr,
+                  tDot11fIEext_chan_switch_ann *dot_11_ptr,
+                                     tpPESession session_entry);
+
 
 /// Populate a tDot11fIEChannelSwitchWrapper
 void

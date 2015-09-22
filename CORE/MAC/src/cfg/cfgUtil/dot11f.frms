@@ -94,6 +94,7 @@ const EID_FT_INFO                    =  55;
 const EID_TIMEOUT_INTERVAL           =  56;
 const EID_FT_RIC_DATA                =  57;
 const EID_SUPPORTED_OPER_CLASSES     =  59;
+const EID_EXT_CHAN_SWITCH            =  60;
 const EID_HT_INFO                    =  61;
 const EID_SEC_CHAN_OFFSET            =  62;
 const EID_RSNI                       =  65;
@@ -1341,6 +1342,14 @@ IE ChanSwitchAnn (EID_CHANNEL_SWITCH_ANN) // 7.3.2.20
     switchMode,  1;
     newChannel,  1;
     switchCount, 1;
+}
+
+IE ext_chan_switch_ann (EID_EXT_CHAN_SWITCH) // 8.4.2.55
+{
+    switch_mode,   1;
+    new_reg_class, 1;
+    new_channel,   1;
+    switch_count,  1;
 }
 
 IE sec_chan_offset_ele (EID_SEC_CHAN_OFFSET) // 7.3.2.20a
@@ -3293,6 +3302,7 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  FHPattTable;
     OPTIE  PowerConstraints;
     OPTIE  ChanSwitchAnn;
+    OPTIE  ext_chan_switch_ann;
     OPTIE  Quiet;
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
@@ -3381,6 +3391,7 @@ FRAME Beacon2
     OPTIE  Country;
     OPTIE  PowerConstraints;
     OPTIE  ChanSwitchAnn;
+    OPTIE  ext_chan_switch_ann;
     OPTIE  Quiet;
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
@@ -3439,6 +3450,7 @@ FRAME BeaconIEs
     OPTIE  FHPattTable;
     OPTIE  PowerConstraints;
     OPTIE  ChanSwitchAnn;
+    OPTIE  ext_chan_switch_ann;
     OPTIE  Quiet;
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
@@ -3651,6 +3663,7 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  FHPattTable;
     OPTIE  PowerConstraints;
     OPTIE  ChanSwitchAnn;
+    OPTIE  ext_chan_switch_ann;
     OPTIE  Quiet;
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
