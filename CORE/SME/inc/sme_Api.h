@@ -4115,4 +4115,8 @@ eHalStatus sme_disable_non_fcc_channel(tHalHandle hHal,
 				       bool fcc_constraint);
 bool smeNeighborRoamIsHandoffInProgress(tHalHandle hHal, tANI_U8 sessionId);
 
+eHalStatus sme_set_lost_link_info_cb(tHalHandle hal,
+                                     void (*cb)(void *,
+                                                struct sir_lost_link_info *));
+
 #endif //#if !defined( __SME_API_H )

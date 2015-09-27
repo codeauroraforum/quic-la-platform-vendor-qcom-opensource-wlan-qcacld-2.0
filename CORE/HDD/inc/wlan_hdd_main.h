@@ -923,6 +923,7 @@ struct hdd_adapter_s
 #endif
 
    v_S7_t rssi;
+   int8_t rssi_on_disconnect;
 #ifdef WLAN_FEATURE_LPSS
    v_BOOL_t rssi_send;
 #endif

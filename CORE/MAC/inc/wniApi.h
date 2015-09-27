@@ -398,6 +398,7 @@ enum eWniMsgTypes
     eWNI_SME_EPNO_NETWORK_FOUND_IND,
 #endif
     eWNI_SME_FW_DUMP_IND,
+    eWNI_SME_LOST_LINK_INFO_IND,
     eWNI_SME_MSG_TYPES_END
 };
 

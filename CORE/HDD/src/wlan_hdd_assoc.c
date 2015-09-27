@@ -1003,9 +1003,10 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
                 {
                     cfg80211_disconnected(dev, WLAN_REASON_UNSPECIFIED, NULL, 0, GFP_KERNEL);
                  }
-                hddLog(LOG2,
-                       FL("sent disconnected event to nl80211, rssi: %d"),
-                       pAdapter->rssi);
+                hddLog(VOS_TRACE_LEVEL_INFO_HIGH,
+                       FL("sent disconnected event to nl80211, reason code %d"),
+                          (eCSR_ROAM_LOSTLINK == roamStatus) ?
+                          pRoamInfo->reasonCode : WLAN_REASON_UNSPECIFIED);
             }
             //If the Device Mode is Station
             // and the P2P Client is Connected
