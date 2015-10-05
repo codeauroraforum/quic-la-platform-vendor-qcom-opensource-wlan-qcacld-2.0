@@ -13056,10 +13056,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    }
 
    mutex_init(&pHddCtx->sap_lock);
-
-   pHddCtx->isLoadInProgress = FALSE;
    pHddCtx->wifi_turn_on_time_since_boot = adf_get_boottime();
-
 #if defined(CONFIG_HDD_INIT_WITH_RTNL_LOCK)
    if (rtnl_lock_enable == TRUE) {
       rtnl_lock_enable = FALSE;
@@ -13085,8 +13082,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
            "qcom_sap_wakelock");
 
    hdd_hostapd_channel_wakelock_init(pHddCtx);
-
-   vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
 
    // Initialize the restart logic
    wlan_hdd_restart_init(pHddCtx);
@@ -13208,6 +13203,8 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    hdd_init_auto_suspend_timer(pHddCtx);
    hdd_start_auto_suspend_attempt(pHddCtx, false);
 
+   pHddCtx->isLoadInProgress = FALSE;
+   vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    complete(&wlan_start_comp);
    goto success;
 
