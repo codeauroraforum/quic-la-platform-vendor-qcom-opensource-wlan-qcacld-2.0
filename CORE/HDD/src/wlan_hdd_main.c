@@ -11999,6 +11999,14 @@ static int hdd_driver_init( void)
 
    ENTER();
 
+#ifdef TIMER_MANAGER
+      vos_timer_manager_init();
+#endif
+
+#ifdef MEMORY_DEBUG
+      vos_mem_init();
+#endif
+
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
    hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
    /*
@@ -12038,14 +12046,6 @@ static int hdd_driver_init( void)
          }
          return ret_status;
       }
-#endif
-
-#ifdef TIMER_MANAGER
-      vos_timer_manager_init();
-#endif
-
-#ifdef MEMORY_DEBUG
-      vos_mem_init();
 #endif
 
       /* Preopen VOSS so that it is ready to start at least SAL */
