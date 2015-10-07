@@ -14849,7 +14849,8 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
     if (req->channel) {
         status = wlan_hdd_cfg80211_connect_start(pAdapter, req->ssid,
                                                   req->ssid_len, req->bssid,
-                          #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0))
+                          #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0)) || \
+                                           defined(CFG80211_BSSID_HINT_BACKPORT)
                                                   req->bssid_hint,
                           #else
                                                   NULL,
@@ -14858,7 +14859,8 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
     } else {
         status = wlan_hdd_cfg80211_connect_start(pAdapter, req->ssid,
                                                   req->ssid_len, req->bssid,
-                          #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0))
+                          #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,15,0)) || \
+                                           defined(CFG80211_BSSID_HINT_BACKPORT)
                                                   req->bssid_hint,
                           #else
                                                   NULL,
