@@ -11683,7 +11683,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 
    mutex_init(&pHddCtx->sap_lock);
 
-   pHddCtx->isLoadInProgress = FALSE;
    pHddCtx->wifi_turn_on_time_since_boot = vos_get_monotonic_boottime();
 
 #ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
@@ -11696,8 +11695,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
            "qcom_sap_wakelock");
 
    hdd_hostapd_channel_wakelock_init(pHddCtx);
-
-   vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
 
    // Initialize the restart logic
    wlan_hdd_restart_init(pHddCtx);
@@ -11836,7 +11833,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
     * So that we can reconfigure the offload parameters
     */
    hdd_wlan_register_ip6_notifier(pHddCtx);
-
    /*
     * Register IPv4 notifier to notify if any change in IP
     * So that we can reconfigure the offload parameters
@@ -11848,7 +11844,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    else
       hddLog(LOGE, FL("Registered IPv4 notifier"));
 
+   pHddCtx->isLoadInProgress = FALSE;
+   vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    complete(&wlan_start_comp);
+
    goto success;
 
 err_nl_srv:
