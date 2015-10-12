@@ -617,6 +617,4 @@ void lim_set_vht_caps(tpAniSirGlobal p_mac,
 #endif /* WLAN_FEATURE_11AC */
 
 void lim_set_stads_rtt_cap(tpDphHashNode sta_ds, struct s_ext_cap *ext_cap);
-eHalStatus lim_send_ext_cap_ie(tpAniSirGlobal mac_ctx,
-			       uint32_t session_id);
 #endif /* __LIM_UTILS_H */
