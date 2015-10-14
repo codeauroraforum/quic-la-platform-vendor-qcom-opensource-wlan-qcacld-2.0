@@ -19594,6 +19594,9 @@ pdev_resume:
 	/* unpause the vdev if left paused and hif_pci_suspend fails */
 	wma_unpause_vdev(wma);
 
+	if (runtime_pm)
+		vos_runtime_pm_allow_suspend();
+
 	return ret;
 }
 
@@ -19921,6 +19924,7 @@ static VOS_STATUS wma_suspend_req(tp_wma_handle wma, tpSirWlanSuspendParam info)
 
 	if (info == NULL) {
 		WMA_LOGD("runtime PM: Request to suspend all interfaces");
+		wmi_set_runtime_pm_inprogress(wma->wmi_handle, TRUE);
 		goto suspend_all_iface;
 	}
 
@@ -20078,7 +20082,6 @@ send_ready_to_suspend:
 	wma_set_wow_bus_suspend(wma, 1);
 
 	wma_send_status_to_suspend_ind(wma, TRUE, info == NULL);
-
 
 	return VOS_STATUS_SUCCESS;
 }
@@ -29977,7 +29980,6 @@ int wma_runtime_suspend_req(WMA_HANDLE handle)
 	int ret = 0;
 	tp_wma_handle wma = (tp_wma_handle) handle;
 
-	wmi_set_runtime_pm_inprogress(wma->wmi_handle, TRUE);
 	vos_event_reset(&wma->runtime_suspend);
 
 	vosMessage.bodyptr = NULL;
@@ -29986,7 +29988,7 @@ int wma_runtime_suspend_req(WMA_HANDLE handle)
 
 	if (!VOS_IS_STATUS_SUCCESS(vosStatus)) {
 		ret = -EAGAIN;
-		goto out;
+		return ret;
 	}
 
 	if (vos_wait_single_event(&wma->runtime_suspend,
@@ -29994,7 +29996,6 @@ int wma_runtime_suspend_req(WMA_HANDLE handle)
 			VOS_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get runtime suspend event");
 		ret = -EAGAIN;
-		wma_runtime_resume_req(wma);
 		goto out;
 	}
 
@@ -30006,7 +30007,8 @@ int wma_runtime_suspend_req(WMA_HANDLE handle)
 	}
 out:
 	if (ret)
-		wmi_set_runtime_pm_inprogress(wma->wmi_handle, FALSE);
+		wma_runtime_resume_req(wma);
+
 	return ret;
 }
 
@@ -30016,6 +30018,8 @@ int wma_runtime_resume_req(WMA_HANDLE handle)
 	VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
 	int ret = 0;
 
+	vos_runtime_pm_prevent_suspend();
+
 	vosMessage.bodyptr = NULL;
 	vosMessage.type    = WDA_RUNTIME_PM_RESUME_IND;
 	vosStatus = vos_mq_post_message(VOS_MQ_ID_WDA, &vosMessage );
@@ -30023,6 +30027,7 @@ int wma_runtime_resume_req(WMA_HANDLE handle)
 	if (!VOS_IS_STATUS_SUCCESS(vosStatus)) {
 		WMA_LOGE("Failed to post Runtime PM Resume IND to VOS");
 		ret = -EAGAIN;
+		vos_runtime_pm_allow_suspend();
 	}
 
 	return ret;
