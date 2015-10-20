@@ -657,7 +657,7 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle,
     // Fill the channel number in the spectrum in the operating freq band
     for (channelnum = 0;
             channelnum < pSpectInfoParams->numSpectChans;
-                channelnum++, pChans++) {
+                channelnum++, pChans++, pSpectCh++) {
         chSafe = VOS_TRUE;
 
         /* check if the channel is in NOL blacklist */
@@ -698,7 +698,6 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle,
         if(*pChans == 14 &&
                eCSR_DOT11_MODE_11b != pSapCtx->csrRoamProfile.phyMode)
         {
-            pSpectCh++;
             continue;
         }
 
@@ -709,7 +708,6 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle,
             pSpectCh->rssiAgr = SOFTAP_MIN_RSSI;// Initialise for all channels
             pSpectCh->channelWidth = SOFTAP_HT20_CHANNELWIDTH; // Initialise 20MHz for all the Channels
         }
-        pSpectCh++;
     }
     return eSAP_TRUE;
 }
