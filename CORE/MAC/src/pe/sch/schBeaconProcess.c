@@ -595,13 +595,6 @@ static void __schBeaconProcessForSession( tpAniSirGlobal      pMac,
                 }
                 limCheckVHTOpModeChange(pMac, psessionEntry,
                         chWidth, pStaDs->staIndex, pMh->sa);
-
-                /* Update Nss also */
-                if (pStaDs->vhtSupportedRxNss != (pBeacon->OperatingMode.rxNSS + 1)) {
-                    pStaDs->vhtSupportedRxNss = pBeacon->OperatingMode.rxNSS + 1;
-                    limSetNssChange( pMac, psessionEntry, pStaDs->vhtSupportedRxNss,
-                            pStaDs->staIndex, pMh->sa);
-                }
              }
           }
        }
