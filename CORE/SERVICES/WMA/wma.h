@@ -1564,6 +1564,14 @@ VOS_STATUS wma_vdev_start(tp_wma_handle wma, struct wma_vdev_start_req *req,
 
 void wma_remove_vdev_req(tp_wma_handle wma, u_int8_t vdev_id, u_int8_t type);
 
+/* API's to enable HDD to suspsend FW.
+ * This are active only if Bus Layer aggreed to suspend.
+ * This will be called for only for SDIO driver, for others
+ * by default HIF return failure, as we suspend FW in bus
+ * suspend callbacks
+ */
+int wma_suspend_fw(void);
+int wma_resume_fw(void);
 struct wma_txrx_node *wma_get_interface_by_vdev_id(uint8_t vdev_id);
 bool wma_is_vdev_up(uint8_t vdev_id);
 

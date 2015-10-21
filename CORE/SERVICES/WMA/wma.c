@@ -27646,3 +27646,77 @@ bool wma_is_vdev_up(uint8_t vdev_id)
 	else
 		return false;
 }
+
+/*
+ * wma_suspend_fw() - API to suspend FW
+ *
+ * The API will be called only for SDIO driver from HDD, for other drivers
+ * by default HIF return failure, FW suspend happens in bus suspend callbacks.
+ *
+ * Return : int
+ */
+int wma_suspend_fw(void)
+{
+	int ret = 0;
+	int is_wow_enabled;
+
+	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA,
+			vos_get_global_context(VOS_MODULE_ID_VOSS, NULL));
+
+	if (!wma)
+		return -EINVAL;
+
+	is_wow_enabled = wma_is_wow_mode_selected(wma);
+	if (is_wow_enabled)
+		ret = wma_enable_wow_in_fw(wma);
+	else
+		ret = wma_suspend_target(wma, 0);
+
+	if (ret) {
+		pr_err("%s: %s suspend failed\n", __func__,
+				is_wow_enabled ? "wow" : "pdev");
+		return ret;
+	}
+
+	pr_debug("%s: %s suspend successful\n", __func__,
+				is_wow_enabled ? "wow" : "pdev");
+
+	return ret;
+}
+
+/*
+ * wma_resume_fw() - API to resume FW
+ *
+ * The API will be called only for SDIO driver from HDD, for other drivers
+ * by default HIF return failure, FW resume happens in bus resume callbacks.
+ *
+ * Return : int
+ */
+int wma_resume_fw(void)
+{
+	int ret = 0;
+	int is_wow_enabled;
+
+	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA,
+			vos_get_global_context(VOS_MODULE_ID_VOSS, NULL));
+
+	if (!wma)
+		return -EINVAL;
+
+	is_wow_enabled = wma_is_wow_mode_selected(wma);
+	if (is_wow_enabled)
+		ret = wma_disable_wow_in_fw(wma);
+	else
+		ret = wma_resume_target(wma);
+
+	if (ret) {
+		pr_err("%s: %s resume failed\n", __func__,
+				is_wow_enabled ? "wow" : "pdev");
+		return ret;
+	}
+
+	pr_debug("%s: %s resume successful\n", __func__,
+			is_wow_enabled ? "wow" : "pdev");
+
+	return ret;
+}

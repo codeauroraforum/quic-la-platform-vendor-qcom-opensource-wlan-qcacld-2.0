@@ -822,6 +822,16 @@ void HIFIpaGetCEResource(HIF_DEVICE *hif_device,
 #endif /* IPA_UC_OFFLOAD */
 
 void HIFSetMailboxSwap(HIF_DEVICE  *device);
+
+int hif_register_driver(void);
+void hif_unregister_driver(void);
+/* The API's check if FW can be suspended as part of cfg80211 suspend.
+ * This is done for SDIO drivers, for other bus types it's NO OP, they
+ * enable/disable wow in bus suspend callback.
+ * In SDIO driver bus suspend host will configure 4 bit sdio mode to
+ * 1 bit sdio mode and set the appropriate host flags.
+ */
+bool hif_is_80211_fw_wow_required(void);
 #ifdef __cplusplus
 }
 #endif
