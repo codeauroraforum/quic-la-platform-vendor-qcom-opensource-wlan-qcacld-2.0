@@ -62,7 +62,7 @@
 /* OL_TXRX_NUM_EXT_TIDS -
  * 16 "real" TIDs + 3 pseudo-TIDs for mgmt, mcast/bcast & non-QoS data
  */
-#define OL_TXRX_NUM_EXT_TIDS 19
+#define OL_TXRX_NUM_EXT_TIDS 31
 
 #define OL_TX_NUM_QOS_TIDS 16 /* 16 regular TIDs */
 #define OL_TX_NON_QOS_TID 16
