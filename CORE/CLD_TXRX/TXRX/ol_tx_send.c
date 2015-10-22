@@ -573,7 +573,7 @@ ol_tx_completion_handler(
     }
 
     /* One shot protected access to pdev freelist, when setup */
-    if (lcl_freelist) {
+    if (lcl_freelist && tx_desc_last) {
         adf_os_spin_lock(&pdev->tx_mutex);
         tx_desc_last->next = pdev->tx_desc.freelist;
         pdev->tx_desc.freelist = lcl_freelist;
@@ -816,7 +816,7 @@ ol_tx_inspect_handler(
         }
     }
 
-    if (lcl_freelist) {
+    if (lcl_freelist && tx_desc_last) {
         adf_os_spin_lock(&pdev->tx_mutex);
         tx_desc_last->next = pdev->tx_desc.freelist;
         pdev->tx_desc.freelist = lcl_freelist;
