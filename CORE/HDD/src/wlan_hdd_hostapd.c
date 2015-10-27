@@ -3897,6 +3897,7 @@ static int iw_softap_setwpsie(struct net_device *dev,
    u_int8_t WPSIeType;
    u_int16_t length;
    struct iw_point s_priv_data;
+   int ret = 0;
 
    ENTER();
 
@@ -3948,9 +3949,8 @@ static int iw_softap_setwpsie(struct net_device *dev,
          case DOT11F_EID_WPA:
             if (wps_genie[1] < 2 + 4)
             {
-               vos_mem_free(pSap_WPSIe);
-               kfree(fwps_genie);
-               return -EINVAL;
+                ret = -EINVAL;
+                goto exit;
             }
             else if (memcmp(&wps_genie[2], "\x00\x50\xf2\x04", 4) == 0)
             {
@@ -4008,6 +4008,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length > sizeof(pSap_WPSIe->sapwpsie.sapWPSBeaconIE.UUID_E))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSBeaconIE.UUID_E, pos, length);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_UUIDE_PRESENT;
                       pos += length;
@@ -4022,9 +4027,8 @@ static int iw_softap_setwpsie(struct net_device *dev,
 
                    default:
                       hddLog (LOGW, "UNKNOWN TLV in WPS IE(%x)", (*pos<<8 | *(pos+1)));
-                      vos_mem_free(pSap_WPSIe);
-                      kfree(fwps_genie);
-                      return -EINVAL;
+                      ret = -EINVAL;
+                      goto exit;
                 }
               }
             }
@@ -4036,9 +4040,8 @@ static int iw_softap_setwpsie(struct net_device *dev,
 
          default:
             hddLog (LOGE, "%s Set UNKNOWN IE %X",__func__, wps_genie[0]);
-            vos_mem_free(pSap_WPSIe);
-            kfree(fwps_genie);
-            return 0;
+            ret = -EINVAL;
+            goto exit;
       }
     }
     else if( wps_genie[0] == eQC_WPS_PROBE_RSP_IE)
@@ -4050,9 +4053,8 @@ static int iw_softap_setwpsie(struct net_device *dev,
          case DOT11F_EID_WPA:
             if (wps_genie[1] < 2 + 4)
             {
-               vos_mem_free(pSap_WPSIe);
-               kfree(fwps_genie);
-               return -EINVAL;
+                ret = -EINVAL;
+                goto exit;
             }
             else if (memcmp(&wps_genie[2], "\x00\x50\xf2\x04", 4) == 0)
             {
@@ -4116,6 +4118,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length > (sizeof(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.UUID_E)))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.UUID_E, pos, length);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_UUIDE_PRESENT;
                       pos += length;
@@ -4125,6 +4132,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length >  (sizeof(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.Manufacture.name)))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.Manufacture.num_name = length;
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.Manufacture.name, pos, length);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_MANUFACTURE_PRESENT;
@@ -4135,6 +4147,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length > (sizeof(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ModelName.text)))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ModelName.num_text = length;
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ModelName.text, pos, length);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_MODELNAME_PRESENT;
@@ -4144,6 +4161,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length > (sizeof(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ModelNumber.text)))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ModelNumber.num_text = length;
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ModelNumber.text, pos, length);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_MODELNUMBER_PRESENT;
@@ -4153,6 +4175,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length > (sizeof(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SerialNumber.text)))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SerialNumber.num_text = length;
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SerialNumber.text, pos, length);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_SERIALNUMBER_PRESENT;
@@ -4176,6 +4203,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
                       pos += 2;
                       length = *pos<<8 | *(pos+1);
                       pos += 2;
+                      if (length > (sizeof(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DeviceName.text)))
+                      {
+                          ret = -EINVAL;
+                          goto exit;
+                      }
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DeviceName.num_text = length;
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DeviceName.text, pos, length);
                       pos += length;
@@ -4212,6 +4244,8 @@ static int iw_softap_setwpsie(struct net_device *dev,
 #else
     halStatus = WLANSAP_Set_WpsIe(pVosContext, pSap_WPSIe);
 #endif
+    if (halStatus != eHAL_STATUS_SUCCESS)
+        ret = -EINVAL;
     pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(pHostapdAdapter);
     if( pHostapdState->bCommit && WPSIeType == eQC_WPS_PROBE_RSP_IE)
     {
@@ -4223,11 +4257,11 @@ static int iw_softap_setwpsie(struct net_device *dev,
         WLANSAP_Update_WpsIe ( pVosContext );
 #endif
     }
-
+exit:
     vos_mem_free(pSap_WPSIe);
     kfree(fwps_genie);
     EXIT();
-    return halStatus;
+    return ret;
 }
 
 static int iw_softap_stopbss(struct net_device *dev,
