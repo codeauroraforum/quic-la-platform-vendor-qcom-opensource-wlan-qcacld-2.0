@@ -4399,4 +4399,7 @@ eHalStatus sme_set_lost_link_info_cb(tHalHandle hal,
                                      void (*cb)(void *,
                                                 struct sir_lost_link_info *));
 
+eHalStatus sme_roam_set_default_key_index(tHalHandle hal, uint8_t session_id,
+					uint8_t default_idx);
+
 #endif //#if !defined( __SME_API_H )
