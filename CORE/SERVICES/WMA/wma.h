@@ -1619,4 +1619,7 @@ void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle);
 
 int wma_crash_inject(tp_wma_handle wma_handle, uint32_t type,
 			uint32_t delay_time_ms);
+
+uint32_t wma_get_vht_ch_width(void);
+
 #endif
