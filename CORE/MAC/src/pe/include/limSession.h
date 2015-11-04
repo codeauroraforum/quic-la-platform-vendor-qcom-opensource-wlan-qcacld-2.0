@@ -582,6 +582,21 @@ tpPESession peFindSessionByPeerSta(tpAniSirGlobal pMac, tANI_U8*  sa, tANI_U8* s
  tpPESession peFindSessionBySessionId(tpAniSirGlobal pMac , tANI_U8 sessionId);
 
 /*--------------------------------------------------------------------------
+  \brief pe_find_session_by_sme_session_id() - looks up the PE session given the session ID.
+
+  This function returns the session context  if the session
+  corresponding to the given session ID is found in the PE session table.
+
+  \param mac_ctx                   - pointer to global adapter context
+  \param sme_session_id            -session ID for which session context needs to be looked up.
+
+  \return tpPESession          - pointer to the session context or NULL if session is not found.
+
+  \sa
+  --------------------------------------------------------------------------*/
+ tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,tANI_U8 sme_session_id);
+
+/*--------------------------------------------------------------------------
   \brief peFindSessionByBssid() - looks up the PE session given staid.
 
   This function returns the session context and the session ID if the session

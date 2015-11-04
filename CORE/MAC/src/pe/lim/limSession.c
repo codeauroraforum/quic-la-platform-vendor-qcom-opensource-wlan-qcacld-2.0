@@ -474,6 +474,35 @@ tpPESession peFindSessionByBssIdx(tpAniSirGlobal pMac,  tANI_U8 bssIdx)
 
 }
 
+/*--------------------------------------------------------------------------
+  \brief pe_find_session_by_sme_session_id() - looks up the PE session given the session ID.
+
+  This function returns the session context  if the session
+  corresponding to the given session ID is found in the PE session table.
+
+  \param mac_ctx               - pointer to global adapter context
+  \param sme_session_id        -session ID for which session context needs to be looked up.
+
+  \return tpPESession          - pointer to the session context or NULL if session is not found.
+
+  \sa
+  --------------------------------------------------------------------------*/
+tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,
+                                                tANI_U8 sme_session_id)
+{
+    uint8_t i;
+    for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
+       if ( (mac_ctx->lim.gpSession[i].valid) &&
+           (mac_ctx->lim.gpSession[i].smeSessionId ==
+             sme_session_id) ) {
+           return &mac_ctx->lim.gpSession[i];
+       }
+    }
+    limLog(mac_ctx, LOG4,
+         FL("Session lookup fails for smeSessionID: %d"),
+             sme_session_id);
+    return NULL;
+}
 
 /*--------------------------------------------------------------------------
   \brief peFindSessionByStaId() - looks up the PE session given staid.
