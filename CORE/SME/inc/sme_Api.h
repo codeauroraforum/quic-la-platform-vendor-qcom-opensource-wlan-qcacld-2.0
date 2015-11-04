@@ -4273,4 +4273,8 @@ eHalStatus sme_set_mas(tANI_U32 val);
 eHalStatus sme_set_miracast(tHalHandle hal, uint8_t filter_type);
 
 void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
+
+eHalStatus sme_roam_set_default_key_index(tHalHandle hal, uint8_t session_id,
+					uint8_t default_idx);
+
 #endif //#if !defined( __SME_API_H )
