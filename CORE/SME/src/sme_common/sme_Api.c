@@ -4456,6 +4456,8 @@ eHalStatus sme_GetConfigParam(tHalHandle hHal, tSmeConfigParams *pParam)
       pParam->enable_bus_auto_suspend = pMac->sme.enable_bus_auto_suspend;
 #endif
       pParam->f_prefer_non_dfs_on_radar = pMac->f_prefer_non_dfs_on_radar;
+      pParam->csrConfig.mcc_rts_cts_prot_enable =
+          pMac->roam.configParam.mcc_rts_cts_prot_enable;
       sme_ReleaseGlobalLock( &pMac->sme );
    }
 
