@@ -546,6 +546,7 @@ struct wma_txrx_node {
 	void *plink_status_req;
 	void *psnr_req;
 	u_int8_t delay_before_vdev_stop;
+	uint8_t wep_default_key_idx;
 };
 
 #if defined(QCA_WIFI_FTM)
