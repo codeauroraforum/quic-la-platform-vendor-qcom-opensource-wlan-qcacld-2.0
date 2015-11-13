@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -90,71 +90,6 @@ static eHalStatus hdd_OemDataReqCallback(tHalHandle hHal,
     wireless_send_event(dev, IWEVCUSTOM, &wrqu, buffer);
 
     return status;
-}
-
-/**--------------------------------------------------------------------------------------------
-
-  \brief iw_get_oem_data_rsp() -
-
-  This function gets the oem data response. This invokes
-  the respective sme functionality. Function for handling the oem data rsp
-  IOCTL
-
-  \param - dev  - Pointer to the net device
-         - info - Pointer to the iw_oem_data_req
-         - wrqu - Pointer to the iwreq data
-         - extra - Pointer to the data
-
-  \return - 0 for success, non zero for failure
-
------------------------------------------------------------------------------------------------*/
-int iw_get_oem_data_rsp(
-        struct net_device *dev,
-        struct iw_request_info *info,
-        union iwreq_data *wrqu,
-        char *extra)
-{
-    int                                   rc = 0;
-    eHalStatus                            status;
-    struct iw_oem_data_rsp*               pHddOemDataRsp;
-    tOemDataRsp*                          pSmeOemDataRsp;
-
-    hdd_adapter_t *pAdapter = (netdev_priv(dev));
-
-    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
-    {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                                  "%s:LOGP in Progress. Ignore!!!",__func__);
-       return -EBUSY;
-    }
-
-    do
-    {
-        //get the oem data response from sme
-        status = sme_getOemDataRsp(WLAN_HDD_GET_HAL_CTX(pAdapter), &pSmeOemDataRsp);
-        if (status != eHAL_STATUS_SUCCESS)
-        {
-            hddLog(LOGE, "%s: failed in sme_getOemDataRsp", __func__);
-            rc = -EIO;
-            break;
-        }
-        else
-        {
-            if (pSmeOemDataRsp != NULL)
-            {
-                pHddOemDataRsp = (struct iw_oem_data_rsp*)(extra);
-                vos_mem_copy(pHddOemDataRsp->oemDataRsp, pSmeOemDataRsp->oemDataRsp, OEM_DATA_RSP_SIZE);
-            }
-            else
-            {
-                hddLog(LOGE, "%s: pSmeOemDataRsp = NULL", __func__);
-                rc = -EIO;
-                break;
-            }
-        }
-    } while(0);
-
-    return rc;
 }
 
 /**---------------------------------------------------------------------------

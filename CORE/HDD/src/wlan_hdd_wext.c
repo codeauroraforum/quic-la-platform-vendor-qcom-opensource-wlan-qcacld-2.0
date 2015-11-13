@@ -107,9 +107,6 @@
 #include "wlan_hdd_cfg80211.h"
 #endif
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-#define MAX_OEM_DATA_RSP_LEN            2047
-#endif
 #include "vos_nvitem.h"
 
 #define HDD_FINISH_ULA_TIME_OUT         800
@@ -395,11 +392,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 /* (SIOCIWFIRSTPRIV + 14) is currently unused */
 /* (SIOCIWFIRSTPRIV + 15) is currently unused */
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-/* Private ioctls for setting the measurement configuration */
 /* (SIOCIWFIRSTPRIV + 17) is currently unused */
-#define WLAN_PRIV_GET_OEM_DATA_RSP (SIOCIWFIRSTPRIV + 19)
-#endif
+/* (SIOCIWFIRSTPRIV + 19) is currently unused */
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
 #define WLAN_PRIV_SET_FTIES             (SIOCIWFIRSTPRIV + 20)
@@ -9914,9 +9908,6 @@ static const iw_handler we_private[] = {
    [WLAN_PRIV_ADD_TSPEC             - SIOCIWFIRSTPRIV]   = iw_add_tspec,
    [WLAN_PRIV_DEL_TSPEC             - SIOCIWFIRSTPRIV]   = iw_del_tspec,
    [WLAN_PRIV_GET_TSPEC             - SIOCIWFIRSTPRIV]   = iw_get_tspec,
-#ifdef FEATURE_OEM_DATA_SUPPORT
-   [WLAN_PRIV_GET_OEM_DATA_RSP - SIOCIWFIRSTPRIV] = iw_get_oem_data_rsp, //oem data req Specifc
-#endif
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
    [WLAN_PRIV_SET_FTIES                 - SIOCIWFIRSTPRIV]   = iw_set_fties,
@@ -10861,15 +10852,6 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "getTspec" },
-
-#ifdef FEATURE_OEM_DATA_SUPPORT
-    /* handlers for main ioctl - OEM DATA */
-    {
-        WLAN_PRIV_GET_OEM_DATA_RSP,
-        0,
-        IW_PRIV_TYPE_BYTE | MAX_OEM_DATA_RSP_LEN,
-        "get_oem_data_rsp" },
-#endif
 
     /* handlers for main ioctl - host offload */
     {
