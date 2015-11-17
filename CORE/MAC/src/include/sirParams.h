@@ -703,6 +703,8 @@ typedef struct sSirMbMsgP2p
 
 #define SIR_HAL_UPDATE_WEP_DEFAULT_KEY      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 337)
 
+#define SIR_HAL_GET_RSSI                   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 338)
+
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types
