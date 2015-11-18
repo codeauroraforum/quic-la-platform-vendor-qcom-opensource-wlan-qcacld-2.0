@@ -9887,6 +9887,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
                              moduleLoglevel,
                              &numEntries,
                              FW_MODULE_LOG_LEVEL_STRING_LENGTH);
+
      while (count < numEntries)
      {
          /* FW module log level input string looks like below:
@@ -9919,6 +9920,12 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
   }
 
 #endif
+
+     ret = process_wma_set_command((int)pAdapter->sessionId,
+                                (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
+                                pHddCtx->cfg_ini->rts_profile, VDEV_CMD);
+     if (ret != 0)
+        hddLog(LOGE, "FAILED TO SET RTSCTS Profile ret:%d", ret);
 
 
    return pAdapter;
