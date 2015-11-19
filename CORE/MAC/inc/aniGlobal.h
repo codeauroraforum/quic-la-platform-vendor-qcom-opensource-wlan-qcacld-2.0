@@ -977,6 +977,7 @@ typedef struct sMacOpenParameters
     tANI_U32 ucTxPartitionBase;
 #endif /* IPA_UC_OFFLOAD */
     uint16_t  max_mgmt_tx_fail_count;
+    bool force_target_assert_enabled;
 } tMacOpenParameters;
 
 typedef struct sHalMacStartParameters
