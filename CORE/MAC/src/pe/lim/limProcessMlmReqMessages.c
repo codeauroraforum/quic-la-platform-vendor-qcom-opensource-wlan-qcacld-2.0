@@ -2923,18 +2923,15 @@ limProcessMlmDisassocReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_
         pStaDs->mlmStaContext.mlmState   = eLIM_MLM_WT_DEL_STA_RSP_STATE;
 
         limSendDisassocMgmtFrame(pMac,
-                                 pMlmDisassocReq->reasonCode,
-                                 pMlmDisassocReq->peerMacAddr,
-                                 psessionEntry, FALSE);
-
-        /* Send Disassoc CNF and receive path cleanup */
-        limSendDisassocCnf(pMac);
-	/*
-	 * Abort Tx so that data frames won't be sent to the AP
-	 * after sending Disassoc.
-	 */
-	if (LIM_IS_STA_ROLE(psessionEntry))
-		WDA_TxAbort(psessionEntry->smeSessionId);
+                             pMlmDisassocReq->reasonCode,
+                             pMlmDisassocReq->peerMacAddr,
+                             psessionEntry, TRUE);
+        /*
+         * Abort Tx so that data frames won't be sent to the AP
+         * after sending Disassoc.
+         */
+         if (LIM_IS_STA_ROLE(psessionEntry))
+               WDA_TxAbort(psessionEntry->smeSessionId);
     }
     else
     {
