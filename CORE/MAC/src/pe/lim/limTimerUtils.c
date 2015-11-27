@@ -571,6 +571,7 @@ limCreateTimers(tpAniSirGlobal pMac)
     pMac->lim.gLimPreAuthTimerTable.pTable = vos_mem_malloc(cfgValue*sizeof(tLimPreAuthNode));
     if(pMac->lim.gLimPreAuthTimerTable.pTable == NULL)
     {
+        pMac->lim.gLimPreAuthTimerTable.numEntry = 0;
         limLog(pMac, LOGP, FL("AllocateMemory failed!"));
         goto err_timer;
     }
