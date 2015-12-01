@@ -1114,7 +1114,6 @@ sapMarkChannelsLeakingIntoNOL(ptSapContext sapContext,
                                   dfs_nol_channel,
                                   pTempChannelList[j]);
                         pTempChannelList[j] = 0;
-                        break;
                     }
                     j++;
                     k++;
