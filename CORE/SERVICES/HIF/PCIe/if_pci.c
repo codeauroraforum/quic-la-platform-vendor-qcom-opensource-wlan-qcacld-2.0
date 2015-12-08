@@ -1719,8 +1719,10 @@ void hif_pci_shutdown(struct pci_dev *pdev)
     if (!vos_is_ssr_ready(__func__))
         printk("Host driver is not ready for SSR, attempting anyway\n");
 
-    if (!WLAN_IS_EPPING_ENABLED(vos_get_conparam()))
+    if (!WLAN_IS_EPPING_ENABLED(vos_get_conparam())) {
+        hif_disable_isr(scn);
         hdd_wlan_shutdown();
+    }
 
     mem = (void __iomem *)sc->mem;
 

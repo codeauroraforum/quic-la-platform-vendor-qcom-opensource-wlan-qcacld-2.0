@@ -1932,8 +1932,6 @@ VOS_STATUS hdd_wlan_shutdown(void)
        VOS_ASSERT(0);
    }
 
-   hif_disable_isr(((VosContextType*)pVosContext)->pHIFContext);
-
    hdd_unregister_mcast_bcast_filter(pHddCtx);
 
    hddLog(VOS_TRACE_LEVEL_INFO, "%s: Flush Queues",__func__);
@@ -2172,6 +2170,8 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
 
    pHddCtx->isLogpInProgress = FALSE;
    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
+   /* Register TM level change handler function to the platform */
+   hddDevTmRegisterNotifyCallback(pHddCtx);
    pHddCtx->hdd_mcastbcast_filter_set = FALSE;
    hdd_register_mcast_bcast_filter(pHddCtx);
    hdd_ssr_timer_del();
