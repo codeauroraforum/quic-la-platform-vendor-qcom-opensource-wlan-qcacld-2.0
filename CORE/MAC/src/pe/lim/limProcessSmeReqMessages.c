@@ -3746,10 +3746,6 @@ void limProcessSmeGetWPSPBCSessions(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     sapEvent.sapevt.sapGetWPSPBCSessionEvent.status = VOS_STATUS_E_FAULT;
 
-    /* initial to some pointers to null */
-    GetWPSPBCSessionsReq.pSapEventCallback = NULL;
-    GetWPSPBCSessionsReq.pUsrContext = NULL;
-
     if (limIsSmeGetWPSPBCSessionsReqValid(pMac,  &GetWPSPBCSessionsReq, (tANI_U8 *) pMsgBuf) != eSIR_SUCCESS)
     {
         limLog(pMac, LOGE,
