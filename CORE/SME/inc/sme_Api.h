@@ -4138,6 +4138,9 @@ bool sme_validate_sap_channel_switch(tHalHandle hal,
 					uint8_t cc_switch_mode,
 					uint32_t session_id);
 
+eHalStatus sme_register_mgmt_frame_ind_callback(tHalHandle hal,
+      sir_mgmt_frame_ind_callback callback);
+
 void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
 void sme_set_pdev_ht_vht_ies(tHalHandle hHal, bool enable2x2);
 

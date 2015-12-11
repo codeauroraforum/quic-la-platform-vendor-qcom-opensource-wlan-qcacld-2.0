@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -406,11 +406,6 @@ WLANSAP_RoamCallback
                        __func__, "eCSR_ROAM_WPS_PBC_PROBE_REQ_IND", roamStatus);
             break;
 
-        case eCSR_ROAM_INDICATE_MGMT_FRAME:
-            sapSignalHDDevent(sapContext, pCsrRoamInfo,
-                              eSAP_INDICATE_MGMT_FRAME,
-                              (v_PVOID_t) eSAP_STATUS_SUCCESS);
-            break;
         case eCSR_ROAM_REMAIN_CHAN_READY:
             sapSignalHDDevent(sapContext, pCsrRoamInfo,
                               eSAP_REMAIN_CHAN_READY,

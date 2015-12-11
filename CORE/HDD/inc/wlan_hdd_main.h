@@ -215,6 +215,9 @@
 
 #define HDD_MAC_ADDR_LEN    6
 #define HDD_SESSION_ID_ANY  50 //This should be same as CSR_SESSION_ID_ANY
+/* This should be same as CSR_ROAM_SESSION_MAX */
+#define HDD_SESSION_MAX  5
+
 
 #define HDD_MIN_TX_POWER (-100) // minimum tx power
 #define HDD_MAX_TX_POWER (+100)  // maximum tx power
@@ -1737,4 +1740,8 @@ static inline void wlan_hdd_stop_sap(hdd_adapter_t *ap_adapter) {}
 static inline void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter) {}
 #endif
 bool wlan_hdd_get_fw_state(hdd_adapter_t *adapter);
+void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind);
+hdd_adapter_t *hdd_get_adapter_by_sme_session_id(hdd_context_t *hdd_ctx,
+						uint32_t sme_session_id);
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

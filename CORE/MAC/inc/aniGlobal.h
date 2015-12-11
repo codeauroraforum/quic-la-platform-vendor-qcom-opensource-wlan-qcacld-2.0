@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1097,6 +1097,7 @@ typedef struct sAniSirGlobal
     bool per_band_chainmask_supp;
     struct vdev_type_nss vdev_type_nss_2g;
     struct vdev_type_nss vdev_type_nss_5g;
+    sir_mgmt_frame_ind_callback mgmt_frame_ind_cb;
 } tAniSirGlobal;
 
 typedef enum
