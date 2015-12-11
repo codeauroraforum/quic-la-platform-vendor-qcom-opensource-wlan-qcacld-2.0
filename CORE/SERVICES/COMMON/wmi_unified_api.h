@@ -139,6 +139,8 @@ wmi_get_pending_cmds(wmi_unified_t wmi_handle);
 void
 wmi_set_target_suspend(wmi_unified_t wmi_handle, A_BOOL val);
 
+void wmi_set_tgt_assert(wmi_unified_t wmi_handle, A_BOOL val);
+
 /**
  WMI API to set D0WOW flag
 */

@@ -9801,6 +9801,7 @@ int iw_set_two_ints_getnone(struct net_device *dev,
                             union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+    hdd_context_t *hdd_ctx = NULL;
     int *value = (int *)extra;
     int sub_cmd = value[0];
     int ret = 0;
@@ -9810,6 +9811,11 @@ int iw_set_two_ints_getnone(struct net_device *dev,
                                   "%s:LOGP in Progress. Ignore!!!", __func__);
         return -EBUSY;
     }
+
+    hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+
+    if (0 != wlan_hdd_validate_context(hdd_ctx))
+        return -EINVAL;
 
     switch(sub_cmd) {
     case WE_SET_SMPS_PARAM:
@@ -9821,6 +9827,10 @@ int iw_set_two_ints_getnone(struct net_device *dev,
 #ifdef DEBUG
     case WE_SET_FW_CRASH_INJECT:
         hddLog(LOGE, "WE_SET_FW_CRASH_INJECT: %d %d", value[1], value[2]);
+        if (!hdd_ctx->cfg_ini->crash_inject_enabled) {
+            hddLog(LOGE, "Crash Inject ini disabled, Ignore Crash Inject");
+            return 0;
+        }
         ret = process_wma_set_command_twoargs((int) pAdapter->sessionId,
                                               (int) GEN_PARAM_CRASH_INJECT,
                                               value[1], value[2], GEN_CMD);
