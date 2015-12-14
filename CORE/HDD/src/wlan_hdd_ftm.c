@@ -4867,6 +4867,13 @@ static int iw_ftm_setchar_getnone(struct net_device *dev, struct iw_request_info
     VOS_STATUS status;
     hdd_adapter_t *pAdapter;
 
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     ret =0;
     pointer = wrqu->data.pointer;
     length = wrqu->data.length;
