@@ -27220,25 +27220,6 @@ static VOS_STATUS wma_update_wep_default_key(tp_wma_handle wma,
 }
 
 /*
- * wma_update_wep_default_key - function to update default key id
- * @wma: pointer to wma handler
- * @update_def_key: pointer to wep_update_default_key_idx
- *
- * function makes a copy of default key index to txrx node
- *
- * return: Success
- */
-static VOS_STATUS wma_update_wep_default_key(tp_wma_handle wma,
-			struct wep_update_default_key_idx *update_def_key)
-{
-	struct wma_txrx_node *iface =
-		&wma->interfaces[update_def_key->session_id];
-	iface->wep_default_key_idx = update_def_key->default_idx;
-
-	return VOS_STATUS_SUCCESS;
-}
-
-/*
  * function   : wma_mc_process_msg
  * Description :
  * Args       :

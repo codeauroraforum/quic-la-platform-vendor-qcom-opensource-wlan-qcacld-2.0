@@ -6087,19 +6087,6 @@ typedef enum {
     (((roam_reason) & WMI_ROAM_SUBNET_CHANGE_STATUS_MASK) >> \
      WMI_ROAM_SUBNET_CHANGE_STATUS_SHIFT)
 
-
-/*
- * These will be used in WMI_ROAM_SYNCH_EVENTID for passing the subnet change
- * info. Once roaming happens, firmware checks if subnet has changed and
- * populates roam_reason field in WMI_ROAM_SYNCH_EVENTID using the definitions
- * below.
- */
-typedef enum {
-    WMI_ROAM_SUBNET_CHANGE_STATUS_UNKNOWN = 0,
-    WMI_ROAM_SUBNET_CHANGE_STATUS_UNCHANGED,
-    WMI_ROAM_SUBNET_CHANGE_STATUS_CHANGED,
-} wmi_roam_subnet_change_status;
-
 /**whenever RIC request information change, host driver should pass all ric related information to firmware (now only support tsepc)
 * Once, 11r roaming happens, firmware can generate RIC request in reassoc request based on these informations
 */

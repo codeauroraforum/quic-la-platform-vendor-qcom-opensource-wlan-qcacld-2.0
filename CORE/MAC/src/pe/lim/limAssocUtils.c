@@ -780,10 +780,6 @@ limSendDelStaCnf(tpAniSirGlobal pMac, tSirMacAddr staDsAddr,
        return;
     }
 
-    if((mlmStaContext.cleanupTrigger == eLIM_LINK_MONITORING_DISASSOC) ||
-       (mlmStaContext.cleanupTrigger == eLIM_LINK_MONITORING_DEAUTH))
-       return;
-
     if ((mlmStaContext.cleanupTrigger ==
                                       eLIM_HOST_DISASSOC) ||
         (mlmStaContext.cleanupTrigger ==
