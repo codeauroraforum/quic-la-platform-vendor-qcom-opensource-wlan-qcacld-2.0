@@ -3736,29 +3736,19 @@ static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile
                 }
             }
         }
-        if ( eCSR_CFG_DOT11_MODE_11G == cfgDot11Mode ||
-             eCSR_CFG_DOT11_MODE_11N == cfgDot11Mode ||
-             eCSR_CFG_DOT11_MODE_ABG == cfgDot11Mode
-#ifdef WLAN_FEATURE_11AC
-             || eCSR_CFG_DOT11_MODE_11AC == cfgDot11Mode
-#endif
-        )
-        {
-            // If there are Extended Rates in the beacon, we will reflect those
-            // extended rates that we support in out Extended Operational Rate
-            // set:
-            pDstRate = pExRateSet->rate;
-            if(pIes->ExtSuppRates.present)
-            {
-                for ( i = 0; i < pIes->ExtSuppRates.num_rates; i++ )
-                {
-                    if ( csrRatesIsDot11RateSupported( pMac, pIes->ExtSuppRates.rates[ i ] ) )
-                    {
-                        if (!csrCheckRateBitmap(pIes->ExtSuppRates.rates[ i ], rateBitmap))
-                        {
-                            *pDstRate++ = pIes->ExtSuppRates.rates[ i ];
-                            pExRateSet->numRates++;
-                        }
+        /* If there are Extended Rates in the beacon, we will reflect those
+         * extended rates that we support in out Extended Operational Rate
+         * set:
+         */
+        pDstRate = pExRateSet->rate;
+        if (pIes->ExtSuppRates.present) {
+            for (i=0; i<pIes->ExtSuppRates.num_rates; i++) {
+                if (csrRatesIsDot11RateSupported(pMac,
+                        pIes->ExtSuppRates.rates[i])) {
+                    if (!csrCheckRateBitmap(pIes->ExtSuppRates.rates[i],
+                                                             rateBitmap)) {
+                        *pDstRate++ = pIes->ExtSuppRates.rates[i];
+                        pExRateSet->numRates++;
                     }
                 }
             }
@@ -7868,7 +7858,7 @@ eHalStatus csrRoamSaveConnectedInfomation(tpAniSirGlobal pMac, tANI_U32 sessionI
 }
 
 
-static boolean is_disconnect_pending(tpAniSirGlobal pmac,
+boolean is_disconnect_pending(tpAniSirGlobal pmac,
 				uint8_t sessionid)
 {
 	tListElem *entry = NULL;
@@ -8320,7 +8310,7 @@ static void csrRoamingStateConfigCnfProcessor( tpAniSirGlobal pMac, tANI_U32 res
     {
         if ( CCM_IS_RESULT_SUCCESS(result) )
         {
-            smsLog(pMac, LOG2, "Cfg sequence complete");
+            smsLog(pMac, LOG1, "Cfg sequence complete");
             // Successfully set the configuration parameters for the new Bss.  Attempt to
             // join the roaming Bss.
             if(pCommand->u.roamCmd.pRoamBssEntry)
@@ -8328,6 +8318,8 @@ static void csrRoamingStateConfigCnfProcessor( tpAniSirGlobal pMac, tANI_U32 res
                 pScanResult = GET_BASE_ADDR(pCommand->u.roamCmd.pRoamBssEntry, tCsrScanResult, Link);
                 pBssDesc = &pScanResult->Result.BssDescriptor;
             }
+            smsLog(pMac, LOG1, "BSSType = %d",
+                          pCommand->u.roamCmd.roamProfile.BSSType);
             if ( csrIsBssTypeIBSS( pCommand->u.roamCmd.roamProfile.BSSType ) ||
                  CSR_IS_WDS( &pCommand->u.roamCmd.roamProfile )
                   || CSR_IS_INFRA_AP(&pCommand->u.roamCmd.roamProfile)
@@ -8456,6 +8448,8 @@ static void csrRoamingStateConfigCnfProcessor( tpAniSirGlobal pMac, tANI_U32 res
         }//if ( WNI_CFG_SUCCESS == result )
         else
         {
+            smsLog(pMac, LOG1,
+                          FL("!CCM_IS_RESULT_SUCCESS  result = %d"), result);
             // In the event the configuration failed,  for infra let the roam processor
             //attempt to join something else...
             if( pCommand->u.roamCmd.pRoamBssEntry && CSR_IS_INFRASTRUCTURE( &pCommand->u.roamCmd.roamProfile ) )
@@ -16949,24 +16943,29 @@ static void check_allowed_ssid_list(tSirRoamOffloadScanReq *req_buffer,
  *||==========================================================================||
  *|| New cmd        |            LAST SENT COMMAND --->                       ||
  *||====|=====================================================================||
- *||    V           |  RSO_START  |  RSO_STOP  |  RSO_RESTART | RSO_UPDATE_CFG||
+ *||    V           | START | STOP | RESTART | UPDATE_CFG| ABORT_SCAN         ||
  *|| -------------------------------------------------------------------------||
- *|| RSO_START      |     NO      |   YES      |     NO       |      NO       ||
- *|| RSO_STOP       |    YES      |   YES      |     YES      |      YES      ||
- *|| RSO_RESTART    |    YES      |   NO       |     NO       |      YES      ||
- *|| RSO_UPDATE_CFG |    YES      |   NO       |     YES      |      YES      ||
+ *|| RSO_START      | NO    | YES  |  NO     | NO        | NO                 ||
+ *|| RSO_STOP       | YES   | YES  |  YES    | YES       | YES                ||
+ *|| RSO_RESTART    | YES   | YES  |  NO     | YES       | YES                ||
+ *|| RSO_UPDATE_CFG | YES   | NO   |  YES    | YES       | YES                ||
+ *|| RSO_ABORT_SCAN | YES   | NO   |  YES    | YES       | YES                ||
  *||==========================================================================||
  **/
 #define RSO_START_BIT       (1<<ROAM_SCAN_OFFLOAD_START)
 #define RSO_STOP_BIT        (1<<ROAM_SCAN_OFFLOAD_STOP)
 #define RSO_RESTART_BIT     (1<<ROAM_SCAN_OFFLOAD_RESTART)
 #define RSO_UPDATE_CFG_BIT  (1<<ROAM_SCAN_OFFLOAD_UPDATE_CFG)
-#define RSO_START_ALLOW_MASK   ( RSO_STOP_BIT )
-#define RSO_STOP_ALLOW_MASK    ( RSO_UPDATE_CFG_BIT | RSO_RESTART_BIT | \
-		RSO_STOP_BIT | RSO_START_BIT )
-#define RSO_RESTART_ALLOW_MASK ( RSO_UPDATE_CFG_BIT | RSO_START_BIT )
+#define RSO_ABORT_SCAN_BIT  (1<<ROAM_SCAN_OFFLOAD_ABORT_SCAN)
+#define RSO_START_ALLOW_MASK   (RSO_STOP_BIT)
+#define RSO_STOP_ALLOW_MASK    (RSO_UPDATE_CFG_BIT | RSO_RESTART_BIT | \
+		RSO_STOP_BIT | RSO_START_BIT | RSO_ABORT_SCAN_BIT)
+#define RSO_RESTART_ALLOW_MASK (RSO_UPDATE_CFG_BIT | RSO_START_BIT | \
+		RSO_ABORT_SCAN_BIT | RSO_RESTART_BIT)
 #define RSO_UPDATE_CFG_ALLOW_MASK  (RSO_UPDATE_CFG_BIT | RSO_STOP_BIT | \
-		RSO_START_BIT)
+		RSO_START_BIT | RSO_ABORT_SCAN_BIT)
+#define RSO_ABORT_SCAN_ALLOW_MASK (RSO_START_BIT | RSO_RESTART_BIT | \
+		RSO_UPDATE_CFG_BIT | RSO_ABORT_SCAN_BIT)
 
 bool csr_is_RSO_cmd_allowed(tpAniSirGlobal mac_ctx, uint8_t command,
 		uint8_t session_id)
@@ -16989,6 +16988,9 @@ bool csr_is_RSO_cmd_allowed(tpAniSirGlobal mac_ctx, uint8_t command,
 	case ROAM_SCAN_OFFLOAD_UPDATE_CFG:
 		desiredMask = RSO_UPDATE_CFG_ALLOW_MASK;
 		break;
+	case ROAM_SCAN_OFFLOAD_ABORT_SCAN:
+		desiredMask = RSO_ABORT_SCAN_ALLOW_MASK;
+		break;
 	default:
 		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
 			FL("Wrong RSO command %d, not allowed"), command);
@@ -16998,6 +17000,32 @@ bool csr_is_RSO_cmd_allowed(tpAniSirGlobal mac_ctx, uint8_t command,
 	return ret_val;
 }
 
+void csr_roam_send_restart_cmd(tpAniSirGlobal pMac, tANI_U8 session_id,
+		tANI_U8 command, tANI_U8 reason)
+{
+	struct sir_sme_roam_restart_req *msg;
+	eHalStatus status;
+
+	msg = vos_mem_malloc(sizeof(struct sir_sme_roam_restart_req));
+	if (msg == NULL) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			FL("Memory allocation failed"));
+		VOS_ASSERT(msg);
+		return;
+	}
+	vos_mem_set(msg, sizeof(struct sir_sme_roam_restart_req), 0);
+	msg->message_type = eWNI_SME_ROAM_RESTART_REQ;
+	msg->length = sizeof(struct sir_sme_roam_restart_req);
+	msg->sme_session_id = session_id;
+	msg->command = command;
+	msg->reason = reason;
+	status = palSendMBMessage(pMac->hHdd, msg);
+	if (eHAL_STATUS_FAILURE == status) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			FL("Sending msg eWNI_SME_ROAM_RESTART_REQ failed"));
+		vos_mem_free(msg);
+	}
+}
 eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
                               tANI_U8 command, tANI_U8 reason)
 {
@@ -17049,6 +17077,10 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
         FL("RSO out-of-sync command %d lastSentCmd %d"),
         command, pNeighborRoamInfo->lastSentCmd);
       return eHAL_STATUS_FAILURE;
+   }
+   if (ROAM_SCAN_OFFLOAD_RESTART == command) {
+       csr_roam_send_restart_cmd(pMac, sessionId, command, reason);
+       goto cmd_sent;
    }
    if ((VOS_TRUE == bRoamScanOffloadStarted) && (ROAM_SCAN_OFFLOAD_START == command))
    {
@@ -17445,6 +17477,7 @@ eHalStatus csrRoamOffloadScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
         else if (ROAM_SCAN_OFFLOAD_STOP == command)
             bRoamScanOffloadStarted = VOS_FALSE;
    }
+cmd_sent:
    /* update the last sent cmd */
    pNeighborRoamInfo->lastSentCmd = command;
 

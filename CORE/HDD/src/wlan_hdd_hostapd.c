@@ -80,7 +80,7 @@
 #include "wniCfgAp.h"
 #include "wlan_hdd_misc.h"
 #include <vos_utils.h>
-#if defined CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
 #include <net/cnss.h>
 #endif
 
@@ -171,6 +171,7 @@ void hdd_hostapd_channel_allow_suspend(hdd_adapter_t *pAdapter,
             hddLog(LOGE, FL("DFS: allowing suspend (chan %d)"), channel);
             vos_wake_lock_release(&pHddCtx->sap_dfs_wakelock,
                                   WIFI_POWER_EVENT_WAKELOCK_DFS);
+            vos_runtime_pm_allow_suspend(pHddCtx->runtime_context.dfs);
         }
     }
 }
@@ -208,6 +209,7 @@ void hdd_hostapd_channel_prevent_suspend(hdd_adapter_t *pAdapter,
     if (NV_CHANNEL_DFS == vos_nv_getChannelEnabledState(channel)) {
         if (atomic_inc_return(&pHddCtx->sap_dfs_ref_cnt) == 1) {
             hddLog(LOGE, FL("DFS: preventing suspend (chan %d)"), channel);
+            vos_runtime_pm_prevent_suspend(pHddCtx->runtime_context.dfs);
             vos_wake_lock_acquire(&pHddCtx->sap_dfs_wakelock,
                                   WIFI_POWER_EVENT_WAKELOCK_DFS);
         }
@@ -993,6 +995,79 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
 }
 
 /**
+ * hdd_update_chandef() - Function to update channel width and center freq
+ * @hostapd_adapter:	hostapd adapter
+ * @chandef:		cfg80211 chan def
+ * @cb_mode:		chan offset
+ *
+ * This function will be called to update channel width and center freq
+ *
+ * Return: None
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)) || defined(WITH_BACKPORTS)
+static inline void
+hdd_update_chandef(hdd_adapter_t *hostapd_adapter,
+		struct cfg80211_chan_def *chandef,
+		ePhyChanBondState cb_mode)
+{
+	uint16_t   ch_width;
+	hdd_ap_ctx_t *phdd_ap_ctx;
+	uint8_t  center_chan, chan;
+
+	phdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(hostapd_adapter);
+	ch_width = phdd_ap_ctx->sapConfig.acs_cfg.ch_width;
+
+	switch (ch_width) {
+	case eHT_CHANNEL_WIDTH_20MHZ:
+	case eHT_CHANNEL_WIDTH_40MHZ:
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+			"ch_width %d, won't update", ch_width);
+		break;
+	case eHT_CHANNEL_WIDTH_80MHZ:
+		chan = vos_freq_to_chan(chandef->chan->center_freq);
+		chandef->width = NL80211_CHAN_WIDTH_80;
+
+		switch (cb_mode) {
+		case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_CENTERED:
+		case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW:
+			center_chan = chan + 2;
+			break;
+		case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW:
+			center_chan = chan + 6;
+			break;
+		case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH:
+		case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_CENTERED:
+			center_chan = chan - 2;
+			break;
+		case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH:
+			center_chan = chan - 6;
+			break;
+		default:
+			center_chan = chan;
+			break;
+		}
+
+		chandef->center_freq1 = vos_chan_to_freq(center_chan);
+		break;
+	case eHT_CHANNEL_WIDTH_160MHZ:
+	default:
+		/* Todo, please add related codes if support 160MHZ or others */
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+			"unsupport ch_width %d", ch_width);
+		break;
+	}
+
+}
+#else
+static inline void
+hdd_update_chandef(hdd_adapter_t *hostapd_adapter,
+		struct cfg80211_chan_def *chandef,
+		ePhyChanBondState cb_mode)
+{
+}
+#endif
+
+/**
  * hdd_chan_change_notify() - Function to notify hostapd about channel change
  * @hostapd_adapter	hostapd adapter
  * @dev:		Net device structure
@@ -1070,6 +1145,10 @@ VOS_STATUS hdd_chan_change_notify(hdd_adapter_t *hostapd_adapter,
 			__func__, phy_mode, cb_mode, channel_type, oper_chan);
 
 	cfg80211_chandef_create(&chandef, chan, channel_type);
+
+	if ((phy_mode == eCSR_DOT11_MODE_11ac) ||
+	    (phy_mode == eCSR_DOT11_MODE_11ac_ONLY))
+		hdd_update_chandef(hostapd_adapter, &chandef, cb_mode);
 
 	cfg80211_ch_switch_notify(dev, &chandef);
 
@@ -1179,7 +1258,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     v_U8_t cc_len = WLAN_SVC_COUNTRY_CODE_LEN;
     hdd_adapter_t *con_sap_adapter;
     VOS_STATUS status = VOS_STATUS_SUCCESS;
-#if defined CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
     int ret = 0;
 #endif
 
@@ -1317,22 +1396,20 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
             pHostapdState->bssState = BSS_START;
 
-#ifdef FEATURE_GREEN_AP
-            if (!(VOS_STA & pHddCtx->concurrency_mode) &&
-                    cfg->enable2x2 &&
-                    cfg->enableGreenAP) {
-                hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_PS_START_EVENT);
-            } else {
-                hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_PS_STOP_EVENT);
-                hddLog(VOS_TRACE_LEVEL_INFO,
-                    "Green-AP: is disabled, due to sta_concurrency: %d, enable2x2: %d, enableGreenAP: %d",
-                     VOS_STA & pHddCtx->concurrency_mode,
-                     cfg->enable2x2,
-                     cfg->enableGreenAP);
-            }
-#endif
+            hdd_wlan_green_ap_start_bss(pHddCtx);
+
             // Send current operating channel of SoftAP to BTC-ES
             send_btc_nlink_msg(WLAN_BTC_SOFTAP_BSS_START, 0);
+
+            /* Set default key index */
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                    "%s: default key index %hu", __func__,
+                    pHddApCtx->wep_def_key_idx);
+
+            sme_roam_set_default_key_index(
+                    WLAN_HDD_GET_HAL_CTX(pHostapdAdapter),
+                    pHostapdAdapter->sessionId,
+                    pHddApCtx->wep_def_key_idx);
 
             //Set group key / WEP key every time when BSS is restarted
             if( pHddApCtx->groupKey.keyLength )
@@ -1434,9 +1511,8 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             hdd_hostapd_channel_allow_suspend(pHostapdAdapter,
                     pHddApCtx->operatingChannel);
 
-#ifdef FEATURE_GREEN_AP
-            hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_PS_STOP_EVENT);
-#endif
+            hdd_wlan_green_ap_stop_bss(pHddCtx);
+
             //Free up Channel List incase if it is set
 #ifdef WLAN_FEATURE_MBSSID
             sapCleanupChannelList(WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter));
@@ -1731,9 +1807,8 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                     &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.chan_info);
             }
 
-#ifdef FEATURE_GREEN_AP
-            hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_ADD_STA_EVENT);
-#endif
+            hdd_wlan_green_ap_add_sta(pHddCtx);
+
             break;
         case eSAP_STA_DISASSOC_EVENT:
             memcpy(wrqu.addr.sa_data, &pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac,
@@ -1860,9 +1935,9 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 hdd_stop_bus_bw_compute_timer(pHostapdAdapter);
             }
 #endif
-#ifdef FEATURE_GREEN_AP
-            hdd_wlan_green_ap_mc(pHddCtx, GREEN_AP_DEL_STA_EVENT);
-#endif
+
+            hdd_wlan_green_ap_del_sta(pHddCtx);
+
             break;
         case eSAP_WPS_PBC_PROBE_REQ_EVENT:
         {
@@ -2015,7 +2090,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
         case eSAP_DFS_NOL_GET:
             hddLog(VOS_TRACE_LEVEL_INFO,
                     FL("Received eSAP_DFS_NOL_GET event"));
-#if defined CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
             /* get the dfs nol from cnss */
             ret = cnss_wlan_get_dfs_nol(
                       pSapEvent->sapevt.sapDfsNolInfo.pDfsList,
@@ -2037,7 +2112,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 #endif
         case eSAP_DFS_NOL_SET:
             hddLog(VOS_TRACE_LEVEL_INFO, FL("Received eSAP_DFS_NOL_SET event"));
-#if defined CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
             /* set the dfs nol to cnss */
             ret = cnss_wlan_set_dfs_nol(
                     pSapEvent->sapevt.sapDfsNolInfo.pDfsList,
@@ -2487,6 +2562,10 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 #ifdef DEBUG
     case QCSAP_IOCTL_SET_FW_CRASH_INJECT:
         hddLog(LOGE, "WE_SET_FW_CRASH_INJECT: %d %d", value[1], value[2]);
+        if (!pHddCtx->cfg_ini->crash_inject_enabled) {
+            hddLog(LOGE, "Crash Inject ini disabled, Ignore Crash Inject");
+            return 0;
+        }
         ret = process_wma_set_command_twoargs((int) pAdapter->sessionId,
                                            (int) GEN_PARAM_CRASH_INJECT,
                                            value[1], value[2], GEN_CMD);
@@ -3300,21 +3379,23 @@ static __iw_softap_setparam(struct net_device *dev,
                 break;
             }
 #ifdef IPA_UC_OFFLOAD
-        case QCSAP_IPA_UC_STAT:
-            {
-                /* If input value is non-zero get stats */
-                if (1 == set_value) {
-                    hdd_ipa_uc_stat_request(pHostapdAdapter, set_value);
-                } else if (3 == set_value) {
-                    hdd_ipa_uc_rt_debug_host_dump(
-                      WLAN_HDD_GET_CTX(pHostapdAdapter));
-                } else {
-                    /* place holder for stats clean up
-                     * Stats clean not implemented yet on firmware and ipa */
-		}
+	case QCSAP_IPA_UC_STAT:
+	    {
+		    /* If input value is non-zero get stats */
+		    if (1 == set_value) {
+			    hdd_ipa_uc_stat_request(pHostapdAdapter, set_value);
+		    } else if (3 == set_value) {
+			    hdd_ipa_uc_rt_debug_host_dump(pHddCtx);
+		    } else if (4 == set_value) {
+			    hdd_ipa_dump_info(pHddCtx);
+		    } else {
+			    /* place holder for stats clean up
+			     * Stats clean not implemented yet on FW and IPA
+			     */
+		    }
 
-                return ret;
-            }
+		    return ret;
+	    }
 #endif /* IPA_UC_OFFLOAD */
         case QCASAP_SET_PHYMODE:
             {

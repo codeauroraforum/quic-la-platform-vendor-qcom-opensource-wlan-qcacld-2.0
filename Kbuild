@@ -43,8 +43,9 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_MOBILE_ROUTER := y
 	endif
 
-	ifeq ($(CONFIG_ARCH_MDMFERMIUM), y)
+	ifeq ($(CONFIG_ARCH_MDM9607), y)
 	CONFIG_MOBILE_ROUTER := y
+	CONFIG_QCOM_LTE_COEX := y
 	endif
 
 	#Flag to enable Legacy Fast Roaming3(LFR3)
@@ -104,7 +105,7 @@ ifeq ($(KERNEL_BUILD), 0)
                 CONFIG_LINUX_QCMBR :=y
         endif
 
-	ifneq ($(CONFIG_ARCH_MDMFERMIUM), y)
+	ifneq ($(CONFIG_ARCH_MDM9607), y)
 		#Flag to enable memdump feature
 		CONFIG_WLAN_FEATURE_MEMDUMP := y
 
@@ -152,9 +153,11 @@ CONFIG_ATH_PERF_PWR_OFFLOAD := 1
 #Disable packet log
 CONFIG_REMOVE_PKT_LOG := 0
 
-#Enable 11AC TX
 ifeq ($(CONFIG_ROME_IF),pci)
+#Enable 11AC TX
 	CONFIG_ATH_11AC_TXCOMPACT := 1
+#Enable TSF Capture for Rome PCI
+	CONFIG_WLAN_SYNC_TSF := y
 endif
 ifeq ($(CONFIG_ROME_IF),usb)
 	CONFIG_ATH_11AC_TXCOMPACT := 0
@@ -212,7 +215,7 @@ endif
 
 #Enable MDNS Offload
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
-ifneq ($(CONFIG_ARCH_MDMFERMIUM), y)
+ifneq ($(CONFIG_ARCH_MDM9607), y)
 CONFIG_MDNS_OFFLOAD_SUPPORT := 1
 endif
 endif
@@ -260,8 +263,10 @@ CONFIG_ATH_PCIE_ACCESS_DEBUG := 0
 
 #Enable IPA offload
 ifeq ($(CONFIG_IPA), y)
+ifeq ($(CONFIG_ROME_IF),pci)
 CONFIG_IPA_OFFLOAD := 1
 CONFIG_IPA_UC_OFFLOAD := 1
+endif
 endif
 
 #Enable Signed firmware support for split binary format
@@ -958,13 +963,23 @@ CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DHIF_SDIO \
                 -DCONFIG_ATH_PROCFS_DIAG_SUPPORT \
                 -DFEATURE_HL_GROUP_CREDIT_FLOW_CONTROL \
-                -DHIF_MBOX_SLEEP_WAR \
-		-DDEBUG_HL_LOGGING
+                -DHIF_MBOX_SLEEP_WAR
 endif
+
+ifeq ($(CONFIG_ARCH_MDM9607), y)
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+CDEFINES += -DDEBUG_HL_LOGGING
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_MDM9607), y)
+CDEFINES += -DCONFIG_TUFELLO_DUAL_FW_SUPPORT
+endif
+
 
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 CDEFINES += -DFEATURE_WLAN_FORCE_SAP_SCC
-ifneq ($(CONFIG_ARCH_MDMFERMIUM), y)
+ifneq ($(CONFIG_ARCH_MDM9607), y)
 CDEFINES += -DDHCP_SERVER_OFFLOAD
 CDEFINES += -DWLAN_FEATURE_GPIO_LED_FLASHING
 CDEFINES += -DWLAN_FEATURE_APFIND
@@ -1244,6 +1259,10 @@ endif
 endif
 endif
 
+ifeq ($(CONFIG_ARCH_MDMCALIFORNIUM), y)
+CDEFINES += -DSYNC_IPA_READY
+endif
+
 #Enable GTK Offload
 ifeq ($(CONFIG_GTK_OFFLOAD), 1)
 CDEFINES += -DWLAN_FEATURE_GTK_OFFLOAD
@@ -1274,12 +1293,13 @@ ifeq ($(CONFIG_MOBILE_ROUTER), y)
 #enable MCC TO SCC switch
 CDEFINES += -DFEATURE_WLAN_MCC_TO_SCC_SWITCH
 
-ifneq ($(CONFIG_ARCH_MDMFERMIUM), y)
+#Enable 4address scheme
+CDEFINES += -DFEATURE_WLAN_STA_4ADDR_SCHEME
+
 #enable wlan auto shutdown feature
 CDEFINES += -DFEATURE_WLAN_AUTO_SHUTDOWN
 
-#Enable 4address scheme
-CDEFINES += -DFEATURE_WLAN_STA_4ADDR_SCHEME
+ifneq ($(CONFIG_ARCH_MDM9607), y)
 
 #MDM Device only, to optimize MSM skb cb memory usage
 CDEFINES += -DQCA_MDM_DEVICE
@@ -1351,7 +1371,9 @@ endif
 
 #Flag to enable/disable WLAN D0-WOW
 ifeq ($(CONFIG_PCI_MSM), y)
+ifeq ($(CONFIG_ROME_IF),pci)
 CDEFINES += -DFEATURE_WLAN_D0WOW
+endif
 endif
 
 # Flag to enable bus auto suspend
@@ -1397,6 +1419,11 @@ ifeq ($(CONFIG_ARCH_MDM9640), y)
 CDEFINES += -DFEATURE_AP_MCC_CH_AVOIDANCE
 endif
 
+ifeq ($(CONFIG_ARCH_MDM9607), y)
+CDEFINES += -DFEATURE_AP_MCC_CH_AVOIDANCE
+CDEFINES += -DMDM_SAP_11AC_NO_OVERRIDE
+endif
+
 ifdef CPTCFG_QCA_CLD_WLAN
 CDEFINES += -DWITH_BACKPORTS
 #Enable OBSS feature
@@ -1429,6 +1456,16 @@ CDEFINES += -DWLAN_FEATURE_HOLD_RX_WAKELOCK
 endif
 
 
+ifeq ($(CONFIG_WLAN_FEATURE_RX_WAKELOCK), y)
+CDEFINES += -DWLAN_FEATURE_HOLD_RX_WAKELOCK
+endif
+
+
+ifeq ($(CONFIG_WLAN_WOW_PULSE), y)
+CDEFINES += -DWLAN_FEATURE_WOW_PULSE
+endif
+
+
 KBUILD_CPPFLAGS += $(CDEFINES)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
@@ -1437,6 +1474,24 @@ KBUILD_CPPFLAGS += $(CDEFINES)
 # will override the kernel settings.
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+# If the module name is not "wlan", then the define MULTI_IF_NAME to be the
+# same a the module name. The host driver will then append MULTI_IF_NAME to
+# any string that must be unique for all instances of the driver on the system.
+# This allows multiple instances of the driver with different module names.
+# If the module name is wlan, leave MULTI_IF_NAME undefined and the code will
+# treat the driver as the primary driver.
+ifneq ($(MODNAME), wlan)
+CDEFINES += -DMULTI_IF_NAME=\"$(MODNAME)\"
+endif
+
+# WLAN_HDD_ADAPTER_MAGIC must be unique for all instances of the driver on the
+# system. If it is not defined, then the host driver will use the first 4
+# characters (including NULL) of MULTI_IF_NAME to construct
+# WLAN_HDD_ADAPTER_MAGIC.
+ifdef WLAN_HDD_ADAPTER_MAGIC
+CDEFINES += -DWLAN_HDD_ADAPTER_MAGIC=$(WLAN_HDD_ADAPTER_MAGIC)
 endif
 
 # Module information used by KBuild framework

@@ -1062,9 +1062,13 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 #define WDA_SET_UDP_RESP_OFFLOAD              SIR_HAL_SET_UDP_RESP_OFFLOAD
 
+#define WDA_SET_WOW_PULSE_CMD                 SIR_HAL_SET_WOW_PULSE_CMD
+
 #define WDA_UPDATE_WEP_DEFAULT_KEY            SIR_HAL_UPDATE_WEP_DEFAULT_KEY
 
+#define WDA_SET_CTS2SELF_FOR_STA              SIR_HAL_SET_CTS2SELF_FOR_STA
 
+#define WDA_SET_EGAP_CONF_PARAMS              SIR_HAL_SET_EGAP_CONF_PARAMS
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 

@@ -3841,6 +3841,15 @@ typedef struct sSirRoamOffloadScanRsp
   tANI_U8  sessionId;
   tANI_U32 reason;
 } tSirRoamOffloadScanRsp, *tpSirRoamOffloadScanRsp;
+
+struct sir_sme_roam_restart_req
+{
+	tANI_U16 message_type;
+	tANI_U16 length;
+	tANI_U8  sme_session_id;
+	tANI_U8  command;
+	tANI_U8  reason;
+};
 #endif //WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 
 #define SIR_NOCHANGE_POWER_VALUE  0xFFFFFFFF
@@ -6474,6 +6483,41 @@ struct udp_resp_offload {
 	char       udp_payload_filter[MAX_LEN_UDP_RESP_OFFLOAD];
 	char       udp_response_payload[MAX_LEN_UDP_RESP_OFFLOAD];
 
+};
+
+/*
+ * struct wow_pulse_mode - WoW Pulse set cmd struct
+ *
+ * @wow_pulse_enable: enable or disable this feature
+ * @wow_pulse_pin: GPIO PIN for Pulse
+ * @wow_pulse_interval_low: Pulse interval low
+ * @wow_pulse_interval_high: Pulse interval high
+ *
+ * SME uses this structure to configure wow pulse info
+ * and send it to WMA
+ */
+struct wow_pulse_mode {
+	bool                       wow_pulse_enable;
+	uint8_t                    wow_pulse_pin;
+	uint16_t                   wow_pulse_interval_high;
+	uint16_t                   wow_pulse_interval_low;
+};
+
+/*
+ * struct egap_params - the enhanced green ap params
+ * @vdev_id: vdev id
+ * @enable: enable or disable the enhance green ap in firmware
+ * @inactivity_time: inactivity timeout value
+ * @wait_time: wait timeout value
+ * @flags: feature flag in bitmask
+ *
+ */
+struct egap_conf_params {
+	uint32_t   vdev_id;
+	bool       enable;
+	uint32_t   inactivity_time;
+	uint32_t   wait_time;
+	uint32_t   flags;
 };
 
 #endif /* __SIR_API_H */

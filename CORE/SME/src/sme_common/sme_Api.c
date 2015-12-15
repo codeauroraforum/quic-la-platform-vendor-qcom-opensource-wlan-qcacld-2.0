@@ -73,6 +73,7 @@
 #include "nan_Api.h"
 #endif
 #include "regdomain_common.h"
+#include "schApi.h"
 
 extern tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
@@ -1205,11 +1206,15 @@ sme_process_cmd:
                 {
                     //This is odd. Some one else pull off the command.
                     csrLLUnlock( &pMac->sme.smeCmdActiveList );
+                    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                                "Remove entry failed");
                 }
             }
             else
             {
                 csrLLUnlock( &pMac->sme.smeCmdActiveList );
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                                "Get Pending command failed");
             }
         }
         else
@@ -1234,10 +1239,14 @@ sme_process_cmd:
                     csrScanStartIdleScanTimer(pMac, nTime);
                 }
             }
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                                "No Pending command waiting");
         }
     }
     else {
         csrLLUnlock( &pMac->sme.smeCmdActiveList );
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+                                "Active list command waiting");
     }
 
 sme_process_scan_queue:
@@ -4786,6 +4795,8 @@ eHalStatus sme_GetConfigParam(tHalHandle hHal, tSmeConfigParams *pParam)
       pParam->enableSelfRecovery = pMac->sme.enableSelfRecovery;
       pParam->f_prefer_non_dfs_on_radar = pMac->f_prefer_non_dfs_on_radar;
       pParam->fine_time_meas_cap = pMac->fine_time_meas_cap;
+      pParam->csrConfig.mcc_rts_cts_prot_enable =
+              pMac->roam.configParam.mcc_rts_cts_prot_enable;
       sme_ReleaseGlobalLock( &pMac->sme );
    }
 
@@ -6901,60 +6912,16 @@ eHalStatus sme_ScanGetBKIDCandidateList(tHalHandle hHal, tANI_U32 sessionId,
  *****************************************************************************/
 
 /* ---------------------------------------------------------------------------
-    \fn sme_getOemDataRsp
-    \brief a wrapper function to obtain the OEM DATA RSP
-    \param pOemDataRsp - A pointer to the response object
-    \param pContext - a pointer passed in for the callback
-    \return eHalStatus
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_getOemDataRsp(tHalHandle hHal,
-        tOemDataRsp **pOemDataRsp)
-{
-    eHalStatus status = eHAL_STATUS_SUCCESS;
-    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-
-    do
-    {
-        //acquire the lock for the sme object
-        status = sme_AcquireGlobalLock(&pMac->sme);
-
-        if(!HAL_STATUS_SUCCESS(status))
-        {
-            break;
-        }
-
-        if(pMac->oemData.pOemDataRsp != NULL)
-        {
-            *pOemDataRsp = pMac->oemData.pOemDataRsp;
-        }
-        else
-        {
-            status = eHAL_STATUS_FAILURE;
-        }
-
-        //release the lock for the sme object
-        sme_ReleaseGlobalLock( &pMac->sme );
-
-    } while(0);
-
-    return status;
-}
-
-/* ---------------------------------------------------------------------------
     \fn sme_OemDataReq
     \brief a wrapper function for OEM DATA REQ
     \param sessionId - session id to be used.
     \param pOemDataReqId - pointer to an object to get back the request ID
-    \param callback - a callback function that is called upon finish
-    \param pContext - a pointer passed in for the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_OemDataReq(tHalHandle hHal,
         tANI_U8 sessionId,
         tOemDataReqConfig *pOemDataReqConfig,
-        tANI_U32 *pOemDataReqID,
-        oemData_OemDataReqCompleteCallback callback,
-        void *pContext)
+        tANI_U32 *pOemDataReqID)
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
@@ -6977,7 +6944,7 @@ eHalStatus sme_OemDataReq(tHalHandle hHal,
                 return eHAL_STATUS_FAILURE;
             }
 
-            status = oemData_OemDataReq(hHal, sessionId, pOemDataReqConfig, pOemDataReqID, callback, pContext);
+            status = oemData_OemDataReq(hHal, sessionId, pOemDataReqConfig, pOemDataReqID);
 
             //release the lock for the sme object
             sme_ReleaseGlobalLock( &pMac->sme );
@@ -7019,7 +6986,7 @@ eHalStatus sme_OpenSession(tHalHandle hHal, csrRoamCompleteCallback callback,
    eHalStatus status;
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
 
-   VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "%s: type=%d, subType=%d", __func__, type, subType);
+   VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_HIGH, "%s: type=%d, subType=%d", __func__, type, subType);
 
    if( NULL == pbSessionId )
    {
@@ -13018,6 +12985,30 @@ eHalStatus sme_ocb_stop_timing_advert(
 }
 
 /**
+ * sme_ocb_gen_timing_advert_frame() - generate TA frame and populate the buffer
+ * @hHal: reference to the HAL
+ * @self_addr: the self MAC address
+ * @buf: the buffer that will contain the frame
+ * @timestamp_offset: return for the offset of the timestamp field
+ * @time_value_offset: return for the time_value field in the TA IE
+ *
+ * Return: the length of the buffer.
+ */
+int sme_ocb_gen_timing_advert_frame(tHalHandle hal_handle,
+				    tSirMacAddr self_addr, uint8_t **buf,
+				    uint32_t *timestamp_offset,
+				    uint32_t *time_value_offset)
+{
+	int template_length;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_handle);
+
+	template_length = schGenTimingAdvertFrame(mac_ctx, self_addr, buf,
+						  timestamp_offset,
+						  time_value_offset);
+	return template_length;
+}
+
+/**
  * sme_ocb_get_tsf_timer() - Get the TSF timer value
  * @hHal: reference to the HAL
  * @context: the context of the call
@@ -13528,6 +13519,27 @@ VOS_STATUS sme_SetIdlePowersaveConfig(v_PVOID_t vosContext, tANI_U32 value)
         return VOS_STATUS_E_FAILURE;
     }
     return VOS_STATUS_SUCCESS;
+}
+/**
+ * sme_set_cts2self_for_p2p_go() - sme function to set ini parms to FW.
+ * @hal_handle:                    reference to the HAL
+ *
+ * Return: hal_status
+ */
+eHalStatus sme_set_cts2self_for_p2p_go(tHalHandle hal_handle)
+{
+	eHalStatus status = eHAL_STATUS_SUCCESS;
+	vos_msg_t vos_msg;
+
+	vos_msg.bodyptr = NULL;
+	vos_msg.type = WDA_SET_CTS2SELF_FOR_STA;
+        if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(VOS_MODULE_ID_WDA,
+					&vos_msg))) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			FL("Failed to post WDA_SET_CTS2SELF_FOR_STA to WDA"));
+		status = eHAL_STATUS_FAILURE;
+	}
+	return status;
 }
 
 eHalStatus sme_ConfigEnablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode)
@@ -17303,3 +17315,91 @@ eHalStatus sme_set_lost_link_info_cb(tHalHandle hal,
 	return status;
 }
 
+#ifdef WLAN_FEATURE_WOW_PULSE
+/**
+ * sme_set_wow_pulse() - set wow pulse info
+ * @wow_pulse_set_info: wow_pulse_mode structure pointer
+ *
+ * Return: HAL status
+ */
+VOS_STATUS sme_set_wow_pulse(struct wow_pulse_mode *wow_pulse_set_info)
+{
+	vos_msg_t vos_message;
+	VOS_STATUS vos_status;
+	struct wow_pulse_mode *wow_pulse_set_cmd;
+
+	if (!wow_pulse_set_info) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			"%s: invalid wow_pulse_set_info pointer", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	wow_pulse_set_cmd = vos_mem_malloc(sizeof(*wow_pulse_set_cmd));
+	if (NULL == wow_pulse_set_cmd) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			"%s: fail to alloc wow_pulse_set_cmd", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+
+	*wow_pulse_set_cmd = *wow_pulse_set_info;
+
+	vos_message.type = WDA_SET_WOW_PULSE_CMD;
+	vos_message.bodyptr = wow_pulse_set_cmd;
+	vos_status = vos_mq_post_message(VOS_MODULE_ID_WDA,
+					&vos_message);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			"%s: Not able to post msg to WDA!",
+			__func__);
+		vos_mem_free(wow_pulse_set_cmd);
+		vos_status = VOS_STATUS_E_FAILURE;
+	}
+
+	return vos_status;
+}
+#endif
+
+#ifdef FEATURE_GREEN_AP
+/**
+ * sme_send_egap_conf_params() - set the enhanced green ap configuration params
+ *
+ * @enable: enable/disable the enhanced green ap feature
+ * @inactivity_time: inactivity timeout value
+ * @wait_time: wait timeout value
+ * @flag: feature flag in bitmasp
+ *
+ * Return: Return VOS_STATUS, otherwise appropriate failure code
+ */
+VOS_STATUS sme_send_egap_conf_params(uint32_t enable, uint32_t inactivity_time,
+				     uint32_t wait_time, uint32_t flags)
+{
+	vos_msg_t vos_message;
+	VOS_STATUS vos_status;
+	struct egap_conf_params *egap_params;
+
+	egap_params = vos_mem_malloc(sizeof(*egap_params));
+	if (NULL == egap_params) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+				"%s: fail to alloc egap_params", __func__);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	egap_params->enable = enable;
+	egap_params->inactivity_time = inactivity_time;
+	egap_params->wait_time = wait_time;
+	egap_params->flags = flags;
+
+	vos_message.type = WDA_SET_EGAP_CONF_PARAMS;
+	vos_message.bodyptr = egap_params;
+	vos_status = vos_mq_post_message(VOS_MODULE_ID_WDA,
+					&vos_message);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			"%s: Not able to post msg to WDA!",
+			__func__);
+
+		vos_mem_free(egap_params);
+	}
+	return vos_status;
+}
+#endif

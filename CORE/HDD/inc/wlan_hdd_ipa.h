@@ -57,6 +57,7 @@ int hdd_ipa_set_perf_level(hdd_context_t *hdd_ctx, uint64_t tx_packets,
 
 int hdd_ipa_suspend(hdd_context_t *hdd_ctx);
 int hdd_ipa_resume(hdd_context_t *hdd_ctx);
+void hdd_ipa_ready_cb(hdd_context_t *hdd_ctx);
 
 #ifdef IPA_UC_STA_OFFLOAD
 int hdd_ipa_send_mcc_scc_msg(hdd_context_t *hdd_ctx, bool mcc_mode);
@@ -70,6 +71,7 @@ void hdd_ipa_uc_stat_query(hdd_context_t *pHddCtx,
 	uint32_t *ipa_tx_diff, uint32_t *ipa_rx_diff);
 void hdd_ipa_uc_stat_request( hdd_adapter_t *adapter, uint8_t reason);
 void hdd_ipa_uc_rt_debug_host_dump(hdd_context_t *hdd_ctx);
+void hdd_ipa_dump_info(hdd_context_t *hdd_ctx);
 #endif /* IPA_UC_OFFLOAD */
 #endif /* IPA_OFFLOAD */
 
@@ -81,6 +83,11 @@ void hdd_ipa_uc_force_pipe_shutdown(hdd_context_t *hdd_ctx)
 }
 static inline
 void hdd_ipa_uc_rt_debug_host_dump(hdd_context_t *hdd_ctx)
+{
+	return;
+}
+static inline
+void hdd_ipa_dump_info(hdd_context_t *hdd_ctx)
 {
 	return;
 }

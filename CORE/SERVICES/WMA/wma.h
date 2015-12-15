@@ -403,7 +403,6 @@ typedef struct {
 	u_int32_t rxchainmask;
 	u_int32_t txpow2g;
 	u_int32_t txpow5g;
-	u_int32_t pwrgating;
 	u_int32_t burst_enable;
 	u_int32_t burst_dur;
 	u_int32_t chainmask_2g;
@@ -662,6 +661,9 @@ typedef struct wma_handle {
 	v_U8_t lpss_support; /* LPSS feature is supported in target or not */
 #endif
 	uint8_t ap_arpns_support;
+#ifdef FEATURE_GREEN_AP
+	bool egap_support;
+#endif
 	bool wmi_ready;
 	u_int32_t wlan_init_status;
 	adf_os_device_t adf_dev;
@@ -1634,7 +1636,13 @@ A_UINT32 eCsrAuthType_to_rsn_authmode (eCsrAuthType authtype,
                                        eCsrEncryptionType encr);
 A_UINT32 eCsrEncryptionType_to_rsn_cipherset (eCsrEncryptionType encr);
 
-#define WMA_TGT_INVALID_SNR (-1)
+/*
+ * The firmware value has been changed recently to 0x127
+ * But, to maintain backward compatibility, the old
+ * value is also preserved.
+ */
+#define WMA_TGT_INVALID_SNR_OLD (-1)
+#define WMA_TGT_INVALID_SNR_NEW 0x127
 
 #define WMA_TX_Q_RECHECK_TIMER_WAIT      2    // 2 ms
 #define WMA_TX_Q_RECHECK_TIMER_MAX_WAIT  20   // 20 ms
@@ -1669,6 +1677,15 @@ static inline void wma_set_wifi_start_packet_stats(void *wma_handle,
 	return;
 }
 #endif
+
+/* API's to enable HDD to suspsend FW.
+ * This are active only if Bus Layer aggreed to suspend.
+ * This will be called for only for SDIO driver, for others
+ * by default HIF return failure, as we suspend FW in bus
+ * suspend callbacks
+ */
+int wma_suspend_fw(void);
+int wma_resume_fw(void);
 
 void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle);
 struct wma_txrx_node *wma_get_interface_by_vdev_id(uint8_t vdev_id);

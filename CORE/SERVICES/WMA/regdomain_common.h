@@ -509,7 +509,7 @@ static const COUNTRY_CODE_TO_ENUM_RD ahCmnAllCountries[] = {
     {CTRY_CANADA2,     FCC6_FCCA,     "CA", "CANADA2",        YES, YES, YES, YES, YES, YES, YES, YES, 7000 },
     {CTRY_CHILE,       APL6_WORLD,    "CL", "CHILE",          YES, YES, YES, YES, YES, YES, YES, YES, 7000 },
     {CTRY_CHINA,       APL1_WORLD,    "CN", "CHINA",          YES, YES, YES, YES, YES, YES, YES, YES, 7000 },
-    {CTRY_COLOMBIA,    FCC1_FCCA,     "CO", "COLOMBIA",       YES,  NO, YES, YES, YES, YES, YES, YES, 7000 },
+    {CTRY_COLOMBIA,    FCC3_WORLD,    "CO", "COLOMBIA",       YES,  NO, YES, YES, YES, YES, YES, YES, 7000 },
     {CTRY_COSTA_RICA,  FCC1_WORLD,    "CR", "COSTA RICA",     YES,  NO, YES, YES, YES, YES,  NO, NO, 7000 },
     {CTRY_CROATIA,     ETSI1_WORLD,   "HR", "CROATIA",        YES,  NO, YES, YES, YES, YES, YES, YES, 7000 },
     {CTRY_CYPRUS,      ETSI1_WORLD,   "CY", "CYPRUS",         YES, YES, YES, YES, YES, YES, YES, YES, 7000 },
@@ -1859,6 +1859,8 @@ typedef struct _regdm_supp_op_classes {
 
 u_int16_t regdm_get_opclass_from_channel(u_int8_t *country, u_int8_t channel,
 	u_int8_t offset);
+u_int16_t regdm_get_chanwidth_from_opclass(u_int8_t *country, u_int8_t channel,
+	u_int8_t opclass);
 u_int16_t regdm_set_curr_opclasses(u_int8_t num_classes, u_int8_t *class);
 u_int16_t regdm_get_curr_opclasses(u_int8_t *num_classes, u_int8_t *class);
 

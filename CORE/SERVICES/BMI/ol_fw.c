@@ -78,21 +78,38 @@ static u_int32_t refclk_speed_to_hz[] = {
 #endif
 
 #ifdef HIF_SDIO
+
+#ifdef MULTI_IF_NAME
+#define PREFIX MULTI_IF_NAME
+#else
+#define PREFIX ""
+#endif
+
 static struct ol_fw_files FW_FILES_QCA6174_FW_1_1 = {
-	"qwlan11.bin", "bdwlan11.bin", "otp11.bin", "utf11.bin",
-	"utfbd11.bin", "qsetup11.bin", "epping11.bin"};
+	PREFIX "qwlan11.bin", PREFIX "bdwlan11.bin",
+	PREFIX "otp11.bin", PREFIX "utf11.bin",
+	PREFIX "utfbd11.bin", PREFIX "qsetup11.bin",
+	PREFIX "epping11.bin"};
 static struct ol_fw_files FW_FILES_QCA6174_FW_2_0 = {
-	"qwlan20.bin", "bdwlan20.bin", "otp20.bin", "utf20.bin",
-	"utfbd20.bin", "qsetup20.bin", "epping20.bin"};
+	PREFIX "qwlan20.bin", PREFIX "bdwlan20.bin",
+	PREFIX "otp20.bin", PREFIX "utf20.bin",
+	PREFIX "utfbd20.bin", PREFIX "qsetup20.bin",
+	PREFIX "epping20.bin"};
 static struct ol_fw_files FW_FILES_QCA6174_FW_1_3 = {
-	"qwlan13.bin", "bdwlan13.bin", "otp13.bin", "utf13.bin",
-	"utfbd13.bin", "qsetup13.bin", "epping13.bin"};
+	PREFIX "qwlan13.bin", PREFIX "bdwlan13.bin",
+	PREFIX "otp13.bin", PREFIX "utf13.bin",
+	PREFIX "utfbd13.bin", PREFIX "qsetup13.bin",
+	PREFIX "epping13.bin"};
 static struct ol_fw_files FW_FILES_QCA6174_FW_3_0 = {
-	"qwlan30.bin", "bdwlan30.bin", "otp30.bin", "utf30.bin",
-	"utfbd30.bin", "qsetup30.bin", "epping30.bin"};
+	PREFIX "qwlan30.bin", PREFIX "bdwlan30.bin",
+	PREFIX "otp30.bin", PREFIX "utf30.bin",
+	PREFIX "utfbd30.bin", PREFIX "qsetup30.bin",
+	PREFIX "epping30.bin"};
 static struct ol_fw_files FW_FILES_DEFAULT = {
-	"qwlan.bin", "bdwlan.bin", "otp.bin", "utf.bin",
-	"utfbd.bin", "qsetup.bin", "epping.bin"};
+	PREFIX "qwlan.bin", PREFIX "bdwlan.bin",
+	PREFIX "otp.bin", PREFIX "utf.bin",
+	PREFIX "utfbd.bin", PREFIX "qsetup.bin",
+	PREFIX "epping.bin"};
 
 static A_STATUS ol_sdio_extra_initialization(struct ol_softc *scn);
 
@@ -115,8 +132,14 @@ static int ol_get_fw_files_for_target(struct ol_fw_files *pfw_files,
             break;
     case AR6320_REV3_VERSION:
     case AR6320_REV3_2_VERSION:
-    case QCA9377_REV1_1_VERSION:
             memcpy(pfw_files, &FW_FILES_QCA6174_FW_3_0, sizeof(*pfw_files));
+            break;
+    case QCA9377_REV1_1_VERSION:
+#ifdef CONFIG_TUFELLO_DUAL_FW_SUPPORT
+            memcpy(pfw_files, &FW_FILES_DEFAULT, sizeof(*pfw_files));
+#else
+            memcpy(pfw_files, &FW_FILES_QCA6174_FW_3_0, sizeof(*pfw_files));
+#endif
             break;
     default:
             memcpy(pfw_files, &FW_FILES_DEFAULT, sizeof(*pfw_files));
@@ -1269,6 +1292,21 @@ void ol_target_failure(void *instance, A_STATUS status)
 		pr_info("%s: LOGP is in progress, ignore!\n", __func__);
 		return;
 	}
+
+#if defined(HIF_PCI) && defined(DEBUG)
+	if (vos_is_load_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
+		pr_err("XXX TARGET ASSERTED during driver loading XXX\n");
+
+		if (hif_pci_check_soc_status(scn->hif_sc)
+		    || dump_CE_register(scn)) {
+			return;
+		}
+
+		dump_CE_debug_register(scn->hif_sc);
+		ol_copy_ramdump(scn);
+		VOS_BUG(0);
+	}
+#endif
 
 	if (vos_is_load_unload_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
 		printk("%s: Loading/Unloading is in progress, ignore!\n",

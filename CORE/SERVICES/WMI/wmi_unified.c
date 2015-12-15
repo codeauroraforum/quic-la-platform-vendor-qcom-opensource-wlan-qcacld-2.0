@@ -496,6 +496,7 @@ static u_int8_t* get_wmi_cmd_string(WMI_CMD_ID wmi_command)
 		CASE_RETURN_STRING(WMI_THERMAL_MGMT_CMDID);
 		CASE_RETURN_STRING(WMI_RSSI_BREACH_MONITOR_CONFIG_CMDID);
                 CASE_RETURN_STRING(WMI_LRO_CONFIG_CMDID);
+                CASE_RETURN_STRING(WMI_TRANSFER_DATA_TO_FLASH_CMDID);
                 CASE_RETURN_STRING(WMI_MAWC_SENSOR_REPORT_IND_CMDID);
                 CASE_RETURN_STRING(WMI_ROAM_CONFIGURE_MAWC_CMDID);
                 CASE_RETURN_STRING(WMI_NLO_CONFIGURE_MAWC_CMDID);
@@ -570,6 +571,7 @@ static u_int8_t* get_wmi_cmd_string(WMI_CMD_ID wmi_command)
 		CASE_RETURN_STRING(WMI_BATCH_SCAN_TRIGGER_RESULT_CMDID);
 		/* OEM related cmd */
 		CASE_RETURN_STRING(WMI_OEM_REQ_CMDID);
+		CASE_RETURN_STRING(WMI_OEM_REQUEST_CMDID);
 		/* NAN request cmd */
 		CASE_RETURN_STRING(WMI_NAN_CMDID);
 		/* Modem power state cmd */
@@ -699,6 +701,11 @@ skip_suspend_check:
 	case WMI_D0_WOW_ENABLE_DISABLE_CMDID:
 #endif
 		htc_tag = HTC_TX_PACKET_TAG_AUTO_PM;
+	case WMI_FORCE_FW_HANG_CMDID:
+		if (wmi_handle->tag_crash_inject) {
+			htc_tag = HTC_TX_PACKET_TAG_AUTO_PM;
+			wmi_handle->tag_crash_inject = false;
+		}
 	default:
 		break;
 	}
@@ -734,7 +741,8 @@ dont_tag:
 		//dump_CE_register(scn);
 		//dump_CE_debug_register(scn->hif_sc);
 		adf_os_atomic_dec(&wmi_handle->pending_cmds);
-		pr_err("%s: MAX 1024 WMI Pending cmds reached.\n", __func__);
+		pr_err("%s: MAX %d WMI Pending cmds reached.\n",
+			__func__, WMI_MAX_CMDS);
 		VOS_BUG(0);
 		return -EBUSY;
 	}
@@ -1197,6 +1205,18 @@ void wmi_set_target_suspend(wmi_unified_t wmi_handle, A_BOOL val)
 	adf_os_atomic_set(&wmi_handle->is_target_suspended, val);
 }
 
+/**
+ * wmi_set_tgt_assert() - set target assert configuration
+ * @wmi_handle: Pointer to WMI handle
+ * @val: Target assert config value
+ *
+ * Return: none
+ */
+void wmi_set_tgt_assert(wmi_unified_t wmi_handle, bool val)
+{
+	wmi_handle->tgt_force_assert_enable = val;
+}
+
 #ifdef FEATURE_RUNTIME_PM
 void wmi_set_runtime_pm_inprogress(wmi_unified_t wmi_handle, A_BOOL val)
 {
@@ -1211,6 +1231,10 @@ void wmi_set_d0wow_flag(wmi_unified_t wmi_handle, A_BOOL flag)
 	struct ol_softc *scn =
 		vos_get_context(VOS_MODULE_ID_HIF, wma->vos_context);
 
+	if (NULL == scn) {
+		WMA_LOGE("%s: Failed to get HIF context", __func__);
+		return;
+	}
 	adf_os_atomic_set(&scn->hif_sc->in_d0wow, flag);
 }
 
@@ -1220,6 +1244,16 @@ A_BOOL wmi_get_d0wow_flag(wmi_unified_t wmi_handle)
 	struct ol_softc *scn =
 		vos_get_context(VOS_MODULE_ID_HIF, wma->vos_context);
 
+	if (NULL == scn) {
+		WMA_LOGE("%s: Failed to get HIF context", __func__);
+		return -EINVAL;
+	}
+
 	return adf_os_atomic_read(&scn->hif_sc->in_d0wow);
 }
 #endif
+
+void wmi_tag_crash_inject(wmi_unified_t wmi_handle, A_BOOL flag)
+{
+	wmi_handle->tag_crash_inject = flag;
+}

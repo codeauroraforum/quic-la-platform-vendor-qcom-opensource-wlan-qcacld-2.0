@@ -807,6 +807,9 @@ struct hdd_ap_ctx_s
    // This will have WEP key data, if it is received before start bss
    tCsrRoamSetKey wepKey[CSR_MAX_NUM_KEY];
 
+   /* WEP default key index */
+   uint8_t wep_def_key_idx;
+
    beacon_data_t *beacon;
 
    v_BOOL_t bApActive;
@@ -866,16 +869,68 @@ typedef struct multicast_addr_list
 } t_multicast_add_list;
 #endif
 
+/*
+ * WLAN_HDD_ADAPTER_MAGIC is a magic number used to identify net devices
+ * belonging to this driver from net devices belonging to other devices.
+ * Therefore, the magic number must be unique relative to the numbers for
+ * other drivers in the system. If WLAN_HDD_ADAPTER_MAGIC is already defined
+ * (e.g. by compiler argument), then use that. If it's not already defined,
+ * then use the first 4 characters of MULTI_IF_NAME to construct the magic
+ * number. If MULTI_IF_NAME is not defined, then use a default magic number.
+ */
+#ifndef WLAN_HDD_ADAPTER_MAGIC
+#ifdef MULTI_IF_NAME
+#define WLAN_HDD_ADAPTER_MAGIC						\
+	(MULTI_IF_NAME[0] == 0 ? 0x574c414e :				\
+	(MULTI_IF_NAME[1] == 0 ? (MULTI_IF_NAME[0] << 24) :		\
+	(MULTI_IF_NAME[2] == 0 ? (MULTI_IF_NAME[0] << 24) |		\
+		(MULTI_IF_NAME[1] << 16) :				\
+	(MULTI_IF_NAME[0] << 24) | (MULTI_IF_NAME[1] << 16) |		\
+		(MULTI_IF_NAME[2] << 8) | MULTI_IF_NAME[3])))
+#else
 #define WLAN_HDD_ADAPTER_MAGIC 0x574c414e //ASCII "WLAN"
+#endif
+#endif
+
+/**
+ * struct hdd_runtime_pm_context - context to prevent/allow runtime pm
+ * @scan: scan context to prevent/allow runtime pm
+ * @roc : remain on channel runtime pm context
+ * @dfs : Dynamic frequency selection runtime pm context
+ *
+ * Prevent Runtime PM for scan, roc and dfs.
+ */
+struct hdd_runtime_pm_context {
+	void *scan;
+	void *roc;
+	void *dfs;
+};
+
+/**
+ * struct hdd_adapter_pm_context - Context/Adapter to prevent/allow runtime pm
+ * @connect : Connect context per adapter
+ *
+ * Structure to hold runtime pm contexts for each adapter
+ */
+struct hdd_adapter_pm_context {
+	void *connect;
+};
 
 struct hdd_adapter_s
 {
-   void *pHddCtx;
+   /* Magic cookie for adapter sanity verification.  Note that this
+    * needs to be at the beginning of the private data structure so
+    * that it will exists at the beginning of dev->priv and hence
+    * will always be in mapped memory
+    */
+   v_U32_t magic;
 
-   device_mode_t device_mode;
+   void *pHddCtx;
 
    /** Handle to the network device */
    struct net_device *dev;
+
+   device_mode_t device_mode;
 
    /** IPv4 notifier callback for handling ARP offload on change in IP */
    struct work_struct  ipv4NotifierWorkQueue;
@@ -1023,8 +1078,6 @@ struct hdd_adapter_s
 #endif
    uint8_t addr_filter_pattern;
 
-   //Magic cookie for adapter sanity verification
-   v_U32_t magic;
    v_BOOL_t higherDtimTransition;
    v_BOOL_t survey_idx;
 
@@ -1088,7 +1141,7 @@ struct hdd_adapter_s
 	/* MAC addresses used for OCB interfaces */
 	tSirMacAddr ocb_mac_address[VOS_MAX_CONCURRENCY_PERSONA];
 	int ocb_mac_addr_count;
-	void *runtime_ctx;
+	struct hdd_adapter_pm_context runtime_context;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1185,6 +1238,8 @@ typedef struct
     vos_timer_t ps_timer;
 
     hdd_green_ap_stats stats;
+
+    bool egap_support;
 
 }hdd_green_ap_ctx_t;
 #endif /* FEATURE_GREEN_AP */
@@ -1587,6 +1642,10 @@ struct hdd_context_s
     bool per_band_chainmask_supp;
     uint16_t hdd_txrx_hist_idx;
     struct hdd_tx_rx_histogram hdd_txrx_hist[NUM_TX_RX_HISTOGRAM];
+    struct hdd_runtime_pm_context runtime_context;
+#ifdef IPA_OFFLOAD
+    struct completion ipa_ready;
+#endif
 };
 
 /*---------------------------------------------------------------------------
@@ -1748,6 +1807,19 @@ int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter);
 #ifdef FEATURE_GREEN_AP
 void hdd_wlan_green_ap_mc(hdd_context_t *pHddCtx,
         hdd_green_ap_event_t event);
+void hdd_wlan_green_ap_init(struct hdd_context_s *hdd_ctx);
+void hdd_wlan_green_ap_deinit(struct hdd_context_s *hdd_ctx);
+void hdd_wlan_green_ap_start_bss(hdd_context_t *hdd_ctx);
+void hdd_wlan_green_ap_stop_bss(struct hdd_context_s *hdd_ctx);
+void hdd_wlan_green_ap_add_sta(struct hdd_context_s *hdd_ctx);
+void hdd_wlan_green_ap_del_sta(struct hdd_context_s *hdd_ctx);
+#else
+static inline void hdd_wlan_green_ap_init(struct hdd_context_s *hdd_ctx) {}
+static inline void hdd_wlan_green_ap_deinit(struct hdd_context_s *hdd_ctx) {}
+static inline void hdd_wlan_green_ap_start_bss(hdd_context_t *hdd_ctx) {}
+static inline void hdd_wlan_green_ap_stop_bss(struct hdd_context_s *hdd_ctx) {}
+static inline void hdd_wlan_green_ap_add_sta(struct hdd_context_s *hdd_ctx) {}
+static inline void hdd_wlan_green_ap_del_sta(struct hdd_context_s *hdd_ctx) {}
 #endif
 
 #ifdef WLAN_FEATURE_STATS_EXT
@@ -1867,4 +1939,15 @@ void hdd_connect_result(struct net_device *dev, const u8 *bssid,
 
 void wlan_hdd_display_tx_rx_histogram(hdd_context_t *pHddCtx);
 void wlan_hdd_clear_tx_rx_histogram(hdd_context_t *pHddCtx);
+
+void hdd_runtime_suspend_init(hdd_context_t *);
+void hdd_runtime_suspend_deinit(hdd_context_t *);
+
+#ifdef FEATURE_GREEN_AP
+void wlan_hdd_set_egap_support(hdd_context_t *hdd_ctx, struct hdd_tgt_cfg *cfg);
+#else
+static inline void wlan_hdd_set_egap_support(hdd_context_t *hdd_ctx,
+					     struct hdd_tgt_cfg *cfg) {}
+#endif
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

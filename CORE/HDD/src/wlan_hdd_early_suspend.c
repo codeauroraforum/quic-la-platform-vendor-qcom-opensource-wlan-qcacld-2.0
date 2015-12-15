@@ -2158,7 +2158,6 @@ VOS_STATUS hdd_wlan_re_init(void *hif_sc)
    /* Pass FW version to HIF layer */
    hif_set_fw_info(hif_sc, pHddCtx->target_fw_version);
 
-
    /* Restart all adapters */
    hdd_start_all_adapters(pHddCtx);
 
@@ -2238,7 +2237,6 @@ err_unregister_pmops:
    hdd_unregister_mcast_bcast_filter(pHddCtx);
 #endif
    hdd_close_all_adapters(pHddCtx);
-
 
 err_vosstop:
    vos_stop(pVosContext);

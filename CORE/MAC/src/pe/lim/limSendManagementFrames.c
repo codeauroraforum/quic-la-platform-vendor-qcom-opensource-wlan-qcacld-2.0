@@ -1294,6 +1294,18 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         {
             limLog(pMac, LOG1, FL("Populate HT IEs in Assoc Response"));
             PopulateDot11fHTCaps( pMac, psessionEntry, &frm.HTCaps );
+            /*
+             * Check the STA capability and update the HTCaps accordingly
+             */
+            frm.HTCaps.supportedChannelWidthSet =
+                    (pSta->htSupportedChannelWidthSet <
+                       psessionEntry->htSupportedChannelWidthSet) ?
+                         pSta->htSupportedChannelWidthSet :
+                         psessionEntry->htSupportedChannelWidthSet ;
+
+            if (!frm.HTCaps.supportedChannelWidthSet)
+                frm.HTCaps.shortGI40MHz = 0;
+
             PopulateDot11fHTInfo( pMac, &frm.HTInfo, psessionEntry );
         }
         limLog(pMac, LOG1, FL("SupportedChnlWidth: %d, mimoPS: %d, GF: %d, shortGI20:%d, shortGI40: %d, dsssCck: %d, AMPDU Param: %x"),
@@ -2376,7 +2388,8 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-    if(psessionEntry->pePersona == VOS_P2P_CLIENT_MODE)
+    if(psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ||
+       psessionEntry->pePersona == VOS_STA_MODE)
     {
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
@@ -3215,7 +3228,8 @@ limSendReassocReqMgmtFrame(tpAniSirGlobal     pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-    if(psessionEntry->pePersona == VOS_P2P_CLIENT_MODE)
+    if(psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ||
+       psessionEntry->pePersona == VOS_STA_MODE)
     {
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
@@ -3582,7 +3596,8 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-    if(psessionEntry->pePersona == VOS_P2P_CLIENT_MODE)
+    if(psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ||
+       psessionEntry->pePersona == VOS_STA_MODE)
     {
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
@@ -3994,11 +4009,7 @@ limSendDisassocMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-    if((psessionEntry->pePersona == VOS_P2P_CLIENT_MODE) ||
-       (psessionEntry->pePersona == VOS_P2P_GO_MODE))
-    {
-        txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
-    }
+    txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
 
     if (waitForAck)
     {
@@ -4199,11 +4210,7 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-    if((psessionEntry->pePersona == VOS_P2P_CLIENT_MODE) ||
-       (psessionEntry->pePersona == VOS_P2P_GO_MODE))
-    {
-        txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
-    }
+    txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
 
 #ifdef FEATURE_WLAN_TDLS
     pStaDs = dphLookupHashEntry(pMac, peer, &aid, &psessionEntry->dph.dphHashTable);

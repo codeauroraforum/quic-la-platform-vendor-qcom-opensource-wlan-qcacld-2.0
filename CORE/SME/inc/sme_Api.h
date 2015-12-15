@@ -1921,25 +1921,12 @@ eHalStatus sme_ScanGetBKIDCandidateList(tHalHandle hHal, tANI_U32 sessionId,
     \fn sme_OemDataReq
     \param sessionId - session id of session to be used for oem data req.
     \param pOemDataReqID - pointer to an object to get back the request ID
-    \param callback - a callback function that is called upon finish
-    \param pContext - a pointer passed in for the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_OemDataReq(tHalHandle hHal,
                                        tANI_U8 sessionId,
                                        tOemDataReqConfig *,
-                                       tANI_U32 *pOemDataReqID,
-                                       oemData_OemDataReqCompleteCallback callback,
-                                       void *pContext);
-
-/* ---------------------------------------------------------------------------
-    \fn sme_getOemDataRsp
-    \param pOemDataRsp - A pointer to the response object
-    \param pOemDataReqID - pointer to an object to get back the request ID
-    \return eHalStatus
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_getOemDataRsp(tHalHandle hHal,
-                                         tOemDataRsp **pOemDataRsp);
+                                       tANI_U32 *pOemDataReqID);
 
 #endif /*FEATURE_OEM_DATA_SUPPORT*/
 
@@ -3624,6 +3611,7 @@ void smeGetCommandQStatus( tHalHandle hHal );
  */
 VOS_STATUS sme_SetIdlePowersaveConfig(v_PVOID_t vosContext, tANI_U32 value);
 VOS_STATUS sme_notify_modem_power_state(tHalHandle hHal, tANI_U32 value);
+eHalStatus sme_set_cts2self_for_p2p_go(tHalHandle hHal);
 
 eHalStatus sme_ConfigEnablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode);
 eHalStatus sme_ConfigDisablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode);
@@ -3851,6 +3839,10 @@ eHalStatus sme_ocb_start_timing_advert(struct sir_ocb_timing_advert
 
 eHalStatus sme_ocb_stop_timing_advert(struct sir_ocb_timing_advert
                                       *timing_advert);
+
+int sme_ocb_gen_timing_advert_frame(tHalHandle hHal, tSirMacAddr self_addr,
+                                    uint8_t **buf, uint32_t *timestamp_offset,
+                                    uint32_t *time_value_offset);
 
 eHalStatus sme_ocb_get_tsf_timer(tHalHandle hHal, void *context,
                                  ocb_callback callback,
@@ -4402,6 +4394,27 @@ static inline VOS_STATUS sme_set_udp_resp_offload(struct udp_resp_offload
 eHalStatus sme_set_lost_link_info_cb(tHalHandle hal,
                                      void (*cb)(void *,
                                                 struct sir_lost_link_info *));
+#ifdef FEATURE_GREEN_AP
+VOS_STATUS sme_send_egap_conf_params(uint32_t enable,
+				     uint32_t inactivity_time,
+				     uint32_t wait_time,
+				     uint32_t flags);
+#else
+static inline VOS_STATUS sme_send_egap_conf_params(uint32_t enable,
+						   uint32_t inactivity_time,
+						   uint32_t wait_time,
+						   uint32_t flags)
+{
+	return VOS_STATUS_E_NOSUPPORT;
+}
+#endif
+
+#ifdef WLAN_FEATURE_WOW_PULSE
+VOS_STATUS sme_set_wow_pulse(struct wow_pulse_mode *wow_pulse_set_info);
+#endif
+
+eHalStatus sme_roam_set_default_key_index(tHalHandle hal, uint8_t session_id,
+					uint8_t default_idx);
 
 eHalStatus sme_roam_set_default_key_index(tHalHandle hal, uint8_t session_id,
 					uint8_t default_idx);

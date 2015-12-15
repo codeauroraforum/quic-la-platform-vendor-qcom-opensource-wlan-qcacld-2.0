@@ -2403,6 +2403,7 @@ static void wma_vdev_stats_lost_link_helper(tp_wma_handle wma,
 	int8_t rssi;
 	struct wma_target_req *req_msg;
 	uint8_t zero_mac[ETH_ALEN] = {0};
+	int8_t bcn_snr, dat_snr;
 
 	node = &wma->interfaces[vdev_stats->vdev_id];
 	if (node->vdev_up &&
@@ -2415,16 +2416,18 @@ static void wma_vdev_stats_lost_link_helper(tp_wma_handle wma,
 				 __func__);
 			return;
 		}
+		bcn_snr = vdev_stats->vdev_snr.bcn_snr;
+		dat_snr = vdev_stats->vdev_snr.dat_snr;
 		WMA_LOGD("%s: get vdev id %d, beancon snr %d, data snr %d",
-			 __func__, vdev_stats->vdev_id,
-			 vdev_stats->vdev_snr.bcn_snr,
-			 vdev_stats->vdev_snr.dat_snr);
-		if (vdev_stats->vdev_snr.bcn_snr != WMA_TGT_INVALID_SNR)
-			rssi = vdev_stats->vdev_snr.bcn_snr;
-		else if (vdev_stats->vdev_snr.dat_snr != WMA_TGT_INVALID_SNR)
-			rssi = vdev_stats->vdev_snr.dat_snr;
+			 __func__, vdev_stats->vdev_id, bcn_snr, dat_snr);
+		if ((bcn_snr != WMA_TGT_INVALID_SNR_OLD) &&
+			(bcn_snr != WMA_TGT_INVALID_SNR_NEW))
+			rssi = bcn_snr;
+		else if ((dat_snr != WMA_TGT_INVALID_SNR_OLD) &&
+				(dat_snr != WMA_TGT_INVALID_SNR_NEW))
+			rssi = dat_snr;
 		else
-			rssi = WMA_TGT_INVALID_SNR;
+			rssi = WMA_TGT_INVALID_SNR_OLD;
 
 		/* Get the absolute rssi value from the current rssi value */
 		rssi = rssi + WMA_TGT_NOISE_FLOOR_DBM;
@@ -2443,7 +2446,8 @@ static void wma_update_vdev_stats(tp_wma_handle wma,
 	v_S7_t rssi = 0;
 	VOS_STATUS vos_status;
 	tAniGetRssiReq *pGetRssiReq = (tAniGetRssiReq*)wma->pGetRssiReq;
-	vos_msg_t sme_msg = {0} ;
+	vos_msg_t sme_msg = {0};
+	int8_t bcn_snr, dat_snr;
 
 	node = &wma->interfaces[vdev_stats->vdev_id];
 	stats_rsp_params = node->stats_rsp;
@@ -2474,15 +2478,17 @@ static void wma_update_vdev_stats(tp_wma_handle wma,
 		}
 	}
 
+	bcn_snr = vdev_stats->vdev_snr.bcn_snr;
+	dat_snr = vdev_stats->vdev_snr.dat_snr;
 	WMA_LOGD("vdev id %d beancon snr %d data snr %d",
-			vdev_stats->vdev_id,
-			vdev_stats->vdev_snr.bcn_snr,
-			vdev_stats->vdev_snr.dat_snr);
+		vdev_stats->vdev_id, bcn_snr, dat_snr);
 
 	if (pGetRssiReq &&
 		pGetRssiReq->sessionId == vdev_stats->vdev_id) {
-		if ((vdev_stats->vdev_snr.bcn_snr == WMA_TGT_INVALID_SNR) &&
-			(vdev_stats->vdev_snr.dat_snr == WMA_TGT_INVALID_SNR)) {
+		if ((bcn_snr == WMA_TGT_INVALID_SNR_OLD ||
+			bcn_snr == WMA_TGT_INVALID_SNR_NEW) &&
+			(dat_snr == WMA_TGT_INVALID_SNR_OLD ||
+			 dat_snr == WMA_TGT_INVALID_SNR_NEW)) {
 			/*
 			 * Firmware sends invalid snr till it sees
 			 * Beacon/Data after connection since after
@@ -2492,10 +2498,12 @@ static void wma_update_vdev_stats(tp_wma_handle wma,
 			 */
 			rssi = wma->first_rssi;
 		} else {
-			if (vdev_stats->vdev_snr.bcn_snr != WMA_TGT_INVALID_SNR) {
-				rssi = vdev_stats->vdev_snr.bcn_snr;
-			} else if (vdev_stats->vdev_snr.dat_snr != WMA_TGT_INVALID_SNR) {
-				rssi = vdev_stats->vdev_snr.dat_snr;
+			if (bcn_snr != WMA_TGT_INVALID_SNR_OLD &&
+				bcn_snr != WMA_TGT_INVALID_SNR_NEW) {
+				rssi = bcn_snr;
+			} else if (dat_snr != WMA_TGT_INVALID_SNR_OLD &&
+					dat_snr != WMA_TGT_INVALID_SNR_NEW) {
+				rssi = dat_snr;
 			}
 
 			/*
@@ -2521,12 +2529,14 @@ static void wma_update_vdev_stats(tp_wma_handle wma,
 	if (node->psnr_req) {
 		tAniGetSnrReq *p_snr_req = node->psnr_req;
 
-		if (vdev_stats->vdev_snr.bcn_snr != WMA_TGT_INVALID_SNR)
-			p_snr_req->snr = vdev_stats->vdev_snr.bcn_snr;
-		else if (vdev_stats->vdev_snr.dat_snr != WMA_TGT_INVALID_SNR)
-			p_snr_req->snr = vdev_stats->vdev_snr.dat_snr;
+		if ((bcn_snr != WMA_TGT_INVALID_SNR_OLD) &&
+			(bcn_snr != WMA_TGT_INVALID_SNR_NEW))
+			p_snr_req->snr = bcn_snr;
+		else if ((dat_snr != WMA_TGT_INVALID_SNR_OLD) &&
+				(dat_snr != WMA_TGT_INVALID_SNR_NEW))
+			p_snr_req->snr = dat_snr;
 		else
-			p_snr_req->snr = WMA_TGT_INVALID_SNR;
+			p_snr_req->snr = WMA_TGT_INVALID_SNR_OLD;
 
 		sme_msg.type = eWNI_SME_SNR_IND;
 		sme_msg.bodyptr = p_snr_req;
@@ -4951,6 +4961,7 @@ static int wma_csa_offload_handler(void *handle, u_int8_t *event, u_int32_t len)
 		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie*)(&csa_event->xcsa_ie[0]);
 		csa_offload_event->channel = xcsa_ie->newchannel;
 		csa_offload_event->switchmode = xcsa_ie->switchmode;
+		csa_offload_event->new_op_class = xcsa_ie->newClass;
 	} else {
 		WMA_LOGE("CSA Event error: No CSA IE present");
 		vos_mem_free(csa_offload_event);
@@ -6700,6 +6711,8 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 		WMI_UPDATE_FW_MEM_DUMP_EVENTID,
 		wma_fw_mem_dump_event_handler);
 
+	wmi_set_tgt_assert(wma_handle->wmi_handle,
+			   mac_params->force_target_assert_enabled);
 	/* Firmware debug log */
 	vos_status = dbglog_init(wma_handle->wmi_handle);
 	if (vos_status != VOS_STATUS_SUCCESS) {
@@ -12320,6 +12333,9 @@ static int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 	cmd->peer_vht_caps = params->vht_caps;
 #endif
 
+	if (params->p2pCapableSta)
+		cmd->peer_flags |= WMI_PEER_IS_P2P_CAPABLE;
+
 	if (params->rmfEnabled)
 		cmd->peer_flags |= WMI_PEER_PMF;
 
@@ -13075,6 +13091,126 @@ static int32_t wmi_unified_pdev_green_ap_ps_enable_cmd(wmi_unified_t wmi_handle,
 	}
 	return 0;
 }
+
+/**
+ * wma_egap_info_status_event() - egap info status event
+ * @handle:	pointer to wma handler
+ * @event:	pointer to event
+ * @len:	len of the event
+ *
+ * Return:	0 for success, otherwise appropriate error code
+ */
+static int wma_egap_info_status_event(void *handle, u_int8_t *event,
+				      uint32_t len)
+{
+	WMI_TX_PAUSE_EVENTID_param_tlvs *param_buf;
+	wmi_ap_ps_egap_info_event_fixed_param  *egap_info_event;
+	wmi_ap_ps_egap_info_chainmask_list *chainmask_event;
+	u_int8_t *buf_ptr;
+
+	param_buf = (WMI_TX_PAUSE_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		WMA_LOGE("Invalid EGAP Info status event buffer");
+		return -EINVAL;
+	}
+
+	egap_info_event = (wmi_ap_ps_egap_info_event_fixed_param  *)
+				param_buf->fixed_param;
+	buf_ptr = (uint8_t *)egap_info_event;
+	buf_ptr += sizeof(wmi_ap_ps_egap_info_event_fixed_param);
+	chainmask_event = (wmi_ap_ps_egap_info_chainmask_list *)buf_ptr;
+
+	WMA_LOGI("mac_id: %d, status: %d, tx_mask: %x, rx_mask: %d",
+		 chainmask_event->mac_id,
+		 egap_info_event->status,
+		 chainmask_event->tx_chainmask,
+		 chainmask_event->rx_chainmask);
+	return 0;
+}
+
+/**
+ * wma_send_egap_conf_params() - send wmi cmd of egap configuration params
+ * @wma_handle:	 wma handler
+ * @egap_params: pointer to egap_params
+ *
+ * Return:	 0 for success, otherwise appropriate error code
+ */
+VOS_STATUS wma_send_egap_conf_params(WMA_HANDLE handle,
+				     struct egap_conf_params *egap_params)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	wmi_ap_ps_egap_param_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int32_t err;
+
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, sizeof(*cmd));
+	if (!buf) {
+		WMA_LOGE("Failed to allocate buffer to send ap_ps_egap cmd");
+		return -ENOMEM;
+	}
+	cmd = (wmi_ap_ps_egap_param_cmd_fixed_param *) wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_ap_ps_egap_param_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+			       wmi_ap_ps_egap_param_cmd_fixed_param));
+
+	cmd->enable = egap_params->enable;
+	cmd->inactivity_time = egap_params->inactivity_time;
+	cmd->wait_time = egap_params->wait_time;
+	cmd->flags = egap_params->flags;
+	err = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
+				   sizeof(*cmd), WMI_AP_PS_EGAP_PARAM_CMDID);
+	if (err) {
+		WMA_LOGE("Failed to send ap_ps_egap cmd");
+		adf_nbuf_free(buf);
+		return -EIO;
+	}
+	return 0;
+}
+
+/**
+ * wma_setup_egap_support() - setup the EGAP support flag
+ * @tgt_cfg:  pointer to hdd target configuration
+ * @egap_support: EGAP support flag
+ *
+ * Return:	  None
+ */
+void wma_setup_egap_support(struct hdd_tgt_cfg *tgt_cfg, WMA_HANDLE handle)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+
+	if (tgt_cfg && wma_handle)
+		tgt_cfg->egap_support = wma_handle->egap_support;
+}
+
+/**
+ * wma_register_egap_event_handle() - register the EGAP event handle
+ * @wma_handle:	wma handler
+ *
+ * Return:	None
+ */
+void wma_register_egap_event_handle(WMA_HANDLE handle)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	int status;
+
+	if (WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
+				   WMI_SERVICE_EGAP)) {
+		status = wmi_unified_register_event_handler(
+						   wma_handle->wmi_handle,
+						   WMI_AP_PS_EGAP_INFO_EVENTID,
+						   wma_egap_info_status_event);
+		if (status) {
+			WMA_LOGE("Failed to register Enhance Green AP event");
+			wma_handle->egap_support = false;
+		} else {
+			WMA_LOGI("Set the Enhance Green AP event handler");
+			wma_handle->egap_support = true;
+		}
+	} else
+		wma_handle->egap_support = false;
+}
+
 #endif /* FEATURE_GREEN_AP */
 
 static int
@@ -13696,9 +13832,6 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		case WMI_PDEV_PARAM_BURST_DUR:
 			wma->pdevconfig.burst_dur = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_POWER_GATING_SLEEP:
-			wma->pdevconfig.pwrgating = privcmd->param_value;
-			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT2G:
 			wma->pdevconfig.txpow2g = privcmd->param_value;
 			if ((pMac->roam.configParam.bandCapability ==
@@ -13857,9 +13990,6 @@ int wma_cli_get_command(void *wmapvosContext, int vdev_id,
 			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT5G:
 			ret = wma->pdevconfig.txpow5g;
-			break;
-                case WMI_PDEV_PARAM_POWER_GATING_SLEEP:
-			ret = wma->pdevconfig.pwrgating;
 			break;
                 case WMI_PDEV_PARAM_BURST_ENABLE:
 			ret = wma->pdevconfig.burst_enable;
@@ -15797,6 +15927,7 @@ static void wma_prevent_suspend_check(tp_wma_handle wma)
 	wma->ap_client_cnt++;
 	if (wma->ap_client_cnt ==
 	    wma->wlan_resource_config.num_offload_peers) {
+		vos_runtime_pm_prevent_suspend(wma->runtime_context.ap);
 		vos_wake_lock_acquire(&wma->wow_wake_lock,
 				WIFI_POWER_EVENT_WAKELOCK_ADD_STA);
 		WMA_LOGW("%s: %d clients connected, prevent suspend",
@@ -15811,6 +15942,7 @@ static void wma_allow_suspend_check(tp_wma_handle wma)
 	    wma->wlan_resource_config.num_offload_peers - 1) {
 		vos_wake_lock_release(&wma->wow_wake_lock,
                                       WIFI_POWER_EVENT_WAKELOCK_DEL_STA);
+		vos_runtime_pm_allow_suspend(wma->runtime_context.ap);
 		WMA_LOGW("%s: %d clients connected, allow suspend",
 			 __func__, wma->ap_client_cnt);
 	}
@@ -15952,8 +16084,14 @@ static wmi_buf_t wma_setup_install_key_cmd(tp_wma_handle wma_handle,
 	case eSIR_ED_WEP104:
 		cmd->key_cipher = WMI_CIPHER_WEP;
 		if (key_params->unicast &&
-		    cmd->key_ix == key_params->def_key_idx)
+				cmd->key_ix == key_params->def_key_idx) {
+			WMA_LOGD("STA Mode: cmd->key_flags |= TX_USAGE");
 			cmd->key_flags |= TX_USAGE;
+		} else if ((mode == wlan_op_mode_ap) &&
+				(cmd->key_ix == key_params->def_key_idx)) {
+			WMA_LOGD("AP Mode: cmd->key_flags |= TX_USAGE");
+			cmd->key_flags |= TX_USAGE;
+		}
 		break;
 	case eSIR_ED_TKIP:
 		cmd->key_txmic_len = WMA_TXMIC_LEN;
@@ -19913,10 +20051,13 @@ static void wma_add_wow_wakeup_event(tp_wma_handle wma,
 					   WOW_WAKE_EVENT_TYPE event,
 					   v_BOOL_t enable)
 {
-	if (enable)
+	if (enable) {
 		wma->wow_wakeup_enable_mask |= 1 << event;
-	else
+		wma->wow_wakeup_disable_mask &= ~(1 << event);
+	} else {
 		wma->wow_wakeup_disable_mask |= 1 << event;
+		wma->wow_wakeup_enable_mask &= ~(1 << event);
+	}
 
 	WMA_LOGD("%s %s event %s\n", __func__,
 			enable ? "enable" : "disable",
@@ -21334,6 +21475,7 @@ static VOS_STATUS wma_send_host_wakeup_ind_to_fw(tp_wma_handle wma)
 		if (!vos_is_logp_in_progress(VOS_MODULE_ID_WDA, NULL)) {
 #ifdef CONFIG_CNSS
 			if (pMac->sme.enableSelfRecovery) {
+				wmi_tag_crash_inject(wma->wmi_handle, true);
 				vos_trigger_recovery();
 			} else {
 				VOS_BUG(0);
@@ -26980,6 +27122,103 @@ static inline VOS_STATUS wma_send_udp_resp_offload_cmd(tp_wma_handle wma_handle,
 }
 #endif
 
+
+
+#ifdef WLAN_FEATURE_WOW_PULSE
+
+
+#define WMI_WOW_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM \
+WMI_WOW_HOSTWAKEUP_GPIO_PIN_PATTERN_CONFIG_CMD_fixed_param
+
+
+#define WMITLV_TAG_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM \
+WMITLV_TAG_STRUC_wmi_wow_hostwakeup_gpio_pin_pattern_config_cmd_fixed_param
+
+/*
+ * the repeat_cnt is reserved by FW team, the current value
+ * is always 0xffffffff
+ */
+#define WMI_WOW_PULSE_REPEAT_CNT 0xffffffff
+
+/**
+* wma_send_wow_pulse_cmd() - send wmi cmd of wow pulse cmd
+* infomation to fw.
+* @wma_handle: wma handler
+* @udp_response: wow_pulse_mode pointer
+*
+* Return: Return VOS_STATUS
+*/
+static VOS_STATUS wma_send_wow_pulse_cmd(tp_wma_handle wma_handle,
+					struct wow_pulse_mode *wow_pulse_cmd)
+{
+	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
+	wmi_buf_t buf;
+	WMI_WOW_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM *cmd;
+	u_int16_t len;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		 WMA_LOGE("wmi_buf_alloc failed");
+		 return VOS_STATUS_E_NOMEM;
+	}
+
+	cmd = (WMI_WOW_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM *)wmi_buf_data(buf);
+	vos_mem_zero(cmd, len);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM,
+		WMITLV_GET_STRUCT_TLVLEN(
+			WMI_WOW_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM));
+
+	cmd->enable = wow_pulse_cmd->wow_pulse_enable;
+	cmd->pin = wow_pulse_cmd->wow_pulse_pin;
+	cmd->interval_low = wow_pulse_cmd->wow_pulse_interval_low;
+	cmd->interval_high = wow_pulse_cmd->wow_pulse_interval_high;
+	cmd->repeat_cnt = WMI_WOW_PULSE_REPEAT_CNT;
+
+	if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
+		WMI_WOW_HOSTWAKEUP_GPIO_PIN_PATTERN_CONFIG_CMDID)) {
+		WMA_LOGE("Failed to send send wow pulse");
+		wmi_buf_free(buf);
+		vos_status = VOS_STATUS_E_FAILURE;
+	}
+
+	WMA_LOGD("%s: Exit", __func__);
+	return vos_status;
+}
+
+#undef WMI_WOW_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM
+#undef WMITLV_TAG_HOSTWAKEUP_GPIO_CMD_FIXED_PARAM
+#undef WMI_WOW_PULSE_REPEAT_CNT
+
+#else
+static inline VOS_STATUS wma_send_wow_pulse_cmd(tp_wma_handle wma_handle,
+					struct wow_pulse_mode *wow_pulse_cmd)
+{
+	return VOS_STATUS_E_FAILURE;
+}
+#endif
+
+/*
+ * wma_update_wep_default_key - function to update default key id
+ * @wma: pointer to wma handler
+ * @update_def_key: pointer to wep_update_default_key_idx
+ *
+ * function makes a copy of default key index to txrx node
+ *
+ * return: Success
+ */
+static VOS_STATUS wma_update_wep_default_key(tp_wma_handle wma,
+			struct wep_update_default_key_idx *update_def_key)
+{
+	struct wma_txrx_node *iface =
+		&wma->interfaces[update_def_key->session_id];
+	iface->wep_default_key_idx = update_def_key->default_idx;
+
+	return VOS_STATUS_SUCCESS;
+}
+
 /*
  * wma_update_wep_default_key - function to update default key id
  * @wma: pointer to wma handler
@@ -27780,11 +28019,24 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 				(struct udp_resp_offload *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
+		case WDA_SET_WOW_PULSE_CMD:
+			wma_send_wow_pulse_cmd(wma_handle,
+				(struct wow_pulse_mode *)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
 		case WDA_UPDATE_WEP_DEFAULT_KEY:
 			wma_update_wep_default_key(wma_handle,
 			    (struct wep_update_default_key_idx *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
+		case WDA_SET_EGAP_CONF_PARAMS:
+			wma_send_egap_conf_params(wma_handle,
+				(struct egap_conf_params *)msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_SET_CTS2SELF_FOR_STA:
+			wma_set_cts2self_for_p2p_go(wma_handle, true);
+
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
 			/* Do Nothing? MSG Body should be freed at here */
@@ -29826,6 +30078,8 @@ static void wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	hdd_tgt_cfg.lpss_support = wma_handle->lpss_support;
 #endif
 	hdd_tgt_cfg.ap_arpns_support = wma_handle->ap_arpns_support;
+
+	wma_setup_egap_support(&hdd_tgt_cfg, wma_handle);
 	wma_handle->tgt_cfg_update_cb(hdd_ctx, &hdd_tgt_cfg);
 }
 static wmi_buf_t wma_setup_wmi_init_msg(tp_wma_handle wma_handle,
@@ -30073,6 +30327,9 @@ v_VOID_t wma_rx_service_ready_event(WMA_HANDLE handle, void *cmd_param_info)
 		WMA_LOGE("Failed to register WMI_TBTTOFFSET_UPDATE_EVENTID callback");
 		return;
 	}
+
+	/* register the Enhanced Green AP event handler */
+	wma_register_egap_event_handle(wma_handle);
 
 	/* Initialize the log supported event handler */
 	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -31348,6 +31605,36 @@ VOS_STATUS WDA_SetIdlePsConfig(void *wda_handle, tANI_U32 idle_ps)
 	}
 
 	WMA_LOGD("Successfully Set Idle Ps Config %d", idle_ps);
+	return VOS_STATUS_SUCCESS;
+}
+
+/**
+ * wma_set_cts2self_for_p2p_go() - set CTS2SELF command for P2P GO.
+ * @wda_handle:                  pointer to wma handle.
+ * @cts2self_for_p2p_go:         value needs to set to firmware.
+ *
+ * At the time of driver startup, inform about ini parma to FW that
+ * if legacy client connects to P2P GO, stop using NOA for P2P GO.
+ *
+ * Return: VOS_STATUS.
+ */
+VOS_STATUS wma_set_cts2self_for_p2p_go(void *wda_handle,
+				    uint32_t cts2self_for_p2p_go)
+{
+	int32_t ret;
+	tp_wma_handle wma = (tp_wma_handle)wda_handle;
+
+	ret = wmi_unified_pdev_set_param(wma->wmi_handle,
+			WMI_PDEV_PARAM_CTS2SELF_FOR_P2P_GO_CONFIG,
+                        cts2self_for_p2p_go);
+	if (ret) {
+		WMA_LOGE("Fail to Set CTS2SELF for p2p GO %d",
+			cts2self_for_p2p_go);
+		return VOS_STATUS_E_FAILURE;
+	}
+
+	WMA_LOGD("Successfully Set CTS2SELF for p2p GO %d",
+		cts2self_for_p2p_go);
 	return VOS_STATUS_SUCCESS;
 }
 
@@ -32894,7 +33181,10 @@ uint32_t wma_get_vht_ch_width(void)
 	v_CONTEXT_t v_ctx =  vos_get_global_context(VOS_MODULE_ID_VOSS, NULL);
 	tp_wma_handle wm_hdl = (tp_wma_handle)vos_get_context(VOS_MODULE_ID_WDA,
 							      v_ctx);
-
+	if (NULL == wm_hdl) {
+		WMA_LOGE("%s: Failed to get wm_hdl", __func__);
+		return -EINVAL;
+	}
 	if (wm_hdl->vht_cap_info & IEEE80211_VHTCAP_SUP_CHAN_WIDTH_160)
 		fw_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
 	else if (wm_hdl->vht_cap_info & IEEE80211_VHTCAP_SUP_CHAN_WIDTH_80_160)
@@ -32903,3 +33193,79 @@ uint32_t wma_get_vht_ch_width(void)
 	return fw_ch_wd;
 }
 
+/*
+ * wma_suspend_fw() - API to suspend FW
+ *
+ * The API will be called only for SDIO driver from HDD, for other drivers
+ * by default HIF return failure, FW suspend happens in bus suspend callbacks.
+ *
+ * Return : int
+ */
+
+int wma_suspend_fw(void)
+{
+	int ret = 0;
+	int is_wow_enabled;
+
+	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA,
+			vos_get_global_context(VOS_MODULE_ID_VOSS, NULL));
+
+	if (!wma)
+		return -EINVAL;
+
+	is_wow_enabled = wma_is_wow_mode_selected(wma);
+	if (is_wow_enabled)
+		ret = wma_enable_wow_in_fw(wma, 0);
+	else
+		ret = wma_suspend_target(wma, 0);
+
+	if (ret) {
+		pr_err("%s: %s suspend failed\n", __func__,
+				is_wow_enabled ? "wow" : "pdev");
+		return ret;
+	}
+
+	pr_debug("%s: %s suspend successful\n", __func__,
+				is_wow_enabled ? "wow" : "pdev");
+
+	return ret;
+}
+
+/*
+ * wma_resume_fw() - API to resume FW
+ *
+ * The API will be called only for SDIO driver from HDD, for other drivers
+ * by default HIF return failure, FW resume happens in bus resume callbacks.
+ *
+ * Return : int
+ */
+
+
+int wma_resume_fw(void)
+{
+	int ret = 0;
+	int is_wow_enabled;
+
+	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA,
+			vos_get_global_context(VOS_MODULE_ID_VOSS, NULL));
+
+	if (!wma)
+		return -EINVAL;
+
+	is_wow_enabled = wma_is_wow_mode_selected(wma);
+	if (is_wow_enabled)
+		ret = wma_disable_wow_in_fw(wma, 0);
+	else
+		ret = wma_resume_target(wma, 0);
+
+	if (ret) {
+		pr_err("%s: %s resume failed\n", __func__,
+				is_wow_enabled ? "wow" : "pdev");
+		return ret;
+	}
+
+	pr_debug("%s: %s resume successful\n", __func__,
+			is_wow_enabled ? "wow" : "pdev");
+
+	return ret;
+}

@@ -105,7 +105,7 @@
 #include "wlan_qct_wda.h"
 #include "wlan_hdd_tdls.h"
 #ifdef FEATURE_WLAN_CH_AVOID
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
 #include <net/cnss.h>
 #endif
 #include "regdomain_common.h"
@@ -612,6 +612,136 @@ done:
     return;
 }
 
+/**
+ * hdd_wlan_green_ap_init() - Initialize Green AP feature
+ * @hdd_ctx: HDD global context
+ *
+ * Return: none
+ */
+void hdd_wlan_green_ap_init(struct hdd_context_s *hdd_ctx)
+{
+	if (!VOS_IS_STATUS_SUCCESS(hdd_wlan_green_ap_attach(hdd_ctx)))
+		hddLog(LOGE, FL("Failed to allocate Green-AP resource"));
+}
+
+/**
+ * hdd_wlan_green_ap_deinit() - De-initialize Green AP feature
+ * @hdd_ctx: HDD global context
+ *
+ * Return: none
+ */
+void hdd_wlan_green_ap_deinit(struct hdd_context_s *hdd_ctx)
+{
+	if (!VOS_IS_STATUS_SUCCESS(hdd_wlan_green_ap_deattach(hdd_ctx)))
+		hddLog(LOGE, FL("Cannot deallocate Green-AP resource"));
+}
+
+/**
+ * wlan_hdd_set_egap_support() - helper function to set egap support flag
+ * @hdd_ctx:   pointer to hdd context
+ * @cfg:       pointer to hdd target configuration knob
+ *
+ * Return:     None
+ */
+void wlan_hdd_set_egap_support(hdd_context_t *hdd_ctx, struct hdd_tgt_cfg *cfg)
+{
+	if (hdd_ctx && cfg)
+		hdd_ctx->green_ap_ctx->egap_support = cfg->egap_support;
+}
+
+/**
+ * hdd_wlan_green_ap_start_bss() - Notify Green AP of Start BSS event
+ * @hdd_ctx: HDD global context
+ *
+ * Return: none
+ */
+void hdd_wlan_green_ap_start_bss(struct hdd_context_s *hdd_ctx)
+{
+	hdd_config_t *cfg;
+
+	if (!hdd_ctx) {
+		hddLog(LOGE, FL("hdd context is NULL"));
+		goto exit;
+	}
+
+	cfg = hdd_ctx->cfg_ini;
+
+	if (!cfg) {
+		hddLog(LOGE, FL("hdd cfg is NULL"));
+		goto exit;
+	}
+
+	/* check if the firmware and ini are both enabled the egap,
+	 * and also the feature_flag enable, then we enable the egap
+	 */
+	if (hdd_ctx->green_ap_ctx->egap_support && cfg->enable_egap &&
+	    cfg->egap_feature_flag) {
+		hddLog(LOG1,
+		       FL("Set EGAP - enabled: %d, flag: %x, inact_time: %d, wait_time: %d"),
+			  cfg->enable_egap,
+			  cfg->egap_feature_flag,
+			  cfg->egap_inact_time,
+			  cfg->egap_wait_time);
+		if (!sme_send_egap_conf_params(cfg->enable_egap,
+					       cfg->egap_inact_time,
+					       cfg->egap_wait_time,
+					       cfg->egap_feature_flag)) {
+			/* EGAP is enabled, disable host GAP */
+			hdd_wlan_green_ap_mc(hdd_ctx, GREEN_AP_PS_STOP_EVENT);
+			goto exit;
+		}
+		/* fall through, if send_egap_conf_params() failed,
+		 * then check host GAP and enable it accordingly
+		 */
+	}
+
+	if (!(VOS_STA & hdd_ctx->concurrency_mode) &&
+	    cfg->enable2x2 && cfg->enableGreenAP) {
+		hdd_wlan_green_ap_mc(hdd_ctx, GREEN_AP_PS_START_EVENT);
+	} else {
+		hdd_wlan_green_ap_mc(hdd_ctx, GREEN_AP_PS_STOP_EVENT);
+		hddLog(LOG1,
+		       FL("Green AP disabled - sta_con: %d, 2x2: %d, GAP: %d"),
+		       (VOS_STA & hdd_ctx->concurrency_mode),
+		       cfg->enable2x2, cfg->enableGreenAP);
+	}
+exit:
+	return;
+}
+
+/**
+ * hdd_wlan_green_ap_stop_bss() - Notify Green AP of Stop BSS event
+ * @hdd_ctx: HDD global context
+ *
+ * Return: none
+ */
+void hdd_wlan_green_ap_stop_bss(struct hdd_context_s *hdd_ctx)
+{
+	hdd_wlan_green_ap_mc(hdd_ctx, GREEN_AP_PS_STOP_EVENT);
+}
+
+/**
+ * hdd_wlan_green_ap_add_sta() - Notify Green AP of Add Station  event
+ * @hdd_ctx: HDD global context
+ *
+ * Return: none
+ */
+void hdd_wlan_green_ap_add_sta(struct hdd_context_s *hdd_ctx)
+{
+	hdd_wlan_green_ap_mc(hdd_ctx, GREEN_AP_ADD_STA_EVENT);
+}
+
+/**
+ * hdd_wlan_green_ap_del_sta() - Notify Green AP of Delete Station event
+ * @hdd_ctx: HDD global context
+ *
+ * Return: none
+ */
+void hdd_wlan_green_ap_del_sta(struct hdd_context_s *hdd_ctx)
+{
+	hdd_wlan_green_ap_mc(hdd_ctx, GREEN_AP_DEL_STA_EVENT);
+}
+
 #endif /* FEATURE_GREEN_AP */
 
 /**
@@ -764,7 +894,7 @@ static int __hdd_netdev_notifier_call(struct notifier_block * nb,
       (strncmp(dev->name, "p2p", 3)))
       return NOTIFY_DONE;
 
-   if ((pAdapter->magic != WLAN_HDD_ADAPTER_MAGIC) &&
+   if ((pAdapter->magic != WLAN_HDD_ADAPTER_MAGIC) ||
       (pAdapter->dev != dev)) {
       hddLog(LOGE, FL("device adapter is not matching!!!"));
       return NOTIFY_DONE;
@@ -7202,6 +7332,8 @@ void hdd_update_tgt_cfg(void *context, void *param)
     hdd_ctx->lpss_support = cfg->lpss_support;
 #endif
 
+    wlan_hdd_set_egap_support(hdd_ctx, cfg);
+
     hdd_ctx->ap_arpns_support = cfg->ap_arpns_support;
     hdd_update_tgt_services(hdd_ctx, &cfg->services);
     if (hdd_ctx->per_band_chainmask_supp)
@@ -8072,6 +8204,87 @@ void hdd_set_station_ops( struct net_device *pWlanDev )
       pWlanDev->netdev_ops = &wlan_drv_ops;
 }
 
+#ifdef FEATURE_RUNTIME_PM
+/**
+ * hdd_runtime_suspend_init() - API to initialize runtime pm context
+ * @hdd_ctx: HDD Context
+ *
+ * The API initializes the context to prevent runtime pm for various use
+ * cases like scan, roc, dfs.
+ * This API can be extended to initialize the context to prevent runtime pm
+ *
+ * Return: void
+ */
+void hdd_runtime_suspend_init(hdd_context_t *hdd_ctx)
+{
+	struct hdd_runtime_pm_context *context = &hdd_ctx->runtime_context;
+
+	context->scan = vos_runtime_pm_prevent_suspend_init("scan");
+	context->roc = vos_runtime_pm_prevent_suspend_init("roc");
+	context->dfs = vos_runtime_pm_prevent_suspend_init("dfs");
+}
+
+/**
+ * hdd_runtime_suspend_deinit() - API to deinit runtime pm context
+ * @hdd_ctx: HDD context
+ *
+ * The API deinit the context to prevent runtime pm.
+ *
+ * Return: void
+ */
+void hdd_runtime_suspend_deinit(hdd_context_t *hdd_ctx)
+{
+	struct hdd_runtime_pm_context *context = &hdd_ctx->runtime_context;
+
+	vos_runtime_pm_prevent_suspend_deinit(context->scan);
+	context->scan = NULL;
+	vos_runtime_pm_prevent_suspend_deinit(context->roc);
+	context->roc = NULL;
+	vos_runtime_pm_prevent_suspend_deinit(context->dfs);
+	context->dfs = NULL;
+}
+
+/**
+ * hdd_adapter_runtime_suspend_init() - API to init runtime pm context/adapter
+ * @adapter: Interface Adapter
+ *
+ * API is used to init the context to prevent runtime pm/adapter
+ *
+ * Return: void
+ */
+static void
+hdd_adapter_runtime_suspend_init(hdd_adapter_t *adapter)
+{
+	struct hdd_adapter_pm_context *context = &adapter->runtime_context;
+
+	context->connect = vos_runtime_pm_prevent_suspend_init("connect");
+}
+
+/**
+ * hdd_adapter_runtime_suspend_denit() - API to deinit runtime pm/adapter
+ * @adapter: Interface Adapter
+ *
+ * API is used to deinit the context to prevent runtime pm/adapter
+ *
+ * Return: void
+ */
+static void hdd_adapter_runtime_suspend_denit(hdd_adapter_t *adapter)
+{
+	struct hdd_adapter_pm_context *context = &adapter->runtime_context;
+
+	vos_runtime_pm_prevent_suspend_deinit(context->connect);
+	context->connect = NULL;
+}
+
+#else
+void hdd_runtime_suspend_init(hdd_context_t *hdd_ctx) { }
+void hdd_runtime_suspend_deinit(hdd_context_t *hdd_ctx) { }
+static inline void
+hdd_adapter_runtime_suspend_init(hdd_adapter_t *adapter) { }
+static inline void
+hdd_adapter_runtime_suspend_denit(hdd_adapter_t *adapter) { }
+#endif
+
 static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMacAddr macAddr, const char* name )
 {
    struct net_device *pWlanDev = NULL;
@@ -8162,7 +8375,7 @@ static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMac
       /* set pWlanDev's parent to underlying device */
       SET_NETDEV_DEV(pWlanDev, pHddCtx->parent_dev);
       hdd_wmm_init( pAdapter );
-      pAdapter->runtime_ctx = vos_runtime_pm_prevent_suspend_init(name);
+      hdd_adapter_runtime_suspend_init(pAdapter);
    }
 
    return pAdapter;
@@ -8503,8 +8716,7 @@ void hdd_cleanup_adapter(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
       return;
    }
 
-   vos_runtime_pm_prevent_suspend_deinit(pAdapter->runtime_ctx);
-   pAdapter->runtime_ctx = NULL;
+    hdd_adapter_runtime_suspend_denit(pAdapter);
    /* The adapter is marked as closed. When hdd_wlan_exit() call returns,
     * the driver is almost closed and cannot handle either control
     * messages or data. However, unregister_netdevice() call above will
@@ -9216,6 +9428,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
                              moduleLoglevel,
                              &numEntries,
                              FW_MODULE_LOG_LEVEL_STRING_LENGTH);
+
      while (count < numEntries)
      {
          /* FW module log level input string looks like below:
@@ -9249,12 +9462,16 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
 
 #endif
 
+     ret = process_wma_set_command((int)pAdapter->sessionId,
+                                (int)WMI_VDEV_PARAM_ENABLE_RTSCTS,
+                                pHddCtx->cfg_ini->rts_profile, VDEV_CMD);
+     if (ret != 0)
+        hddLog(LOGE, "FAILED TO SET RTSCTS Profile ret:%d", ret);
+
 
    return pAdapter;
 
 err_free_netdev:
-   vos_runtime_pm_prevent_suspend_deinit(pAdapter->runtime_ctx);
-   pAdapter->runtime_ctx = NULL;
    free_netdev(pAdapter->dev);
    wlan_hdd_release_intf_addr( pHddCtx,
                                pAdapter->macAddressCurrent.bytes );
@@ -9422,6 +9639,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
    switch(pAdapter->device_mode)
    {
       case WLAN_HDD_INFRA_STATION:
+      case WLAN_HDD_IBSS:
       case WLAN_HDD_P2P_CLIENT:
       case WLAN_HDD_P2P_DEVICE:
          if (hdd_connIsConnected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)) ||
@@ -9462,7 +9680,8 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
             hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
                                eCSR_SCAN_ABORT_DEFAULT);
          }
-         if (pAdapter->device_mode != WLAN_HDD_INFRA_STATION) {
+         if ((pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) ||
+              (pAdapter->device_mode == WLAN_HDD_P2P_DEVICE)) {
              wlan_hdd_cleanup_remain_on_channel_ctx(pAdapter);
          }
 
@@ -9693,7 +9912,7 @@ void hdd_connect_result(struct net_device *dev,
 	cfg80211_connect_result(dev, bssid, req_ie, req_ie_len,
 				resp_ie, resp_ie_len, status, gfp);
 
-	vos_runtime_pm_allow_suspend(padapter->runtime_ctx);
+	vos_runtime_pm_allow_suspend(padapter->runtime_context.connect);
 }
 
 
@@ -10950,13 +11169,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    //This frees pMac(HAL) context. There should not be any call that requires pMac access after this.
    vos_close(pVosContext);
 
-#ifdef FEATURE_GREEN_AP
-   if (!VOS_IS_STATUS_SUCCESS(
-         hdd_wlan_green_ap_deattach(pHddCtx)))
-   {
-      hddLog(LOGE, FL("Cannot deallocate Green-AP resource"));
-   }
-#endif
+   hdd_wlan_green_ap_deinit(pHddCtx);
 
    //Close Watchdog
    if (pConfig && pConfig->fIsLogpEnabled)
@@ -10980,6 +11193,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 #endif /* WLAN_KD_READY_NOTIFIER */
 
 
+   hdd_runtime_suspend_deinit(pHddCtx);
    hdd_close_all_adapters( pHddCtx );
 
 #ifdef IPA_OFFLOAD
@@ -11857,6 +12071,63 @@ static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_WOW_PULSE
+/**
+* wlan_hdd_set_wow_pulse() - call SME to send wmi cmd of wow pulse
+* @phddctx: hdd_context_t structure pointer
+* @enable: enable or disable this behaviour
+*
+* Return: int
+*/
+static int wlan_hdd_set_wow_pulse(hdd_context_t *phddctx, bool enable)
+{
+	hdd_config_t *pcfg_ini = phddctx->cfg_ini;
+	struct wow_pulse_mode wow_pulse_set_info;
+	VOS_STATUS status;
+
+	hddLog(LOG1, FL("wow pulse enable flag is %d"), enable);
+
+	if (false == phddctx->cfg_ini->wow_pulse_support)
+		return 0;
+
+	/* prepare the request to send to SME */
+	if (enable == true) {
+		wow_pulse_set_info.wow_pulse_enable = true;
+		wow_pulse_set_info.wow_pulse_pin =
+				pcfg_ini->wow_pulse_pin;
+		wow_pulse_set_info.wow_pulse_interval_low =
+				pcfg_ini->wow_pulse_interval_low;
+		wow_pulse_set_info.wow_pulse_interval_high=
+				pcfg_ini->wow_pulse_interval_high;
+	} else {
+		wow_pulse_set_info.wow_pulse_enable = false;
+		wow_pulse_set_info.wow_pulse_pin = 0;
+		wow_pulse_set_info.wow_pulse_interval_low = 0;
+		wow_pulse_set_info.wow_pulse_interval_high= 0;
+	}
+	hddLog(LOG1,"%s: enable %d pin %d low %d high %d",
+		__func__, wow_pulse_set_info.wow_pulse_enable,
+		wow_pulse_set_info.wow_pulse_pin,
+		wow_pulse_set_info.wow_pulse_interval_low,
+		wow_pulse_set_info.wow_pulse_interval_high);
+
+	status = sme_set_wow_pulse(&wow_pulse_set_info);
+	if (VOS_STATUS_E_FAILURE == status) {
+		hddLog(LOGE,
+			"%s: sme_set_wow_pulse failure!", __func__);
+		return -EIO;
+	}
+	hddLog(LOG2,
+		"%s: sme_set_wow_pulse success!", __func__);
+	return 0;
+}
+#else
+static int inline wlan_hdd_set_wow_pulse(hdd_context_t *phddctx, bool enable)
+{
+	return 0;
+}
+#endif
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_wlan_startup() - HDD init function
@@ -11886,7 +12157,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    tSmeThermalParams thermalParam;
    tSirTxPowerLimit *hddtxlimit;
 #ifdef FEATURE_WLAN_CH_AVOID
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
    uint16_t unsafe_channel_count;
    int unsafeChannelIndex;
 #endif
@@ -11928,6 +12199,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    vos_set_wakelock_logging(false);
 
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+   vos_set_load_in_progress(VOS_MODULE_ID_VOSS, TRUE);
 
    /*Get vos context here bcoz vos_open requires it*/
    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
@@ -12133,6 +12405,8 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_wdclose;
    }
 
+   hdd_wlan_green_ap_init(pHddCtx);
+
    status = vos_open( &pVosContext, 0);
    if ( !VOS_IS_STATUS_SUCCESS( status ))
    {
@@ -12168,6 +12442,12 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
              "%s: Failed to init channel list", __func__);
       goto err_vosclose;
    }
+
+   if (0 != wlan_hdd_set_wow_pulse(pHddCtx, true)) {
+      hddLog(VOS_TRACE_LEVEL_ERROR,
+             "%s: Failed to set wow pulse", __func__);
+   }
+
 
    /* Set 802.11p config
     * TODO-OCB: This has been temporarily added here to ensure this paramter
@@ -12253,8 +12533,24 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    }
 
 #ifdef IPA_OFFLOAD
+#ifdef SYNC_IPA_READY
+   /* Check if IPA is ready before calling any IPA API */
+   if ((ret = ipa_register_ipa_ready_cb((void *)hdd_ipa_ready_cb,
+                                      (void *)pHddCtx)) == -EEXIST) {
+      hddLog(VOS_TRACE_LEVEL_FATAL, FL("IPA is ready"));
+   } else if (ret >= 0) {
+      hddLog(VOS_TRACE_LEVEL_FATAL,
+             FL("IPA is not ready - wait until it is ready"));
+      init_completion(&pHddCtx->ipa_ready);
+      wait_for_completion(&pHddCtx->ipa_ready);
+   } else {
+      hddLog(VOS_TRACE_LEVEL_FATAL,
+             FL("IPA is not ready - Fail to register IPA ready callback"));
+      goto err_wiphy_unregister;
+   }
+#endif
    if (hdd_ipa_init(pHddCtx) == VOS_STATUS_E_FAILURE)
-	goto err_wiphy_unregister;
+      goto err_wiphy_unregister;
 #endif
 
    /*Start VOSS which starts up the SME/MAC/HAL modules and everything else */
@@ -12266,7 +12562,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    }
 
 #ifdef FEATURE_WLAN_CH_AVOID
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
    cnss_get_wlan_unsafe_channel(pHddCtx->unsafe_channel_list,
                                 &(pHddCtx->unsafe_channel_count),
                                 sizeof(v_U16_t) * NUM_20MHZ_RF_CHANNELS);
@@ -12326,6 +12622,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       }
 
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
+      vos_set_load_in_progress(VOS_MODULE_ID_VOSS, FALSE);
       pHddCtx->isLoadInProgress = FALSE;
 
       hddLog(LOGE, FL("FTM driver loaded"));
@@ -12609,6 +12906,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       hdd_set_idle_ps_config(pHddCtx, TRUE);
    }
 
+   if (pHddCtx->cfg_ini->enable_go_cts2self_for_sta)
+       sme_set_cts2self_for_p2p_go(pHddCtx->hHal);
+
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
    if (pHddCtx->cfg_ini->WlanAutoShutdown != 0)
        if (sme_set_auto_shutdown_cb(pHddCtx->hHal, wlan_hdd_auto_shutdown_cb)
@@ -12621,13 +12921,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                   hdd_skip_acs_scan_timer_handler, (void *)pHddCtx);
    if (!VOS_IS_STATUS_SUCCESS(status))
         hddLog(LOGE, FL("Failed to init ACS Skip timer\n"));
-#endif
-
-#ifdef FEATURE_GREEN_AP
-    if (!VOS_IS_STATUS_SUCCESS(
-             hdd_wlan_green_ap_attach(pHddCtx))) {
-       hddLog(LOGE, FL("Failed to allocate Green-AP resource"));
-    }
 #endif
 
 #ifdef WLAN_FEATURE_NAN
@@ -12687,11 +12980,11 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                "%s: Error setting txlimit in sme", __func__);
    }
 
-   hal_status = sme_set_tsf_gpio(pHddCtx->hHal, pHddCtx->cfg_ini->tsf_gpio_pin);
-
-   if (eHAL_STATUS_SUCCESS != hal_status) {
-        hddLog(VOS_TRACE_LEVEL_ERROR,
-            FL("set tsf GPIO fail"));
+   if (pHddCtx->cfg_ini->tsf_gpio_pin != TSF_GPIO_PIN_INVALID) {
+       hal_status = sme_set_tsf_gpio(pHddCtx->hHal,
+                                     pHddCtx->cfg_ini->tsf_gpio_pin);
+       if (eHAL_STATUS_SUCCESS != hal_status)
+           hddLog(VOS_TRACE_LEVEL_ERROR, FL("set tsf GPIO failed"));
    }
 
 #ifdef MSM_PLATFORM
@@ -12760,8 +13053,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       hddLog(LOG1, FL("Registered IPv4 notifier"));
 
    ol_pktlog_init(hif_sc);
+   hdd_runtime_suspend_init(pHddCtx);
    pHddCtx->isLoadInProgress = FALSE;
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
+   vos_set_load_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    complete(&wlan_start_comp);
    goto success;
 
@@ -12823,6 +13118,8 @@ err_vosclose:
 err_vos_nv_close:
 
    vos_nv_close();
+
+   hdd_wlan_green_ap_deinit(pHddCtx);
 
 err_wdclose:
    if(pHddCtx->cfg_ini->fIsLogpEnabled)
@@ -13868,7 +14165,7 @@ void hdd_ch_avoid_cb
        }
    }
 
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
             "%s : number of unsafe channels is %d ",
             __func__,  hdd_ctxt->unsafe_channel_count);
