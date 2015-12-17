@@ -18798,7 +18798,7 @@ static VOS_STATUS wma_suspend_req(tp_wma_handle wma, tpSirWlanSuspendParam info)
 						wma->wow.gtk_pdev_enable);
 	}
 
-	if (!connected && !pno_in_progress && !extscan_in_progress) {
+	if (!enable_wow && !pno_in_progress && !extscan_in_progress) {
 		WMA_LOGD("All vdev are in disconnected state and pno/extscan is not in progress, skipping wow");
 		vos_mem_free(info);
 		goto send_ready_to_suspend;
