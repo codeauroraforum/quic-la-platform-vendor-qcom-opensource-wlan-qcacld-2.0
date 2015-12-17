@@ -39,12 +39,12 @@ BRIEF DESCRIPTION:
 ===========================================================================*/
 
 #define QWLAN_VERSION_MAJOR            4
-#define QWLAN_VERSION_MINOR            0
-#define QWLAN_VERSION_PATCH            10	
+#define QWLAN_VERSION_MINOR            2
+#define QWLAN_VERSION_PATCH            24	
 #define QWLAN_VERSION_EXTRA            ""
-#define QWLAN_VERSION_BUILD            239
+#define QWLAN_VERSION_BUILD            30
 
-#define QWLAN_VERSIONSTR               "4.0.10.239"
+#define QWLAN_VERSIONSTR               "4.2.24.30"
 
 
 #define AR6320_REV1_VERSION             0x5000000
