@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -6485,4 +6485,18 @@ struct udp_resp_offload {
 
 };
 
+/**
+ * struct smps_force_mode_event - smps force mode event param
+ * @message_type: Type of message
+ * @length: length
+ * @vdev_id: vdev id
+ * @status: status of the SMPS force mode command
+ *
+ */
+struct sir_smps_force_mode_event {
+	uint16_t   message_type;
+	uint16_t   length;
+	uint8_t    vdev_id;
+	uint8_t    status;
+};
 #endif /* __SIR_API_H */
