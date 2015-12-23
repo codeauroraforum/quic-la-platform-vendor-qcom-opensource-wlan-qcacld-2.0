@@ -3412,6 +3412,15 @@ enum dot11p_mode {
 #define CFG_TGT_GTX_USR_CFG_MAX       (32)
 #define CFG_TGT_GTX_USR_CFG_DEFAULT   (32)
 
+/*
+ * Support to start sap in indoor channel
+ * Customer can config this item to enable/disable sap in indoor channel
+ * Default: Disable
+ */
+#define CFG_INDOOR_CHANNEL_SUPPORT_NAME     "gindoor_channel_support"
+#define CFG_INDOOR_CHANNEL_SUPPORT_MIN      (0)
+#define CFG_INDOOR_CHANNEL_SUPPORT_MAX      (1)
+#define CFG_INDOOR_CHANNEL_SUPPORT_DEFAULT  (0)
 
 /*---------------------------------------------------------------------------
   Type declarations
@@ -4109,6 +4118,7 @@ typedef struct
    uint16_t                    max_mgmt_tx_fail_count;
    int8_t                      first_scan_bucket_threshold;
    uint8_t                     ht_mpdu_density;
+   bool                        indoor_channel_support;
    uint16_t                    sap_tx_leakage_threshold;
    /* parameter to control GTX */
    uint32_t                    tgt_gtx_usr_cfg;

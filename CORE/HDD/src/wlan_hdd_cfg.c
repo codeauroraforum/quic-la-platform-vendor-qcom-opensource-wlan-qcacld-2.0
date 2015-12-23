@@ -4209,6 +4209,14 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_TGT_GTX_USR_CFG_DEFAULT,
                 CFG_TGT_GTX_USR_CFG_MIN,
                 CFG_TGT_GTX_USR_CFG_MAX),
+
+   REG_VARIABLE(CFG_INDOOR_CHANNEL_SUPPORT_NAME,
+                WLAN_PARAM_Integer,
+                hdd_config_t, indoor_channel_support,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_INDOOR_CHANNEL_SUPPORT_DEFAULT,
+                CFG_INDOOR_CHANNEL_SUPPORT_MIN,
+                CFG_INDOOR_CHANNEL_SUPPORT_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
