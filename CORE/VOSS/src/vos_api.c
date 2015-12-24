@@ -1335,42 +1335,6 @@ void vos_set_logp_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
    pHddCtx->isLogpInProgress = value;
 }
 
-/**
- * vos_is_unload_in_progress() - check if driver unload is in
- * progress
- *
- * @moduleContext: the input module context pointer
- * @moduleId: the module ID who's context pointer is input in
- *        moduleContext
- *
- * Return: true  - unload in progress
- *         false - unload not in progress/error
- */
-
-
-v_BOOL_t vos_is_unload_in_progress(VOS_MODULE_ID moduleId,
-				 v_VOID_t *moduleContext)
-{
-	hdd_context_t *hdd_ctx = NULL;
-
-	if (gpVosContext == NULL) {
-		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-		"%s: global voss context is NULL", __func__);
-		VOS_ASSERT(0);
-		return 0;
-	}
-	hdd_ctx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD,
-						   gpVosContext);
-	if (NULL == hdd_ctx) {
-		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-		"%s: hdd context is NULL", __func__);
-		VOS_ASSERT(0);
-		return 0;
-	}
-
-	return hdd_ctx->isUnloadInProgress;
-}
-
 v_U8_t vos_is_load_unload_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext)
 {
   if (gpVosContext == NULL)
@@ -1402,6 +1366,23 @@ void vos_set_load_unload_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
 }
 
 /**
+ * vos_is_unload_in_progress - check if driver unload is in progress
+ *
+ * Return: true - unload in progress
+ *         false - unload not in progress
+ */
+v_U8_t vos_is_unload_in_progress(void)
+{
+	if (gpVosContext == NULL) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+			"%s: global voss context is NULL", __func__);
+		return 0;
+	}
+
+	return gpVosContext->is_unload_in_progress;
+}
+
+/**
  * vos_is_load_in_progress - check if driver load is in progress
  *
  * @moduleId: the module ID who's context pointer is input in moduleContext
@@ -1419,6 +1400,24 @@ v_U8_t vos_is_load_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext)
 	}
 
 	return gpVosContext->is_load_in_progress;
+}
+
+/**
+ * vos_set_unload_in_progress - set driver unload in progress status
+ * @value: true - driver unload starts
+ *         false - driver unload completes
+ *
+ * Return: none
+ */
+void vos_set_unload_in_progress(v_U8_t value)
+{
+	if (gpVosContext == NULL) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+			"%s: global voss context is NULL", __func__);
+		return;
+	}
+
+	gpVosContext->is_unload_in_progress = value;
 }
 
 /**
@@ -1843,218 +1842,6 @@ VOS_STATUS vos_mq_post_message( VOS_MQ_ID msgQueueId, vos_msg_t *pMsg )
   return VOS_STATUS_SUCCESS;
 
 } /* vos_mq_post_message()*/
-
-
-/**---------------------------------------------------------------------------
-
-  \brief vos_tx_mq_serialize() - serialize a message to the Tx execution flow
-
-  This API allows messages to be posted to a specific message queue in the
-  Tx excution flow.  Messages for the Tx execution flow can be posted only
-  to the following queue.
-
-  <ul>
-    <li> TL
-  </ul>
-
-  \param msgQueueId - identifies the message queue upon which the message
-         will be posted.
-
-  \param message - a pointer to a message buffer.  Body memory for this message
-         buffer is allocated by the caller and free'd by the vOSS after the
-         message is dispacthed to the appropriate component.  If the consumer
-         of the message needs to keep anything in the body, it needs to copy
-         the contents before returning from the message handler.
-
-  \return VOS_STATUS_SUCCESS - the message has been successfully posted
-          to the message queue.
-
-          VOS_STATUS_E_INVAL - The value specified by msgQueueId does not
-          refer to a valid Message Queue Id.
-
-          VOS_STATUS_E_FAULT  - message is an invalid pointer.
-
-          VOS_STATUS_E_FAILURE - the message queue handler has reported
-          an unknown failure.
-
-  \sa
-
-  --------------------------------------------------------------------------*/
-VOS_STATUS vos_tx_mq_serialize( VOS_MQ_ID msgQueueId, vos_msg_t *pMsg )
-{
-  pVosMqType      pTargetMq   = NULL;
-  pVosMsgWrapper  pMsgWrapper = NULL;
-
-  if ((gpVosContext == NULL) || (pMsg == NULL))
-  {
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-        "%s: Null params or global vos context is null", __func__);
-    VOS_ASSERT(0);
-    return VOS_STATUS_E_FAILURE;
-  }
-
-  switch (msgQueueId)
-  {
-    /// Message Queue ID for messages bound for SME
-    case  VOS_MQ_ID_TL:
-    {
-       pTargetMq = &(gpVosContext->vosSched.tlTxMq);
-       break;
-    }
-
-    /// Message Queue ID for messages bound for the SYS module
-    case VOS_MQ_ID_SYS:
-    {
-       pTargetMq = &(gpVosContext->vosSched.sysTxMq);
-       break;
-    }
-
-    default:
-
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-              "%s: Trying to queue msg into unknown Tx Msg queue ID %d",
-               __func__, msgQueueId);
-
-    return VOS_STATUS_E_FAILURE;
-  }
-
-  if (pTargetMq == NULL)
-  {
-     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-         "%s: pTargetMq == NULL", __func__);
-     return VOS_STATUS_E_FAILURE;
-  }
-
-
-  /*
-  ** Try and get a free Msg wrapper
-  */
-  pMsgWrapper = vos_mq_get(&gpVosContext->freeVosMq);
-
-  if (NULL == pMsgWrapper)
-  {
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-              "%s: VOS Core run out of message wrapper", __func__);
-
-    return VOS_STATUS_E_RESOURCES;
-  }
-
-  /*
-  ** Copy the message now
-  */
-  vos_mem_copy( (v_VOID_t*)pMsgWrapper->pVosMsg,
-                (v_VOID_t*)pMsg, sizeof(vos_msg_t));
-
-  vos_mq_put(pTargetMq, pMsgWrapper);
-
-  set_bit(TX_POST_EVENT_MASK, &gpVosContext->vosSched.txEventFlag);
-  wake_up_interruptible(&gpVosContext->vosSched.txWaitQueue);
-
-  return VOS_STATUS_SUCCESS;
-
-} /* vos_tx_mq_serialize()*/
-
-/**---------------------------------------------------------------------------
-
-  \brief vos_rx_mq_serialize() - serialize a message to the Rx execution flow
-
-  This API allows messages to be posted to a specific message queue in the
-  Tx excution flow.  Messages for the Rx execution flow can be posted only
-  to the following queue.
-
-  <ul>
-    <li> TL
-  </ul>
-
-  \param msgQueueId - identifies the message queue upon which the message
-         will be posted.
-
-  \param message - a pointer to a message buffer.  Body memory for this message
-         buffer is allocated by the caller and free'd by the vOSS after the
-         message is dispacthed to the appropriate component.  If the consumer
-         of the message needs to keep anything in the body, it needs to copy
-         the contents before returning from the message handler.
-
-  \return VOS_STATUS_SUCCESS - the message has been successfully posted
-          to the message queue.
-
-          VOS_STATUS_E_INVAL - The value specified by msgQueueId does not
-          refer to a valid Message Queue Id.
-
-          VOS_STATUS_E_FAULT  - message is an invalid pointer.
-
-          VOS_STATUS_E_FAILURE - the message queue handler has reported
-          an unknown failure.
-
-  \sa
-
-  --------------------------------------------------------------------------*/
-
-VOS_STATUS vos_rx_mq_serialize( VOS_MQ_ID msgQueueId, vos_msg_t *pMsg )
-{
-  pVosMqType      pTargetMq   = NULL;
-  pVosMsgWrapper  pMsgWrapper = NULL;
-  if ((gpVosContext == NULL) || (pMsg == NULL))
-  {
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-        "%s: Null params or global vos context is null", __func__);
-    VOS_ASSERT(0);
-    return VOS_STATUS_E_FAILURE;
-  }
-
-  switch (msgQueueId)
-  {
-
-    case VOS_MQ_ID_SYS:
-    {
-       pTargetMq = &(gpVosContext->vosSched.sysRxMq);
-       break;
-    }
-
-    default:
-
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-              "%s: Trying to queue msg into unknown Rx Msg queue ID %d",
-               __func__, msgQueueId);
-
-    return VOS_STATUS_E_FAILURE;
-  }
-
-  if (pTargetMq == NULL)
-  {
-     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-         "%s: pTargetMq == NULL", __func__);
-     return VOS_STATUS_E_FAILURE;
-  }
-
-
-  /*
-  ** Try and get a free Msg wrapper
-  */
-  pMsgWrapper = vos_mq_get(&gpVosContext->freeVosMq);
-
-  if (NULL == pMsgWrapper)
-  {
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-              "%s: VOS Core run out of message wrapper", __func__);
-
-    return VOS_STATUS_E_RESOURCES;
-  }
-
-  /*
-  ** Copy the message now
-  */
-  vos_mem_copy( (v_VOID_t*)pMsgWrapper->pVosMsg,
-                (v_VOID_t*)pMsg, sizeof(vos_msg_t));
-
-  vos_mq_put(pTargetMq, pMsgWrapper);
-
-  set_bit(RX_POST_EVENT_MASK, &gpVosContext->vosSched.rxEventFlag);
-  wake_up_interruptible(&gpVosContext->vosSched.rxWaitQueue);
-
-  return VOS_STATUS_SUCCESS;
-
-} /* vos_rx_mq_serialize()*/
 
 v_VOID_t
 vos_sys_probe_thread_cback

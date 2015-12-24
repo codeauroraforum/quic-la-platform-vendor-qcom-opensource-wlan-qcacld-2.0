@@ -1111,6 +1111,10 @@ typedef enum {
     /* TDLS Event */
     WMI_TDLS_PEER_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_TDLS),
 
+    /** STA SMPS Event */
+    /** force SMPS mode */
+    WMI_STA_SMPS_FORCE_MODE_COMPLETE_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_STA_SMPS),
+
     /*location scan event*/
     /*report the firmware's capability of batch scan*/
     WMI_BATCH_SCAN_ENABLED_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_LOCATION_SCAN),
@@ -1939,8 +1943,29 @@ typedef struct {
      * @brief num_ocb_schedules - The supported number of OCB schedule segments
      */
     A_UINT32 num_ocb_schedules;
+
+    /**
+     * @brief specific configuration from host, such as per platform configuration
+     */
+    #define WMI_RSRC_CFG_FLAG_WOW_IGN_PCIE_RST_S 0
+    #define WMI_RSRC_CFG_FLAG_WOW_IGN_PCIE_RST_M 0x1
+    A_UINT32 flag1;
 } wmi_resource_config;
 
+#define WMI_RSRC_CFG_FLAG_SET(word32, flag, value) \
+    do { \
+        (word32) &= ~WMI_RSRC_CFG_FLAG_ ## flag ## _M; \
+        (word32) |= ((value) << WMI_RSRC_CFG_FLAG_ ## flag ## _S) & \
+            WMI_RSRC_CFG_FLAG_ ## flag ## _M; \
+    } while (0)
+#define WMI_RSRC_CFG_FLAG_GET(word32, flag) \
+    (((word32) & WMI_RSRC_CFG_FLAG_ ## flag ## _M) >> \
+    WMI_RSRC_CFG_FLAG_ ## flag ## _S)
+
+#define WMI_RSRC_CFG_FLAG_WOW_IGN_PCIE_RST_SET(word32, value) \
+    WMI_RSRC_CFG_FLAG_SET((word32), WOW_IGN_PCIE_RST, (value))
+#define WMI_RSRC_CFG_FLAG_WOW_IGN_PCIE_RST_GET(word32) \
+    WMI_RSRC_CFG_FLAG_GET((word32), WOW_IGN_PCIE_RST)
 
 typedef struct {
     A_UINT32   tlv_header;     /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_init_cmd_fixed_param */
@@ -2243,7 +2268,8 @@ enum wmi_scan_event_type {
     WMI_SCAN_EVENT_DEQUEUED=0x10,       /* scan request got dequeued */
     WMI_SCAN_EVENT_PREEMPTED=0x20,		/* preempted by other high priority scan */
     WMI_SCAN_EVENT_START_FAILED=0x40,   /* scan start failed */
-    WMI_SCAN_EVENT_RESTARTED=0x80,      /*scan restarted*/
+    WMI_SCAN_EVENT_RESTARTED=0x80,      /* Scan restarted */
+    WMI_SCAN_EVENT_FOREIGN_CHANNEL_EXIT = 0x100,
     WMI_SCAN_EVENT_MAX=0x8000
 };
 
@@ -9391,6 +9417,8 @@ typedef struct {
     A_UINT32 bcn_probe_rsp_len;
     /** the length of reassoc rsp */
     A_UINT32 reassoc_rsp_len;
+    /** the length of reassoc req */
+    A_UINT32 reassoc_req_len;
     /**
      * TLV (tag length value ) parameters follows roam_synch_event
      * The TLV's are:
@@ -9400,6 +9428,7 @@ typedef struct {
      *     wmi_key_material key;
      *     A_UINT32 status; subnet changed status not being used
      *     currently. will pass the information using roam_status.
+     *     A_UINT8 reassoc_req_frame[];  length identified by reassoc_req_len
      **/
 } wmi_roam_synch_event_fixed_param;
 
@@ -11966,6 +11995,17 @@ typedef struct {
     /** Return status. 0 for success, non-zero otherwise */
     A_UINT32 status;
 } wmi_transfer_data_to_flash_complete_event_fixed_param;
+
+/*
+ * This structure is used to report SMPS force mode set complete to host.
+ */
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_sta_smps_force_mode_complete_event_fixed_param */
+    /* Unique id identifying the VDEV */
+    A_UINT32 vdev_id;
+    /* Return status. 0 for success, non-zero otherwise */
+    A_UINT32 status;
+} wmi_sta_smps_force_mode_complete_event_fixed_param;
 
 /*
  * This structure is used to report SCPC calibrated data to host.

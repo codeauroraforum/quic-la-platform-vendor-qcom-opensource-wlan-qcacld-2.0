@@ -366,6 +366,64 @@ uint8_t wlan_hdd_find_opclass(tHalHandle hal, uint8_t channel,
 	return opclass;
 }
 
+#ifdef CONFIG_CNSS
+/**
+ * hdd_request_pm_qos() - vote performance management qos
+ * @val: Memory latency usec requirement to ensure
+ *
+ * To endure CPU hardware wake up, vote to performance management module.
+ * Current voting will prevent hardware power collapse then can reduce CPU
+ * wake up latency.
+ * Performance QoS voting will ensure WLAN performance.
+ * Start up time and throughput
+ *
+ * Return: none
+ */
+static inline void hdd_request_pm_qos(int val)
+{
+	cnss_request_pm_qos(val);
+}
+
+/**
+ * hdd_remove_pm_qos() - Cancel performance voting
+ *
+ * Not need to stay wake up CPU any more. Remove voting to release CPU
+ *
+ * Return: none
+ */
+static inline void hdd_remove_pm_qos(void)
+{
+	cnss_remove_pm_qos();
+}
+#else
+/**
+ * hdd_request_pm_qos() - vote performance management qos
+ * @val: Memory latency usec requirement to ensure
+ *
+ * To endure CPU hardware wake up, vote to performance management module.
+ * Current voting will prevent hardware power collapse then can reduce CPU
+ * wake up latency.
+ * Performance QoS votign will ensure WLAN performance.
+ * Start up time and throughput
+ *
+ * Return: none
+ */
+static inline void hdd_request_pm_qos(int val)
+{
+}
+
+/**
+ * hdd_remove_pm_qos() - Cancel performance voting
+ *
+ * Not need to stay wake up CPU any more. Remove voting to release CPU
+ *
+ * Return: none
+ */
+static inline void hdd_remove_pm_qos(void)
+{
+}
+#endif
+
 #ifdef FEATURE_GREEN_AP
 
 static void hdd_wlan_green_ap_timer_fn(void *phddctx)
@@ -1680,7 +1738,7 @@ hdd_parse_send_action_frame_v1_data(const tANI_U8 *pValue,
     if (1 != v) return -EINVAL;
 
     v = kstrtos32(tempBuf, 10, &tempInt);
-    if (v < 0 || tempInt <= 0 || tempInt > WNI_CFG_CURRENT_CHANNEL_STAMAX)
+    if (v < 0 || tempInt < 0 || tempInt > WNI_CFG_CURRENT_CHANNEL_STAMAX)
      return -EINVAL;
 
     *pChannel = tempInt;
@@ -11219,6 +11277,7 @@ free_hdd_ctx:
        pHddCtx->cfg_ini= NULL;
    }
 
+   wlan_hdd_deinit_tx_rx_histogram(pHddCtx);
    wiphy_unregister(wiphy) ;
 
    wiphy_free(wiphy) ;
@@ -11280,6 +11339,7 @@ void __hdd_wlan_exit(void)
    pHddCtx->isUnloadInProgress = TRUE;
 
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+   vos_set_unload_in_progress(TRUE);
 
 #ifdef WLAN_FEATURE_LPSS
    wlan_hdd_send_status_pkg(NULL, NULL, 0, 0);
@@ -11683,9 +11743,17 @@ void hdd_cnss_request_bus_bandwidth(hdd_context_t *pHddCtx,
         cnss_request_bus_bandwidth(next_vote_level);
 
         if (next_vote_level == CNSS_BUS_WIDTH_LOW) {
+            if (pHddCtx->hbw_requested) {
+                hdd_remove_pm_qos();
+                pHddCtx->hbw_requested = false;
+            }
             if (vos_sched_handle_throughput_req(false))
                 hddLog(LOGE, FL("low bandwidth set rx affinity fail"));
         } else {
+            if (!pHddCtx->hbw_requested) {
+                hdd_request_pm_qos(DISABLE_KRAIT_IDLE_PS_VAL);
+                pHddCtx->hbw_requested = true;
+            }
             if (vos_sched_handle_throughput_req(true))
                 hddLog(LOGE, FL("high bandwidth set rx affinity fail"));
         }
@@ -11831,6 +11899,38 @@ static void hdd_bus_bw_compute_cbk(void *priv)
 }
 #endif
 
+/**
+ * wlan_hdd_init_tx_rx_histogram() - init tx/rx histogram stats
+ * @pHddCtx: hdd context
+ *
+ * Return: 0 for success
+ */
+int wlan_hdd_init_tx_rx_histogram(hdd_context_t *pHddCtx)
+{
+	pHddCtx->hdd_txrx_hist = vos_mem_malloc(
+		 (sizeof(struct hdd_tx_rx_histogram) * NUM_TX_RX_HISTOGRAM));
+	if (pHddCtx->hdd_txrx_hist == NULL) {
+		hddLog(VOS_TRACE_LEVEL_FATAL,
+			"%s: Failed malloc for hdd_txrx_hist",__func__);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+/**
+ * wlan_hdd_deinit_tx_rx_histogram() - deinit tx/rx histogram stats
+ * @pHddCtx: hdd context
+ *
+ * Return: none
+ */
+void wlan_hdd_deinit_tx_rx_histogram(hdd_context_t *pHddCtx)
+{
+	if (pHddCtx->hdd_txrx_hist) {
+		vos_mem_free(pHddCtx->hdd_txrx_hist);
+		pHddCtx->hdd_txrx_hist = NULL;
+	}
+}
+
 void wlan_hdd_display_tx_rx_histogram(hdd_context_t *pHddCtx)
 {
     int i;
@@ -11867,7 +11967,8 @@ void wlan_hdd_display_tx_rx_histogram(hdd_context_t *pHddCtx)
 void wlan_hdd_clear_tx_rx_histogram(hdd_context_t *pHddCtx)
 {
     pHddCtx->hdd_txrx_hist_idx = 0;
-    vos_mem_zero(pHddCtx->hdd_txrx_hist, sizeof(pHddCtx->hdd_txrx_hist));
+    vos_mem_zero(pHddCtx->hdd_txrx_hist,
+        (sizeof(struct hdd_tx_rx_histogram) * NUM_TX_RX_HISTOGRAM));
 }
 
 /**---------------------------------------------------------------------------
@@ -12235,6 +12336,11 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    mutex_init(&pHddCtx->tdls_lock);
 #endif
 
+   status = wlan_hdd_init_tx_rx_histogram(pHddCtx);
+   if (status != 0) {
+       goto err_free_hdd_context;
+   }
+
    spin_lock_init(&pHddCtx->dfs_lock);
    hdd_init_offloaded_packets_ctx(pHddCtx);
    // Load all config first as TL config is needed during vos_open
@@ -12242,7 +12348,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if(pHddCtx->cfg_ini == NULL)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Failed kmalloc hdd_config_t",__func__);
-      goto err_free_hdd_context;
+      goto err_histogram;
    }
 
    vos_mem_zero(pHddCtx->cfg_ini, sizeof( hdd_config_t ));
@@ -12402,8 +12508,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       goto err_vos_nv_close;
    }
 
-   wlan_hdd_update_wiphy(wiphy, pHddCtx->cfg_ini);
-
 #if      !defined(REMOVE_PKT_LOG)
    hif_init_pdev_txrx_handle(hif_sc,
                              vos_get_context(VOS_MODULE_ID_TXRX, pVosContext));
@@ -12422,6 +12526,20 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_preStart failed", __func__);
       goto err_vosclose;
+   }
+
+   wlan_hdd_update_wiphy(wiphy, pHddCtx->cfg_ini);
+
+   if (sme_IsFeatureSupportedByFW(DOT11AC)) {
+      hddLog(VOS_TRACE_LEVEL_INFO_HIGH, "%s: support 11ac", __func__);
+   } else {
+      hddLog(VOS_TRACE_LEVEL_INFO_HIGH, "%s: not support 11ac", __func__);
+      if ((pHddCtx->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY)||
+          (pHddCtx->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac)) {
+
+          pHddCtx->cfg_ini->dot11Mode = eHDD_DOT11_MODE_11n;
+          pHddCtx->cfg_ini->sap_p2p_11ac_override = 0;
+      }
    }
 
    status = wlan_hdd_reg_init(pHddCtx);
@@ -12546,7 +12664,11 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_start failed",__func__);
+#ifdef IPA_OFFLOAD
+      goto err_ipa_cleanup;
+#else
       goto err_wiphy_unregister;
+#endif
    }
 
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -13091,6 +13213,11 @@ err_close_adapter:
 err_vosstop:
    vos_stop(pVosContext);
 
+#ifdef IPA_OFFLOAD
+err_ipa_cleanup:
+   hdd_ipa_cleanup(pHddCtx);
+#endif
+
 err_wiphy_unregister:
    wiphy_unregister(wiphy);
 
@@ -13125,6 +13252,9 @@ err_config:
    kfree(pHddCtx->cfg_ini);
    pHddCtx->cfg_ini= NULL;
 
+err_histogram:
+   wlan_hdd_deinit_tx_rx_histogram(pHddCtx);
+
 err_free_hdd_context:
    /* wiphy_free() will free the HDD context so remove global reference */
    if (pVosContext)
@@ -13152,34 +13282,6 @@ success:
    EXIT();
    return 0;
 }
-
-/*
- * In BMI Phase we are only sending small chunk (256 bytes) of the FW image at
- * a time, and wait for the completion interrupt to start the next transfer.
- * During this phase, the KRAIT is entering IDLE/StandAlone(SA) Power Save(PS).
- * The delay incurred for resuming from IDLE/SA PS is huge during driver load.
- * So prevent APPS IDLE/SA PS during driver load for reducing interrupt latency.
- */
-
-#ifdef CONFIG_CNSS
-static inline void hdd_request_pm_qos(int val)
-{
-   cnss_request_pm_qos(val);
-}
-
-static inline void hdd_remove_pm_qos(void)
-{
-   cnss_remove_pm_qos();
-}
-#else
-static inline void hdd_request_pm_qos(int val)
-{
-}
-
-static inline void hdd_remove_pm_qos(void)
-{
-}
-#endif
 
 /**---------------------------------------------------------------------------
 
@@ -13219,12 +13321,15 @@ static int hdd_driver_init( void)
 
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
    hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
-   /*
-    * The Krait is going to Idle/Stand Alone Power Save
-    * more aggressively which is resulting in the longer driver load time.
-    * The Fix is to not allow Krait to enter Idle Power Save during driver load.
-    */
 
+   /*
+    * In BMI Phase we are only sending small chunk (256 bytes) of the FW image
+    * at a time, and wait for the completion interrupt to start the next
+    * transfer. During this phase, the KRAIT is entering IDLE/StandAlone(SA)
+    * Power Save(PS). The delay incurred for resuming from IDLE/SA PS is huge
+    * during driver load. So prevent APPS IDLE/SA PS during driver load for
+    * reducing interrupt latency.
+    */
    hdd_request_pm_qos(DISABLE_KRAIT_IDLE_PS_VAL);
 
    vos_ssr_protect_init();
@@ -13428,6 +13533,7 @@ static void hdd_driver_exit(void)
       rtnl_lock();
       pHddCtx->isUnloadInProgress = TRUE;
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+      vos_set_unload_in_progress(TRUE);
       rtnl_unlock();
    }
 

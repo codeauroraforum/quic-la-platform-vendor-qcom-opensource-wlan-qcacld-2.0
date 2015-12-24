@@ -158,6 +158,9 @@
 
 #define WMI_DEFAULT_NOISE_FLOOR_DBM (-96)
 
+/* Threshold to print tx time taken in ms*/
+#define WDA_TX_TIME_THRESHOLD 1000
+
 #define WMI_MCC_MIN_CHANNEL_QUOTA             20
 #define WMI_MCC_MAX_CHANNEL_QUOTA             80
 #define WMI_MCC_MIN_NON_ZERO_CHANNEL_LATENCY  30
@@ -7121,18 +7124,19 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 		WMA_LOGA("BSS is not yet stopped. Defering vdev(vdev id %x) deletion",
 				vdev_id);
 		iface->del_staself_req = pdel_sta_self_req_param;
-		return status;
+		status = VOS_STATUS_E_FAILURE;
+		goto out;
 	}
 
-        adf_os_spin_lock_bh(&wma_handle->vdev_detach_lock);
-        if(!iface->handle) {
-                WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed",
-                    vdev_id);
-                adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
+	adf_os_spin_lock_bh(&wma_handle->vdev_detach_lock);
+	if(!iface->handle) {
+		WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed",
+			vdev_id);
+		adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
 		vos_mem_free(pdel_sta_self_req_param);
 		pdel_sta_self_req_param = NULL;
-		return status;
-        }
+		goto out;
+	}
 
         /* Unregister vdev from TL shim before vdev delete
          * Will protect from invalid vdev access */
@@ -7843,12 +7847,20 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 	if (ret)
 		WMA_LOGE("Failed to set WMI_VDEV_PARAM_DISCONNECT_TH");
 
+	WMA_LOGD("%s %d vdev_id %d mcc_rts_cts_prot_enable %d\n",
+		 __func__, __LINE__, self_sta_req->sessionId,
+		 mac->roam.configParam.mcc_rts_cts_prot_enable);
+
 	ret = wmi_unified_vdev_set_param_send(wma_handle->wmi_handle,
 				self_sta_req->sessionId,
 				WMI_VDEV_PARAM_MCC_RTSCTS_PROTECTION_ENABLE,
 				mac->roam.configParam.mcc_rts_cts_prot_enable);
 	if (ret)
 		WMA_LOGE("Failed to set WMI_VDEV_PARAM_MCC_RTSCTS_PROTECTION_ENABLE");
+
+	WMA_LOGD("%s %d vdev_id %d mcc_bcast_prob_resp_enable %d\n",
+		 __func__, __LINE__, self_sta_req->sessionId,
+		 mac->roam.configParam.mcc_bcast_prob_resp_enable);
 
 	ret = wmi_unified_vdev_set_param_send(wma_handle->wmi_handle,
 			self_sta_req->sessionId,
@@ -21365,7 +21377,7 @@ suspend_all_iface:
 						wma->wow.gtk_pdev_enable);
 	}
 
-	if (!enable_wow) {
+	if (!enable_wow && !pno_in_progress && !extscan_in_progress) {
 		WMA_LOGD("All vdev are in disconnected state and pno/extscan is not in progress, skipping wow");
 		vos_mem_free(info);
 		goto send_ready_to_suspend;
@@ -30932,6 +30944,9 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 	 */
 	if (downld_comp_required) {
 		static uint8_t mgmt_downld_fail_count = 0;
+		unsigned long time_snapshot;
+
+		time_snapshot = vos_timer_get_system_time();
 		/*
 		 * Wait for Download Complete
 		 * @ Integrated : Dxe Complete
@@ -30969,6 +30984,10 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 					RECOVERY_SIM_ASSERT, 0);
 		} else {
 			mgmt_downld_fail_count = 0;
+			if ((vos_timer_get_system_time() - time_snapshot) >=
+							WDA_TX_TIME_THRESHOLD)
+				WMA_LOGE("%s Tx Complete took %lu ms",__func__,
+				   vos_timer_get_system_time() - time_snapshot);
 		}
 	} else {
 		/*
