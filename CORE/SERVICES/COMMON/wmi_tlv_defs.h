@@ -605,6 +605,14 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_scpc_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_ap_ps_egap_info_chainmask_list,
     WMITLV_TAG_STRUC_wmi_sta_smps_force_mode_complete_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_bpf_get_capability_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_bpf_capability_info_evt_fixed_param,
+    WMITLV_TAG_STRUC_wmi_bpf_get_vdev_stats_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_bpf_vdev_stats_info_evt_fixed_param,
+    WMITLV_TAG_STRUC_wmi_bpf_set_vdev_instructions_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_bpf_del_vdev_instructions_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_delete_resp_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_peer_delete_resp_event_fixed_param,
 } WMITLV_TAG_ID;
 
 /*
@@ -844,7 +852,11 @@ typedef enum {
     OP(WMI_AP_PS_EGAP_PARAM_CMDID) \
     OP(WMI_PMF_OFFLOAD_SET_SA_QUERY_CMDID) \
     OP(WMI_TRANSFER_DATA_TO_FLASH_CMDID) \
-    OP(WMI_OEM_REQUEST_CMDID)
+    OP(WMI_OEM_REQUEST_CMDID) \
+    OP(WMI_BPF_GET_CAPABILITY_CMDID) \
+    OP(WMI_BPF_GET_VDEV_STATS_CMDID) \
+    OP(WMI_BPF_SET_VDEV_INSTRUCTIONS_CMDID) \
+    OP(WMI_BPF_DEL_VDEV_INSTRUCTIONS_CMDID)
 /*
  * IMPORTANT: Please add _ALL_ WMI Events Here.
  * Otherwise, these WMI TLV Functions will be process them.
@@ -963,7 +975,11 @@ typedef enum {
     OP(WMI_TRANSFER_DATA_TO_FLASH_COMPLETE_EVENTID) \
     OP(WMI_OEM_RESPONSE_EVENTID) \
     OP(WMI_PDEV_UTF_SCPC_EVENTID) \
-    OP(WMI_STA_SMPS_FORCE_MODE_COMPLETE_EVENTID)
+    OP(WMI_STA_SMPS_FORCE_MODE_COMPLETE_EVENTID) \
+    OP(WMI_BPF_CAPABILIY_INFO_EVENTID) \
+    OP(WMI_BPF_VDEV_STATS_INFO_EVENTID) \
+    OP(WMI_VDEV_DELETE_RESP_EVENTID) \
+    OP(WMI_PEER_DELETE_RESP_EVENTID)
 
 /* TLV definitions of WMI commands */
 
@@ -2393,6 +2409,27 @@ WMITLV_CREATE_PARAM_STRUC(WMI_NLO_CONFIGURE_MAWC_CMDID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_extscan_configure_mawc_cmd_fixed_param, wmi_extscan_configure_mawc_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_EXTSCAN_CONFIGURE_MAWC_CMDID);
 
+/* bpf offload capability get cmd */
+#define WMITLV_TABLE_WMI_BPF_GET_CAPABILITY_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bpf_get_capability_cmd_fixed_param, wmi_bpf_get_capability_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_BPF_GET_CAPABILITY_CMDID);
+
+/* bpf offload get vdev status cmd */
+#define WMITLV_TABLE_WMI_BPF_GET_VDEV_STATS_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bpf_get_vdev_stats_cmd_fixed_param, wmi_bpf_get_vdev_stats_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_BPF_GET_VDEV_STATS_CMDID);
+
+/* bpf offload set vdev instructions cmd */
+#define WMITLV_TABLE_WMI_BPF_SET_VDEV_INSTRUCTIONS_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bpf_set_vdev_instructions_cmd_fixed_param, wmi_bpf_set_vdev_instructions_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, buf_inst, WMITLV_SIZE_VAR)
+WMITLV_CREATE_PARAM_STRUC(WMI_BPF_SET_VDEV_INSTRUCTIONS_CMDID);
+
+/* bpf offload delete vdev instructions cmd */
+#define WMITLV_TABLE_WMI_BPF_DEL_VDEV_INSTRUCTIONS_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bpf_del_vdev_instructions_cmd_fixed_param, wmi_bpf_del_vdev_instructions_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_BPF_DEL_VDEV_INSTRUCTIONS_CMDID);
+
 /************************** TLV definitions of WMI events *******************************/
 
 /* Service Ready event */
@@ -2519,6 +2556,11 @@ WMITLV_CREATE_PARAM_STRUC(WMI_VDEV_START_RESP_EVENTID);
 #define WMITLV_TABLE_WMI_VDEV_STOPPED_EVENTID(id,op,buf,len)                                                         \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_vdev_stopped_event_fixed_param, wmi_vdev_stopped_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_VDEV_STOPPED_EVENTID);
+
+/* VDEV delete response Event */
+#define WMITLV_TABLE_WMI_VDEV_DELETE_RESP_EVENTID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_vdev_delete_resp_event_fixed_param, wmi_vdev_delete_resp_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_VDEV_DELETE_RESP_EVENTID);
 
 /* VDEV Install Key Complete Event */
 #define WMITLV_TABLE_WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID(id,op,buf,len)                                           \
@@ -2916,9 +2958,14 @@ WMITLV_CREATE_PARAM_STRUC(WMI_OFFLOAD_PROB_RESP_TX_STATUS_EVENTID);
 WMITLV_CREATE_PARAM_STRUC(WMI_HOST_AUTO_SHUTDOWN_EVENTID);
 
 /* peer state Event */
-#define WMITLV_TABLE_WMI_PEER_STATE_EVENTID(id,op,buf,len)                                     \
+#define WMITLV_TABLE_WMI_PEER_STATE_EVENTID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_peer_state_event_fixed_param, wmi_peer_state_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_PEER_STATE_EVENTID);
+
+/* peer delete response Event */
+#define WMITLV_TABLE_WMI_PEER_DELETE_RESP_EVENTID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_peer_delete_resp_event_fixed_param, wmi_peer_delete_resp_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_PEER_DELETE_RESP_EVENTID);
 
 /* peer assoc conf Event */
 #define WMITLV_TABLE_WMI_PEER_ASSOC_CONF_EVENTID(id,op,buf,len) \
@@ -3034,6 +3081,16 @@ WMITLV_CREATE_PARAM_STRUC(WMI_MAWC_ENABLE_SENSOR_EVENTID);
 #define WMITLV_TABLE_WMI_STA_SMPS_FORCE_MODE_COMPLETE_EVENTID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_sta_smps_force_mode_complete_event_fixed_param, wmi_sta_smps_force_mode_complete_event_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_STA_SMPS_FORCE_MODE_COMPLETE_EVENTID);
+
+/* bpf offload capability info event */
+#define WMITLV_TABLE_WMI_BPF_CAPABILIY_INFO_EVENTID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bpf_capability_info_evt_fixed_param,  wmi_bpf_capability_info_evt_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_BPF_CAPABILIY_INFO_EVENTID);
+
+/* bpf offload vdev status info event */
+#define WMITLV_TABLE_WMI_BPF_VDEV_STATS_INFO_EVENTID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_bpf_vdev_stats_info_evt_fixed_param, wmi_bpf_vdev_stats_info_evt_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_BPF_VDEV_STATS_INFO_EVENTID);
 
 #ifdef __cplusplus
 }
