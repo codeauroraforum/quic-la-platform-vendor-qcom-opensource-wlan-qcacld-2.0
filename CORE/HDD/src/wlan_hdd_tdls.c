@@ -173,8 +173,7 @@ void wlan_hdd_tdls_disable_offchan_and_teardown_links(hdd_context_t *hddctx)
  */
 void hdd_tdls_notify_mode_change(hdd_adapter_t *adapter, hdd_context_t *hddctx)
 {
-	if (adapter->device_mode != WLAN_HDD_INFRA_STATION)
-		wlan_hdd_tdls_disable_offchan_and_teardown_links(hddctx);
+	wlan_hdd_tdls_disable_offchan_and_teardown_links(hddctx);
 }
 
 #ifdef CONFIG_TDLS_IMPLICIT
