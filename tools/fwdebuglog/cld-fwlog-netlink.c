@@ -382,6 +382,7 @@ static int32_t create_nl_socket()
 static int initialize(int32_t sock_fd)
 {
     char *mesg = "Hello";
+    int ret;
 
     memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.nl_family = AF_NETLINK;
@@ -413,8 +414,10 @@ static int initialize(int32_t sock_fd)
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    if (sendmsg(sock_fd, &msg, 0) < 0) {
-        android_printf("%s error ", __func__);
+    ret = sendmsg(sock_fd, &msg, 0);
+    if (ret < 0) {
+        android_printf("%s error sock_fd: %d ret:%d errno:%d, %s",
+                          __func__, sock_fd, (int)ret, errno, strerror(errno));
         return -1;
     }
     return 1;
@@ -481,7 +484,7 @@ static int cnss_intf_receive(int sock)
     struct nlmsghdr *h;
 
     fromlen = sizeof(from);
-    while ( 1 ) {
+    while (1) {
         left = recvfrom(sock, buf, sizeof(buf), MSG_DONTWAIT,
                         (struct sockaddr *) &from, &fromlen);
         if (left < 0) {
@@ -516,7 +519,6 @@ static int cnss_intf_receive(int sock)
                                     else
                                         continue;
                                 }
-                                diag_initialize(sock_fd, optionflag);
                                 cnssdiag_register_kernel_logging(sock_fd, nlh);
                                 break;
                             }
@@ -562,9 +564,13 @@ static inline void* cnss_intf_wait_receive(void * arg)
     arg; /* Avoid warning */
     fd_set  fds;
     int     oldfd, ret;
-    int sock;
+    int sock = 0;
 
-    cnss_intf_init();
+    ret = cnss_intf_init();
+    if (ret < 0) {
+        android_printf("%s: failed to initialize", __func__);
+        return NULL;
+    }
     sock = cnss_sock;
 
     if (sock < 0) {
