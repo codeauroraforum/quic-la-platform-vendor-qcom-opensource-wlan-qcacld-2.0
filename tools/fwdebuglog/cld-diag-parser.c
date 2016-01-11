@@ -531,6 +531,10 @@ diag_free_db()
 static int32_t
 diag_insert_db(char *format, char *pack, int32_t id)
 {
+    if (!gdiag_header) {
+        android_printf("%s: gdiag_header is NULL\n", __func__);
+        return 0;
+    }
     /* Double Hashing  */
     int32_t i = id % gdiag_header->n_entries;
     int32_t j = gdiag_header->hash - (id % gdiag_header->hash);
@@ -560,8 +564,16 @@ diag_find_by_id( uint32_t id)
 {
     boolean isfound = FALSE;
     int32_t count = 0;
-    int32_t i = id % gdiag_header->n_entries;
-    int32_t j = gdiag_header->hash - (id % gdiag_header->hash);
+    int32_t i;
+    int32_t j;
+
+    if (!gdiag_header) {
+        android_printf("%s: gdiag_header is NULL\n", __func__);
+        return NULL;
+    }
+
+    i = id % gdiag_header->n_entries;
+    j = gdiag_header->hash - (id % gdiag_header->hash);
     if (gdiag_header->n_usedEntries == 0) {
         return NULL;
     }
@@ -919,6 +931,10 @@ process_diagfw_msg(uint8_t *datap, uint16_t len, uint32_t optionflag,
     num_buf = len - 4;
     debug_printf("\n --%s-- %d\n", __FUNCTION__, optionflag);
 
+    if (!gdiag_header) {
+        android_printf("%s: gdiag_header is NULL\n", __func__);
+        return -1;
+    }
     while (num_buf  > count) {
 
         header1 = *(buffer + index);
