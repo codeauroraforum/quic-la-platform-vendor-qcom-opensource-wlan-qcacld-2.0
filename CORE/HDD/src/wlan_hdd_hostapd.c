@@ -3964,6 +3964,12 @@ static int iw_softap_setwpsie(struct net_device *dev,
 
    ENTER();
 
+   if (!capable(CAP_NET_ADMIN)) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+   }
+
    if(!wrqu->data.length || wrqu->data.length <= QCSAP_MAX_WSC_IE)
       return 0;
 
