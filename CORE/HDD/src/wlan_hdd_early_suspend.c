@@ -101,7 +101,11 @@
 #include <wlan_qct_wda.h>
 #include <if_pci.h>
 #endif
-#define HDD_SSR_BRING_UP_TIME 10000
+#ifdef CONFIG_SLUB_DEBUG_ON
+#define HDD_SSR_BRING_UP_TIME 40000
+#else
+#define HDD_SSR_BRING_UP_TIME 30000
+#endif
 
 static eHalStatus g_full_pwr_status;
 static eHalStatus g_standby_status;
