@@ -1381,6 +1381,7 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
         {
            VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                        ("Invalid pHddCtx pointer") );
+           return -1;
         }
         else
         {
@@ -1391,6 +1392,7 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
     {
        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                   ("Invalid pVosContext pointer") );
+       return -1;
     }
 
     /* 20MHz channels */
