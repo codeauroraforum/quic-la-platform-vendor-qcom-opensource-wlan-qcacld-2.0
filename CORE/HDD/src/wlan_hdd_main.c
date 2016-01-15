@@ -12615,6 +12615,36 @@ static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
 }
 #endif
 
+/**
+ * hdd_tsf_init() - Initialize the TSF synchronization interface
+ * @hdd_ctx: HDD global context
+ *
+ * When TSF synchronization via GPIO is supported by the driver and
+ * has been enabled in the configuration file, this function plumbs
+ * the GPIO value down to firmware via SME.
+ *
+ * Return: None
+ */
+#ifdef WLAN_FEATURE_TSF
+static void hdd_tsf_init(hdd_context_t *hdd_ctx)
+{
+	eHalStatus hal_status;
+
+	if (hdd_ctx->cfg_ini->tsf_gpio_pin == TSF_GPIO_PIN_INVALID)
+		return;
+
+	hal_status = sme_set_tsf_gpio(hdd_ctx->hHal,
+				      hdd_ctx->cfg_ini->tsf_gpio_pin);
+	if (eHAL_STATUS_SUCCESS != hal_status)
+		hddLog(LOGE, FL("set tsf GPIO failed, status: %d"),
+		       hal_status);
+}
+#else
+static void hdd_tsf_init(hdd_context_t *hdd_ctx)
+{
+}
+#endif
+
 /**---------------------------------------------------------------------------
 
   \brief hdd_wlan_startup() - HDD init function
@@ -13452,12 +13482,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                "%s: Error setting txlimit in sme", __func__);
    }
 
-   hal_status = sme_set_tsf_gpio(pHddCtx->hHal, pHddCtx->cfg_ini->tsf_gpio_pin);
-
-   if (eHAL_STATUS_SUCCESS != hal_status) {
-        hddLog(VOS_TRACE_LEVEL_ERROR,
-            FL("set tsf GPIO fail"));
-   }
+   hdd_tsf_init(pHddCtx);
 
 #ifdef MSM_PLATFORM
    spin_lock_init(&pHddCtx->bus_bw_lock);
