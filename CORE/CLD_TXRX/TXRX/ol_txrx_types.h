@@ -951,6 +951,9 @@ struct ol_txrx_vdev_t {
 
 	/* packet count that only forwarded and not dent to OS layer */
 	uint64_t fwd_to_tx_packets;
+
+	/* Default OCB TX parameter */
+	struct ocb_tx_ctrl_hdr_t *ocb_def_tx_param;
 };
 
 struct ol_rx_reorder_array_elem_t {
