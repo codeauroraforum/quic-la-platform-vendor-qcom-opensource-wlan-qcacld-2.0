@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -324,12 +324,13 @@ struct ipa_uc_fw_stats {
 	uint32_t rx_reserved;
 };
 
-static const char *op_string[] = {
+static const char *op_string[HDD_IPA_UC_OPCODE_MAX] = {
 	"TX_SUSPEND",
 	"TX_RESUME",
 	"RX_SUSPEND",
 	"RX_RESUME",
 	"STATS",
+	"OPCODE_MAX"
 };
 #endif /* IPA_UC_OFFLOAD */
 

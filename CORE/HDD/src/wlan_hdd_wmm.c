@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -102,7 +102,7 @@ const v_U8_t hddWmmUpToAcMap[] = {
 };
 
 //Linux based UP -> AC Mapping
-const v_U8_t hddLinuxUpToAcMap[8] = {
+const v_U8_t hddLinuxUpToAcMap[HDD_WMM_UP_TO_AC_MAP_SIZE] = {
    HDD_LINUX_AC_BE,
    HDD_LINUX_AC_BK,
    HDD_LINUX_AC_BK,

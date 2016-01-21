@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -27244,16 +27244,21 @@ int wma_dfs_indicate_radar(struct ieee80211com *ic,
 	pmac = (tpAniSirGlobal)
 		vos_get_context(VOS_MODULE_ID_PE, wma->vos_context);
 
+	if (!pmac) {
+		WMA_LOGE("%s:Invalid MAC handle", __func__);
+		return -ENOENT;
+	}
+
 	if (wma->dfs_ic != ic)
 	{
-		WMA_LOGE("%s:DFS- Invalid WMA handle",__func__);
+		WMA_LOGE("%s:DFS- Invalid WMA handle", __func__);
 		return -ENOENT;
 	}
 	radar_event = (struct wma_dfs_radar_indication *)
 		vos_mem_malloc(sizeof(struct wma_dfs_radar_indication));
 	if (radar_event == NULL)
 	{
-		WMA_LOGE("%s:DFS- Invalid radar_event",__func__);
+		WMA_LOGE("%s:DFS- Invalid radar_event", __func__);
 		return -ENOENT;
 	}
 

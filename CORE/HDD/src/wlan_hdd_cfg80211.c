@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -4807,7 +4807,7 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     ENTER();
     if (params->head && !params->head_len)
     {
-        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   FL("head_len is NULL"));
         return -EINVAL;
     }
@@ -4817,7 +4817,7 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     if (!params->head && !old)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                  FL("session(%d) old and new heads points to NULL"),
+                  FL("session(%d) old and new heads point to NULL"),
                      pAdapter->sessionId);
         return -EINVAL;
     }
@@ -4846,12 +4846,12 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)) && !defined(WITH_BACKPORTS)
     if(params->dtim_period || !old )
         beacon->dtim_period = params->dtim_period;
-    else
+    else if (old)
         beacon->dtim_period = old->dtim_period;
 #else
     if(dtim_period || !old )
         beacon->dtim_period = dtim_period;
-    else
+    else if (old)
         beacon->dtim_period = old->dtim_period;
 #endif
 
@@ -4881,7 +4881,6 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     kfree(old);
 
     return 0;
-
 }
 
 v_U8_t* wlan_hdd_cfg80211_get_ie_ptr(v_U8_t *pIes, int length, v_U8_t eid)
