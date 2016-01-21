@@ -64,7 +64,7 @@
 #include <net/arp.h>
 #include <net/cfg80211.h>
 #include <vos_trace.h>
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
 #include <net/cnss.h>
 #endif
 #include <linux/wireless.h>
@@ -8640,7 +8640,7 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
     int rssi = 0;
     hdd_context_t *pHddCtx;
     int status;
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
     struct timespec ts;
 #endif
 
@@ -8659,7 +8659,7 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
 
     memcpy(mgmt->bssid, bss_desc->bssId, ETH_ALEN);
 
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
     /* Android does not want the time stamp from the frame.
        Instead it wants a monotonic increasing value */
     cnss_get_monotonic_boottime(&ts);

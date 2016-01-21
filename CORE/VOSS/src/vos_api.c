@@ -69,7 +69,7 @@
 #include "wlan_hdd_main.h"
 #include <linux/vmalloc.h>
 #include "wlan_hdd_cfg80211.h"
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
 #include <net/cnss.h>
 #endif
 
@@ -2401,7 +2401,7 @@ void vos_trigger_recovery(void)
 
 v_U64_t vos_get_monotonic_boottime(void)
 {
-#ifdef CONFIG_CNSS
+#if defined(CONFIG_CNSS) || defined(CONFIG_CNSS_SDIO)
    struct timespec ts;
 
    cnss_get_monotonic_boottime(&ts);
