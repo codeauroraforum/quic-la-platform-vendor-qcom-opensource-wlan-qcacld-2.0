@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -71,6 +71,8 @@ enum wlan_op_mode {
 #define WLAN_BUNDLE_STATS     4
 #define WLAN_CREDIT_STATS     5
 #endif
+
+#define OL_TXSTATS_DUMP_MOD_FREQ    10
 
 /**
  * @brief Set up the data SW subsystem.
