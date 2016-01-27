@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -11929,7 +11929,8 @@ static void hdd_bus_bw_compute_cbk(void *priv)
             continue;
 
 #ifdef IPA_UC_OFFLOAD
-        pValidAdapter = pAdapter;
+        if (NULL == pValidAdapter)
+        	pValidAdapter = pAdapter;
 #endif /* IPA_UC_OFFLOAD */
 
         if ((pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
@@ -11969,6 +11970,9 @@ static void hdd_bus_bw_compute_cbk(void *priv)
     hdd_ipa_uc_stat_query(pHddCtx, &ipa_tx_packets, &ipa_rx_packets);
     tx_packets += (uint64_t)ipa_tx_packets;
     rx_packets += (uint64_t)ipa_rx_packets;
+
+    pValidAdapter->stats.tx_packets += ipa_tx_packets;
+    pValidAdapter->stats.rx_packets += ipa_rx_packets;
 #endif /* IPA_UC_OFFLOAD */
 
     hdd_cnss_request_bus_bandwidth(pHddCtx, tx_packets, rx_packets);
