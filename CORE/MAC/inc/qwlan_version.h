@@ -39,12 +39,21 @@ BRIEF DESCRIPTION:
 ===========================================================================*/
 
 #define QWLAN_VERSION_MAJOR            4
+<<<<<<< HEAD
 #define QWLAN_VERSION_MINOR            2
 #define QWLAN_VERSION_PATCH            24	
 #define QWLAN_VERSION_EXTRA            ""
 #define QWLAN_VERSION_BUILD            35
 
 #define QWLAN_VERSIONSTR               "4.2.24.35"
+=======
+#define QWLAN_VERSION_MINOR            0
+#define QWLAN_VERSION_PATCH            11
+#define QWLAN_VERSION_EXTRA            ""
+#define QWLAN_VERSION_BUILD            007
+
+#define QWLAN_VERSIONSTR               "4.0.11.007"
+>>>>>>> 8cfe32c... Cafstaging Release 4.0.11.007
 
 
 #define AR6320_REV1_VERSION             0x5000000
