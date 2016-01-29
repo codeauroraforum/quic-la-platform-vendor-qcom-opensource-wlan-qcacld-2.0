@@ -844,6 +844,7 @@ typedef struct wma_handle {
 	uint16_t max_mgmt_tx_fail_count;
 
 	struct wma_runtime_pm_context runtime_context;
+	bool     pause_other_vdev_on_mcc_start;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
