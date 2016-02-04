@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -12572,6 +12572,15 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    {
       hdd_set_idle_ps_config(pHddCtx, TRUE);
    }
+
+   /* Reset previous stats before turning on/off */
+   vos_mem_set(&pAdapter->mib_stats,
+                sizeof(pAdapter->mib_stats), 0);
+
+   if (sme_set_mib_stats_enable(pHddCtx->hHal,
+                     pHddCtx->cfg_ini->mib_stats_enabled) !=
+			eHAL_STATUS_SUCCESS)
+           hddLog(VOS_TRACE_LEVEL_ERROR, FL("set mib stats failed"));
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
    if (pHddCtx->cfg_ini->WlanAutoShutdown != 0)

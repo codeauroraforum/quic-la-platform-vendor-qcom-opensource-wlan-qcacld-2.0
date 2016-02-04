@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3617,6 +3617,7 @@ sme_StopBatchScanInd
 VOS_STATUS sme_SetIdlePowersaveConfig(v_PVOID_t vosContext, tANI_U32 value);
 VOS_STATUS sme_notify_modem_power_state(tHalHandle hHal, tANI_U32 value);
 
+eHalStatus sme_set_mib_stats_enable(tHalHandle hal, uint8_t value);
 eHalStatus sme_ConfigEnablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode);
 eHalStatus sme_ConfigDisablePowerSave (tHalHandle hHal, tPmcPowerSavingMode psMode);
 eHalStatus sme_PsOffloadEnablePowerSave (tHalHandle hHal, tANI_U32 sessionId);
@@ -4150,4 +4151,8 @@ void sme_set_vdev_nss(tHalHandle hal, bool enable2x2);
 void sme_set_per_band_chainmask_supp(tHalHandle hal, bool val);
 void sme_set_lte_coex_supp(tHalHandle hal, bool val);
 void sme_set_bcon_offload_supp(tHalHandle hal, bool val);
+eHalStatus sme_get_mib_stats(tHalHandle hal,
+				csr_mib_stats_callback callback,
+				void *context, void *vos_context,
+				uint8_t session_id);
 #endif //#if !defined( __SME_API_H )

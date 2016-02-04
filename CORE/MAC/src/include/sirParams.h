@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -667,6 +667,9 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_DCC_UPDATE_NDL_CMD          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 326)
 #define SIR_HAL_SET_PDEV_IE_REQ             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 327)
 
+#define SIR_HAL_MIB_STATS_REQ               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 342)
+#define SIR_HAL_SET_MIB_STATS_ENABLE        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 343)
+#define SIR_HAL_SET_MIB_STATS_DISABLE       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 344)
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types

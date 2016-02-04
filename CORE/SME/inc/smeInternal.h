@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -196,6 +196,8 @@ typedef struct tagSmeStruct
     ocb_callback dcc_update_ndl_callback;
     void *dcc_stats_event_context;
     ocb_callback dcc_stats_event_callback;
+    void *mib_stats_context;
+    void (*csr_mib_stats_callback) (struct mib_stats_metrics*, void*);
 } tSmeStruct, *tpSmeStruct;
 
 

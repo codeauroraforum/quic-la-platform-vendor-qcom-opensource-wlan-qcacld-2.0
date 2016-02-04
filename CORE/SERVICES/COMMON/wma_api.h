@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -143,4 +143,5 @@ void *wma_get_beacon_buffer_by_vdev_id(u_int8_t vdev_id,
 int process_wma_set_command(int sessid, int paramid,
                                    int sval, int vpdev);
 tANI_U8 wma_getFwWlanFeatCaps(tANI_U8 featEnumValue);
+VOS_STATUS wma_set_mib_stats_enable(void *wda_handle, u_int32_t enable);
 #endif

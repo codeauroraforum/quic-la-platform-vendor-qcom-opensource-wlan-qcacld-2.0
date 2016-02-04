@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1116,6 +1116,7 @@ struct hdd_adapter_s
 	/* MAC addresses used for OCB interfaces */
 	tSirMacAddr ocb_mac_address[VOS_MAX_CONCURRENCY_PERSONA];
 	int ocb_mac_addr_count;
+	struct mib_stats_metrics mib_stats;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)

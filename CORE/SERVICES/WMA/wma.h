@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -735,6 +735,7 @@ typedef struct wma_handle {
 	u_int16_t RArateLimitInterval;
 #endif
 
+	bool is_mib_enabled;
 
 	/* Powersave Configuration Parameters */
 	u_int8_t staMaxLIModDtim;
@@ -751,6 +752,7 @@ typedef struct wma_handle {
 	uint32_t txrx_chainmask;
 	uint8_t per_band_chainmask_supp;
 	uint16_t max_mgmt_tx_fail_count;
+	uint32_t ccmp_replays_attack_cnt;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {

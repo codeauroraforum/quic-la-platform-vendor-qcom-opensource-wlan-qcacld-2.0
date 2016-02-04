@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -996,6 +996,10 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_DCC_GET_STATS_CMD                 SIR_HAL_DCC_GET_STATS_CMD
 #define WDA_DCC_CLEAR_STATS_CMD               SIR_HAL_DCC_CLEAR_STATS_CMD
 #define WDA_DCC_UPDATE_NDL_CMD                SIR_HAL_DCC_UPDATE_NDL_CMD
+
+#define WDA_MIB_STATS_REQ                     SIR_HAL_MIB_STATS_REQ
+#define WDA_SET_MIB_STATS_ENABLE              SIR_HAL_SET_MIB_STATS_ENABLE
+#define WDA_SET_MIB_STATS_DISABLE             SIR_HAL_SET_MIB_STATS_DISABLE
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 

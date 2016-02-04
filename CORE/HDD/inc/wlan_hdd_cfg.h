@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2912,6 +2912,15 @@ enum dot11p_mode {
 #define CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_MAX     (500)
 #define CFG_DBG_MAX_MGMT_TX_FAILURE_COUNT_DEFAULT (0)
 
+/*
+ * MIB Stats enable/disable
+ * This variable will turn off/on collection of mib stats in FW
+ */
+#define CFG_MIB_STATS_ENABLED_NAME     "gdot11_mib_stats_enabled"
+#define CFG_MIB_STATS_ENABLED_MIN      (0)
+#define CFG_MIB_STATS_ENABLED_MAX      (1)
+#define CFG_MIB_STATS_ENABLED_DEFAULT  (0)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3527,6 +3536,7 @@ typedef struct
    uint8_t                     sap_dot11mc;
    uint8_t                     prefer_non_dfs_on_radar;
    uint16_t                    max_mgmt_tx_fail_count;
+   bool                        mib_stats_enabled;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3996,6 +3996,12 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MIN,
                 CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX),
 
+   REG_VARIABLE(CFG_MIB_STATS_ENABLED_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, mib_stats_enabled,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_MIB_STATS_ENABLED_DEFAULT,
+                CFG_MIB_STATS_ENABLED_MIN,
+                CFG_MIB_STATS_ENABLED_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -4612,6 +4618,9 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
             "Name = [gEnableDumpCollect] Value = [%u]",
                      pHddCtx->cfg_ini->is_ramdump_enabled);
+
+  hddLog(LOG2, "Name = [gdot11_mib_stats_enabled] Value = [%u]",
+                   pHddCtx->cfg_ini->mib_stats_enabled);
 
   hddLog(LOG2, "Name = [gmax_mgmt_tx_failure_count] Value = [%u]",
                    pHddCtx->cfg_ini->max_mgmt_tx_fail_count);
