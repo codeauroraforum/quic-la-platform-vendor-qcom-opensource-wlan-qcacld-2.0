@@ -31440,7 +31440,8 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 	is_high_latency = wdi_out_cfg_is_high_latency(
 				txrx_vdev->pdev->ctrl_pdev);
 
-	downld_comp_required = tx_frm_download_comp_cb && is_high_latency;
+	downld_comp_required = tx_frm_download_comp_cb && is_high_latency &&
+				tx_frm_ota_comp_cb;
 
 	/* Fill the frame index to send */
 	if(pFc->type == SIR_MAC_MGMT_FRAME) {
@@ -31580,15 +31581,6 @@ VOS_STATUS WDA_TxPacket(void *wma_context, void *tx_frame, u_int16_t frmLen,
 		} else {
 			mgmt_downld_fail_count = 0;
 		}
-	} else {
-		/*
-		 * For Low Latency Devices
-		 * Call the download complete
-		 * callback once the frame is successfully
-		 * given to txrx module
-		 */
-		tx_frm_download_comp_cb(wma_handle->mac_context, tx_frame,
-					WMA_TX_FRAME_BUFFER_NO_FREE);
 	}
 
 	return VOS_STATUS_SUCCESS;
