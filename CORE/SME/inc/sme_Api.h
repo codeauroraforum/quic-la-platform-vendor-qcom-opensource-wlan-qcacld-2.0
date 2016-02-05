@@ -4016,6 +4016,9 @@ eHalStatus sme_ExtScanRegisterCallback (tHalHandle hHal,
 
 #endif /* FEATURE_WLAN_EXTSCAN */
 
+VOS_STATUS sme_set_beacon_filter(uint32_t vdev_id, uint32_t *ie_map);
+VOS_STATUS sme_unset_beacon_filter(uint32_t vdev_id);
+
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 /* ---------------------------------------------------------------------------
     \fn sme_abortRoamScan
