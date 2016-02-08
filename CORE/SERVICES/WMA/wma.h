@@ -544,6 +544,7 @@ struct wma_txrx_node {
 	void *psnr_req;
 	uint8_t nss_2g;
 	uint8_t nss_5g;
+	bool is_vdev_valid;
 };
 
 #if defined(QCA_WIFI_FTM)
