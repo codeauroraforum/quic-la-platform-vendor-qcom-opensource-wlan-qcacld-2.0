@@ -670,6 +670,8 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_UPDATE_Q2Q_IE_IND          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 310)
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
+#define SIR_BTC_BT_WLAN_INTERVAL_CMD        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 360)
+
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types

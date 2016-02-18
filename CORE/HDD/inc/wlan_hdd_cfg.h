@@ -2866,6 +2866,67 @@ enum dot11p_mode {
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX       (1)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT   (0)
 
+/**
+* For P2P
+* gBTIntervalPageP2P/gWLIntervalPageP2P intervals length (in ms) during
+* WLAN P2P (single vdev) + BT Paging, min 20ms, max 200ms.
+* Customer could change these parameters' value in qcom_cfg.ini file to improve
+* P2P throughput when BT doing Page. Example as:
+* gBTIntervalPageP2P=30
+* gWLIntervalPageP2P=120
+*/
+
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P           "gBTIntervalPageP2P"
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P           "gWLIntervalPageP2P"
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_DEFAULT   (30)
+
+/**
+* For STA
+* gBTIntervalPageSTA/gWLIntervalPageSTA intervals length (in ms) during
+* WLAN STA (single vdev) + BT Paging, min 20ms, max 200ms.
+* Customer could change these parameters' value in qcom_cfg.ini file to improve
+* STA throughput when BT doing Page. Example as:
+* gBTIntervalPageSTA=30
+* gWLIntervalPageSTA=120
+*/
+
+#define CFG_BTC_BT_INTERVAL_PAGE_STA           "gBTIntervalPageSTA"
+#define CFG_BTC_BT_INTERVAL_PAGE_STA_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_PAGE_STA_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_PAGE_STA_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_PAGE_STA           "gWLIntervalPageSTA"
+#define CFG_BTC_WLAN_INTERVAL_PAGE_STA_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_STA_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_STA_DEFAULT   (30)
+
+
+/**
+* For SAP
+* gBTIntervalPageSAP/gWLIntervalPageSAP intervals length (in ms) during
+* WLAN SAP (single vdev) + BT Paging, min 20ms, max 200ms.
+* Customer could change these parameters' value in qcom_cfg.ini file to improve
+* SAP throughput when BT doing Page. Example as:
+* gBTIntervalPageSAP=30
+* gWLIntervalPageSAP=120
+*/
+
+#define CFG_BTC_BT_INTERVAL_PAGE_SAP           "gBTIntervalPageSAP"
+#define CFG_BTC_BT_INTERVAL_PAGE_SAP_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_PAGE_SAP_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_PAGE_SAP_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_PAGE_SAP           "gWLIntervalPageSAP"
+#define CFG_BTC_WLAN_INTERVAL_PAGE_SAP_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_SAP_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_SAP_DEFAULT   (30)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -3478,7 +3539,17 @@ typedef struct
    bool                        is_ramdump_enabled;
    uint8_t                     sap_dot11mc;
    uint8_t                     prefer_non_dfs_on_radar;
+
+   uint32_t                    coex_page_p2p_bt_interval;
+   uint32_t                    coex_page_p2p_wlan_interval;
+
+   uint32_t                    coex_page_sta_bt_interval;
+   uint32_t                    coex_page_sta_wlan_interval;
+
+   uint32_t                    coex_page_sap_bt_interval;
+   uint32_t                    coex_page_sap_wlan_interval;
 } hdd_config_t;
+
 
 #ifdef WLAN_FEATURE_MBSSID
 typedef struct mbssid_sap_dyn_ini_config {
@@ -3629,4 +3700,6 @@ v_VOID_t hdd_mbssid_apply_def_cfg_ini(hdd_adapter_t *pAdapter);
 #endif
 
 void print_hdd_cfg(hdd_context_t *pHddCtx);
+
+void hdd_set_btc_bt_wlan_interval(hdd_context_t *pHddCtx);
 #endif

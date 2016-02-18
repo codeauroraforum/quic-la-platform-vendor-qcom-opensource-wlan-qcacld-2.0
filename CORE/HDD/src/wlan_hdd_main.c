@@ -12470,6 +12470,13 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 	wlan_hdd_dcc_register_for_dcc_stats_event(pHddCtx);
 
    ol_pktlog_init(hif_sc);
+
+   /*
+    * Send btc page and wlan (p2p/sta/sap) interval to firmware if
+    * relevant parameters set in ini file.
+    */
+   hdd_set_btc_bt_wlan_interval(pHddCtx);
+
    complete(&wlan_start_comp);
    goto success;
 

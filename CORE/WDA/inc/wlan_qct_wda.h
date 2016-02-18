@@ -996,6 +996,8 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_DCC_CLEAR_STATS_CMD               SIR_HAL_DCC_CLEAR_STATS_CMD
 #define WDA_DCC_UPDATE_NDL_CMD                SIR_HAL_DCC_UPDATE_NDL_CMD
 
+#define WDA_BTC_BT_WLAN_INTERVAL_CMD          SIR_BTC_BT_WLAN_INTERVAL_CMD
+
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 #define WDA_UPDATE_Q2Q_IE_IND                 SIR_HAL_UPDATE_Q2Q_IE_IND
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
