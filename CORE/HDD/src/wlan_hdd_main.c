@@ -4586,7 +4586,8 @@ static int switch_to_1x1_connected_sta_state(hdd_context_t *hdd_ctx,
 	bool send_smps;
 
 	/*  Check TDLS status and update antenna mode */
-	ret = wlan_hdd_tdls_antenna_switch(hdd_ctx, adapter);
+	ret = wlan_hdd_tdls_antenna_switch(hdd_ctx, adapter,
+					   HDD_ANTENNA_MODE_1X1);
 	if (0 != ret)
 		return ret;
 
@@ -4670,7 +4671,8 @@ static int switch_to_2x2_connected_sta_state(hdd_context_t *hdd_ctx,
 	bool send_smps;
 
 	/*  Check TDLS status and update antenna mode */
-	ret = wlan_hdd_tdls_antenna_switch(hdd_ctx, adapter);
+	ret = wlan_hdd_tdls_antenna_switch(hdd_ctx, adapter,
+					   HDD_ANTENNA_MODE_2X2);
 	if (0 != ret)
 		return ret;
 
