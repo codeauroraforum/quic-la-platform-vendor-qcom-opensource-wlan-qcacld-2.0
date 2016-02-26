@@ -4138,4 +4138,8 @@ bool sme_validate_sap_channel_switch(tHalHandle hal,
 					uint32_t session_id);
 
 void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
+
+void sme_send_disassoc_req_frame(tHalHandle hal, uint8_t session_id,
+		uint8_t *peer_mac, tANI_U16 reason, uint8_t wait_for_ack);
+
 #endif //#if !defined( __SME_API_H )

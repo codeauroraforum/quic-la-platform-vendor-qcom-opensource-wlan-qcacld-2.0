@@ -1297,7 +1297,10 @@ limProcessMessages(tpAniSirGlobal pMac, tpSirMsgQ  limMsg)
             // These messages are from HDD
             limProcessNormalHddMsg(pMac, limMsg, true);  //need to response to hdd
             break;
-
+        case eWNI_SME_SEND_DISASSOC_FRAME:
+            /* Need to response to hdd */
+            limProcessNormalHddMsg(pMac, limMsg, true);
+            break;
         case eWNI_SME_SCAN_ABORT_IND:
           {
             tSirMbMsg *pMsg = limMsg->bodyptr;
