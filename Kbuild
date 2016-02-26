@@ -959,7 +959,10 @@ CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DHIF_SDIO \
                 -DCONFIG_ATH_PROCFS_DIAG_SUPPORT \
                 -DFEATURE_HL_GROUP_CREDIT_FLOW_CONTROL \
-                -DHIF_MBOX_SLEEP_WAR
+                -DHIF_MBOX_SLEEP_WAR \
+                -DFEATURE_BUS_BANDWIDTH \
+                -DTX_COMPLETION_THREAD \
+                -DMSM8976_TCP_PERF
 endif
 
 ifeq ($(CONFIG_ARCH_MDM9607), y)
