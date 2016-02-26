@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -110,12 +110,12 @@
 #ifdef FEATURE_OEM_DATA_SUPPORT
 #define MAX_OEM_DATA_RSP_LEN            2047
 #endif
+#include "vos_nvitem.h"
 
 #define HDD_FINISH_ULA_TIME_OUT         800
 #define HDD_SET_MCBC_FILTERS_TO_FW      1
 #define HDD_DELETE_MCBC_FILTERS_FROM_FW 0
 
-extern int wlan_hdd_cfg80211_update_band(struct wiphy *wiphy, eCsrBand eBand);
 static int ioctl_debug;
 module_param(ioctl_debug, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
@@ -9567,7 +9567,7 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
                      FL("Failed to set the band value to %u"), band);
              return -EINVAL;
         }
-        wlan_hdd_cfg80211_update_band(pHddCtx->wiphy, (eCsrBand)band);
+        vos_update_band((eCsrBand)band);
     }
     return 0;
 }
