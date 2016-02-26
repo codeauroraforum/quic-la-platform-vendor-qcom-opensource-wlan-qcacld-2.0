@@ -1270,4 +1270,8 @@ a_bool_t ol_txrx_get_ocb_peer(struct ol_txrx_pdev_t *pdev, struct ol_txrx_peer_t
 void ol_txrx_display_stats(struct ol_txrx_pdev_t *pdev, uint16_t bitmap);
 void ol_txrx_clear_stats(struct ol_txrx_pdev_t *pdev, uint16_t bitmap);
 
+void ol_rx_reset_pn_replay_counter(struct ol_txrx_pdev_t *pdev);
+uint32_t ol_rx_get_tkip_replay_counter(struct ol_txrx_pdev_t *pdev);
+uint32_t ol_rx_get_ccmp_replay_counter(struct ol_txrx_pdev_t *pdev);
+
 #endif /* _OL_TXRX_CTRL_API__H_ */
