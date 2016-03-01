@@ -4155,4 +4155,7 @@ eHalStatus sme_get_mib_stats(tHalHandle hal,
 				csr_mib_stats_callback callback,
 				void *context, void *vos_context,
 				uint8_t session_id);
+void sme_send_disassoc_req_frame(tHalHandle hal, uint8_t session_id,
+		uint8_t *peer_mac, tANI_U16 reason, uint8_t wait_for_ack);
+
 #endif //#if !defined( __SME_API_H )
