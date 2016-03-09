@@ -6615,6 +6615,8 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
 #ifdef WLAN_FEATURE_MBSSID
     v_CONTEXT_t pVosContext = (WLAN_HDD_GET_CTX(pAdapter))->pvosContext;
     v_CONTEXT_t sapContext=NULL;
+    tVOS_CON_MODE device_mode;
+    uint32_t session_id = CSR_SESSION_ID_INVALID;
 #endif
     int ret;
 
@@ -6639,13 +6641,27 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
 
     pAdapter->sessionCtx.ap.sapContext = sapContext;
 
-    status = WLANSAP_Start(sapContext);
+    if (pAdapter->device_mode == WLAN_HDD_P2P_GO) {
+        device_mode = VOS_P2P_GO_MODE;
+    } else if (pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+        device_mode = VOS_STA_SAP_MODE;
+    } else {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                FL("Invalid device_mode for AP: %d"), pAdapter->device_mode);
+        return VOS_STATUS_E_FAILURE;
+    }
+
+    status = WLANSAP_Start(sapContext, device_mode,
+            pAdapter->macAddressCurrent.bytes,
+            &session_id);
     if ( ! VOS_IS_STATUS_SUCCESS( status ) )
     {
           VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: WLANSAP_Start failed!!"));
           WLANSAP_Close(sapContext);
+          pAdapter->sessionCtx.ap.sapContext = NULL;
           return status;
     }
+    pAdapter->sessionId = session_id;
 #endif
 
     // Allocate the Wireless Extensions state structure
@@ -6663,6 +6679,7 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,("ERROR: hdd_set_hostapd failed!!"));
 #ifdef WLAN_FEATURE_MBSSID
          WLANSAP_Close(sapContext);
+         pAdapter->sessionCtx.ap.sapContext = NULL;
 #endif
          return status;
     }
@@ -6673,6 +6690,7 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: Hostapd HDD vos event init failed!!"));
 #ifdef WLAN_FEATURE_MBSSID
          WLANSAP_Close(sapContext);
+         pAdapter->sessionCtx.ap.sapContext = NULL;
 #endif
          return status;
     }
@@ -6685,6 +6703,7 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
                    "ERROR: Hostapd HDD stop bss event init failed!!");
 #ifdef WLAN_FEATURE_MBSSID
          WLANSAP_Close(sapContext);
+         pAdapter->sessionCtx.ap.sapContext = NULL;
 #endif
          return status;
     }
@@ -6737,6 +6756,7 @@ error_wmm_init:
     hdd_softap_deinit_tx_rx( pAdapter );
 #ifdef WLAN_FEATURE_MBSSID
     WLANSAP_Close(sapContext);
+    pAdapter->sessionCtx.ap.sapContext = NULL;
 #endif
     EXIT();
     return status;
