@@ -5507,13 +5507,16 @@ int process_wma_set_command(int sessid, int paramid,
        return -EINVAL;
     }
 
-    if (vpdev != PDEV_CMD &&
-        VOS_STATUS_SUCCESS != sme_is_session_valid(hdd_ctx->hHal,
+    if (vpdev == PDEV_CMD || VOS_FTM_MODE == hdd_get_conparam())
+       goto skip_ftm;
+
+    if (VOS_STATUS_SUCCESS != sme_is_session_valid(hdd_ctx->hHal,
                                                      sessid)) {
        hddLog(LOGE, FL("SME session id is not valid %d"), sessid);
        return -EINVAL;
     }
 
+skip_ftm:
     iwcmd = (wda_cli_set_cmd_t *)vos_mem_malloc(
                                 sizeof(wda_cli_set_cmd_t));
     if (NULL == iwcmd) {
@@ -5549,6 +5552,10 @@ int process_wma_set_command_twoargs(int sessid, int paramid,
     v_CONTEXT_t vos_context = vos_get_global_context(0, NULL);
     hdd_context_t *hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD, vos_context);
 
+    /* Skip session validation in FTM mode and for PDEV commands */
+    if (vpdev == PDEV_CMD || VOS_FTM_MODE == hdd_get_conparam())
+       goto skip_ftm;
+
     if (!hdd_ctx) {
        hddLog(LOGE,FL("hdd context is not valid!"));
        return -EINVAL;
@@ -5561,6 +5568,7 @@ int process_wma_set_command_twoargs(int sessid, int paramid,
        goto out;
     }
 
+skip_ftm:
     iwcmd = vos_mem_malloc(sizeof(*iwcmd));
 
     if (NULL == iwcmd) {
