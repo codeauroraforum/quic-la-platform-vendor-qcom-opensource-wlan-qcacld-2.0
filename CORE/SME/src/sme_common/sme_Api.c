@@ -17639,4 +17639,24 @@ bool sme_is_sta_smps_allowed(tHalHandle hal, uint8_t session_id)
 	return (csr_session->supported_nss_1x1 == true) ? false : true;
 }
 
+/*
+ *  sme_is_session_valid(): verify a sme session
+ *  @param hal_handle: hal handle for getting global mac struct.
+ *  @param session_id: sme_session_id
+ *  Return: eHAL_STATUS_SUCCESS or non-zero on failure.
+ */
+VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_handle);
 
+	if (NULL == mac_ctx) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("mac_ctx is null!!"));
+	        VOS_ASSERT(0);
+	        return VOS_STATUS_E_FAILURE;
+	}
+	if (CSR_IS_SESSION_VALID(mac_ctx, session_id))
+	        return VOS_STATUS_SUCCESS;
+
+	return VOS_STATUS_E_FAILURE;
+}

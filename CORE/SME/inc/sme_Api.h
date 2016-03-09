@@ -4431,4 +4431,6 @@ eHalStatus sme_update_mimo_power_save(tHalHandle hHal,
 
 bool sme_is_sta_smps_allowed(tHalHandle hHal, uint8_t session_id);
 
+VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id);
+
 #endif //#if !defined( __SME_API_H )
