@@ -948,6 +948,9 @@ struct ol_txrx_vdev_t {
 	/* Information about the schedules in the schedule */
 	struct ol_txrx_ocb_chan_info *ocb_channel_info;
 	uint32_t ocb_channel_count;
+
+	/* packet count that only forwarded and not dent to OS layer */
+	uint64_t fwd_to_tx_packets;
 };
 
 struct ol_rx_reorder_array_elem_t {

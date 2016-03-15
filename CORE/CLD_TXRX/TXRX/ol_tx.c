@@ -722,6 +722,31 @@ MSDU_LOOP_BOTTOM:
     return NULL; /* all MSDUs were accepted */
 }
 
+/**
+ * ol_txrx_get_vdev_from_vdev_id() - get vdev from vdev_id
+ * @vdev_id: vdev_id
+ *
+ * Return: vdev handle
+ *            NULL if not found.
+ */
+ol_txrx_vdev_handle ol_txrx_get_vdev_from_vdev_id(uint8_t vdev_id)
+{
+	v_CONTEXT_t vos_context = vos_get_global_context(VOS_MODULE_ID_TXRX,
+								NULL);
+	ol_txrx_pdev_handle pdev = vos_get_context(VOS_MODULE_ID_TXRX,
+							 vos_context);
+	ol_txrx_vdev_handle vdev = NULL;
+
+	if (adf_os_unlikely(!pdev))
+		return NULL;
+
+	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem)
+		if (vdev->vdev_id == vdev_id)
+			break;
+
+	return vdev;
+}
+
 adf_nbuf_t
 ol_tx_hl(ol_txrx_vdev_handle vdev, adf_nbuf_t msdu_list)
 {

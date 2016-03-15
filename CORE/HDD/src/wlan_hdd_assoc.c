@@ -69,6 +69,7 @@
 #include <wlan_hdd_ipa.h>
 #endif
 #include <vos_sched.h>
+#include "tl_shim.h"
 
 struct ether_addr
 {
@@ -733,6 +734,8 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         spin_lock_bh(&pHddCtx->bus_bw_lock);
         pAdapter->prev_tx_packets = pAdapter->stats.tx_packets;
         pAdapter->prev_rx_packets = pAdapter->stats.rx_packets;
+        pAdapter->prev_fwd_packets =
+            tlshim_get_fwd_to_tx_packet_count(pAdapter->sessionId);
         spin_unlock_bh(&pHddCtx->bus_bw_lock);
         hdd_start_bus_bw_compute_timer(pAdapter);
 #endif
@@ -781,6 +784,7 @@ static void hdd_SendAssociationEvent(struct net_device *dev,tCsrRoamInfo *pCsrRo
         spin_lock_bh(&pHddCtx->bus_bw_lock);
         pAdapter->prev_tx_packets = 0;
         pAdapter->prev_rx_packets = 0;
+        pAdapter->prev_fwd_packets = 0;
         spin_unlock_bh(&pHddCtx->bus_bw_lock);
         hdd_stop_bus_bw_compute_timer(pAdapter);
 #endif
