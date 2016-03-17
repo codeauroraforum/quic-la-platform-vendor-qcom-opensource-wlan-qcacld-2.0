@@ -341,27 +341,37 @@ static tANI_U32 limPrepareTdlsFrameHeader(tpAniSirGlobal pMac, tANI_U8* pFrame,
     return(header_offset += PAYLOAD_TYPE_TDLS_SIZE) ;
 }
 
-/*
- * TX Complete for Management frames
+/**
+ * lim_mgmt_tdls_tx_complete - callback to indicate Tx completion
+ * @mac_ctx: pointer to mac structure
+ * @tx_complete: indicates tx sucess/failure
+ *
+ * function will be invoked on receiving tx completion indication
+ *
+ * return: success: eHAL_STATUS_SUCCESS failure: eHAL_STATUS_FAILURE
  */
- eHalStatus limMgmtTXComplete(tpAniSirGlobal pMac,
-                                   tANI_U32 txCompleteSuccess)
+eHalStatus lim_mgmt_tdls_tx_complete(tpAniSirGlobal mac_ctx,
+				uint32_t tx_complete)
 {
-    tpPESession psessionEntry = NULL ;
+	tpPESession session_entry = NULL ;
 
-    if (0xff != pMac->lim.mgmtFrameSessionId)
-    {
-        psessionEntry = peFindSessionBySessionId(pMac, pMac->lim.mgmtFrameSessionId);
-        if (NULL == psessionEntry)
-        {
-            limLog(pMac, LOGE, FL("sessionID %d is not found"),
-                               pMac->lim.mgmtFrameSessionId);
-            return eHAL_STATUS_FAILURE;
-        }
-        limSendSmeMgmtTXCompletion(pMac, psessionEntry, txCompleteSuccess);
-        pMac->lim.mgmtFrameSessionId = 0xff;
-    }
-    return eHAL_STATUS_SUCCESS;
+	limLog(mac_ctx, LOG1, FL("tdls_frm_session_id %x tx_complete %x"),
+		mac_ctx->lim.tdls_frm_session_id, tx_complete);
+
+	if (0xff != mac_ctx->lim.tdls_frm_session_id) {
+		session_entry = peFindSessionBySessionId(mac_ctx,
+					mac_ctx->lim.tdls_frm_session_id);
+		if (NULL == session_entry) {
+			limLog(mac_ctx, LOGE, FL("session id %d is not found"),
+				mac_ctx->lim.tdls_frm_session_id);
+			return eHAL_STATUS_FAILURE;
+		}
+
+		limSendSmeMgmtTXCompletion(mac_ctx, session_entry, tx_complete);
+		mac_ctx->lim.tdls_frm_session_id = 0xff;
+	}
+
+	return eHAL_STATUS_SUCCESS;
 }
 
 /*
@@ -531,18 +541,18 @@ tSirRetStatus limSendTdlsDisReqFrame(tpAniSirGlobal pMac, tSirMacAddr peer_mac,
            limTraceTdlsActionString(SIR_MAC_TDLS_DIS_REQ),
            MAC_ADDR_ARRAY(peer_mac));
 
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.tdls_frm_session_id = psessionEntry->peSessionId;
     halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_DATA,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, false );
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.tdls_frm_session_id = 0xff;
         limLog(pMac, LOGE, FL("could not send TDLS Discovery Request frame"));
         return eSIR_FAILURE;
     }
@@ -846,7 +856,7 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
            MAC_ADDR_ARRAY(peerMac));
 
 
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.tdls_frm_session_id = psessionEntry->peSessionId;
     /*
      * Transmit Discovery response and watch if this is delivered to
      * peer STA.
@@ -860,11 +870,11 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
                             ANI_TXDIR_IBSS,
                             0,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_SELF_STA_REQUESTED_MASK, smeSessionId, false );
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.tdls_frm_session_id = 0xff;
         limLog(pMac, LOGE, FL("could not send TDLS Discovery Response frame!"));
         return eSIR_FAILURE;
     }
@@ -1156,14 +1166,14 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
                        limTraceTdlsActionString(SIR_MAC_TDLS_SETUP_REQ),
                        MAC_ADDR_ARRAY(peerMac));
 
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.tdls_frm_session_id = psessionEntry->peSessionId;
 #if defined(CONFIG_HL_SUPPORT)
     halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_DATA,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, true );
 #else
@@ -1172,13 +1182,13 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, false );
 #endif
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.tdls_frm_session_id = 0xff;
         limLog(pMac, LOGE, FL("could not send TDLS Setup Request frame!"));
         return eSIR_FAILURE;
     }
@@ -1365,14 +1375,14 @@ tSirRetStatus limSendTdlsTeardownFrame(tpAniSirGlobal pMac,
                        "AP": "DIRECT"),
                        MAC_ADDR_ARRAY(peerMac));
 
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.tdls_frm_session_id = psessionEntry->peSessionId;
 #if defined(CONFIG_HL_SUPPORT)
     halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_DATA,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId,
                             (reason == eSIR_MAC_TDLS_TEARDOWN_PEER_UNREACHABLE) ? true : false );
@@ -1382,14 +1392,14 @@ tSirRetStatus limSendTdlsTeardownFrame(tpAniSirGlobal pMac,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId,
                             false );
 #endif
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.tdls_frm_session_id = 0xff;
         limLog(pMac, LOGE, FL("could not send TDLS Teardown frame"));
         return eSIR_FAILURE;
 
@@ -1643,14 +1653,14 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
            limTraceTdlsActionString(SIR_MAC_TDLS_SETUP_RSP),
            MAC_ADDR_ARRAY(peerMac));
 
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.tdls_frm_session_id = psessionEntry->peSessionId;
 #if defined(CONFIG_HL_SUPPORT)
     halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_DATA,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, true );
 #else
@@ -1659,13 +1669,13 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, false );
 #endif
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.tdls_frm_session_id = 0xff;
         limLog(pMac, LOGE, FL("could not send TDLS Setup Response"));
         return eSIR_FAILURE;
     }
@@ -1874,14 +1884,14 @@ tSirRetStatus limSendTdlsLinkSetupCnfFrame(tpAniSirGlobal pMac,
            limTraceTdlsActionString(SIR_MAC_TDLS_SETUP_CNF),
            MAC_ADDR_ARRAY(peerMac));
 
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.tdls_frm_session_id = psessionEntry->peSessionId;
 #if defined(CONFIG_HL_SUPPORT)
     halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_DATA,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, true );
 #else
@@ -1890,14 +1900,14 @@ tSirRetStatus limSendTdlsLinkSetupCnfFrame(tpAniSirGlobal pMac,
                             ANI_TXDIR_TODS,
                             TID_AC_VI,
                             limTxComplete, pFrame,
-                            limMgmtTXComplete,
+                            lim_mgmt_tdls_tx_complete,
                             HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME,
                             smeSessionId, false );
 #endif
 
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
-        pMac->lim.mgmtFrameSessionId = 0xff;
+        pMac->lim.tdls_frm_session_id = 0xff;
         limLog(pMac, LOGE, FL("could not send TDLS Setup Confirm frame"));
         return eSIR_FAILURE;
 
