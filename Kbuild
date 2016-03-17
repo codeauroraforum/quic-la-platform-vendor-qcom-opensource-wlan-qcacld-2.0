@@ -962,7 +962,8 @@ CDEFINES +=     -DCONFIG_HL_SUPPORT \
                 -DHIF_MBOX_SLEEP_WAR \
                 -DFEATURE_BUS_BANDWIDTH \
                 -DTX_COMPLETION_THREAD \
-                -DMSM8976_TCP_PERF
+                -DMSM8976_TCP_PERF \
+		-DFEATURE_SKB_PRE_ALLOC
 endif
 
 ifeq ($(CONFIG_ARCH_MDM9607), y)
