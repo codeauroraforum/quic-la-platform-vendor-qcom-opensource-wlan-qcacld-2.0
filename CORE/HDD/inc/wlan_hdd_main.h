@@ -1329,6 +1329,16 @@ struct hdd_offloaded_packets_ctx {
 };
 #endif
 
+/**
+ * struct acs_dfs_policy - Define ACS policies
+ * @acs_dfs_mode: Dfs mode enabled/disabled.
+ * @acs_channel: pre defined channel to avoid ACS.
+ */
+struct acs_dfs_policy {
+	enum dfs_mode acs_dfs_mode;
+	uint8_t acs_channel;
+};
+
 /** Adapter stucture definition */
 
 struct hdd_context_s
@@ -1674,6 +1684,8 @@ struct hdd_context_s
      * at runtime and intersecting it with target capab before updating.
      */
     uint32_t fine_time_meas_cap_target;
+
+    struct acs_dfs_policy acs_policy;
 };
 
 /*---------------------------------------------------------------------------
@@ -1970,6 +1982,7 @@ void
 hdd_get_ibss_peer_info_cb(v_VOID_t *pUserData,
                                     tSirPeerInfoRspParams *pPeerInfo);
 
+enum  sap_acs_dfs_mode wlan_hdd_get_dfs_mode(enum dfs_mode mode);
 void hdd_ch_avoid_cb(void *hdd_context, void *indi_param);
 uint8_t hdd_find_prefd_safe_chnl(hdd_context_t *hdd_ctxt,
 		hdd_adapter_t *ap_adapter);
