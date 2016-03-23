@@ -547,6 +547,8 @@ struct wma_txrx_node {
 	u_int8_t delay_before_vdev_stop;
 
 	uint8_t wep_default_key_idx;
+	bool is_vdev_valid;
+
 };
 
 #if defined(QCA_WIFI_FTM)
