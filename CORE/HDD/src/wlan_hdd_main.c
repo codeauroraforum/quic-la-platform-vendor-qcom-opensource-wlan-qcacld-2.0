@@ -11826,7 +11826,6 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
        wlan_hdd_logging_sock_deactivate_svc(pHddCtx);
 
 #ifdef WLAN_KD_READY_NOTIFIER
-   cnss_diag_notify_wlan_close();
    nl_srv_exit(pHddCtx->ptt_pid);
 #else
    nl_srv_exit();
@@ -13771,7 +13770,6 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 
 err_nl_srv:
 #ifdef WLAN_KD_READY_NOTIFIER
-   cnss_diag_notify_wlan_close();
    nl_srv_exit(pHddCtx->ptt_pid);
 #else
    nl_srv_exit();
