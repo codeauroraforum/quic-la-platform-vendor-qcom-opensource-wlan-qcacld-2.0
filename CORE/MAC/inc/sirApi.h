@@ -6523,4 +6523,18 @@ struct sir_smps_force_mode_event {
 	uint8_t    vdev_id;
 	uint8_t    status;
 };
+
+
+/**
+ * struct sir_del_all_tdls_peers - delete all tdls peers
+ * @msg_type: type of message
+ * @msg_len: length of message
+ * bssid: bssid of peer device
+ */
+struct sir_del_all_tdls_peers {
+	uint16_t msg_type;
+	uint16_t msg_len;
+	tSirMacAddr bssid;
+};
+
 #endif /* __SIR_API_H */
