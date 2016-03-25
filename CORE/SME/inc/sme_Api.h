@@ -4406,4 +4406,6 @@ eHalStatus sme_update_mimo_power_save(tHalHandle hHal,
 
 bool sme_is_sta_smps_allowed(tHalHandle hHal, uint8_t session_id);
 
+void sme_update_fine_time_measurement_capab(tHalHandle hal, uint32_t val);
+
 #endif //#if !defined( __SME_API_H )
