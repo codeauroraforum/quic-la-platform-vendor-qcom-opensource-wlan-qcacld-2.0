@@ -1146,7 +1146,13 @@ void ol_schedule_ramdump_work(struct ol_softc *scn)
 
 static void fw_indication_work_handler(struct work_struct *fw_indication)
 {
-#if !defined(HIF_SDIO)
+#ifndef HIF_USB
+	struct device *dev = NULL;
+
+	if (ramdump_scn && ramdump_scn->adf_dev
+			&& ramdump_scn->adf_dev->dev)
+		dev = ramdump_scn->adf_dev->dev;
+
 	vos_device_self_recovery();
 #endif
 }
@@ -1394,7 +1400,7 @@ void ol_target_failure(void *instance, A_STATUS status)
 	struct ol_softc *scn = (struct ol_softc *)instance;
 	void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
 	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA, vos_context);
-#ifdef HIF_PCI
+#ifndef HIF_USB
 	int ret;
 #endif
 
@@ -1452,6 +1458,16 @@ void ol_target_failure(void *instance, A_STATUS status)
 		}
 	} else if (-1 == ret) {
 		return;
+	}
+#endif
+
+#ifdef HIF_SDIO
+	ret = hif_sdio_check_fw_reg(scn);
+	if (0 == ret) {
+		if (scn->enable_self_recovery) {
+			ol_schedule_fw_indication_work(scn);
+			return;
+		}
 	}
 #endif
 
