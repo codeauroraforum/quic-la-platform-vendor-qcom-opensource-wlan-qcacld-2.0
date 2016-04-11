@@ -1586,6 +1586,7 @@ enum uapsd_up {
 	UAPSD_UP_NC,
 	UAPSD_UP_MAX
 };
+void wma_set_dfs_regdomain(uint8_t regdomain);
 
 #define WMA_TGT_INVALID_SNR (-1)
 #endif

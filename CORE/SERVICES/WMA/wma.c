@@ -221,10 +221,6 @@ wmi_unified_vdev_up_send(wmi_unified_t wmi,
                   u_int8_t vdev_id, u_int16_t aid,
                   u_int8_t bssid[IEEE80211_ADDR_LEN]);
 
-
-/* Configure the regulatory domain for DFS radar filter initialization*/
-void wma_set_dfs_regdomain(tp_wma_handle wma);
-
 static VOS_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
 				t_thermal_cmd_params thermal_info);
 
@@ -19900,8 +19896,6 @@ v_VOID_t wma_rx_ready_event(WMA_HANDLE handle, void *cmd_param_info)
 
 	vos_event_set(&wma_handle->wma_ready_event);
 
-	wma_set_dfs_regdomain(wma_handle);
-
 	WMA_LOGD("Exit");
 }
 
@@ -21637,51 +21631,33 @@ wma_dfs_configure_channel(struct ieee80211com *dfs_ic,
 /*
  * Configure the regulatory domain for DFS radar filter initialization
  */
-void wma_set_dfs_regdomain(tp_wma_handle wma)
+void wma_set_dfs_regdomain(uint8_t regdomain)
 {
-	u_int8_t ctl;
-	u_int32_t regdmn = wma->reg_cap.eeprom_rd;
-	u_int32_t regdmn5G;
+	void *vos_context = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
+	tp_wma_handle wma = vos_get_context(VOS_MODULE_ID_WDA, vos_context);
 
-	if (regdmn < 0)
-	{
-		WMA_LOGE("%s:DFS-Invalid regdomain",__func__);
-		/*
-		 * Set the DFS reg domain to unintlialized domain
-		 * to indicate dfs regdomain configuration failure
-		 */
-		wma->dfs_ic->current_dfs_regdomain = DFS_UNINIT_DOMAIN;
-		return;
-	}
+	if (!wma)
+		WMA_LOGE("%s: Unable to get WMA handle", __func__);
 
-	regdmn5G = get_regdmn_5g(regdmn);
-	ctl = regdmn_get_ctl_for_regdmn(regdmn5G);
-
-	if (!ctl)
-	{
-		WMA_LOGI("%s:DFS-Invalid CTL",__func__);
-		/*
-		 * Set the DFS reg domain to unintlialized domain
-		 * to indicate dfs regdomain configuration failure
-		 */
-		wma->dfs_ic->current_dfs_regdomain = DFS_UNINIT_DOMAIN;
-		return;
-	}
-	if (ctl == FCC)
-	{
-		WMA_LOGI("%s:DFS- CTL = FCC",__func__);
+	if (REGDOMAIN_FCC == regdomain) {
+		WMA_LOGI("%s:DFS- DOMAIN = FCC",__func__);
 		wma->dfs_ic->current_dfs_regdomain = DFS_FCC_DOMAIN;
 	}
-	else if (ctl == ETSI)
-	{
-		WMA_LOGI("%s:DFS- CTL = ETSI",__func__);
+	else if (REGDOMAIN_ETSI == regdomain) {
+		WMA_LOGI("%s:DFS- DOMAIN = ETSI",__func__);
 		wma->dfs_ic->current_dfs_regdomain = DFS_ETSI_DOMAIN;
 	}
-	else if (ctl == MKK)
-	{
-		WMA_LOGI("%s:DFS- CTL = MKK",__func__);
+	else if (REGDOMAIN_JAPAN == regdomain) {
+		WMA_LOGI("%s:DFS- DOMAIN = MKK",__func__);
 		wma->dfs_ic->current_dfs_regdomain = DFS_MKK4_DOMAIN;
 	}
+	else {
+		WMA_LOGI("%s:DFS-Invalid DOMAIN, Setting FCC",__func__);
+		/* Set FCC as default regdomain */
+		wma->dfs_ic->current_dfs_regdomain = DFS_FCC_DOMAIN;
+		return;
+	}
+
 	WMA_LOGI("%s: ****** Current Reg Domain: %d *******", __func__,
 			wma->dfs_ic->current_dfs_regdomain);
 }
