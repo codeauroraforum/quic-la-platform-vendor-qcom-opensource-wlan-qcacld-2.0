@@ -21873,7 +21873,7 @@ static void wma_start_oem_data_req(tp_wma_handle wma_handle,
 
 	WMA_LOGD("%s: Send OEM Data Request to target", __func__);
 
-	if (!startOemDataReq && !startOemDataReq->data) {
+	if (!startOemDataReq || !startOemDataReq->data) {
 		WMA_LOGE("%s: startOemDataReq is null", __func__);
 		goto out;
 	}
