@@ -4245,4 +4245,6 @@ void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
 eHalStatus sme_roam_set_default_key_index(tHalHandle hal, uint8_t session_id,
 					uint8_t default_idx);
 
+VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id);
+
 #endif //#if !defined( __SME_API_H )
