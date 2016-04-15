@@ -1083,6 +1083,7 @@ WLANSAP_RoamCallback
                      */
                     vos_timer_stop(&pMac->sap.SapDfsInfo.sap_dfs_cac_timer);
                     vos_timer_destroy(&pMac->sap.SapDfsInfo.sap_dfs_cac_timer);
+                    pMac->sap.SapDfsInfo.is_dfs_cac_timer_running = false;
 
                     /*
                      * User space is already indicated the CAC start and if
@@ -1099,8 +1100,6 @@ WLANSAP_RoamCallback
                              * Lets try not to be on the DFS channel
                              */
                     }
-
-                    pMac->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
 
                     sapEvent.event = eSAP_DFS_CHANNEL_CAC_RADAR_FOUND;
                     sapEvent.params = 0;
