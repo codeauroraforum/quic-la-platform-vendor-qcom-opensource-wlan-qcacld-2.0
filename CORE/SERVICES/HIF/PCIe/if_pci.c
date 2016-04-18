@@ -2506,6 +2506,7 @@ void hif_pci_crash_shutdown(struct pci_dev *pdev)
         return;
     }
 
+    hif_pci_pm_runtime_exit(sc);
     adf_os_spin_lock_irqsave(&hif_state->suspend_lock);
 
     hif_irq_record(HIF_CRASH, sc);
