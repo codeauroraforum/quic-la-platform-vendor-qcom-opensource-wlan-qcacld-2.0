@@ -11846,6 +11846,7 @@ void __hdd_wlan_exit(void)
 
    hdd_close_tx_queues(pHddCtx);
    //Do all the cleanup before deregistering the driver
+   memdump_deinit();
    hdd_wlan_exit(pHddCtx);
    EXIT();
 }
@@ -13179,6 +13180,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
       pHddCtx->isLoadInProgress = FALSE;
 
+      memdump_init();
       hddLog(LOGE, FL("FTM driver loaded"));
       complete(&wlan_start_comp);
       return VOS_STATUS_SUCCESS;
@@ -13848,7 +13850,6 @@ static int hdd_driver_init( void)
        ret_status = -ENODEV;
        break;
    } else {
-       memdump_init();
        pr_info("%s: driver loaded in %lld\n", WLAN_MODULE_NAME,
                                               adf_get_boottime() - start);
        return 0;
@@ -13975,7 +13976,6 @@ static void hdd_driver_exit(void)
    }
 
    vos_wait_for_work_thread_completion(__func__);
-   memdump_deinit();
 
    hif_unregister_driver();
 
