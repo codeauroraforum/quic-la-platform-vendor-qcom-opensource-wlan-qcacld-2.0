@@ -4410,4 +4410,6 @@ void sme_update_fine_time_measurement_capab(tHalHandle hal, uint32_t val);
 
 eHalStatus sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id);
 
+VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id);
+
 #endif //#if !defined( __SME_API_H )
