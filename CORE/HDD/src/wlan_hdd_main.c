@@ -3760,17 +3760,17 @@ static VOS_STATUS hdd_parse_ese_beacon_req(tANI_U8 *pValue,
     /* no argument followed by spaces */
     if ('\0' == *inPtr) return -EINVAL;
 
-    /* Getting the first argument ie measurement token */
+    /* Getting the first argument ie Number of IE fields */
     v = sscanf(inPtr, "%31s ", buf);
     if (1 != v) return -EINVAL;
 
     v = kstrtos32(buf, 10, &tempInt);
     if (v < 0) return -EINVAL;
 
+    tempInt = VOS_MIN(tempInt, SIR_ESE_MAX_MEAS_IE_REQS);
     pEseBcnReq->numBcnReqIe = tempInt;
 
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
-               "Number of Bcn Req Ie fields(%d)", pEseBcnReq->numBcnReqIe);
+    hddLog(LOG1, "Number of Bcn Req Ie fields: %d", pEseBcnReq->numBcnReqIe);
 
     for (j = 0; j < (pEseBcnReq->numBcnReqIe); j++) {
         for (i = 0; i < 4; i++) {
@@ -13319,6 +13319,10 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
 
    /* Fwr capabilities received, Set the Dot11 mode */
    sme_SetDefDot11Mode(pHddCtx->hHal);
+
+   wlansap_set_tx_leakage_threshold(pHddCtx->hHal,
+        pHddCtx->cfg_ini->sap_tx_leakage_threshold);
+
    /* Register with platform driver as client for Suspend/Resume */
    status = hddRegisterPmOps(pHddCtx);
    if ( !VOS_IS_STATUS_SUCCESS( status ) )

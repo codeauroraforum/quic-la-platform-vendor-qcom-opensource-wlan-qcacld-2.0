@@ -3397,6 +3397,16 @@ enum dot11p_mode {
 #define CFG_FIRST_SCAN_BUCKET_THRESHOLD_MAX       (-30)
 #define CFG_FIRST_SCAN_BUCKET_THRESHOLD_DEFAULT   (-30)
 
+/*
+ * sap tx leakage threshold
+ * customer can set this value from 100 to 1000 which means
+ * sap tx leakage threshold is -10db to -100db
+ */
+#define CFG_SAP_TX_LEAKAGE_THRESHOLD_NAME    "gsap_tx_leakage_threshold"
+#define CFG_SAP_TX_LEAKAGE_THRESHOLD_MIN     (100)
+#define CFG_SAP_TX_LEAKAGE_THRESHOLD_MAX     (1000)
+#define CFG_SAP_TX_LEAKAGE_THRESHOLD_DEFAULT (310)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -4093,6 +4103,7 @@ typedef struct
    uint16_t                    max_mgmt_tx_fail_count;
    int8_t                      first_scan_bucket_threshold;
    uint8_t                     ht_mpdu_density;
+   uint16_t                    sap_tx_leakage_threshold;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
