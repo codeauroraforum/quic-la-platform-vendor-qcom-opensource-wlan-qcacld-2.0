@@ -2004,4 +2004,5 @@ static inline void wlan_hdd_set_egap_support(hdd_context_t *hdd_ctx,
 int wlan_hdd_update_txrx_chain_mask(hdd_context_t *hdd_ctx,
 				    uint8_t chain_mask);
 
+void wlan_hdd_undo_acs(hdd_adapter_t *adapter);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
