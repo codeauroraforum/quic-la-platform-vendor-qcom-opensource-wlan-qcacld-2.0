@@ -486,6 +486,11 @@ static int tlshim_mgmt_rx_process(void *context, u_int8_t *data,
 		return 0;
 	}
 
+	if (!wma_handle) {
+		TLSHIM_LOGE("%s: Failed to get WMA context!", __func__);
+		return 0;
+	}
+
 	param_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *) data;
 	if (!param_tlvs) {
 		TLSHIM_LOGE("Get NULL point message from FW");
