@@ -3407,6 +3407,12 @@ enum dot11p_mode {
 #define CFG_SAP_TX_LEAKAGE_THRESHOLD_MAX     (1000)
 #define CFG_SAP_TX_LEAKAGE_THRESHOLD_DEFAULT (310)
 
+#define CFG_TGT_GTX_USR_CFG_NAME      "tgt_gtx_usr_cfg"
+#define CFG_TGT_GTX_USR_CFG_MIN       (0)
+#define CFG_TGT_GTX_USR_CFG_MAX       (32)
+#define CFG_TGT_GTX_USR_CFG_DEFAULT   (32)
+
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -4104,6 +4110,8 @@ typedef struct
    int8_t                      first_scan_bucket_threshold;
    uint8_t                     ht_mpdu_density;
    uint16_t                    sap_tx_leakage_threshold;
+   /* parameter to control GTX */
+   uint32_t                    tgt_gtx_usr_cfg;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
