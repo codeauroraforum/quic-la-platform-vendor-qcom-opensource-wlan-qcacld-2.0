@@ -74,6 +74,7 @@ static v_BOOL_t init_by_reg_core = VOS_FALSE;
  * Preprocessor Definitions and Constants
  * -------------------------------------------------------------------------*/
 #define MAX_COUNTRY_COUNT        300
+#define REG_WAIT_TIME 50
 
 /*
  * This is a set of common rules used by our world regulatory domains.
@@ -1222,8 +1223,12 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
     if ((COUNTRY_INIT == source) && (VOS_FALSE == init_by_reg_core)) {
         init_by_driver = VOS_TRUE;
 
-        if (('0' != country_code[0]) || ('0' != country_code[1]))
+        if (('0' != country_code[0]) || ('0' != country_code[1])) {
+            INIT_COMPLETION(pHddCtx->reg_init);
             regulatory_hint(wiphy, country_code);
+            wait_for_completion_timeout(&pHddCtx->reg_init,
+                                        msecs_to_jiffies(REG_WAIT_TIME));
+    }
 
     } else if (COUNTRY_IE == source || COUNTRY_USER == source) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)) || defined(WITH_BACKPORTS)
@@ -1760,6 +1765,8 @@ VOS_STATUS vos_init_wiphy_from_eeprom(void)
          return VOS_STATUS_E_FAULT;
       }
    }
+
+   init_completion(&pHddCtx->reg_init);
 
    /* send CTL info to firmware */
    regdmn_set_regval(&pHddCtx->reg);
