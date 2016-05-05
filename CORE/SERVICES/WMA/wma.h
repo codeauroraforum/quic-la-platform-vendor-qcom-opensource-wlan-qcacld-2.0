@@ -841,6 +841,7 @@ typedef struct wma_handle {
 	uint16_t max_mgmt_tx_fail_count;
 
 	struct wma_runtime_pm_context runtime_context;
+	struct sir_allowed_action_frames allowed_action_frames;
 }t_wma_handle, *tp_wma_handle;
 
 struct wma_target_cap {
