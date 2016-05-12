@@ -723,7 +723,6 @@ typedef enum {
     /** Modem power state command */
     WMI_MODEM_POWER_STATE_CMDID=WMI_CMD_GRP_START_ID(WMI_GRP_COEX),
     WMI_CHAN_AVOID_UPDATE_CMDID,
-    WMI_COEX_CONFIG_CMDID,
 
     /**
      *  OBSS scan offload enable/disable commands
@@ -10539,19 +10538,6 @@ typedef struct {
 } wmi_vdev_tsf_report_event_fixed_param;
 
 /* ADD NEW DEFS HERE */
-typedef enum wmi_coex_config_type {
-    WMI_COEX_CONFIG_PAGE_P2P_TDM = 1, /* config interval (arg1 BT, arg2 WLAN) for P2P + PAGE */
-    WMI_COEX_CONFIG_PAGE_STA_TDM = 2, /* config interval (arg1 BT, arg2 WLAN) for STA + PAGE */
-    WMI_COEX_CONFIG_PAGE_SAP_TDM = 3, /* config interval (arg1 BT, arg2 WLAN) for SAP + PAGE */
-} WMI_COEX_CONFIG_TYPE;
-
-typedef struct {
-    A_UINT32 tlv_header;
-    A_UINT32 vdev_id;
-    A_UINT32 config_type; /* wmi_coex_config_type enum */
-    A_UINT32 config_arg1;
-    A_UINT32 config_arg2;
-} WMI_COEX_CONFIG_CMD_fixed_param;
 
 
 /*****************************************************************************

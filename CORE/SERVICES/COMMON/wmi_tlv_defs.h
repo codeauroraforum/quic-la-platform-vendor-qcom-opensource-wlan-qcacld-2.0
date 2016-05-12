@@ -559,8 +559,7 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_vdev_tsf_report_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_get_fw_mem_dump_fixed_param,
     WMITLV_TAG_STRUC_wmi_update_fw_mem_dump_fixed_param,
-    WMITLV_TAG_STRUC_wmi_fw_mem_dump_params,
-    WMITLV_TAG_STRUC_WMI_COEX_CONFIG_CMD_fixed_param,
+    WMITLV_TAG_STRUC_wmi_fw_mem_dump_params
 } WMITLV_TAG_ID;
 
 /*
@@ -774,8 +773,7 @@ typedef enum {
     OP(WMI_ROAM_FILTER_CMDID) \
     OP(WMI_PASSPOINT_LIST_CONFIG_CMDID) \
     OP(WMI_VDEV_TSF_TSTAMP_ACTION_CMDID) \
-    OP(WMI_GET_FW_MEM_DUMP_CMDID) \
-    OP(WMI_COEX_CONFIG_CMDID)
+    OP(WMI_GET_FW_MEM_DUMP_CMDID)
 
 /*
  * IMPORTANT: Please add _ALL_ WMI Events Here.
@@ -2173,11 +2171,6 @@ WMITLV_CREATE_PARAM_STRUC(WMI_ROAM_FILTER_CMDID);
 #define WMITLV_TABLE_WMI_VDEV_TSF_TSTAMP_ACTION_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_vdev_tsf_tstamp_action_cmd_fixed_param, wmi_vdev_tsf_tstamp_action_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_VDEV_TSF_TSTAMP_ACTION_CMDID);
-
-/* COEX config cmd */
-#define WMITLV_TABLE_WMI_COEX_CONFIG_CMDID(id,op,buf,len) \
-    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_COEX_CONFIG_CMD_fixed_param, WMI_COEX_CONFIG_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX)
-WMITLV_CREATE_PARAM_STRUC(WMI_COEX_CONFIG_CMDID);
 
 /************************** TLV definitions of WMI events *******************************/
 
