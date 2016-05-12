@@ -785,7 +785,7 @@ static void hdd_smps_force_mode_cb(void *context,
 
 }
 
-#if defined (FEATURE_WLAN_MCC_TO_SCC_SWITCH) || defined (FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE)
+#if defined (FEATURE_WLAN_MCC_TO_SCC_SWITCH) || defined (FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE) || defined (FEATURE_WLAN_CH_AVOID)
 /**
  * wlan_hdd_restart_sap() - This function is used to restart SAP in driver internally
  * @ap_adapter: - Pointer to SAP hdd_adapter_t structure
@@ -11285,6 +11285,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
              vos_flush_work(&pHddCtx->sap_start_work);
              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
                         FL("Canceled the pending SAP restart work"));
+             hdd_change_ch_avoidance_status(pHddCtx, false);
              hdd_change_sap_restart_required_status(pHddCtx, false);
          }
          //Any softap specific cleanup here...
@@ -14327,6 +14328,12 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    rtnl_lock_enable = FALSE;
 #endif
 
+#ifdef CONFIG_CNSS
+   cnss_init_work(&pHddCtx->sap_start_work, hdd_sap_restart_handle);
+#else
+   INIT_WORK(&pHddCtx->sap_start_work, hdd_sap_restart_handle);
+#endif
+
    if (pHddCtx->cfg_ini->dot11p_mode == WLAN_HDD_11P_STANDALONE) {
        /* Create only 802.11p interface */
       pAdapter = hdd_open_adapter(pHddCtx, WLAN_HDD_OCB,
@@ -15816,8 +15823,6 @@ void hdd_unsafe_channel_restart_sap(hdd_context_t *hdd_ctx)
 	hdd_adapter_t *adapter;
 	VOS_STATUS status;
 
-	static bool restart_sap_in_progress = false;
-
 	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
 	while (NULL != adapter_node && VOS_STATUS_SUCCESS == status) {
 		adapter = adapter_node->pAdapter;
@@ -15850,21 +15855,32 @@ void hdd_unsafe_channel_restart_sap(hdd_context_t *hdd_ctx)
 			channel_loop++) {
 			if (((hdd_ctx->unsafe_channel_list[channel_loop] ==
 				adapter->sessionCtx.ap.operatingChannel)) &&
+				(false == hdd_ctx->is_ch_avoid_in_progress) &&
 				(adapter->sessionCtx.ap.sapConfig.acs_cfg.
-				 acs_mode == true) &&
-				!restart_sap_in_progress) {
-				hddLog(LOGE,
-				FL("Restarting SAP due to unsafe channel"));
-				wlan_hdd_send_svc_nlink_msg(
-						WLAN_SVC_LTE_COEX_IND,
-						NULL,
-						0);
-				restart_sap_in_progress = true;
+				 acs_mode == true)) {
+				hdd_change_ch_avoidance_status(hdd_ctx, true);
+
+				vos_flush_work(
+					&hdd_ctx->sap_start_work);
+
 				/*
 				 * current operating channel
 				 * is un-safe channel, restart driver
 				 */
+				hddLog(LOGE,
+					FL("Restarting SAP due to unsafe channel"));
+
+				wlan_hdd_send_svc_nlink_msg(
+						WLAN_SVC_LTE_COEX_IND,
+						NULL,
+						0);
+
 				hdd_hostapd_stop(adapter->dev);
+
+				if (hdd_ctx->cfg_ini->sap_restrt_ch_avoid)
+					schedule_work(
+					&hdd_ctx->sap_start_work);
+
 				return;
 			}
 		}

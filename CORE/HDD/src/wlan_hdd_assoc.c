@@ -1587,7 +1587,7 @@ void hdd_PerformRoamSetKeyComplete(hdd_adapter_t *pAdapter)
  *
  * Return: void.
  */
-static void hdd_sap_restart_handle(struct work_struct *work)
+void hdd_sap_restart_handle(struct work_struct *work)
 {
     hdd_adapter_t *sap_adapter;
     hdd_context_t *hdd_ctx = container_of(work,
@@ -1608,9 +1608,15 @@ static void hdd_sap_restart_handle(struct work_struct *work)
         vos_ssr_unprotect(__func__);
         return;
     }
-    wlan_hdd_start_sap(sap_adapter);
 
-    hdd_change_sap_restart_required_status(hdd_ctx, false);
+    if (hdd_ctx->is_ch_avoid_in_progress) {
+        sap_adapter->sessionCtx.ap.sapConfig.channel = AUTO_CHANNEL_SELECT;
+        wlan_hdd_restart_sap(sap_adapter);
+        hdd_change_ch_avoidance_status(hdd_ctx, false);
+    } else {
+        wlan_hdd_start_sap(sap_adapter);
+        hdd_change_sap_restart_required_status(hdd_ctx, false);
+    }
     vos_ssr_unprotect(__func__);
 }
 
@@ -2218,16 +2224,13 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
          * creating workqueue then our main thread might go to sleep which
          * is not acceptable.
          */
-#ifdef CONFIG_CNSS
-         cnss_init_work(&pHddCtx->sap_start_work,
-                        hdd_sap_restart_handle);
-#else
-         INIT_WORK(&pHddCtx->sap_start_work,
-                   hdd_sap_restart_handle);
-#endif
-         schedule_work(&pHddCtx->sap_start_work);
 
-
+         /*
+          * If channel avoidance is intiated, don't schedule the work.
+          * Channel avoidance takes care restarting SAP.
+          */
+         if (true == hdd_is_sap_restart_required(pHddCtx))
+             schedule_work(&pHddCtx->sap_start_work);
     }
 
 #ifdef FEATURE_WLAN_FORCE_SAP_SCC

@@ -3412,6 +3412,11 @@ enum dot11p_mode {
 #define CFG_TGT_GTX_USR_CFG_MAX       (32)
 #define CFG_TGT_GTX_USR_CFG_DEFAULT   (32)
 
+#define CFG_CH_AVOID_SAP_RESTART_NAME    "sap_ch_avoid_restart"
+#define CFG_CH_AVOID_SAP_RESTART_MIN     (0)
+#define CFG_CH_AVOID_SAP_RESTART_MAX     (1)
+#define CFG_CH_AVOID_SAP_RESTART_DEFAULT (0)
+
 /*
  * Support to start sap in indoor channel
  * Customer can config this item to enable/disable sap in indoor channel
@@ -3426,7 +3431,7 @@ enum dot11p_mode {
   Type declarations
   -------------------------------------------------------------------------*/
 
-typedef struct
+struct hdd_config
 {
    //Bitmap to track what is explicitly configured
    DECLARE_BITMAP(bExplicitCfg, MAX_CFG_INI_ITEMS);
@@ -4122,7 +4127,10 @@ typedef struct
    uint16_t                    sap_tx_leakage_threshold;
    /* parameter to control GTX */
    uint32_t                    tgt_gtx_usr_cfg;
-} hdd_config_t;
+   bool                        sap_restrt_ch_avoid;
+};
+
+typedef struct hdd_config hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
 typedef struct mbssid_sap_dyn_ini_config {

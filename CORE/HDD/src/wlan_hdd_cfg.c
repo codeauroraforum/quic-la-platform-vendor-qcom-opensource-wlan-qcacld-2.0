@@ -4210,6 +4210,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_TGT_GTX_USR_CFG_MIN,
                 CFG_TGT_GTX_USR_CFG_MAX),
 
+   REG_VARIABLE(CFG_CH_AVOID_SAP_RESTART_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, sap_restrt_ch_avoid,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_CH_AVOID_SAP_RESTART_DEFAULT,
+                CFG_CH_AVOID_SAP_RESTART_MIN,
+                CFG_CH_AVOID_SAP_RESTART_MAX),
+
    REG_VARIABLE(CFG_INDOOR_CHANNEL_SUPPORT_NAME,
                 WLAN_PARAM_Integer,
                 hdd_config_t, indoor_channel_support,
@@ -4905,6 +4912,10 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
   hddLog(LOG2, "Name = [%s] Value = [%u]",
                  CFG_TGT_GTX_USR_CFG_NAME,
                  pHddCtx->cfg_ini->tgt_gtx_usr_cfg);
+
+  hddLog(LOG2, "Name = [%s] Value = [%u]",
+                 CFG_CH_AVOID_SAP_RESTART_NAME,
+                 pHddCtx->cfg_ini->sap_restrt_ch_avoid);
 }
 
 #define CFG_VALUE_MAX_LEN 256
