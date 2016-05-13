@@ -668,5 +668,6 @@ bool lim_is_ext_cap_ie_present (struct s_ext_cap *ext_cap);
 bool lim_is_robust_mgmt_action_frame(uint8_t action_catagory);
 void lim_update_caps_info_for_bss(tpAniSirGlobal mac_ctx,
 				uint16_t *caps, uint16_t bss_caps);
-
+eHalStatus limP2PActionCnf(tpAniSirGlobal mac_ctx,
+				uint32_t tx_complete_success);
 #endif /* __LIM_UTILS_H */
