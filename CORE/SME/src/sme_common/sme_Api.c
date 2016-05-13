@@ -12590,7 +12590,6 @@ void sme_set_pdev_ht_vht_ies(tHalHandle hal, bool enable2x2)
 		if (eHAL_STATUS_SUCCESS != status) {
 			smsLog(mac_ctx, LOGE, FL(
 				"SME_PDEV_SET_HT_VHT_IE msg to PE failed"));
-			vos_mem_free(ht_vht_cfg);
 		}
 		sme_ReleaseGlobalLock(&mac_ctx->sme);
 	}
@@ -14281,8 +14280,13 @@ eHalStatus sme_set_miracast(tHalHandle hal, uint8_t filter_type)
 	uint32_t *val;
 	tpAniSirGlobal mac_ptr = PMAC_STRUCT(hal);
 
+    if (NULL == mac_ptr) {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                "%s: Invalid MAC pointer", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
 	val = vos_mem_malloc(sizeof(*val));
-	if (NULL == val || NULL == mac_ptr) {
+	if (NULL == val) {
 		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
 				"%s: Invalid pointer", __func__);
 		return eHAL_STATUS_E_MALLOC_FAILED;
@@ -14297,7 +14301,7 @@ eHalStatus sme_set_miracast(tHalHandle hal, uint8_t filter_type)
 	if (!VOS_IS_STATUS_SUCCESS(
 				vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))) {
 		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-				"%s: Not able to post WDA_SET_MAS_ENABLE_DISABLE to WMA!",
+		        "%s: Not able to post SIR_HAL_SET_MIRACAST to WMA!",
 				__func__);
 		vos_mem_free(val);
 		return eHAL_STATUS_FAILURE;
