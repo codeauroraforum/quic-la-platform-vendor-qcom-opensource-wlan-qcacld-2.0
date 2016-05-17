@@ -54,6 +54,7 @@
 #include <net/cfg80211.h>
 #include "regdomain.h"
 #include "regdomain_common.h"
+#include "wma.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0))
 #define IEEE80211_CHAN_NO_80MHZ		1<<7
@@ -3555,6 +3556,7 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
           }
        }
     }
+    wma_set_dfs_regdomain(temp_reg_domain);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
     return;
