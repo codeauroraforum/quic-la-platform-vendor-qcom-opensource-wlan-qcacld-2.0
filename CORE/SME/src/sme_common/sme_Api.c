@@ -3903,7 +3903,7 @@ eHalStatus sme_RoamStopBss(tHalHandle hHal, tANI_U8 sessionId)
     \return eHalStatus  SUCCESS  Roam callback will be called to indicate actual results
   -------------------------------------------------------------------------------*/
 eHalStatus sme_RoamDisconnectSta(tHalHandle hHal, tANI_U8 sessionId,
-                                tANI_U8 *pPeerMacAddr)
+                                struct tagCsrDelStaParams *pDelStaParams)
 {
    eHalStatus status = eHAL_STATUS_FAILURE;
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
@@ -3919,8 +3919,7 @@ eHalStatus sme_RoamDisconnectSta(tHalHandle hHal, tANI_U8 sessionId,
    {
       if( CSR_IS_SESSION_VALID( pMac, sessionId ) )
       {
-         status = csrRoamIssueDisassociateStaCmd( pMac, sessionId, pPeerMacAddr,
-                                                  eSIR_MAC_DEAUTH_LEAVING_BSS_REASON);
+         status = csrRoamIssueDisassociateStaCmd( pMac, sessionId, pDelStaParams);
       }
       else
       {
@@ -6532,60 +6531,16 @@ eHalStatus sme_ScanGetBKIDCandidateList(tHalHandle hHal, tANI_U32 sessionId,
  *****************************************************************************/
 
 /* ---------------------------------------------------------------------------
-    \fn sme_getOemDataRsp
-    \brief a wrapper function to obtain the OEM DATA RSP
-    \param pOemDataRsp - A pointer to the response object
-    \param pContext - a pointer passed in for the callback
-    \return eHalStatus
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_getOemDataRsp(tHalHandle hHal,
-        tOemDataRsp **pOemDataRsp)
-{
-    eHalStatus status = eHAL_STATUS_SUCCESS;
-    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-
-    do
-    {
-        //acquire the lock for the sme object
-        status = sme_AcquireGlobalLock(&pMac->sme);
-
-        if(!HAL_STATUS_SUCCESS(status))
-        {
-            break;
-        }
-
-        if(pMac->oemData.pOemDataRsp != NULL)
-        {
-            *pOemDataRsp = pMac->oemData.pOemDataRsp;
-        }
-        else
-        {
-            status = eHAL_STATUS_FAILURE;
-        }
-
-        //release the lock for the sme object
-        sme_ReleaseGlobalLock( &pMac->sme );
-
-    } while(0);
-
-    return status;
-}
-
-/* ---------------------------------------------------------------------------
     \fn sme_OemDataReq
     \brief a wrapper function for OEM DATA REQ
     \param sessionId - session id to be used.
     \param pOemDataReqId - pointer to an object to get back the request ID
-    \param callback - a callback function that is called upon finish
-    \param pContext - a pointer passed in for the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_OemDataReq(tHalHandle hHal,
         tANI_U8 sessionId,
         tOemDataReqConfig *pOemDataReqConfig,
-        tANI_U32 *pOemDataReqID,
-        oemData_OemDataReqCompleteCallback callback,
-        void *pContext)
+        tANI_U32 *pOemDataReqID)
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
@@ -6608,7 +6563,7 @@ eHalStatus sme_OemDataReq(tHalHandle hHal,
                 return eHAL_STATUS_FAILURE;
             }
 
-            status = oemData_OemDataReq(hHal, sessionId, pOemDataReqConfig, pOemDataReqID, callback, pContext);
+            status = oemData_OemDataReq(hHal, sessionId, pOemDataReqConfig, pOemDataReqID);
 
             //release the lock for the sme object
             sme_ReleaseGlobalLock( &pMac->sme );
@@ -15052,4 +15007,26 @@ void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log)
 {
     tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
     mac_ctx->sap.enable_dfs_phy_error_logs = enable_log;
+}
+
+/*
+ *  sme_is_session_valid(): verify a sme session
+ *  @param hal_handle: hal handle for getting global mac struct.
+ *  @param session_id: sme_session_id
+ *  Return: eHAL_STATUS_SUCCESS or non-zero on failure.
+ */
+VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_handle);
+
+	if (NULL == mac_ctx) {
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+			  FL("mac_ctx is null!!"));
+	        VOS_ASSERT(0);
+	        return VOS_STATUS_E_FAILURE;
+	}
+	if (CSR_IS_SESSION_VALID(mac_ctx, session_id))
+	        return VOS_STATUS_SUCCESS;
+
+	return VOS_STATUS_E_FAILURE;
 }

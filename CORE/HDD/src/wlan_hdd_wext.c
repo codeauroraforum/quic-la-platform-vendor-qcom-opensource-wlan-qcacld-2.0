@@ -107,9 +107,6 @@
 #include "wlan_hdd_cfg80211.h"
 #endif
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-#define MAX_OEM_DATA_RSP_LEN            2047
-#endif
 #include "vos_nvitem.h"
 
 #define HDD_FINISH_ULA_TIME_OUT         800
@@ -395,11 +392,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 /* (SIOCIWFIRSTPRIV + 14) is currently unused */
 /* (SIOCIWFIRSTPRIV + 15) is currently unused */
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-/* Private ioctls for setting the measurement configuration */
-#define WLAN_PRIV_SET_OEM_DATA_REQ (SIOCIWFIRSTPRIV + 17)
-#define WLAN_PRIV_GET_OEM_DATA_RSP (SIOCIWFIRSTPRIV + 19)
-#endif
+/* (SIOCIWFIRSTPRIV + 17) is currently unused */
+/* (SIOCIWFIRSTPRIV + 19) is currently unused */
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
 #define WLAN_PRIV_SET_FTIES             (SIOCIWFIRSTPRIV + 20)
@@ -4578,12 +4572,34 @@ static int iw_set_mlme(struct net_device *dev,
 }
 
 int process_wma_set_command(int sessid, int paramid,
-                                   int sval, int vpdev)
+                            int sval, int vpdev)
 {
     int ret = 0;
     vos_msg_t msg = {0};
 
-    wda_cli_set_cmd_t *iwcmd = (wda_cli_set_cmd_t *)vos_mem_malloc(
+    v_CONTEXT_t vos_context = vos_get_global_context(0, NULL);
+    hdd_context_t *hdd_ctx;
+    wda_cli_set_cmd_t *iwcmd;
+
+    /* Skip session validation in FTM mode and for PDEV commands */
+    if (vpdev == PDEV_CMD || VOS_FTM_MODE == hdd_get_conparam())
+       goto skip_ftm;
+
+    hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD, vos_context);
+    if (!hdd_ctx) {
+       hddLog(LOGE,FL("hdd context is not valid!"));
+       return -EINVAL;
+    }
+
+    if (vpdev != PDEV_CMD &&
+        VOS_STATUS_SUCCESS != sme_is_session_valid(hdd_ctx->hHal,
+                                                     sessid)) {
+       hddLog(LOGE, FL("SME session id is not valid %d"), sessid);
+       return -EINVAL;
+    }
+
+skip_ftm:
+    iwcmd = (wda_cli_set_cmd_t *)vos_mem_malloc(
                                 sizeof(wda_cli_set_cmd_t));
     if (NULL == iwcmd) {
        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_mem_alloc failed", __func__);
@@ -4599,7 +4615,7 @@ int process_wma_set_command(int sessid, int paramid,
     msg.bodyptr = (void *)iwcmd;
     if (VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA,
                                                   &msg)) {
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, "%s: "
+       hddLog(VOS_TRACE_LEVEL_ERROR, "%s: "
                  "Not able to post wda_cli_set_cmd message to WDA",
                  __func__);
        vos_mem_free(iwcmd);
@@ -4613,7 +4629,29 @@ int process_wma_set_command_twoargs(int sessid, int paramid,
 {
     int ret = 0;
     vos_msg_t msg = {0};
-    wda_cli_set_cmd_t *iwcmd = vos_mem_malloc(sizeof(*iwcmd));
+    wda_cli_set_cmd_t *iwcmd;
+
+    v_CONTEXT_t vos_context = vos_get_global_context(0, NULL);
+    hdd_context_t *hdd_ctx;
+    /* Skip session validation in FTM mode and for PDEV commands */
+    if (vpdev == PDEV_CMD || VOS_FTM_MODE == hdd_get_conparam())
+       goto skip_ftm;
+
+    hdd_ctx = vos_get_context(VOS_MODULE_ID_HDD, vos_context);
+
+    if (!hdd_ctx) {
+       hddLog(LOGE,FL("hdd context is not valid!"));
+       return -EINVAL;
+    }
+
+    if (VOS_STATUS_SUCCESS  != sme_is_session_valid(hdd_ctx->hHal,
+                                                     sessid)) {
+       hddLog(LOGE, FL("SME session id is not valid %d"), sessid);
+       return -EINVAL;
+    }
+
+skip_ftm:
+    iwcmd = vos_mem_malloc(sizeof(*iwcmd));
 
     if (NULL == iwcmd) {
         hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_mem_alloc failed!", __func__);
@@ -6454,6 +6492,12 @@ static int iw_setnone_getint(struct net_device *dev, struct iw_request_info *inf
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                                   "%s:LOGP in Progress. Ignore!!!", __func__);
         return -EBUSY;
+    }
+
+    if (VOS_STATUS_SUCCESS != sme_is_session_valid(hHal,
+                               pAdapter->sessionId)) {
+       hddLog(LOGE, FL("session id is not valid %d"), pAdapter->sessionId);
+       return -EINVAL;
     }
 
     switch (value[0])
@@ -9914,10 +9958,6 @@ static const iw_handler we_private[] = {
    [WLAN_PRIV_ADD_TSPEC             - SIOCIWFIRSTPRIV]   = iw_add_tspec,
    [WLAN_PRIV_DEL_TSPEC             - SIOCIWFIRSTPRIV]   = iw_del_tspec,
    [WLAN_PRIV_GET_TSPEC             - SIOCIWFIRSTPRIV]   = iw_get_tspec,
-#ifdef FEATURE_OEM_DATA_SUPPORT
-   [WLAN_PRIV_SET_OEM_DATA_REQ - SIOCIWFIRSTPRIV] = iw_set_oem_data_req, //oem data req Specifc
-   [WLAN_PRIV_GET_OEM_DATA_RSP - SIOCIWFIRSTPRIV] = iw_get_oem_data_rsp, //oem data req Specifc
-#endif
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
    [WLAN_PRIV_SET_FTIES                 - SIOCIWFIRSTPRIV]   = iw_set_fties,
@@ -10862,22 +10902,6 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         "getTspec" },
-
-#ifdef FEATURE_OEM_DATA_SUPPORT
-    /* handlers for main ioctl - OEM DATA */
-    {
-        WLAN_PRIV_SET_OEM_DATA_REQ,
-        IW_PRIV_TYPE_BYTE | sizeof(struct iw_oem_data_req) | IW_PRIV_SIZE_FIXED,
-        0,
-        "set_oem_data_req" },
-
-    /* handlers for main ioctl - OEM DATA */
-    {
-        WLAN_PRIV_GET_OEM_DATA_RSP,
-        0,
-        IW_PRIV_TYPE_BYTE | MAX_OEM_DATA_RSP_LEN,
-        "get_oem_data_rsp" },
-#endif
 
     /* handlers for main ioctl - host offload */
     {

@@ -768,7 +768,8 @@ eHalStatus sme_RoamGetAssociatedStas(tHalHandle hHal, tANI_U8 sessionId,
     \param pPeerMacAddr - Caller allocated memory filled with peer MAC address (6 bytes)
     \return eHalStatus  SUCCESS  Roam callback will be called to indicate actual results
   -------------------------------------------------------------------------------*/
-eHalStatus sme_RoamDisconnectSta(tHalHandle hHal, tANI_U8 sessionId, tANI_U8 *pPeerMacAddr);
+eHalStatus sme_RoamDisconnectSta(tHalHandle hHal, tANI_U8 sessionId,
+                         struct tagCsrDelStaParams *pDelStaParams);
 
 /* ---------------------------------------------------------------------------
     \fn sme_RoamDeauthSta
@@ -1884,25 +1885,12 @@ eHalStatus sme_ScanGetBKIDCandidateList(tHalHandle hHal, tANI_U32 sessionId,
     \fn sme_OemDataReq
     \param sessionId - session id of session to be used for oem data req.
     \param pOemDataReqID - pointer to an object to get back the request ID
-    \param callback - a callback function that is called upon finish
-    \param pContext - a pointer passed in for the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
 eHalStatus sme_OemDataReq(tHalHandle hHal,
                                        tANI_U8 sessionId,
                                        tOemDataReqConfig *,
-                                       tANI_U32 *pOemDataReqID,
-                                       oemData_OemDataReqCompleteCallback callback,
-                                       void *pContext);
-
-/* ---------------------------------------------------------------------------
-    \fn sme_getOemDataRsp
-    \param pOemDataRsp - A pointer to the response object
-    \param pOemDataReqID - pointer to an object to get back the request ID
-    \return eHalStatus
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_getOemDataRsp(tHalHandle hHal,
-                                         tOemDataRsp **pOemDataRsp);
+                                       tANI_U32 *pOemDataReqID);
 
 #endif /*FEATURE_OEM_DATA_SUPPORT*/
 
@@ -4257,5 +4245,7 @@ void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
 
 eHalStatus sme_roam_set_default_key_index(tHalHandle hal, uint8_t session_id,
 					uint8_t default_idx);
+
+VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id);
 
 #endif //#if !defined( __SME_API_H )
