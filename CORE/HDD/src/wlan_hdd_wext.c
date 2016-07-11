@@ -2148,6 +2148,7 @@ static int iw_set_genie(struct net_device *dev,
     u_int8_t *genie = NULL;
     u_int8_t *base_genie = NULL;
     v_U16_t remLen;
+	int ret = 0;
 
    ENTER();
 
@@ -2300,7 +2301,7 @@ static int iw_get_genie(struct net_device *dev,
     if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress) {
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, "%s:LOGP in Progress. Ignore!!!",__func__);
        return 0;
-    }
+    } 
 
 
     hddLog(LOG1,"getGEN_IE ioctl");
