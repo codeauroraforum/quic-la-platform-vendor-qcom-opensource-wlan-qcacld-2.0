@@ -4181,7 +4181,7 @@ static int iw_softap_setwpsie(struct net_device *dev,
    u_int16_t length;
    struct iw_point s_priv_data;
    int ret = 0;
- 
+  
    ENTER();
 
    if (!capable(CAP_NET_ADMIN)) {
