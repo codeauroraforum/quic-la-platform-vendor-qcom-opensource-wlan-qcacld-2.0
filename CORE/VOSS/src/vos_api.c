@@ -1457,6 +1457,46 @@ void vos_set_reinit_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
 }
 
 
+/**
+ * vos_set_shutdown_in_progress - set SSR shutdown progress status
+ *
+ * @moduleId: the module ID of the caller
+ * @value: true - CNSS SSR shutdown start
+ *         false - CNSS SSR shutdown completes
+ * Return: none
+ */
+
+void vos_set_shutdown_in_progress(VOS_MODULE_ID moduleId, bool value)
+{
+	if (gpVosContext == NULL) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+			"%s: global voss context is NULL", __func__);
+		return;
+	}
+	gpVosContext->is_shutdown_in_progress = value;
+}
+
+/**
+ * vos_is_shutdown_in_progress - check if SSR shutdown is in progress
+ *
+ * @moduleId: the module ID of the caller
+ * @moduleContext: the input module context pointer
+ *
+ * Return: true - shutdown in progress
+ *         false - shutdown is  not in progress
+ */
+
+bool vos_is_shutdown_in_progress(VOS_MODULE_ID moduleId,
+	 v_VOID_t *moduleContext)
+{
+	if (gpVosContext == NULL) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+			"%s: global voss context is NULL", __func__);
+		return 0;
+	}
+	return gpVosContext->is_shutdown_in_progress;
+}
+
 /**---------------------------------------------------------------------------
 
   \brief vos_alloc_context() - allocate a context within the VOSS global Context
@@ -2692,46 +2732,6 @@ VOS_STATUS vos_flush_logs(uint32_t is_fatal,
 void vos_logging_set_fw_flush_complete(void)
 {
 	wlan_logging_set_fw_flush_complete();
-}
-
-/**
- * vos_is_crash_indication_pending() - get crash indication status
- *
- * After wlan start up, we check the pending flag to know whether
- * it was caused by SSR. If it 's true,we need to indicate a netlink
- * message to wlan service to restart application process (hostapd).
- *
- * Return: true if carsh indication is pending.
- */
-bool vos_is_crash_indication_pending(void)
-{
-	if (gpVosContext == NULL) {
-		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-		"%s: global voss context is NULL", __func__);
-	  return false;
-	}
-
-	return gpVosContext->crash_indication_pending;
-}
-
-/**
- * vos_set_crash_indication_pending() - set crash indication status
- * @value: pending statue to set
- *
- * Upon crash happends, we set the pending flag to true. To indicate
- * the crash indication event to wlan service is needed after recovery.
- *
- * Return: None
- */
-void vos_set_crash_indication_pending(bool value)
-{
-	if (gpVosContext == NULL) {
-		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-		"%s: global voss context is NULL", __func__);
-		return ;
-	}
-
-	gpVosContext->crash_indication_pending = value;
 }
 
 /**
