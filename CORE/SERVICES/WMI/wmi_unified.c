@@ -753,7 +753,18 @@ dont_tag:
 		adf_os_atomic_dec(&wmi_handle->pending_cmds);
 		pr_err("%s: MAX %d WMI Pending cmds reached.\n",
 			__func__, WMI_MAX_CMDS);
-		VOS_BUG(0);
+		if (scn && scn->enable_self_recovery) {
+			if (vos_is_logp_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
+				pr_err("%s- %d: SSR is in progress!!!!\n",
+					 __func__, __LINE__);
+				return -EBUSY;
+			}
+			vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+			pr_err("%s- %d: Start collecting ramdump\n",
+				__func__, __LINE__);
+			ol_schedule_ramdump_work(scn);
+		} else
+			VOS_BUG(0);
 		return -EBUSY;
 	}
 
