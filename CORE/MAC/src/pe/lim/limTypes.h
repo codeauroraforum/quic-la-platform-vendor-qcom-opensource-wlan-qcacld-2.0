@@ -276,7 +276,7 @@ typedef struct sLimMlmReassocReq
 
 typedef struct sLimMlmReassocCnf
 {
-    tSirResultCodes resultCode;
+    tANI_U32 resultCode;
     tANI_U16 protStatusCode; //Protocol Status code.
     tANI_U8  sessionId;
 } tLimMlmReassocCnf, *tpLimMlmReassocCnf;

@@ -63,7 +63,7 @@ typedef struct tagComebackTimerInfo
     tpAniSirGlobal   pMac;
     tANI_U8          sessionID;
     tLimMlmStates    limPrevMlmState;   /* Previous MLM State */
-    tLimSmeStates    limMlmState;       /* MLM State */
+    tLimMlmStates    limMlmState;       /* MLM State */
 } tComebackTimerInfo;
 #endif /* WLAN_FEATURE_11W */
 

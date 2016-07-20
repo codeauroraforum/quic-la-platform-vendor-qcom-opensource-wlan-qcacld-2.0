@@ -1597,7 +1597,7 @@ typedef struct sSirSmeDisassocInd
     tANI_U16            length;
     tANI_U8             sessionId;  // Session Identifier
     tANI_U16            transactionId;   // Transaction Identifier with PE
-    tSirResultCodes     statusCode;
+    tANI_U32     	statusCode;
     tSirMacAddr         bssId;
     tSirMacAddr         peerMacAddr;
     tAniStaStatStruct  perStaStats; // STA stats
@@ -1646,7 +1646,7 @@ typedef struct sSirSmeDeauthInd
     tANI_U16            length;
     tANI_U8            sessionId;       //Added for BT-AMP
     tANI_U16            transactionId;  //Added for BT-AMP
-    tSirResultCodes     statusCode;
+    tANI_U32     	statusCode;
     tSirMacAddr         bssId;// AP BSSID
     tSirMacAddr         peerMacAddr;
 
