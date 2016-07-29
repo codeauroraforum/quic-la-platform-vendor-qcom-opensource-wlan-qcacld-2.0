@@ -1860,4 +1860,27 @@ typedef void (*tCsrLinkStatusCallback)(v_U8_t status, void *pContext);
  * Return: void
  */
 typedef void (*tcsr_fw_state_callback)(void *context);
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+typedef struct _session_info{
+	tVOS_CON_MODE con_mode;
+	eCsrBand band;
+	v_U16_t och;
+	v_U16_t lfreq;
+	v_U16_t hfreq;
+	v_U16_t cfreq;
+	v_U16_t hbw;
+}session_info_t;
+tANI_BOOLEAN csr_find_all_session_info(
+	tHalHandle hHal,
+	session_info_t *session_info,
+	v_U8_t * session_count);
+tANI_BOOLEAN csr_find_sta_session_info(
+	tHalHandle hHal,
+	session_info_t *info);
+tANI_BOOLEAN csr_create_sap_session_info(
+	tHalHandle hHal,
+	eCsrPhyMode sap_phymode,
+	v_U16_t sap_ch,
+	session_info_t *session_info);
+#endif
 #endif

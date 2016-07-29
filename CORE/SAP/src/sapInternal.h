@@ -302,6 +302,7 @@ typedef struct sSapContext {
      */
     struct sap_avoid_channels_info sap_detected_avoid_ch_ie;
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+    eCsrBand	target_band;
 } *ptSapContext;
 
 
@@ -1089,6 +1090,16 @@ void sap_config_acs_result(tHalHandle hal, ptSapContext sap_ctx,
  * Return: true, if channel was present, false othersie.
  */
 bool sap_check_in_avoid_ch_list(ptSapContext sap_ctx, uint8_t channel);
+#endif
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+bool
+sap_channel_switch_validate(
+	ptSapContext sap_context,
+	tHalHandle hal,
+	uint16_t target_channel,
+	eCsrPhyMode sap_phy_mode,
+	uint8_t cc_switch_mode,
+	uint32_t session_id);
 #endif
 #ifdef __cplusplus
 }

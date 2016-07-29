@@ -101,11 +101,20 @@ when           who                what, where, why
 #define       MAX_TEXT_SIZE                32
 
 #define       MAX_CHANNEL_LIST_LEN         256
+
 #ifdef WLAN_FEATURE_MBSSID
-#define       VOS_MAX_NO_OF_SAP_MODE       2 // max # of SAP
+/*
+ * max # of SAP
+ */
+#ifdef WLAN_4SAP_CONCURRENCY
+#define       VOS_MAX_NO_OF_SAP_MODE       4
 #else
-#define       VOS_MAX_NO_OF_SAP_MODE       1 // max # of SAP
+#define       VOS_MAX_NO_OF_SAP_MODE       2
 #endif
+#else
+#define       VOS_MAX_NO_OF_SAP_MODE       1
+#endif
+
 #define       SAP_MAX_NUM_SESSION          5
 #define       SAP_MAX_OBSS_STA_CNT         1 // max # of OBSS STA
 
@@ -519,7 +528,7 @@ typedef struct sap_Config {
     v_U16_t    probeRespBcnIEsLen;
     v_PVOID_t  pProbeRespBcnIEsBuffer; /* buffer for addn ies comes from hostapd*/
     uint8_t   sap_dot11mc;      /* Specify if 11MC is enabled or disabled*/
-
+    eCsrBand   target_band;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE

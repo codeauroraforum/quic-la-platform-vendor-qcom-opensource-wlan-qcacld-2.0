@@ -4432,5 +4432,18 @@ eHalStatus sme_update_mimo_power_save(tHalHandle hHal,
 bool sme_is_sta_smps_allowed(tHalHandle hHal, uint8_t session_id);
 
 VOS_STATUS sme_is_session_valid(tHalHandle hal_handle, uint8_t session_id);
-
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+tANI_BOOLEAN sme_find_sta_session_info(
+	tHalHandle hHal,
+	session_info_t *session_info);
+tANI_BOOLEAN sme_find_all_session_info(
+	tHalHandle hHal,
+	session_info_t *session_info,
+	v_U8_t * session_count);
+tANI_BOOLEAN sme_create_sap_session_info(
+	tHalHandle hHal,
+	eCsrPhyMode sap_phymode,
+	v_U16_t sap_ch,
+	session_info_t *session_info);
+#endif
 #endif //#if !defined( __SME_API_H )

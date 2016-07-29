@@ -1726,7 +1726,8 @@ WLANSAP_SetChannelChangeWithCsa(v_PVOID_t pvosGCtx, v_U32_t targetChannel)
          /*
           * validate target channel switch w.r.t various concurrency rules set.
           */
-         valid = sme_validate_sap_channel_switch(VOS_GET_HAL_CB(sapContext->pvosGCtx),
+         valid = sap_channel_switch_validate(sapContext,
+                  VOS_GET_HAL_CB(sapContext->pvosGCtx),
                   targetChannel, sapContext->csrRoamProfile.phyMode,
                   sapContext->cc_switch_mode, sapContext->sessionId);
          if (!valid)
@@ -3858,7 +3859,7 @@ WLANSAP_ACS_CHSelect(v_PVOID_t pvosGCtx,
     pMac = PMAC_STRUCT( hHal );
     sapContext->acs_cfg = &pConfig->acs_cfg;
     sapContext->csrRoamProfile.phyMode = sapContext->acs_cfg->hw_mode;
-
+    sapContext->target_band = pConfig->target_band;
     if (sapContext->isScanSessionOpen == eSAP_FALSE) {
         tANI_U32 type, subType;
 
@@ -3912,7 +3913,7 @@ WLANSAP_ACS_CHSelect(v_PVOID_t pvosGCtx,
 
         if (VOS_STATUS_E_ABORTED == vosStatus) {
             VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
-                       "In %s,DFS not supported in the current operating mode",
+                       "In %s, acs configuration not supported",
                         __func__);
             return VOS_STATUS_E_FAILURE;
         }
