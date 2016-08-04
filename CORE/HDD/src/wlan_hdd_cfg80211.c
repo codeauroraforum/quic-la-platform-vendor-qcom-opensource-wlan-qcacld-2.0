@@ -8603,27 +8603,58 @@ static int __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NON_AGG_RETRY]) {
 		retry = nla_get_u8(
-			tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NON_AGG_RETRY]);
+				tb[QCA_WLAN_VENDOR_ATTR_CONFIG_NON_AGG_RETRY]);
 
 		/* Maximum value is 31 */
 		retry = retry > 31 ? 31 : retry;
-		ret_val = process_wma_set_command((int)pAdapter->sessionId,
-				(int)WMI_PDEV_PARAM_NON_AGG_SW_RETRY_TH,
-				retry, PDEV_CMD);
+
+		if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_IFINDEX]) {
+			status = sme_update_short_retry_limit_threshold(
+					pHddCtx->hHal,
+					pAdapter->sessionId,
+					retry);
+			if (!HAL_STATUS_SUCCESS(status)) {
+				hddLog(LOGE,
+				FL("sme_update_short_retry_limit_threshold(err=%d)"),
+				status);
+				return -EINVAL;
+			}
+		} else {
+			ret_val = process_wma_set_command(
+					(int)pAdapter->sessionId,
+					(int)WMI_PDEV_PARAM_NON_AGG_SW_RETRY_TH,
+					retry, PDEV_CMD);
+		}
+
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY]) {
 		retry = nla_get_u8(
-			tb[QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY]);
-
+				tb[QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY]);
 		/* Maximum value is 31(0x1f), 0 disable */
 		retry = retry > 31 ? 31 : retry;
 
 		/* Value less than 5 has side effect to t-put */
 		retry = ((retry > 0) && (retry < 5)) ? 5 : retry;
-		ret_val = process_wma_set_command((int)pAdapter->sessionId,
-				(int)WMI_PDEV_PARAM_AGG_SW_RETRY_TH,
-				retry, PDEV_CMD);
+
+		if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_IFINDEX]) {
+			status = sme_update_long_retry_limit_threshold(
+					pHddCtx->hHal,
+					pAdapter->sessionId,
+					retry);
+			if (!HAL_STATUS_SUCCESS(status)) {
+				hddLog(LOGE,
+				FL("sme_update_long_retry_limit_threshold(err=%d)"),
+						status);
+				return -EINVAL;
+			}
+		} else {
+			ret_val = process_wma_set_command(
+					(int)pAdapter->sessionId,
+					(int)WMI_PDEV_PARAM_AGG_SW_RETRY_TH,
+					retry, PDEV_CMD);
+		}
+
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MGMT_RETRY]) {
