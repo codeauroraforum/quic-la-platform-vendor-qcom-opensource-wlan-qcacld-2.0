@@ -20720,6 +20720,7 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle, int runtime_pm)
 	tp_wma_handle wma = handle;
 	wmi_wow_enable_cmd_fixed_param *cmd;
 	wmi_buf_t buf;
+	wmi_buf_t retry_buf = NULL;
 	int32_t len;
 	int ret;
 	struct ol_softc *scn;
@@ -20751,6 +20752,12 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle, int runtime_pm)
 		return VOS_STATUS_E_NOMEM;
 	}
 
+	retry_buf = wmi_buf_alloc(wma->wmi_handle, len);
+	if (!retry_buf) {
+		WMA_LOGE("%s: Failed allocate wmi retry_buf buffer", __func__);
+		return VOS_STATUS_E_NOMEM;
+	}
+
 	cmd = (wmi_wow_enable_cmd_fixed_param *) wmi_buf_data(buf);
 	WMITLV_SET_HDR(&cmd->tlv_header,
 			WMITLV_TAG_STRUC_wmi_wow_enable_cmd_fixed_param,
@@ -20776,6 +20783,8 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle, int runtime_pm)
 	}
 #endif
 
+	/* copy retry buffer in advance */
+	vos_mem_copy(wmi_buf_data(retry_buf), wmi_buf_data(buf), len);
 	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
 				   WMI_WOW_ENABLE_CMDID);
 	if (ret) {
@@ -20785,34 +20794,62 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle, int runtime_pm)
 
 	wmi_set_target_suspend(wma->wmi_handle, TRUE);
 
+	/* Host will wait for 1 sec before to retry the wow cmd again */
 	if (vos_wait_single_event(&wma->target_suspend,
-				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
+				  WMA_TGT_SUSPEND_RETRY_WAIT_TIME)
 				  != VOS_STATUS_SUCCESS) {
-		WMA_LOGE("Failed to receive WoW Enable Ack from FW");
-		if (wma_did_ssr_happen(wma)) {
-			WMA_LOGE("%s: SSR happened while waiting for response",
-				__func__);
-			return VOS_STATUS_E_FAILURE;
-		}
+		wmi_set_target_suspend(wma->wmi_handle, FALSE);
+		WMA_LOGE("Failed to receive WoW Enable Ack in 1 sec");
+		WMA_LOGE("retry the wow enable ack");
 		WMA_LOGE("Credits:%d; Pending_Cmds: %d",
 			wmi_get_host_credits(wma->wmi_handle),
 			wmi_get_pending_cmds(wma->wmi_handle));
-		wmi_set_target_suspend(wma->wmi_handle, FALSE);
-		if (!vos_is_logp_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
-#ifdef CONFIG_CNSS
-			if (pMac->sme.enableSelfRecovery) {
-				vos_trigger_recovery();
-			} else {
-				VOS_BUG(0);
-			}
-#else
-			VOS_BUG(0);
-#endif
-		} else {
-			WMA_LOGE("%s: LOGP is in progress, ignore!", __func__);
+		ret = wmi_unified_cmd_send(wma->wmi_handle, retry_buf, len,
+			   WMI_WOW_ENABLE_CMDID);
+		if (ret) {
+			WMA_LOGE("Failed to enable wow in fw");
+			goto error_retry;
 		}
+		wmi_set_target_suspend(wma->wmi_handle, TRUE);
 
-		return VOS_STATUS_E_FAILURE;
+		if (vos_wait_single_event(&wma->target_suspend,
+					  (WMA_TGT_SUSPEND_COMPLETE_TIMEOUT-
+					   WMA_TGT_SUSPEND_RETRY_WAIT_TIME))
+					  != VOS_STATUS_SUCCESS) {
+			WMA_LOGE("Failed to receive WoW Enable Ack in 6 sec");
+			if (wma_did_ssr_happen(wma)) {
+				WMA_LOGE("%s: SSR occur during rsp wait",
+					__func__);
+				return VOS_STATUS_E_FAILURE;
+			}
+			WMA_LOGE("Credits:%d; Pending_Cmds: %d",
+				wmi_get_host_credits(wma->wmi_handle),
+				wmi_get_pending_cmds(wma->wmi_handle));
+			wmi_set_target_suspend(wma->wmi_handle, FALSE);
+			if (!vos_is_logp_in_progress(
+				VOS_MODULE_ID_VOSS, NULL)) {
+#ifdef CONFIG_CNSS
+				if (pMac->sme.enableSelfRecovery) {
+					vos_trigger_recovery();
+				} else {
+					VOS_BUG(0);
+				}
+#else
+				VOS_BUG(0);
+#endif
+			} else {
+				WMA_LOGE("%s: LOGP is in progress, ignore!",
+					   __func__);
+			}
+
+			return VOS_STATUS_E_FAILURE;
+		}
+	} else {
+		/* Free the retry_buf */
+		if (retry_buf) {
+			wmi_buf_free (retry_buf);
+			retry_buf = NULL;
+		}
 	}
 
 	if (wma->wow_nack) {
@@ -20835,7 +20872,7 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle, int runtime_pm)
 	}
 
 
-	WMA_LOGD("WOW enabled successfully in fw: credits:%d"
+	WMA_LOGE("WOW enabled successfully in fw: credits:%d"
 		"pending_cmds: %d", host_credits, wmi_pending_cmds);
 
 	scn = vos_get_context(VOS_MODULE_ID_HIF, wma->vos_context);
@@ -20854,6 +20891,9 @@ int wma_enable_wow_in_fw(WMA_HANDLE handle, int runtime_pm)
 
 error:
 	wmi_buf_free(buf);
+error_retry:
+	if (retry_buf)
+		wmi_buf_free(retry_buf);
 	return VOS_STATUS_E_FAILURE;
 }
 
