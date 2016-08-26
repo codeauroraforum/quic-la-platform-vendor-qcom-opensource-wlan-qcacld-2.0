@@ -1701,6 +1701,8 @@ struct hdd_context_s
     uint8_t supp_5g_chain_mask;
     /* Current number of TX X RX chains being used */
     enum antenna_mode current_antenna_mode;
+    /* bit map to set/reset TDLS by different sources */
+    unsigned long tdls_source_bitmap;
 };
 
 /*---------------------------------------------------------------------------

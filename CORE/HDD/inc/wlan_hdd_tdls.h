@@ -79,6 +79,22 @@ should not be more than 2000 */
 
 #define TDLS_PEER_LIST_SIZE   256
 
+/**
+ * enum tdls_disable_source - TDLS disable sources
+ * @HDD_SET_TDLS_MODE_SOURCE_USER: disable from user
+ * @HDD_SET_TDLS_MODE_SOURCE_SCAN: disable during scan
+ * @HDD_SET_TDLS_MODE_SOURCE_OFFCHANNEL: disable during offchannel
+ * @HDD_SET_TDLS_MODE_SOURCE_BTC: disable during bluetooth
+ * @HDD_SET_TDLS_MODE_SOURCE_P2P: disable during p2p
+ */
+enum tdls_disable_source {
+    HDD_SET_TDLS_MODE_SOURCE_USER = 0,
+    HDD_SET_TDLS_MODE_SOURCE_SCAN,
+    HDD_SET_TDLS_MODE_SOURCE_OFFCHANNEL,
+    HDD_SET_TDLS_MODE_SOURCE_BTC,
+    HDD_SET_TDLS_MODE_SOURCE_P2P,
+};
+
 typedef struct
 {
     tANI_U32    tdls;
