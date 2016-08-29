@@ -2232,6 +2232,12 @@ typedef enum
 
 #endif
 
+/* Timer to defer for enabling TDLS on P2P listen (Value in milliseconds) */
+#define CFG_TDLS_ENABLE_DEFER_TIMER                "gTDLSEnableDeferTime"
+#define CFG_TDLS_ENABLE_DEFER_TIMER_MIN            (2000)
+#define CFG_TDLS_ENABLE_DEFER_TIMER_MAX            (6000)
+#define CFG_TDLS_ENABLE_DEFER_TIMER_DEFAULT        (5000)
+
 #ifdef WLAN_ACTIVEMODE_OFFLOAD_FEATURE
 #define CFG_ACTIVEMODE_OFFLOAD_ENABLE         "gEnableActiveModeOffload"
 #define CFG_ACTIVEMODE_OFFLOAD_ENABLE_MIN     ( 0 )
@@ -4289,7 +4295,8 @@ typedef struct
    uint32_t                    roam_dense_rssi_thresh_offset;
    uint32_t                    roam_dense_min_aps;
    bool                        bug_on_reinit_failure;
-
+   /* parameter for defer timer for enabling TDLS on p2p listen */
+   uint16_t                    tdls_enable_defer_time;
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID

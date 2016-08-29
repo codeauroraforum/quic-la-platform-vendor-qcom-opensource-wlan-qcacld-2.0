@@ -1703,6 +1703,8 @@ struct hdd_context_s
     enum antenna_mode current_antenna_mode;
     /* bit map to set/reset TDLS by different sources */
     unsigned long tdls_source_bitmap;
+    /* tdls source timer to enable/disable TDLS on p2p listen */
+    vos_timer_t tdls_source_timer;
 };
 
 /*---------------------------------------------------------------------------
