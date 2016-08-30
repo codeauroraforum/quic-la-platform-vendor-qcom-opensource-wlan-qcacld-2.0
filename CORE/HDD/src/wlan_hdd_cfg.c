@@ -4332,6 +4332,14 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_ROAM_DENSE_MIN_APS_DEFAULT,
                 CFG_ROAM_DENSE_MIN_APS_MIN,
                 CFG_ROAM_DENSE_MIN_APS_MAX),
+
+   REG_VARIABLE(CFG_BUG_ON_REINIT_FAILURE_NAME, WLAN_PARAM_Integer,
+                hdd_config_t, bug_on_reinit_failure,
+                VAR_FLAGS_OPTIONAL |
+                VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BUG_ON_REINIT_FAILURE_DEFAULT,
+                CFG_BUG_ON_REINIT_FAILURE_MIN,
+                CFG_BUG_ON_REINIT_FAILURE_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -5037,6 +5045,9 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
                    pHddCtx->cfg_ini->roam_dense_rssi_thresh_offset);
   hddLog(LOG2, "Name = [groam_dense_min_aps] Value = [%u]",
                    pHddCtx->cfg_ini->roam_dense_min_aps);
+  hddLog(LOG2, "Name = [%s] Value = [%u]",
+          CFG_BUG_ON_REINIT_FAILURE_NAME,
+          pHddCtx->cfg_ini->bug_on_reinit_failure);
 
 }
 

@@ -208,6 +208,18 @@
 #define CFG_MAX_RX_AMPDU_FACTOR_MAX            WNI_CFG_MAX_RX_AMPDU_FACTOR_STAMAX
 #define CFG_MAX_RX_AMPDU_FACTOR_DEFAULT        WNI_CFG_MAX_RX_AMPDU_FACTOR_STADEF
 
+/*
+ * This parameter will help to debug ssr reinit failure issues
+ * by raising vos bug so dumps can be collected. If OEM
+ * wants to avoid this crash, just disable this parameter.
+ * wlan driver will only recover after driver unload and load.
+ * Default: Enable
+ */
+#define CFG_BUG_ON_REINIT_FAILURE_NAME     "g_bug_on_reinit_failure"
+#define CFG_BUG_ON_REINIT_FAILURE_MIN      (0)
+#define CFG_BUG_ON_REINIT_FAILURE_MAX      (1)
+#define CFG_BUG_ON_REINIT_FAILURE_DEFAULT  (1)
+
 /* Configuration option for HT MPDU density (Table 8-125 802.11-2012)
  * 0 for no restriction
  * 1 for 1/4 micro sec
@@ -4276,6 +4288,8 @@ typedef struct
    uint32_t                    roam_dense_traffic_thresh;
    uint32_t                    roam_dense_rssi_thresh_offset;
    uint32_t                    roam_dense_min_aps;
+   bool                        bug_on_reinit_failure;
+
 } hdd_config_t;
 
 #ifdef WLAN_FEATURE_MBSSID
