@@ -4427,7 +4427,8 @@ void sme_add_set_thermal_level_callback(tHalHandle hHal,
                    tSmeSetThermalLevelCallback callback);
 
 eHalStatus sme_handle_set_fcc_channel(tHalHandle hHal,
-				       bool fcc_constraint);
+				       bool fcc_constraint,
+				       v_U32_t scan_pending);
 
 eHalStatus sme_set_rssi_monitoring(tHalHandle hal,
 					struct rssi_monitor_req *input);

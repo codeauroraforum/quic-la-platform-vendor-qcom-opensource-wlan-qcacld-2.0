@@ -829,6 +829,8 @@ typedef struct tagCsrScanStruct
     eCsrBand  scanBandPreference;  //This defines the band perference for scan
     csrScanCompleteCallback callback11dScanDone;
     bool fcc_constraint;
+     /* flag to defer updated chanel list */
+    bool defer_update_channel_list;
 }tCsrScanStruct;
 
 //Save the connected information. This structure + connectedProfile

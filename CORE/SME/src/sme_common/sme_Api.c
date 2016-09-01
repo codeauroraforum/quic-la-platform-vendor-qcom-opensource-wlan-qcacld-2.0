@@ -17420,7 +17420,8 @@ eHalStatus vos_send_flush_logs_cmd_to_fw(tpAniSirGlobal mac)
  *
  * Return: eHalStatus.
  */
-eHalStatus sme_handle_set_fcc_channel(tHalHandle hal, bool fcc_constraint)
+eHalStatus sme_handle_set_fcc_channel(tHalHandle hal, bool fcc_constraint,
+		v_U32_t scan_pending)
 {
 	eHalStatus status = eHAL_STATUS_SUCCESS;
 	tpAniSirGlobal mac_ptr  = PMAC_STRUCT(hal);
@@ -17428,16 +17429,15 @@ eHalStatus sme_handle_set_fcc_channel(tHalHandle hal, bool fcc_constraint)
 	status = sme_AcquireGlobalLock(&mac_ptr->sme);
 
 	if (eHAL_STATUS_SUCCESS == status) {
-
-		if (fcc_constraint != mac_ptr->scan.fcc_constraint) {
-			mac_ptr->scan.fcc_constraint = fcc_constraint;
-
-			/* update the channel list to the firmware */
-			status = csrUpdateChannelList(mac_ptr);
+		mac_ptr->scan.fcc_constraint = !fcc_constraint;
+		if (scan_pending == TRUE) {
+			 mac_ptr->scan.defer_update_channel_list = true;
 		}
-
-		sme_ReleaseGlobalLock(&mac_ptr->sme);
+		else {/* update the channel list to the firmware */
+			csrUpdateChannelList(mac_ptr);
+		}
 	}
+	sme_ReleaseGlobalLock(&mac_ptr->sme);
 
 	return status;
 }
