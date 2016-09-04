@@ -2240,4 +2240,5 @@ int hdd_reassoc(hdd_adapter_t *pAdapter, const tANI_U8 *bssid,
 void hdd_sap_restart_handle(struct work_struct *work);
 
 void hdd_set_rps_cpu_mask(hdd_context_t *hdd_ctx);
+void hdd_svc_fw_shutdown_ind(struct device *dev);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
