@@ -680,8 +680,7 @@ static void vos_reg_apply_radar_flags(struct wiphy *wiphy)
        *   do not allow AP mode
        */
       if (!(ch->flags & IEEE80211_CHAN_DISABLED))
-         ch->flags |= IEEE80211_CHAN_RADAR |
-            IEEE80211_CHAN_NO_IBSS |
+         ch->flags |= IEEE80211_CHAN_NO_IBSS |
             IEEE80211_CHAN_PASSIVE_SCAN;
    }
 }
