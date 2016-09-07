@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -124,6 +124,8 @@ struct hif_device {
 #define HIF_DMA_BUFFER_SIZE (4 * 1024)
 #define CMD53_FIXED_ADDRESS 1
 #define CMD53_INCR_ADDRESS  2
+
+void hif_dump_current_dma_addr(void);
 
 BUS_REQUEST *hifAllocateBusRequest(HIF_DEVICE *device);
 void hifFreeBusRequest(HIF_DEVICE *device, BUS_REQUEST *busrequest);
