@@ -298,6 +298,12 @@ wma_process_ftm_command(tp_wma_handle wma_handle,
 			struct ar6k_testmode_cmd_data *msg_buffer);
 #endif
 
+VOS_STATUS wma_roam_scan_bmiss_cnt(tp_wma_handle wma_handle,
+        A_INT32 first_bcnt,
+        A_UINT32 final_bcnt,
+        u_int32_t vdev_id);
+
+
 static VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 		ol_txrx_vdev_handle vdev, u8 peer_addr[6],
 		u_int32_t peer_type, u_int8_t vdev_id,
@@ -6531,6 +6537,15 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 				WMI_VDEV_PARAM_ROAM_FW_OFFLOAD,
 				(WMI_ROAM_FW_OFFLOAD_ENABLE_FLAG |
 				WMI_ROAM_BMISS_FINAL_SCAN_ENABLE_FLAG));
+	}
+
+	/* Initialize BMISS parameters */
+	if ((self_sta_req->type == WMI_VDEV_TYPE_STA) &&
+		(self_sta_req->subType == 0)) {
+		wma_roam_scan_bmiss_cnt(wma_handle,
+		mac->roam.configParam.neighborRoamConfig.nRoamBmissFirstBcnt,
+		mac->roam.configParam.neighborRoamConfig.nRoamBmissFinalBcnt,
+		self_sta_req->sessionId);
 	}
 
 	if (wlan_cfgGetInt(mac, WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED,
