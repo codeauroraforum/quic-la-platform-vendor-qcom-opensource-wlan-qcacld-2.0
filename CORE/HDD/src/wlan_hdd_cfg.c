@@ -4340,6 +4340,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_BUG_ON_REINIT_FAILURE_DEFAULT,
                 CFG_BUG_ON_REINIT_FAILURE_MIN,
                 CFG_BUG_ON_REINIT_FAILURE_MAX),
+
+  REG_VARIABLE(CFG_TDLS_ENABLE_DEFER_TIMER, WLAN_PARAM_Integer,
+                hdd_config_t, tdls_enable_defer_time,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_TDLS_ENABLE_DEFER_TIMER_DEFAULT,
+                CFG_TDLS_ENABLE_DEFER_TIMER_MIN,
+                CFG_TDLS_ENABLE_DEFER_TIMER_MAX),
 };
 
 #ifdef WLAN_FEATURE_MBSSID
@@ -5049,6 +5056,9 @@ void print_hdd_cfg(hdd_context_t *pHddCtx)
           CFG_BUG_ON_REINIT_FAILURE_NAME,
           pHddCtx->cfg_ini->bug_on_reinit_failure);
 
+  hddLog(LOG2, "Name = [%s] Value = [%u] ",
+                 CFG_TDLS_ENABLE_DEFER_TIMER,
+                 pHddCtx->cfg_ini->tdls_enable_defer_time);
 }
 
 #define CFG_VALUE_MAX_LEN 256
