@@ -328,9 +328,8 @@ void vos_pkt_trace_buf_update
    do_gettimeofday(&tv);
    trace_buffer[slot].event_sec_time = tv.tv_sec;
    trace_buffer[slot].event_msec_time = tv.tv_usec;
-   strncpy(trace_buffer[slot].event_string, event_string,
-          (sizeof(trace_buffer[slot].event_string) < strlen(event_string)?
-           sizeof(trace_buffer[slot].event_string) : strlen(event_string)));
+   strlcpy(trace_buffer[slot].event_string, event_string,
+           sizeof(trace_buffer[slot].event_string));
    trace_buffer_order++;
    spin_unlock_bh(&trace_buffer_lock);
 
