@@ -7514,7 +7514,7 @@ struct sme_tx_fail_cnt_threshold {
  */
 struct sme_short_retry_limit {
 	uint8_t session_id;
-	uint32_t short_retry_limit;
+	uint8_t short_retry_limit;
 };
 
 /**
@@ -7525,7 +7525,7 @@ struct sme_short_retry_limit {
  */
 struct sme_long_retry_limit {
 	uint8_t session_id;
-	uint32_t long_retry_limit;
+	uint8_t long_retry_limit;
 };
 
 /**
