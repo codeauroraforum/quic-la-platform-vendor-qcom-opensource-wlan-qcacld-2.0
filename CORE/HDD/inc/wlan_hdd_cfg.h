@@ -2865,6 +2865,103 @@ enum dot11p_mode {
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MIN       (0)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX       (1)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT   (0)
+/**
+* For P2P + STA + BT Paging
+* gBTIntervalPageP2PSTA/gWLIntervalPageP2PSTA intervals length (in ms) during
+* intervals length (in ms) during WLAN P2P + STA (multi vdev) + BT Paging,
+* min 20ms, max 200ms
+* Customer could change these parameters' value to improve P2P throughput
+* during BT Page
+* gBTIntervalPageP2PSTA=80
+* gWLIntervalPageP2PSTA=30
+*/
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_STA           "gBTIntervalPageP2PSTA"
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_STA_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_STA_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA           "gWLIntervalPageP2PSTA"
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA_DEFAULT   (30)
+
+/**
+FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
+* intervals length (in ms) during WLAN STA (single vdev) + BT Inquiry,
+* min 20ms, max 200ms
+* Customer could change these parameters' value to improve STA throughput
+* during BT Inquiry
+* gBTIntervalInquirySTA=120
+* gWLIntervalInquirySTA=30
+*/
+#define CFG_BTC_BT_INTERVAL_INQ_STA           "gBTIntervalInquirySTA"
+#define CFG_BTC_BT_INTERVAL_INQ_STA_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_INQ_STA_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_INQ_STA_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_INQ_STA           "gWLIntervalInquirySTA"
+#define CFG_BTC_WLAN_INTERVAL_INQ_STA_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_INQ_STA_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_INQ_STA_DEFAULT   (30)
+
+/**
+* For SAP + BT Inquiry
+* intervals length (in ms) during WLAN SAP (single vdev) + BT Inquiry,
+* min 20ms, max 200ms
+* Customer could change these parameters' value to improve SAP throughput
+* during BT Inquiry
+* gBTIntervalInquirySAP=120
+* gWLIntervalInquirySAP=30
+*/
+#define CFG_BTC_BT_INTERVAL_INQ_SAP           "gBTIntervalInquirySAP"
+#define CFG_BTC_BT_INTERVAL_INQ_SAP_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_INQ_SAP_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_INQ_SAP_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_INQ_SAP           "gWLIntervalInquirySAP"
+#define CFG_BTC_WLAN_INTERVAL_INQ_SAP_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_INQ_SAP_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_INQ_SAP_DEFAULT   (30)
+
+/**
+* For P2P + BT Inquiry
+* intervals length (in ms) during WLAN P2P (single vdev) + BT Inquiry,
+* min 20ms, max 200ms
+* Customer could change these parameters' value to improve P2P throughput
+* during BT Inquiry
+* gBTIntervalInquiryP2P=120
+* gWLIntervalInquiryP2P=30
+*/
+#define CFG_BTC_BT_INTERVAL_INQ_P2P           "gBTIntervalInquiryP2P"
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P           "gWLIntervalInquiryP2P"
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_DEFAULT   (30)
+
+/**
+* For P2P + STA + BT Inquiry
+* intervals length (in ms) during WLAN P2P + STA (multi vdev) + BT Inquiry,
+* min 20ms, max 200ms
+* Customer could change these parameters' value to improve P2P throughput
+* during BT Inquiry
+* gBTIntervalInquiryP2PSTA=80
+* gWLIntervalInquiryP2PSTA=30
+*/
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_STA           "gBTIntervalInquiryP2PSTA"
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_STA_MIN       (20)
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_STA_MAX       (200)
+#define CFG_BTC_BT_INTERVAL_INQ_P2P_STA_DEFAULT   (30)
+
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA           "gWLIntervalInquiryP2PSTA"
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA_MIN       (20)
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA_MAX       (200)
+#define CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA_DEFAULT   (30)
+
+/* Parameters for roaming scans performed at high RSSI */
 
 /**
 * For P2P
@@ -3548,6 +3645,21 @@ typedef struct
 
    uint32_t                    coex_page_sap_bt_interval;
    uint32_t                    coex_page_sap_wlan_interval;
+
+   uint32_t                    coex_page_p2p_sta_bt_interval;
+   uint32_t                    coex_page_p2p_sta_wlan_interval;
+
+   uint32_t                    coex_inquiry_sta_bt_interval;
+   uint32_t                    coex_inquiry_sta_wlan_interval;
+
+   uint32_t                    coex_inquiry_sap_bt_interval;
+   uint32_t                    coex_inquiry_sap_wlan_interval;
+
+   uint32_t                    coex_inquiry_p2p_bt_interval;
+   uint32_t                    coex_inquiry_p2p_wlan_interval;
+
+   uint32_t                    coex_inquiry_p2p_sta_bt_interval;
+   uint32_t                    coex_inquiry_p2p_sta_wlan_interval;
 } hdd_config_t;
 
 

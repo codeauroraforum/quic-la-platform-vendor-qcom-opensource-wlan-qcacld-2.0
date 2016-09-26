@@ -3983,6 +3983,76 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_BTC_WLAN_INTERVAL_PAGE_SAP_MIN,
                 CFG_BTC_WLAN_INTERVAL_PAGE_SAP_MAX),
 
+   REG_VARIABLE(CFG_BTC_BT_INTERVAL_PAGE_P2P_STA, WLAN_PARAM_Integer,
+                hdd_config_t, coex_page_p2p_sta_bt_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT,
+                CFG_BTC_BT_INTERVAL_PAGE_P2P_STA_MIN,
+                CFG_BTC_BT_INTERVAL_PAGE_P2P_STA_MAX),
+
+   REG_VARIABLE(CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA, WLAN_PARAM_Integer,
+                hdd_config_t, coex_page_p2p_sta_wlan_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA_MIN,
+                CFG_BTC_WLAN_INTERVAL_PAGE_P2P_STA_MAX),
+
+   REG_VARIABLE(CFG_BTC_BT_INTERVAL_INQ_STA, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_sta_bt_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_STA_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_STA_MIN,
+                CFG_BTC_BT_INTERVAL_INQ_STA_MAX),
+
+   REG_VARIABLE(CFG_BTC_WLAN_INTERVAL_INQ_STA, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_sta_wlan_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_STA_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_STA_MIN,
+                CFG_BTC_WLAN_INTERVAL_INQ_STA_MAX),
+
+   REG_VARIABLE(CFG_BTC_BT_INTERVAL_INQ_SAP, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_sap_bt_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_SAP_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_SAP_MIN,
+                CFG_BTC_BT_INTERVAL_INQ_SAP_MAX),
+
+   REG_VARIABLE(CFG_BTC_WLAN_INTERVAL_INQ_SAP, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_sap_wlan_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_SAP_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_SAP_MIN,
+                CFG_BTC_WLAN_INTERVAL_INQ_SAP_MAX),
+
+   REG_VARIABLE(CFG_BTC_BT_INTERVAL_INQ_P2P, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_p2p_bt_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_P2P_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_P2P_MIN,
+                CFG_BTC_BT_INTERVAL_INQ_P2P_MAX),
+
+   REG_VARIABLE(CFG_BTC_WLAN_INTERVAL_INQ_P2P, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_p2p_wlan_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_P2P_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_P2P_MIN,
+                CFG_BTC_WLAN_INTERVAL_INQ_P2P_MAX),
+
+   REG_VARIABLE(CFG_BTC_BT_INTERVAL_INQ_P2P_STA, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_p2p_sta_bt_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_P2P_STA_DEFAULT,
+                CFG_BTC_BT_INTERVAL_INQ_P2P_STA_MIN,
+                CFG_BTC_BT_INTERVAL_INQ_P2P_STA_MAX),
+
+   REG_VARIABLE(CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA, WLAN_PARAM_Integer,
+                hdd_config_t, coex_inquiry_p2p_sta_wlan_interval,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA_DEFAULT,
+                CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA_MIN,
+                CFG_BTC_WLAN_INTERVAL_INQ_P2P_STA_MAX),
+
    REG_VARIABLE(CFG_DOT11P_MODE_NAME, WLAN_PARAM_Integer,
                 hdd_config_t, dot11p_mode,
                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -6799,4 +6869,55 @@ void hdd_set_btc_bt_wlan_interval(hdd_context_t *hdd_ctx)
 		if (VOS_STATUS_SUCCESS != status)
 			hddLog(LOGE, "Fail to set coex page sap bt interval parameters");
 	}
+
+	printk("SACHIN : %s : Inside \n", __func__);
+	if ((config->coex_page_p2p_sta_bt_interval !=0) &&
+        (config->coex_page_p2p_sta_wlan_interval !=0)) {
+        status = sme_set_btc_bt_wlan_interval_page_p2p_sta(
+                                config->coex_page_p2p_sta_bt_interval,
+                                config->coex_page_p2p_sta_wlan_interval);
+        if (VOS_STATUS_SUCCESS != status)
+                hddLog(LOGE, "Fail to set coex page p2p sta bt interval parameters");
+	}
+
+	printk("SACHIN : %s : coex_inquiry_sta_bt_interval : %d, coex_inquiry_sta_wlan_interval : %d\n", __func__,
+		config->coex_inquiry_sta_bt_interval, config->coex_inquiry_sta_wlan_interval);
+	if ((config->coex_inquiry_sta_bt_interval !=0) &&
+			(config->coex_inquiry_sta_wlan_interval !=0)) {
+		status = sme_set_btc_bt_wlan_interval_inquiry_sta(
+				config->coex_inquiry_sta_bt_interval,
+				config->coex_inquiry_sta_wlan_interval);
+		if (VOS_STATUS_SUCCESS != status)
+			hddLog(LOGE, "Fail to set coex inquiry sta bt interval parameters");
+	}
+
+	printk("SACHIN : %s : coex_inquiry_sap_bt_interval : %d, coex_inquiry_sap_wlan_interval : %d\n", __func__,
+	 config->coex_inquiry_sap_bt_interval , config->coex_inquiry_sap_wlan_interval);
+	if ((config->coex_inquiry_sap_bt_interval !=0) &&
+			(config->coex_inquiry_sap_wlan_interval !=0)) {
+		status = sme_set_btc_bt_wlan_interval_inquiry_sap(
+				config->coex_inquiry_sap_bt_interval,
+				config->coex_inquiry_sap_wlan_interval);
+		if (VOS_STATUS_SUCCESS != status)
+			hddLog(LOGE, "Fail to set coex inquiry sap bt interval parameters");
+	}
+
+	if ((config->coex_inquiry_p2p_bt_interval !=0) &&
+			(config->coex_inquiry_p2p_wlan_interval !=0)) {
+		status = sme_set_btc_bt_wlan_interval_inquiry_p2p(
+				config->coex_inquiry_p2p_bt_interval,
+				config->coex_inquiry_p2p_wlan_interval);
+		if (VOS_STATUS_SUCCESS != status)
+			hddLog(LOGE, "Fail to set coex inquiry p2p bt interval parameters");
+	}
+
+	if ((config->coex_inquiry_p2p_sta_bt_interval !=0) &&
+			(config->coex_inquiry_p2p_sta_wlan_interval !=0)) {
+		status = sme_set_btc_bt_wlan_interval_inquiry_p2p_sta(
+				config->coex_inquiry_p2p_sta_bt_interval,
+				config->coex_inquiry_p2p_sta_wlan_interval);
+		if (VOS_STATUS_SUCCESS != status)
+			hddLog(LOGE, "Fail to set coex inquiry p2p sta bt interval parameters");
+	}
+	
 }
