@@ -252,6 +252,7 @@ WLANSAP_ScanCallback
          * the result */
         vos_mem_free(psapContext->channelList);
         psapContext->channelList = NULL;
+        psapContext->num_of_channel = 0;
     }
 #endif
 
@@ -483,6 +484,7 @@ WLANSAP_PreStartBssAcsScanCallback
              */
             vos_mem_free(psapContext->channelList);
             psapContext->channelList = NULL;
+            psapContext->num_of_channel = 0;
         }
 #endif
 
