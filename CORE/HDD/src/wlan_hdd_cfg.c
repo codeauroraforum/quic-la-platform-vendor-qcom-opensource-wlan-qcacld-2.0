@@ -6870,7 +6870,6 @@ void hdd_set_btc_bt_wlan_interval(hdd_context_t *hdd_ctx)
 			hddLog(LOGE, "Fail to set coex page sap bt interval parameters");
 	}
 
-	printk("SACHIN : %s : Inside \n", __func__);
 	if ((config->coex_page_p2p_sta_bt_interval !=0) &&
         (config->coex_page_p2p_sta_wlan_interval !=0)) {
         status = sme_set_btc_bt_wlan_interval_page_p2p_sta(
@@ -6880,8 +6879,7 @@ void hdd_set_btc_bt_wlan_interval(hdd_context_t *hdd_ctx)
                 hddLog(LOGE, "Fail to set coex page p2p sta bt interval parameters");
 	}
 
-	printk("SACHIN : %s : coex_inquiry_sta_bt_interval : %d, coex_inquiry_sta_wlan_interval : %d\n", __func__,
-		config->coex_inquiry_sta_bt_interval, config->coex_inquiry_sta_wlan_interval);
+
 	if ((config->coex_inquiry_sta_bt_interval !=0) &&
 			(config->coex_inquiry_sta_wlan_interval !=0)) {
 		status = sme_set_btc_bt_wlan_interval_inquiry_sta(
@@ -6891,8 +6889,7 @@ void hdd_set_btc_bt_wlan_interval(hdd_context_t *hdd_ctx)
 			hddLog(LOGE, "Fail to set coex inquiry sta bt interval parameters");
 	}
 
-	printk("SACHIN : %s : coex_inquiry_sap_bt_interval : %d, coex_inquiry_sap_wlan_interval : %d\n", __func__,
-	 config->coex_inquiry_sap_bt_interval , config->coex_inquiry_sap_wlan_interval);
+
 	if ((config->coex_inquiry_sap_bt_interval !=0) &&
 			(config->coex_inquiry_sap_wlan_interval !=0)) {
 		status = sme_set_btc_bt_wlan_interval_inquiry_sap(

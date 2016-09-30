@@ -27538,8 +27538,7 @@ int wma_btc_set_bt_wlan_interval(tp_wma_handle wma_handle,
 	cmd->config_type= interval->config_type;
 	cmd->config_arg1 = interval->config_arg1;
 	cmd->config_arg2 = interval->config_arg2;
-	printk("SACHIN : %s : config_type :%d, config_arg1 : %d, config_arg2 : %d\n", __func__,
-		cmd->config_type, cmd->config_arg1, cmd->config_arg2);
+	
 	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 				   WMI_COEX_CONFIG_CMDID);
 	if (ret != EOK) {
