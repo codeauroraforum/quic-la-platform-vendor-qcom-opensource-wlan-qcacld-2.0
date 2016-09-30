@@ -14636,6 +14636,8 @@ static int __wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
            pAdapter->device_mode);
 
     pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    if (WLAN_HDD_SOFTAP == pAdapter->device_mode)
+        hdd_wlan_green_ap_stop_bss(pHddCtx);
 
     status = hdd_get_front_adapter (pHddCtx, &pAdapterNode);
     while (NULL != pAdapterNode && VOS_STATUS_SUCCESS == status) {
@@ -14849,6 +14851,10 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
         hddLog(VOS_TRACE_LEVEL_DEBUG, FL("Reached max concurrent connections"));
         return -EINVAL;
     }
+
+    if (WLAN_HDD_SOFTAP == pAdapter->device_mode)
+        hdd_wlan_green_ap_start_bss(pHddCtx);
+
     if (pAdapter->device_mode == WLAN_HDD_P2P_GO) {
         hdd_adapter_t  *pP2pAdapter = NULL;
         pP2pAdapter = hdd_get_adapter(pHddCtx, WLAN_HDD_P2P_DEVICE);
