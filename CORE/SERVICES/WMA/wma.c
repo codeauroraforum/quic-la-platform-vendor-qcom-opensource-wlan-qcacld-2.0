@@ -6541,7 +6541,7 @@ static ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 
 	/* Initialize BMISS parameters */
 	if ((self_sta_req->type == WMI_VDEV_TYPE_STA) &&
-		(self_sta_req->subType == 0)) {
+		((self_sta_req->subType == 0) ||(self_sta_req->subType == WMI_UNIFIED_VDEV_SUBTYPE_P2P_CLIENT) )) {
 		wma_roam_scan_bmiss_cnt(wma_handle,
 		mac->roam.configParam.neighborRoamConfig.nRoamBmissFirstBcnt,
 		mac->roam.configParam.neighborRoamConfig.nRoamBmissFinalBcnt,
