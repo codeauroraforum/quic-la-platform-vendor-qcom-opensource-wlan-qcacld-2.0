@@ -3367,7 +3367,7 @@ eHalStatus pmcOffloadExitPowersaveState(tpAniSirGlobal pMac, tANI_U32 sessionId)
         pmcOffloadStartAutoStaPsTimer(pMac, sessionId,
                                       pmc->autoPsEntryTimerPeriod);
      else
-        smsLog(pMac, LOGE, FL("Master Sta Ps Disabled"));
+        smsLog(pMac, LOG1, FL("Master Sta Ps Disabled"));
      return eHAL_STATUS_SUCCESS;
 }
 

@@ -10100,7 +10100,7 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
                                         pHddCtx->cfg_ini->TxFlowMaxQueueDepth);
              /* Temporary set log level as error
               * TX Flow control feature settled down, will lower log level */
-             hddLog(VOS_TRACE_LEVEL_ERROR,
+             hddLog(VOS_TRACE_LEVEL_INFO,
                     "MODE %d, CH %d, LWM %d, HWM %d, TXQDEP %d",
                     pAdapter->device_mode,
                     targetChannel,
@@ -10125,7 +10125,7 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
                 WLANTL_SetAdapterMaxQDepth(pHddCtx->pvosContext,
                                            pAdapter->sessionId,
                                            pHddCtx->cfg_ini->TxHbwFlowMaxQueueDepth);
-                hddLog(VOS_TRACE_LEVEL_ERROR,
+                hddLog(VOS_TRACE_LEVEL_INFO,
                       "SCC: MODE %d, CH %d, LWM %d, HWM %d, TXQDEP %d",
                       pAdapter->device_mode,
                       targetChannel,
@@ -10149,7 +10149,7 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
                                            pHddCtx->cfg_ini->TxHbwFlowMaxQueueDepth);
                 /* Temporary set log level as error
                  * TX Flow control feature settled down, will lower log level */
-                hddLog(VOS_TRACE_LEVEL_ERROR,
+                hddLog(VOS_TRACE_LEVEL_INFO,
                       "SCC: MODE %d, CH %d, LWM %d, HWM %d, TXQDEP %d",
                       preAdapterContext->device_mode,
                       targetChannel,
@@ -10193,7 +10193,7 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
                                         pHddCtx->cfg_ini->TxHbwFlowMaxQueueDepth);
                 /* Temporary set log level as error
                  * TX Flow control feature settled down, will lower log level */
-                hddLog(VOS_TRACE_LEVEL_ERROR,
+                hddLog(VOS_TRACE_LEVEL_INFO,
                     "MCC: MODE %d, CH %d, LWM %d, HWM %d, TXQDEP %d",
                     pAdapter5->device_mode,
                     channel5,
@@ -10217,7 +10217,7 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
                                         pHddCtx->cfg_ini->TxLbwFlowMaxQueueDepth);
                 /* Temporary set log level as error
                  * TX Flow control feature settled down, will lower log level */
-                hddLog(VOS_TRACE_LEVEL_ERROR,
+                hddLog(VOS_TRACE_LEVEL_INFO,
                     "MCC: MODE %d, CH %d, LWM %d, HWM %d, TXQDEP %d",
                     pAdapter2_4->device_mode,
                     channel24,
@@ -10236,7 +10236,7 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
    if (staChannel > 0 && (apChannel > 0 || p2pChannel > 0)) {
        ccMode = (p2pChannel==staChannel||apChannel==staChannel) ? "SCC" : "MCC";
    }
-   hddLog(VOS_TRACE_LEVEL_ERROR, "wlan(%d) " MAC_ADDRESS_STR " %s",
+   hddLog(VOS_TRACE_LEVEL_INFO, "wlan(%d) " MAC_ADDRESS_STR " %s",
                 staChannel, MAC_ADDR_ARRAY(staBssid), ccMode);
    if (p2pChannel > 0) {
        hddLog(VOS_TRACE_LEVEL_INFO, "p2p-%s(%d) " MAC_ADDRESS_STR,

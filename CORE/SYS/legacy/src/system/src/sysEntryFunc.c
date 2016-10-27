@@ -178,7 +178,7 @@ sysBbtProcessMessageCore(tpAniSirGlobal pMac, tpSirMsgQ pMsg, tANI_U32 type,
             if (subType == SIR_MAC_MGMT_DEAUTH)
             {
                 tpSirMacMgmtHdr pMacHdr = WDA_GET_RX_MAC_HEADER(pBd);
-                PELOGE(sysLog( pMac, LOGE,
+                PELOGE(sysLog( pMac, LOG1,
                        FL("DEAUTH frame allowed: "
                        "da: " MAC_ADDRESS_STR ", "
                        "sa: " MAC_ADDRESS_STR ", "

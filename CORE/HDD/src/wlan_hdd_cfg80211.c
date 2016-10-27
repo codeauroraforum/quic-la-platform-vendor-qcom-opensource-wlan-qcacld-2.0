@@ -10868,7 +10868,7 @@ static int __wlan_hdd_cfg80211_connect( struct wiphy *wiphy,
                                             TRUE);
     }
 #else
-    hddLog(VOS_TRACE_LEVEL_ERROR,
+    hddLog(VOS_TRACE_LEVEL_INFO,
         FL("Kernel does not support key mgmt offload"));
     sme_UpdateRoamKeyMgmtOffloadEnabled(pHddCtx->hHal, pAdapter->sessionId, FALSE);
 #endif /* #ifdef NL80211_KEY_LEN_PMK */

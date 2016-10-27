@@ -148,7 +148,7 @@ limProcessDeauthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession p
     // Get reasonCode from Deauthentication frame body
     reasonCode = sirReadU16(pBody);
 
-    PELOGE(limLog(pMac, LOGE,
+    PELOGE(limLog(pMac, LOG1,
         FL("Received Deauth frame for Addr: "MAC_ADDRESS_STR" (mlm state = %s,"
         " sme state = %d systemrole  = %d) with reason code %d [%s] from "
         MAC_ADDRESS_STR), MAC_ADDR_ARRAY(pHdr->da),

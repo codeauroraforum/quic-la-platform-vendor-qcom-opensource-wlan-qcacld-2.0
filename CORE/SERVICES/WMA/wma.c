@@ -1317,7 +1317,7 @@ static void wma_remove_peer(tp_wma_handle wma, u_int8_t *bssid,
 		ol_txrx_peer_detach(peer);
 
 	wma->interfaces[vdev_id].peer_count--;
-	WMA_LOGE("%s: Removed peer with peer_addr %pM vdevid %d peer_count %d",
+	WMA_LOGI("%s: Removed peer with peer_addr %pM vdevid %d peer_count %d",
                     __func__, bssid, vdev_id, wma->interfaces[vdev_id].peer_count);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	if (roam_synch_in_progress)
@@ -1508,7 +1508,7 @@ static int wmi_unified_vdev_down_send(wmi_unified_t wmi, u_int8_t vdev_id)
 		adf_nbuf_free(buf);
 		return -EIO;
 	}
-	WMA_LOGE("%s: vdev_id %d", __func__, vdev_id);
+	WMA_LOGI("%s: vdev_id %d", __func__, vdev_id);
 	return 0;
 }
 
@@ -5670,7 +5670,7 @@ int wma_unified_vdev_create_send(wmi_unified_t wmi_handle, u_int8_t if_id,
 	cmd->vdev_type = type;
 	cmd->vdev_subtype = subtype;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->vdev_macaddr);
-	WMA_LOGE("%s: ID = %d VAP Addr = %02x:%02x:%02x:%02x:%02x:%02x",
+	WMA_LOGI("%s: ID = %d VAP Addr = %02x:%02x:%02x:%02x:%02x:%02x",
 		 __func__, if_id,
 		 macaddr[0], macaddr[1], macaddr[2],
 		 macaddr[3], macaddr[4], macaddr[5]);
@@ -5843,7 +5843,7 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
                 adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
                 goto out;
         }
-        WMA_LOGE("Call txrx detach with callback for vdev %d", vdev_id);
+        WMA_LOGI("Call txrx detach with callback for vdev %d", vdev_id);
         ol_txrx_vdev_detach(iface->handle, NULL, NULL);
         wma_vdev_detach_callback(iface);
         adf_os_spin_unlock_bh(&wma_handle->vdev_detach_lock);
@@ -5925,7 +5925,7 @@ static VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 		ol_txrx_peer_detach(peer);
 		goto err;
 	}
-	WMA_LOGE("%s: Created peer with peer_addr %pM vdev_id %d, peer_count - %d",
+	WMA_LOGI("%s: Created peer with peer_addr %pM vdev_id %d, peer_count - %d",
                     __func__, peer_addr, vdev_id, wma->interfaces[vdev_id].peer_count);
 
 #ifdef QCA_IBSS_SUPPORT
@@ -7355,7 +7355,7 @@ VOS_STATUS wma_start_scan(tp_wma_handle wma_handle,
 			cmd->scan_req_id, cmd->vdev_id,
 			scan_req->p2pScanType);
 
-	WMA_LOGE("scan_id %x, vdev_id %x, scan type %x, msg_type %x",
+	WMA_LOGI("scan_id %x, vdev_id %x, scan type %x, msg_type %x",
 			cmd->scan_id, cmd->vdev_id, scan_req->p2pScanType,
 			msg_type);
 
@@ -13692,7 +13692,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 out:
 	params->status = status;
 /* change logging before release */
-	WMA_LOGE("%s: statype %d vdev_id %d aid %d bssid %pM staIdx %d status %d",
+	WMA_LOGI("%s: statype %d vdev_id %d aid %d bssid %pM staIdx %d status %d",
 		 __func__, params->staType, params->smesessionId, params->assocId,
 		 params->bssId, params->staIdx, status);
 	wma_send_msg(wma, WDA_ADD_STA_RSP, (void *)params, 0);
@@ -22900,7 +22900,7 @@ static int wma_scan_event_callback(WMA_HANDLE handle, u_int8_t *data,
 
         /* Stop the scan completion timeout if the event is WMI_SCAN_EVENT_COMPLETED */
         if (scan_event->event == (enum sir_scan_event_type)WMI_SCAN_EVENT_COMPLETED) {
-                WMA_LOGE(" scan complete - scan_id %x, vdev_id %x",
+                WMA_LOGI(" scan complete - scan_id %x, vdev_id %x",
 		wmi_event->scan_id, vdev_id);
 		/*
 		 * first stop the timer then reset scan info, else there is a

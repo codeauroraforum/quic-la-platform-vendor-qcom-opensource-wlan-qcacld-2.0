@@ -1806,7 +1806,7 @@ limSendHeartBeatTimeoutInd(tpAniSirGlobal pMac, tpPESession psessionEntry)
     msg.type = (tANI_U16) SIR_LIM_HEART_BEAT_TIMEOUT;
     msg.bodyptr = psessionEntry;
     msg.bodyval = 0;
-    limLog(pMac, LOGE,
+    limLog(pMac, LOG1,
                  FL("Heartbeat failure from Fw"));
 
     statusCode = limPostMsgApi(pMac, &msg);

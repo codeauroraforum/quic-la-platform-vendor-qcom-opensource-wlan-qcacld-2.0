@@ -280,7 +280,30 @@ void vos_trace_msg( VOS_MODULE_ID module, VOS_TRACE_LEVEL level, char *strFormat
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
          wlan_log_to_user(level, (char *)strBuffer, strlen(strBuffer));
 #else
-         pr_err("%s\n", strBuffer);
+         
+         switch(level){						
+         case VOS_TRACE_LEVEL_FATAL:						
+             pr_crit("%s\n", strBuffer);						
+             break;						
+         case VOS_TRACE_LEVEL_ERROR:						
+             pr_err("%s\n", strBuffer);						
+             break;						
+         case VOS_TRACE_LEVEL_WARN:						
+             pr_warning("%s\n", strBuffer);						
+             break;						
+         case VOS_TRACE_LEVEL_INFO:						
+         case VOS_TRACE_LEVEL_INFO_HIGH:						
+         case VOS_TRACE_LEVEL_INFO_MED:						
+         case VOS_TRACE_LEVEL_INFO_LOW:						
+             pr_info("%s\n", strBuffer);						
+             break;						
+         case VOS_TRACE_LEVEL_DEBUG:						
+             pr_debug("%s\n", strBuffer);						
+             break;						
+         default:						
+             pr_err("%s\n", strBuffer);						
+             break;						
+         }											
 #endif
       }
       va_end(val);

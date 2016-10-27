@@ -577,7 +577,7 @@ void regdmn_set_dfs_region(struct regulatory *reg)
 		return;
 	}
 
-	WMA_LOGE("%s: dfs_region: %d", __func__, reg->dfs_region);
+	WMA_LOGI("%s: dfs_region: %d", __func__, reg->dfs_region);
 	wma_set_dfs_regdomain(wma, reg->dfs_region);
 }
 
