@@ -4985,7 +4985,8 @@ typedef struct{
     u_int8_t thermalCurrLevel;
     u_int8_t thermalMgmtEnabled;
     u_int32_t throttlePeriod;
-    u_int8_t throttle_duty_cycle_tbl[WLAN_THROTTLE_DUTY_CYCLE_LEVEL_MAX];
+    u_int8_t throttle_duty_cycle_2g_tbl[WLAN_THROTTLE_DUTY_CYCLE_LEVEL_MAX];
+    u_int8_t throttle_duty_cycle_5g_tbl[WLAN_THROTTLE_DUTY_CYCLE_LEVEL_MAX];
 } t_thermal_mgmt, *tp_thermal_mgmt;
 
 typedef struct sSirTxPowerLimit

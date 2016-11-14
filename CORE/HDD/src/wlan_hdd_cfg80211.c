@@ -13608,6 +13608,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     u_int16_t prev_rsn_length = 0;
     enum dfs_mode mode;
     int ret;
+    extern uint8_t thermal_band;
     ENTER();
 
     iniConfig = pHddCtx->cfg_ini;
@@ -14271,6 +14272,50 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 #endif
 
     pHostapdState->bCommit = TRUE;
+
+    if (hdd_is_mcc_in_2_band(pHddCtx)) {
+            switch (pHddCtx->thermal_level) {
+                case 0:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level0_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level0_5g)
+                         ? 2
+                         : 5;
+                         break;
+                case 1:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level1_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level1_5g)
+                         ? 2
+                         : 5;
+                         break;
+                case 2:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level2_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level2_5g)
+                         ? 2
+                         : 5;
+                         break;
+                case 3:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level3_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level3_5g)
+                         ? 2
+                         : 5;
+                         break;
+                default:
+                    hddLog(VOS_TRACE_LEVEL_ERROR,
+                       "invalid thermal level %d",
+                       pHddCtx->thermal_level);
+           }
+    } else {
+         hdd_get_band(
+                      (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->operatingChannel,
+                      &thermal_band
+                      );
+    }
+    sme_SetThermalLevel(pHddCtx->hHal, pHddCtx->thermal_level);
+
     EXIT();
 
    return 0;

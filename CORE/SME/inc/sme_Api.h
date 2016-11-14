@@ -241,7 +241,8 @@ typedef struct {
     tSmeThermalLevelInfo smeThermalLevels[SME_MAX_THERMAL_LEVELS];
     u_int8_t smeThermalMgmtEnabled;
     u_int32_t smeThrottlePeriod;
-    u_int8_t sme_throttle_duty_cycle_tbl[SME_MAX_THROTTLE_LEVELS];
+    u_int8_t sme_throttle_duty_cycle_2g_tbl[SME_MAX_THROTTLE_LEVELS];
+    u_int8_t sme_throttle_duty_cycle_5g_tbl[SME_MAX_THROTTLE_LEVELS];
 } tSmeThermalParams;
 
 #ifdef WLAN_FEATURE_APFIND

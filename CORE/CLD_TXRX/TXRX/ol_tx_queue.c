@@ -1161,6 +1161,8 @@ void ol_tx_pdev_throttle_phase_timer(void *context)
     int ms = 0;
     throttle_level cur_level;
     throttle_phase cur_phase;
+    extern uint8_t thermal_band;
+    int (*throttle_time_ms)[THROTTLE_PHASE_MAX];
 
     /* update the phase */
     pdev->tx_throttle.current_throttle_phase++;
@@ -1168,6 +1170,11 @@ void ol_tx_pdev_throttle_phase_timer(void *context)
     if (pdev->tx_throttle.current_throttle_phase == THROTTLE_PHASE_MAX) {
         pdev->tx_throttle.current_throttle_phase = THROTTLE_PHASE_OFF;
     }
+
+    if (thermal_band == 2)
+        throttle_time_ms = pdev->tx_throttle.throttle_time_ms_2g;
+    else
+        throttle_time_ms = pdev->tx_throttle.throttle_time_ms_5g;
 
     if (pdev->tx_throttle.current_throttle_phase == THROTTLE_PHASE_OFF) {
         if (ol_tx_pdev_is_target_empty(/*pdev*/)) {
@@ -1178,7 +1185,7 @@ void ol_tx_pdev_throttle_phase_timer(void *context)
 
             cur_level = pdev->tx_throttle.current_throttle_level;
             cur_phase = pdev->tx_throttle.current_throttle_phase;
-            ms = pdev->tx_throttle.throttle_time_ms[cur_level][cur_phase];
+            ms = throttle_time_ms[cur_level][cur_phase];
             if (pdev->tx_throttle.current_throttle_level !=
                 THROTTLE_LEVEL_0) {
                 TXRX_PRINT(TXRX_PRINT_LEVEL_WARN, "start timer %d ms\n", ms);
@@ -1199,7 +1206,7 @@ void ol_tx_pdev_throttle_phase_timer(void *context)
 
         cur_level = pdev->tx_throttle.current_throttle_level;
         cur_phase = pdev->tx_throttle.current_throttle_phase;
-        ms = pdev->tx_throttle.throttle_time_ms[cur_level][cur_phase];
+        ms = throttle_time_ms[cur_level][cur_phase];
         if (pdev->tx_throttle.current_throttle_level != THROTTLE_LEVEL_0) {
             TXRX_PRINT(TXRX_PRINT_LEVEL_WARN, "start timer %d ms\n", ms);
             adf_os_timer_start(&pdev->tx_throttle.phase_timer, ms);
@@ -1218,6 +1225,8 @@ void ol_tx_pdev_throttle_tx_timer(void *context)
 void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level)
 {
     int ms = 0;
+    extern uint8_t thermal_band;
+    int (*throttle_time_ms)[THROTTLE_PHASE_MAX];
 
     if (level >= THROTTLE_LEVEL_MAX) {
         TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
@@ -1231,6 +1240,15 @@ void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level)
     /* Set the current throttle level */
     pdev->tx_throttle.current_throttle_level = (throttle_level)level;
 
+    if (thermal_band == 2)
+        throttle_time_ms = pdev->tx_throttle.throttle_time_ms_2g;
+    else
+        throttle_time_ms = pdev->tx_throttle.throttle_time_ms_5g;
+
+    VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_INFO,
+              "thermal band %d time %d",
+               thermal_band, throttle_time_ms[level][THROTTLE_PHASE_OFF]);
+
     if (pdev->cfg.is_high_latency) {
 
         adf_os_timer_cancel(&pdev->tx_throttle.phase_timer);
@@ -1238,13 +1256,13 @@ void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level)
         /* Set the phase */
         if (level != THROTTLE_LEVEL_0) {
             pdev->tx_throttle.current_throttle_phase = THROTTLE_PHASE_OFF;
-            ms = pdev->tx_throttle.throttle_time_ms[level][THROTTLE_PHASE_OFF];
+            ms = throttle_time_ms[level][THROTTLE_PHASE_OFF];
             /* pause all */
             ol_txrx_throttle_pause(pdev);
             adf_os_timer_start(&pdev->tx_throttle.phase_timer, ms);
         } else {
             pdev->tx_throttle.current_throttle_phase = THROTTLE_PHASE_ON;
-            ms = pdev->tx_throttle.throttle_time_ms[level][THROTTLE_PHASE_ON];
+            ms = throttle_time_ms[level][THROTTLE_PHASE_ON];
             /* unpause all */
             ol_txrx_throttle_unpause(pdev);
         }
@@ -1253,7 +1271,7 @@ void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level)
         pdev->tx_throttle.current_throttle_phase = THROTTLE_PHASE_OFF;
 
         /* Start with the new time */
-        ms = pdev->tx_throttle.throttle_time_ms[level][THROTTLE_PHASE_OFF];
+        ms = throttle_time_ms[level][THROTTLE_PHASE_OFF];
 
         adf_os_timer_cancel(&pdev->tx_throttle.phase_timer);
         adf_os_timer_start(&pdev->tx_throttle.phase_timer, ms);
@@ -1261,7 +1279,7 @@ void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level)
 }
 
 void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev, int period,
-    u_int8_t *dutycycle_level)
+    u_int8_t *dutycycle_level_2g, u_int8_t *dutycycle_level_5g)
 {
     int i;
 
@@ -1270,16 +1288,26 @@ void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev, int period,
 
     TXRX_PRINT(TXRX_PRINT_LEVEL_WARN, "level  OFF  ON\n");
     for (i = 0; i < THROTTLE_LEVEL_MAX; i++) {
-        pdev->tx_throttle.throttle_time_ms[i][THROTTLE_PHASE_ON] =
+        pdev->tx_throttle.throttle_time_ms_2g[i][THROTTLE_PHASE_ON] =
             pdev->tx_throttle.throttle_period_ms -
-                ((dutycycle_level[i] * pdev->tx_throttle.throttle_period_ms)
+                ((dutycycle_level_2g[i] * pdev->tx_throttle.throttle_period_ms)
                  /100);
-        pdev->tx_throttle.throttle_time_ms[i][THROTTLE_PHASE_OFF] =
+	pdev->tx_throttle.throttle_time_ms_5g[i][THROTTLE_PHASE_ON] =
             pdev->tx_throttle.throttle_period_ms -
-            pdev->tx_throttle.throttle_time_ms[i][THROTTLE_PHASE_ON];
-        TXRX_PRINT(TXRX_PRINT_LEVEL_WARN, "%d      %d    %d\n", i,
-                   pdev->tx_throttle.throttle_time_ms[i][THROTTLE_PHASE_OFF],
-                   pdev->tx_throttle.throttle_time_ms[i][THROTTLE_PHASE_ON]);
+                ((dutycycle_level_5g[i] * pdev->tx_throttle.throttle_period_ms)
+                 /100);
+        pdev->tx_throttle.throttle_time_ms_2g[i][THROTTLE_PHASE_OFF] =
+            pdev->tx_throttle.throttle_period_ms -
+            pdev->tx_throttle.throttle_time_ms_2g[i][THROTTLE_PHASE_ON];
+	pdev->tx_throttle.throttle_time_ms_5g[i][THROTTLE_PHASE_OFF] =
+            pdev->tx_throttle.throttle_period_ms -
+            pdev->tx_throttle.throttle_time_ms_5g[i][THROTTLE_PHASE_ON];
+        VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_INFO,
+                  "%d  2g %d %d  5g %d %d\n", i,
+                  pdev->tx_throttle.throttle_time_ms_2g[i][THROTTLE_PHASE_OFF],
+                  pdev->tx_throttle.throttle_time_ms_2g[i][THROTTLE_PHASE_ON],
+                  pdev->tx_throttle.throttle_time_ms_5g[i][THROTTLE_PHASE_OFF],
+                  pdev->tx_throttle.throttle_time_ms_5g[i][THROTTLE_PHASE_ON]);
     }
 }
 
@@ -1299,7 +1327,8 @@ void ol_tx_throttle_init(struct ol_txrx_pdev_t *pdev)
         dutycycle_level[i] = ol_cfg_throttle_duty_cycle_level(pdev->ctrl_pdev,
                                                               i);
 
-    ol_tx_throttle_init_period(pdev, throttle_period, &dutycycle_level[0]);
+    ol_tx_throttle_init_period(pdev, throttle_period,
+                               &dutycycle_level[0], &dutycycle_level[0]);
 
     adf_os_timer_init(
             pdev->osdev,

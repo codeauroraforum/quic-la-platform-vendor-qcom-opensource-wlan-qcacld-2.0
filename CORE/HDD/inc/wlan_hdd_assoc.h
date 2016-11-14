@@ -180,5 +180,7 @@ void hdd_delete_peer(hdd_station_ctx_t *sta_ctx, uint8_t sta_id);
 
 int hdd_get_peer_idx(hdd_station_ctx_t *sta_ctx, v_MACADDR_t *addr);
 VOS_STATUS hdd_roamDeregisterSTA(hdd_adapter_t *adapter, uint8_t sta_id);
+void hdd_get_band(uint8_t channel, uint8_t *band);
+uint8_t hdd_is_mcc_in_2_band(hdd_context_t *hdd_ctx);
 
 #endif

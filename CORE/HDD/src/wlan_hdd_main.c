@@ -1634,10 +1634,12 @@ static void hdd_set_thermal_level_cb(hdd_context_t *pHddCtx, u_int8_t level)
    else
       /* restore original concurrency mode */
       hdd_ipa_send_mcc_scc_msg(pHddCtx, pHddCtx->mcc_mode);
+   pHddCtx->thermal_level = level;
 }
 #else
 static void hdd_set_thermal_level_cb(hdd_context_t *pHddCtx, u_int8_t level)
 {
+   pHddCtx->thermal_level = level;
 }
 #endif
 
@@ -15410,14 +15412,23 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
        pHddCtx->cfg_ini->thermalMitigationEnable;
    thermalParam.smeThrottlePeriod = pHddCtx->cfg_ini->throttlePeriod;
 
-   thermalParam.sme_throttle_duty_cycle_tbl[0]=
-       pHddCtx->cfg_ini->throttle_dutycycle_level0;
-   thermalParam.sme_throttle_duty_cycle_tbl[1]=
-       pHddCtx->cfg_ini->throttle_dutycycle_level1;
-   thermalParam.sme_throttle_duty_cycle_tbl[2]=
-       pHddCtx->cfg_ini->throttle_dutycycle_level2;
-   thermalParam.sme_throttle_duty_cycle_tbl[3]=
-       pHddCtx->cfg_ini->throttle_dutycycle_level3;
+   thermalParam.sme_throttle_duty_cycle_2g_tbl[0]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level0_2g;
+   thermalParam.sme_throttle_duty_cycle_2g_tbl[1]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level1_2g;
+   thermalParam.sme_throttle_duty_cycle_2g_tbl[2]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level2_2g;
+   thermalParam.sme_throttle_duty_cycle_2g_tbl[3]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level3_2g;
+
+   thermalParam.sme_throttle_duty_cycle_5g_tbl[0]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level0_5g;
+   thermalParam.sme_throttle_duty_cycle_5g_tbl[1]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level1_5g;
+   thermalParam.sme_throttle_duty_cycle_5g_tbl[2]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level2_5g;
+   thermalParam.sme_throttle_duty_cycle_5g_tbl[3]=
+       pHddCtx->cfg_ini->throttle_dutycycle_level3_5g;
 
    thermalParam.smeThermalLevels[0].smeMinTempThreshold =
        pHddCtx->cfg_ini->thermalTempMinLevel0;

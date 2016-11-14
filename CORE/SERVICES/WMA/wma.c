@@ -26180,14 +26180,22 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 	WMA_LOGD("TM enable %d period %d", pThermalParams->thermalMgmtEnabled,
 			 pThermalParams->throttlePeriod);
         WMA_LOGD("Throttle Duty Cycle Level in percentage:\n"
-			 "0 %d\n"
-			 "1 %d\n"
-			 "2 %d\n"
-			 "3 %d",
-			 pThermalParams->throttle_duty_cycle_tbl[0],
-			 pThermalParams->throttle_duty_cycle_tbl[1],
-			 pThermalParams->throttle_duty_cycle_tbl[2],
-			 pThermalParams->throttle_duty_cycle_tbl[3]);
+			 "2g 0 %d\n"
+			 "2g 1 %d\n"
+			 "2g 2 %d\n"
+			 "2g 3 %d\n"
+			 "5g 0 %d\n"
+			 "5g 1 %d\n"
+			 "5g 2 %d\n"
+			 "5g 3 %d",
+			 pThermalParams->throttle_duty_cycle_2g_tbl[0],
+			 pThermalParams->throttle_duty_cycle_2g_tbl[1],
+			 pThermalParams->throttle_duty_cycle_2g_tbl[2],
+			 pThermalParams->throttle_duty_cycle_2g_tbl[3],
+			 pThermalParams->throttle_duty_cycle_5g_tbl[0],
+			 pThermalParams->throttle_duty_cycle_5g_tbl[1],
+			 pThermalParams->throttle_duty_cycle_5g_tbl[2],
+			 pThermalParams->throttle_duty_cycle_5g_tbl[3]);
 
 	wma->thermal_mgmt_info.thermalMgmtEnabled =
 		pThermalParams->thermalMgmtEnabled;
@@ -26227,7 +26235,8 @@ VOS_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 	{
 		ol_tx_throttle_init_period(curr_pdev,
 			pThermalParams->throttlePeriod,
-			&pThermalParams->throttle_duty_cycle_tbl[0]);
+			&pThermalParams->throttle_duty_cycle_2g_tbl[0],
+			&pThermalParams->throttle_duty_cycle_5g_tbl[0]);
 
 		/* Get the temperature thresholds to set in firmware */
 		thermal_params.minTemp = wma->thermal_mgmt_info.

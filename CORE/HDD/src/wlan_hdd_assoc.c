@@ -72,6 +72,8 @@
 #include "tl_shim.h"
 #include "wlan_hdd_oemdata.h"
 
+uint8_t thermal_band = 2;
+
 struct ether_addr
 {
     u_char  ether_addr_octet[6];
@@ -1687,6 +1689,91 @@ void hdd_sap_restart_handle(struct work_struct *work)
     vos_ssr_unprotect(__func__);
 }
 
+void hdd_get_band(uint8_t channel, uint8_t *band)
+{
+   if ( channel > 0 && channel < 14 )
+       *band = 2;
+   else if (channel >= 36 && channel <= 184 )
+       *band = 5;
+}
+
+uint8_t hdd_is_mcc_in_2_band(hdd_context_t *hdd_ctx)
+{
+	VOS_STATUS status;
+	hdd_adapter_t *hdd_adapter = NULL;
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	uint8_t ret = 0;
+	hdd_station_ctx_t *sta_ctx;
+	hdd_ap_ctx_t *ap_ctx;
+	uint8_t band1 = 0, band2 = 0;
+	uint8_t channel = 0, band = 0;
+	hdd_hostapd_state_t *hostapd_state;
+
+	status =  hdd_get_front_adapter(hdd_ctx, &adapter_node);
+
+	/* loop through all adapters and check MCC for STA,P2P,SAP adapters */
+	while (NULL != adapter_node && VOS_STATUS_SUCCESS == status) {
+		hdd_adapter = adapter_node->pAdapter;
+
+		if (!((hdd_adapter->device_mode >= WLAN_HDD_INFRA_STATION)
+					&& (hdd_adapter->device_mode
+						<= WLAN_HDD_P2P_GO))) {
+			/* skip for other adapters */
+			status = hdd_get_next_adapter(hdd_ctx,
+					adapter_node, &next);
+			adapter_node = next;
+			continue;
+		} else {
+			if (WLAN_HDD_INFRA_STATION ==
+					hdd_adapter->device_mode ||
+					WLAN_HDD_P2P_CLIENT ==
+					hdd_adapter->device_mode) {
+				sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(
+								hdd_adapter);
+				if (eConnectionState_Associated ==
+						sta_ctx->conn_info.connState)
+					channel =
+						sta_ctx->conn_info.
+							operationChannel;
+					hdd_get_band(channel, &band);
+			} else if (WLAN_HDD_P2P_GO ==
+					hdd_adapter->device_mode ||
+					WLAN_HDD_SOFTAP ==
+					hdd_adapter->device_mode) {
+				ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(hdd_adapter);
+				hostapd_state =
+					WLAN_HDD_GET_HOSTAP_STATE_PTR(
+								hdd_adapter);
+				if (hostapd_state->bssState == BSS_START &&
+						hostapd_state->vosStatus ==
+						VOS_STATUS_SUCCESS)
+					channel = ap_ctx->operatingChannel;
+					hdd_get_band(channel, &band);
+			}
+
+			if (band1 == 0 && band != 0) {
+				band1 = band;
+			} else if (band2 == 0 && band != 0) {
+				band2 = band;
+			}
+
+			if (band1 != 0 && band2 != 0 && band1 != band2) {
+				hddLog(LOGE,
+					"MCC in 2 bands");
+				return 1;
+			}
+
+			status = hdd_get_next_adapter(hdd_ctx,
+					adapter_node, &next);
+			adapter_node = next;
+		}
+		channel = 0;
+		band = 0;
+	}
+	return ret;
+}
+
 static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo,
                                                     tANI_U32 roamId, eRoamCmdStatus roamStatus,
                                                     eCsrRoamResult roamResult )
@@ -2339,6 +2426,47 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
         }
     }
 #endif /* FEATURE_WLAN_FORCE_SAP_SCC */
+    if (eConnectionState_Associated == pHddStaCtx->conn_info.connState) {
+        if (hdd_is_mcc_in_2_band(pHddCtx)) {
+            switch (pHddCtx->thermal_level) {
+                case 0:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level0_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level0_5g)
+                         ? 2
+                         : 5;
+                         break;
+                case 1:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level1_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level1_5g)
+                         ? 2
+                         : 5;
+                         break;
+                case 2:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level2_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level2_5g)
+                         ? 2
+                         : 5;
+                         break;
+                case 3:
+                    thermal_band =
+                         (pHddCtx->cfg_ini->throttle_dutycycle_level3_2g
+                         > pHddCtx->cfg_ini->throttle_dutycycle_level3_5g)
+                         ? 2
+                         : 5;
+                         break;
+                default:
+                    hddLog(VOS_TRACE_LEVEL_ERROR,
+                       "invalid thermal level %d",
+                       pHddCtx->thermal_level);
+           }
+        } else {
+             hdd_get_band(pHddStaCtx->conn_info.operationChannel, &thermal_band);
+        }
+        sme_SetThermalLevel(pHddCtx->hHal, pHddCtx->thermal_level);
+    }
     return eHAL_STATUS_SUCCESS;
 }
 

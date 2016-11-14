@@ -1865,6 +1865,7 @@ struct hdd_context_s
     vos_timer_t tdls_source_timer;
     struct hdd_scan_chan_info *chan_info;
     struct mutex chan_info_lock;
+    uint8_t thermal_level;
 };
 
 /*---------------------------------------------------------------------------
