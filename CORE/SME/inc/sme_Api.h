@@ -4145,6 +4145,13 @@ eHalStatus sme_register_mgmt_frame_ind_callback(tHalHandle hal,
 void sme_enable_phy_error_logs(tHalHandle hal, bool enable_log);
 void sme_set_pdev_ht_vht_ies(tHalHandle hHal, bool enable2x2);
 
+VOS_STATUS sme_set_btc_bt_wlan_interval_page_p2p(uint32_t bt_interval,
+                                        uint32_t p2p_interval);
+VOS_STATUS sme_set_btc_bt_wlan_interval_page_sta(uint32_t bt_interval,
+                                        uint32_t sta_interval);
+VOS_STATUS sme_set_btc_bt_wlan_interval_page_sap(uint32_t bt_interval,
+                                        uint32_t sap_interval);
+
 void sme_update_vdev_type_nss(tHalHandle hal, uint8_t max_supp_nss,
 		uint32_t vdev_type_nss, eCsrBand band);
 void sme_set_vdev_nss(tHalHandle hal, bool enable2x2);

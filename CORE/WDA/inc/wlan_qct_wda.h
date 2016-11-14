@@ -997,6 +997,8 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_DCC_CLEAR_STATS_CMD               SIR_HAL_DCC_CLEAR_STATS_CMD
 #define WDA_DCC_UPDATE_NDL_CMD                SIR_HAL_DCC_UPDATE_NDL_CMD
 
+#define WDA_BTC_BT_WLAN_INTERVAL_CMD          SIR_BTC_BT_WLAN_INTERVAL_CMD
+
 #define WDA_MIB_STATS_REQ                     SIR_HAL_MIB_STATS_REQ
 #define WDA_SET_MIB_STATS_ENABLE              SIR_HAL_SET_MIB_STATS_ENABLE
 #define WDA_SET_MIB_STATS_DISABLE             SIR_HAL_SET_MIB_STATS_DISABLE

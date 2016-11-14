@@ -674,6 +674,7 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_ndp_indication_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_ndp_confirm_event_fixed_param,
     WMITLV_TAG_STRUC_wmi_ndp_end_indication_event_fixed_param,
+    WMITLV_TAG_STRUC_WMI_COEX_CONFIG_CMD_fixed_param = 522,
 } WMITLV_TAG_ID;
 
 /*
@@ -944,7 +945,8 @@ typedef enum {
     OP(WMI_NDI_GET_CAP_REQ_CMDID) \
     OP(WMI_NDP_INITIATOR_REQ_CMDID) \
     OP(WMI_NDP_RESPONDER_REQ_CMDID) \
-    OP(WMI_NDP_END_REQ_CMDID)
+    OP(WMI_NDP_END_REQ_CMDID) \
+    OP(WMI_COEX_CONFIG_CMDID)
 
 /*
  * IMPORTANT: Please add _ALL_ WMI Events Here.
@@ -3504,6 +3506,11 @@ WMITLV_CREATE_PARAM_STRUC(WMI_PEER_STA_PS_STATECHG_EVENTID);
 #define WMITLV_TABLE_WMI_INST_RSSI_STATS_EVENTID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_inst_rssi_stats_resp_fixed_param, wmi_inst_rssi_stats_resp_fixed_param, fixed_param, WMITLV_SIZE_FIX)
 WMITLV_CREATE_PARAM_STRUC(WMI_INST_RSSI_STATS_EVENTID);
+
+/* COEX config cmd */
+#define WMITLV_TABLE_WMI_COEX_CONFIG_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_COEX_CONFIG_CMD_fixed_param, WMI_COEX_CONFIG_CMD_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+WMITLV_CREATE_PARAM_STRUC(WMI_COEX_CONFIG_CMDID);
 
 
 #ifdef __cplusplus
