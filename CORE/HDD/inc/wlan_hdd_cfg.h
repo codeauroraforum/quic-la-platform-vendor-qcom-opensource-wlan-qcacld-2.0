@@ -3442,6 +3442,16 @@ enum dot11p_mode {
 #define CFG_BTC_ANTENNA_ISOLATION_DEFAULT   (0)
 
 
+/**
+ * Config to set WLAN/BT coex tx power
+ * range: 0 - 63
+ * default: 63
+ */
+#define CFG_BTC_WLAN_COEX_TX_POWER           "gWLCoexTxPower"
+#define CFG_BTC_WLAN_COEX_TX_POWER_MIN       (0)
+#define CFG_BTC_WLAN_COEX_TX_POWER_MAX       (63)
+#define CFG_BTC_WLAN_COEX_TX_POWER_DEFAULT   (63)
+
 /* Parameters for roaming scans performed at high RSSI */
 
 /* Maximum number of scans after RSSI change */
@@ -4717,6 +4727,8 @@ struct hdd_config {
 
    uint32_t                    dynamic_wlan_bt_coex;
    uint32_t                    antenna_isolation;
+
+   uint32_t                    coex_tx_power;
 
    uint8_t                     inform_bss_rssi_raw;
 #ifdef WLAN_FEATURE_TSF

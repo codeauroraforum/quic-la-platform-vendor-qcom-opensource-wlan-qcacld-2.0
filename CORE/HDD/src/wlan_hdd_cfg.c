@@ -4226,6 +4226,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                 CFG_BTC_ANTENNA_ISOLATION_MIN,
                 CFG_BTC_ANTENNA_ISOLATION_MAX),
 
+   REG_VARIABLE(CFG_BTC_WLAN_COEX_TX_POWER, WLAN_PARAM_Integer,
+                hdd_config_t, coex_tx_power,
+                VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                CFG_BTC_WLAN_COEX_TX_POWER_DEFAULT,
+                CFG_BTC_WLAN_COEX_TX_POWER_MIN,
+                CFG_BTC_WLAN_COEX_TX_POWER_MAX),
+
    REG_VARIABLE(CFG_INFORM_BSS_RSSI_RAW_NAME, WLAN_PARAM_Integer,
                 hdd_config_t, inform_bss_rssi_raw,
                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -8009,4 +8016,9 @@ void hdd_set_btc_bt_wlan_interval(hdd_context_t *hdd_ctx)
 
 	if (VOS_STATUS_SUCCESS != status)
 		hddLog(LOGE, "Fail to set enable bt wlan coex parameters");
+
+	status = sme_set_btc_wlan_coex_tx_power(config->coex_tx_power);
+
+	if (VOS_STATUS_SUCCESS != status)
+		hddLog(LOGE, "Fail to set coex tx power");
 }

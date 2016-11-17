@@ -4421,6 +4421,8 @@ VOS_STATUS sme_set_btc_wlan_conn_params(uint32_t conn_val0,
 VOS_STATUS sme_set_btc_dynamic_bt_wlan_coex(uint32_t dynamic_wlan_bt_coex,
 					uint32_t antenna_isolation);
 
+VOS_STATUS sme_set_btc_wlan_coex_tx_power(uint32_t coex_tx_power);
+
 uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
 
 typedef void ( *tSmeSetThermalLevelCallback)(void *pContext, u_int8_t level);
