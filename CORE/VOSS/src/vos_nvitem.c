@@ -1638,6 +1638,34 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
     return VOS_STATUS_SUCCESS;
 }
 
+/* vos_is_fcc_regdomian() - is the regdomain FCC
+ *
+ * Return: true if FCC regdomain
+ *         false otherwise
+ */
+bool vos_is_fcc_regdomain(void)
+{
+	v_CONTEXT_t pVosContext = NULL;
+	hdd_context_t *pHddCtx = NULL;
+	v_REGDOMAIN_t domainId;
+
+	pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+	if (!pVosContext)
+		return false;
+	pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+	if (!pHddCtx) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+				("Invalid pHddCtx pointer"));
+		return false;
+	}
+	vos_nv_getRegDomainFromCountryCode(&domainId,
+			pHddCtx->reg.alpha2, COUNTRY_QUERY);
+	if (REGDOMAIN_FCC == domainId)
+		return true;
+	return false;
+}
+
 #ifdef FEATURE_STATICALLY_ADD_11P_CHANNELS
 #define DEFAULT_11P_POWER (30)
 #endif
@@ -1666,6 +1694,67 @@ bool vos_is_dsrc_channel(uint16_t center_freq)
     }
     return 0;
 }
+
+/**
+ * vos_is_channel_support_sub20() - check channel
+ * support sub20 channel width
+ * @oper_ch: operating channel
+ * @ch_width: channel width
+ * @sec_ch: secondary channel
+ *
+ * Return: true or false
+ */
+bool vos_is_channel_support_sub20(uint16_t operation_channel,
+				  enum phy_ch_width channel_width,
+				  uint16_t secondary_channel)
+{
+	eNVChannelEnabledType channel_state;
+
+	if (VOS_IS_CHANNEL_5GHZ(operation_channel)) {
+		const struct bonded_chan *bonded_chan_ptr;
+
+		channel_state =
+		    vos_search_5g_bonded_channel(operation_channel,
+						 channel_width,
+						 &bonded_chan_ptr);
+		if (NV_CHANNEL_DISABLE == channel_state)
+			return false;
+
+		channel_state =
+		    vos_get_5g_bonded_channel_state(operation_channel,
+						    channel_width,
+						    bonded_chan_ptr);
+		if (NV_CHANNEL_DISABLE == channel_state)
+			return false;
+
+	} else if (VOS_IS_CHANNEL_24GHZ(operation_channel)) {
+		channel_state =
+		    vos_get_2g_bonded_channel_state(operation_channel,
+						    channel_width,
+						    secondary_channel);
+		if (NV_CHANNEL_DISABLE == channel_state)
+			return false;
+	}
+
+	return true;
+}
+
+/**
+ * vos_phy_channel_width_to_sub20: convert phy channel width
+ * to sub20 channel width
+ * @channel_width:  phy channel width
+ * Return: sub20 channel width
+ */
+uint8_t vos_phy_channel_width_to_sub20(enum phy_ch_width channel_width)
+{
+	if (channel_width == CH_WIDTH_5MHZ)
+		return SUB20_MODE_5MHZ;
+	else if (channel_width == CH_WIDTH_10MHZ)
+		return SUB20_MODE_10MHZ;
+	else
+		return SUB20_MODE_NONE;
+}
+
 /**
  * vos_update_band: Update the band
  * @eBand: Band value

@@ -96,6 +96,7 @@ VOS_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req)
 
 	cmd->ndp_cfg_len = ndp_req->ndp_config.ndp_cfg_len;
 	cmd->ndp_app_info_len = ndp_req->ndp_info.ndp_app_info_len;
+	cmd->ndp_channel_cfg = ndp_req->channel_cfg;
 
 	ch_tlv = (wmi_channel *)&cmd[1];
 	WMITLV_SET_HDR(ch_tlv, WMITLV_TAG_STRUC_wmi_channel,
@@ -554,8 +555,15 @@ static int wma_ndp_responder_rsp_event_handler(void *handle,
 	rsp.transaction_id = fixed_params->transaction_id;
 	rsp.reason = fixed_params->reason_code;
 	rsp.status = fixed_params->rsp_status;
+	rsp.create_peer = fixed_params->create_peer;
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&fixed_params->peer_ndi_mac_addr,
 				rsp.peer_mac_addr.bytes);
+
+	WMA_LOGE(FL("WMI_NDP_RESPONDER_RSP_EVENTID(0x%X) received. vdev_id: %d, peer_mac_addr: %pM, transaction_id: %d, status_code %d, reason_code: %d, create_peer: %d"),
+			WMI_NDP_RESPONDER_RSP_EVENTID, rsp.vdev_id,
+			rsp.peer_mac_addr.bytes, rsp.transaction_id,
+			rsp.status, rsp.reason, rsp.create_peer);
+
 	return wma_send_ndp_responder_rsp(&rsp);
 }
 

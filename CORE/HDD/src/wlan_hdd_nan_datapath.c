@@ -58,8 +58,10 @@ qca_wlan_vendor_ndp_policy[QCA_WLAN_VENDOR_ATTR_NDP_PARAMS_MAX + 1] = {
 					.len = VOS_MAC_ADDR_SIZE },
 	[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID_ARRAY] = { .type = NLA_BINARY,
 					.len = NDP_NUM_INSTANCE_ID },
-	[QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE] = { .type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE] = { .type =
+								NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE] = { .type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL_CONFIG] = { .type = NLA_U32 },
 };
 
 /**
@@ -519,12 +521,13 @@ static int hdd_ndp_initiator_req_handler(hdd_context_t *hdd_ctx,
 	req.transaction_id =
 		nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID]);
 
-	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL]) {
-		hddLog(LOGE, FL("NDP channel is unavailable"));
-		return -EINVAL;
-	}
-	req.channel =
-		nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL]);
+	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL])
+		req.channel =
+			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL_CONFIG])
+		req.channel_cfg =
+			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL_CONFIG]);
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_SERVICE_INSTANCE_ID]) {
 		hddLog(LOGE, FL("NDP service instance ID is unavailable"));
@@ -757,7 +760,7 @@ static int hdd_ndp_end_req_handler(hdd_context_t *hdd_ctx, struct nlattr **tb)
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
  *         QCA_WLAN_VENDOR_ATTR_NDP_INTERFACE_CREATE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID (2 bytes)
- * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE (4 bytes)
+ * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE (4 bytes)
  *
  * Return: none
@@ -834,7 +837,8 @@ static void hdd_ndp_iface_create_rsp_handler(hdd_adapter_t *adapter,
 	}
 
 	/* Status code */
-	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE,
+	if (nla_put_u32(vendor_event,
+		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
 		create_status)) {
 		hddLog(LOGE, FL("VENDOR_ATTR_NDP_DRV_RETURN_TYPE put fail"));
 		goto nla_put_failure;
@@ -855,7 +859,8 @@ static void hdd_ndp_iface_create_rsp_handler(hdd_adapter_t *adapter,
 		QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID,
 		create_transaction_id);
 	hddLog(LOG2, FL("status code: %d, value: %d"),
-		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE, create_status);
+		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
+		create_status);
 	hddLog(LOG2, FL("Return value: %d, value: %d"),
 		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE,
 		create_reason);
@@ -944,7 +949,7 @@ static void hdd_ndp_iface_delete_rsp_handler(hdd_adapter_t *adapter,
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
  *         QCA_WLAN_VENDOR_ATTR_NDP_INTERFACE_DELETE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID (2 bytes)
- * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE (4 bytes)
+ * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE (4 bytes)
  *
  * Return: none
@@ -1016,7 +1021,7 @@ void hdd_ndp_session_end_handler(hdd_adapter_t *adapter)
 
 	/* Status code */
 	if (nla_put_u32(vendor_event,
-			QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE,
+			QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
 			ndp_ctx->ndi_delete_rsp_status)) {
 		hddLog(LOGE, FL("VENDOR_ATTR_NDP_DRV_RETURN_TYPE put fail"));
 		goto failure;
@@ -1037,7 +1042,7 @@ void hdd_ndp_session_end_handler(hdd_adapter_t *adapter)
 		QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID,
 		ndp_ctx->ndp_delete_transaction_id);
 	hddLog(LOG2, FL("status code: %d, value: %d"),
-		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE,
+		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
 		ndp_ctx->ndi_delete_rsp_status);
 	hddLog(LOG2, FL("Return value: %d, value: %d"),
 		QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE,
@@ -1084,7 +1089,7 @@ failure:
  *         QCA_WLAN_VENDOR_ATTR_NDP_INITIATOR_RESPONSE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID (2 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID (4 bytes)
- * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE (4 bytes)
+ * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE (4 bytes)
  *
  * Return: none
@@ -1128,7 +1133,8 @@ static void hdd_ndp_initiator_rsp_handler(hdd_adapter_t *adapter,
 			rsp->ndp_instance_id))
 		goto ndp_initiator_rsp_nla_failed;
 
-	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE,
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
 			rsp->status))
 		goto ndp_initiator_rsp_nla_failed;
 
@@ -1487,8 +1493,8 @@ ndp_indication_nla_failed:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
  *         QCA_WLAN_VENDOR_ATTR_NDP_RESPONDER_RESPONSE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID (2 bytes)
- * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE (4 bytes)
- * QCA_WLAN_VENDOR_ATTR_NDP_RESPONSE_CODE (4 bytes)
+ * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE (4 bytes)
+ * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE (4 bytes)
  *
  * Return: none
  */
@@ -1534,12 +1540,13 @@ static void hdd_ndp_responder_rsp_handler(hdd_adapter_t *adapter,
 	   rsp->transaction_id))
 		goto ndp_responder_rsp_nla_failed;
 
-	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE,
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
 	   rsp->status))
 		goto ndp_responder_rsp_nla_failed;
 
 	if (nla_put_u32(vendor_event,
-	   QCA_WLAN_VENDOR_ATTR_NDP_RESPONSE_CODE,
+	   QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE,
 	   rsp->reason))
 		goto ndp_responder_rsp_nla_failed;
 
@@ -1560,7 +1567,7 @@ ndp_responder_rsp_nla_failed:
  * Following vendor event is sent to cfg80211:
  * QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD =
  *         QCA_WLAN_VENDOR_ATTR_NDP_END_RESPONSE (4 bytes)
- * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE (4 bytes)
+ * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_VALUE (4 bytes)
  * QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID (2 bytes)
  *
@@ -1598,7 +1605,8 @@ static void hdd_ndp_end_rsp_handler(hdd_adapter_t *adapter, void *rsp_params)
 			QCA_WLAN_VENDOR_ATTR_NDP_END_RESPONSE))
 		goto ndp_end_rsp_nla_failed;
 
-	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_NDP_DRV_RETURN_TYPE,
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_NDP_DRV_RESPONSE_STATUS_TYPE,
 			rsp->status))
 		goto ndp_end_rsp_nla_failed;
 

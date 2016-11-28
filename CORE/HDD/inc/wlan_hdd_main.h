@@ -119,6 +119,7 @@
 #define WLAN_WAIT_TIME_ABORTSCAN  2000
 #define WLAN_WAIT_TIME_EXTSCAN  1000
 #define WLAN_WAIT_TIME_LL_STATS 800
+#define WLAN_WAIT_TIME_POWER_STATS 800
 
 #define WLAN_WAIT_SMPS_FORCE_MODE  500
 
@@ -148,6 +149,8 @@
 #define WLAN_WAIT_TIME_SCAN_REQ 100
 
 #define WLAN_WAIT_TIME_BPF     1000
+
+#define WLAN_WAIT_TIME_CHAIN_RSSI  1000
 
 #define MAX_NUMBER_OF_ADAPTERS 4
 
@@ -263,6 +266,8 @@ typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
 #define HDD_BW_GET_DIFF(_x, _y) (unsigned long)((ULONG_MAX - (_y)) + (_x) + 1)
 
+#define MAX_PROBE_REQ_OUIS 16
+
 /*
  * Generic asynchronous request/response support
  *
@@ -321,6 +326,7 @@ extern spinlock_t hdd_context_lock;
 #define LINK_STATUS_MAGIC   0x4C4B5354   //LINKSTATUS(LNST)
 #define TEMP_CONTEXT_MAGIC 0x74656d70   // TEMP (temperature)
 #define FW_STATUS_MAGIC 0x46575354 /* FWSTATUS(FWST) */
+#define POWER_STATS_MAGIC 0x14111990
 #define BPF_CONTEXT_MAGIC 0x4575354    /* BPF */
 
 #ifdef QCA_LL_TX_FLOW_CT
@@ -767,6 +773,7 @@ typedef struct hdd_hostapd_state_s
     int bssState;
     vos_event_t vosEvent;
     vos_event_t stop_bss_event;
+    vos_event_t sta_disassoc_event;
     VOS_STATUS vosStatus;
     v_BOOL_t bCommit;
 
@@ -814,6 +821,9 @@ typedef struct {
 
    /** Rate Flags for this connection */
    uint32_t  rate_flags;
+
+   /** SUB 20 Bandwidth Flags */
+   uint8_t   sub20_dynamic_channelwidth;
 } hdd_station_info_t;
 
 struct hdd_ap_ctx_s
@@ -1241,6 +1251,7 @@ struct hdd_adapter_s
     struct hdd_netif_queue_history
             queue_oper_history[WLAN_HDD_MAX_HISTORY_ENTRY];
     struct hdd_netif_queue_stats queue_oper_stats[WLAN_REASON_TYPE_MAX];
+    struct power_stats_response *chip_power_stats;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1431,6 +1442,18 @@ struct hdd_ll_stats_context {
 	struct completion response_event;
 };
 #endif /* End of WLAN_FEATURE_LINK_LAYER_STATS */
+
+/**
+ * struct hdd_chain_rssi_context - hdd chain rssi context
+ * @response_event: chain rssi request wait event
+ * @ignore_result: Flag to ignore the result or not
+ * @chain_rssi: chain rssi array
+ */
+struct hdd_chain_rssi_context {
+	struct completion response_event;
+	bool ignore_result;
+	struct chain_rssi_result result;
+};
 
 #ifdef WLAN_FEATURE_OFFLOAD_PACKETS
 /**
@@ -1813,6 +1836,8 @@ struct hdd_context_s
     struct hdd_ll_stats_context ll_stats_context;
 #endif /* End of WLAN_FEATURE_LINK_LAYER_STATS */
 
+    struct hdd_chain_rssi_context chain_rssi_context;
+
 #ifdef WLAN_FEATURE_MEMDUMP
     uint8_t *fw_dump_loc;
     uint32_t dump_loc_paddr;
@@ -1878,6 +1903,9 @@ struct hdd_context_s
     vos_timer_t tdls_source_timer;
     struct hdd_scan_chan_info *chan_info;
     struct mutex chan_info_lock;
+
+    uint32_t no_of_probe_req_ouis;
+    struct vendor_oui *probe_req_voui;
 };
 
 /*---------------------------------------------------------------------------

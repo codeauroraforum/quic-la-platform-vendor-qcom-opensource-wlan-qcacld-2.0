@@ -4270,6 +4270,11 @@ tSirRetStatus limStaSendAddBss( tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
     //we need to defer the message until we get the response back from HAL.
     SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
 
+    if (psessionEntry->sub20_channelwidth == SUB20_MODE_5MHZ)
+            pAddBssParams->channelwidth = CH_WIDTH_5MHZ;
+    else if (psessionEntry->sub20_channelwidth == SUB20_MODE_10MHZ)
+            pAddBssParams->channelwidth = CH_WIDTH_10MHZ;
+
     msgQ.type = WDA_ADD_BSS_REQ;
     /** @ToDo : Update the Global counter to keeptrack of the PE <--> HAL messages*/
     msgQ.reserved = 0;
@@ -4336,10 +4341,10 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
     vos_mem_set((tANI_U8 *) pAddBssParams, sizeof( tAddBssParams ), 0);
 
 
-    limExtractApCapabilities( pMac,
+    limExtractApCapabilities(pMac,
                             (tANI_U8 *) bssDescription->ieFields,
-                            limGetIElenFromBssDescription( bssDescription ),
-                            pBeaconStruct );
+                            GET_IE_LEN_IN_BSS(bssDescription->length),
+                            pBeaconStruct);
 
     if(pMac->lim.gLimProtectionControl != WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
         limDecideStaProtectionOnAssoc(pMac, pBeaconStruct, psessionEntry);
@@ -4737,6 +4742,11 @@ tSirRetStatus limStaSendAddBssPreAssoc( tpAniSirGlobal pMac, tANI_U8 updateEntry
 
     //we need to defer the message until we get the response back from HAL.
     SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
+
+    if (psessionEntry->sub20_channelwidth == SUB20_MODE_5MHZ)
+            pAddBssParams->channelwidth = CH_WIDTH_5MHZ;
+    else if (psessionEntry->sub20_channelwidth == SUB20_MODE_10MHZ)
+            pAddBssParams->channelwidth = CH_WIDTH_10MHZ;
 
     msgQ.type = WDA_ADD_BSS_REQ;
     /** @ToDo : Update the Global counter to keeptrack of the PE <--> HAL messages*/

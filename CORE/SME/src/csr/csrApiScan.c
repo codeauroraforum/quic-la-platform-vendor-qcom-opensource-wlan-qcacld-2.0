@@ -2989,8 +2989,7 @@ void csrCheckNSaveWscIe(tpAniSirGlobal pMac, tSirBssDescription *pNewBssDescr, t
        (0 == pNewBssDescr->WscIeLen))
     {
         idx = 0;
-        len = pOldBssDescr->length - sizeof(tSirBssDescription) +
-                sizeof(tANI_U16) + sizeof(tANI_U32) - DOT11F_IE_WSCPROBERES_MIN_LEN - 2;
+        len = GET_IE_LEN_IN_BSS(pOldBssDescr->length) - DOT11F_IE_WSCPROBERES_MIN_LEN - 2;
         pbIe = (tANI_U8 *)pOldBssDescr->ieFields;
         //Save WPS IE if it exists
         pNewBssDescr->WscIeLen = 0;
@@ -4371,7 +4370,12 @@ tANI_BOOLEAN csrLearnCountryInformation( tpAniSirGlobal pMac, tSirBssDescription
     tANI_BOOLEAN useVoting = eANI_BOOLEAN_FALSE;
 
     if (VOS_STA_SAP_MODE == vos_get_conparam ())
-        return eHAL_STATUS_SUCCESS;
+    {
+        if (vos_active_session_exists (VOS_STA_SAP_MODE))
+        {
+            return eHAL_STATUS_SUCCESS;
+        }
+    }
 
     if ((NULL == pSirBssDesc) && (NULL == pIes))
         useVoting = eANI_BOOLEAN_TRUE;
@@ -5822,7 +5826,8 @@ eHalStatus csrSendMBScanReq( tpAniSirGlobal pMac, tANI_U16 sessionId,
 
     msgLen = (tANI_U16)(sizeof( tSirSmeScanReq ) - sizeof( pMsg->channelList.channelNumber ) +
                         ( sizeof( pMsg->channelList.channelNumber ) * pScanReq->ChannelInfo.numOfChannels )) +
-                   ( pScanReq->uIEFieldLen ) ;
+                   ( pScanReq->uIEFieldLen ) +
+                   pScanReq->num_vendor_oui * sizeof(struct vendor_oui);
 
     pMsg = vos_mem_malloc(msgLen);
     if ( NULL == pMsg )
@@ -5984,6 +5989,36 @@ eHalStatus csrSendMBScanReq( tpAniSirGlobal pMac, tANI_U16 sessionId,
             if (pScanReq->requestType == eCSR_SCAN_HO_BG_SCAN)
             {
                 pMsg->backgroundScanMode = eSIR_ROAMING_SCAN;
+            }
+
+            pMsg->enable_scan_randomization =
+                                       pScanReq->enable_scan_randomization;
+            if (pMsg->enable_scan_randomization) {
+                vos_mem_copy(pMsg->mac_addr, pScanReq->mac_addr,
+                             VOS_MAC_ADDR_SIZE);
+                vos_mem_copy(pMsg->mac_addr_mask, pScanReq->mac_addr_mask,
+                             VOS_MAC_ADDR_SIZE);
+            }
+
+            pMsg->ie_whitelist = pScanReq->ie_whitelist;
+            if (pMsg->ie_whitelist)
+                vos_mem_copy(pMsg->probe_req_ie_bitmap,
+                             pScanReq->probe_req_ie_bitmap,
+                             PROBE_REQ_BITMAP_LEN * sizeof(uint32_t));
+            pMsg->num_vendor_oui = pScanReq->num_vendor_oui;
+            pMsg->oui_field_len = pScanReq->num_vendor_oui *
+                                  sizeof(struct vendor_oui);
+            pMsg->oui_field_offset = (tANI_U16)(sizeof( tSirSmeScanReq ) -
+                                   sizeof( pMsg->channelList.channelNumber ) +
+                                   (sizeof( pMsg->channelList.channelNumber ) *
+                                   pScanReq->ChannelInfo.numOfChannels )) +
+                                   pScanReq->uIEFieldLen;
+
+            if (pScanReq->num_vendor_oui != 0)
+            {
+                vos_mem_copy((tANI_U8 *)pMsg + pMsg->oui_field_offset,
+                             (uint8_t*)(pScanReq->voui),
+                             pMsg->oui_field_len);
             }
 
         }while(0);
@@ -6466,6 +6501,7 @@ eHalStatus csrScanCopyRequest(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq, tCs
             pDstReq->pIEField = NULL;
             pDstReq->ChannelInfo.ChannelList = NULL;
             pDstReq->SSIDs.SSIDList = NULL;
+            pDstReq->voui = NULL;
 
             if(pSrcReq->uIEFieldLen == 0)
             {
@@ -6708,6 +6744,35 @@ eHalStatus csrScanCopyRequest(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq, tCs
             pDstReq->p2pSearch = pSrcReq->p2pSearch;
             pDstReq->skipDfsChnlInP2pSearch = pSrcReq->skipDfsChnlInP2pSearch;
 
+            if (pSrcReq->num_vendor_oui == 0)
+            {
+                pDstReq->num_vendor_oui = 0;
+                pDstReq->voui = NULL;
+            }
+            else
+            {
+                pDstReq->voui = vos_mem_malloc(pSrcReq->num_vendor_oui *
+                                         sizeof(*pDstReq->voui));
+                if (NULL == pDstReq->voui)
+                        status = eHAL_STATUS_FAILURE;
+                else
+                        status = eHAL_STATUS_SUCCESS;
+
+                if (HAL_STATUS_SUCCESS(status))
+                {
+                    pDstReq->num_vendor_oui = pSrcReq->num_vendor_oui;
+                    vos_mem_copy(pDstReq->voui,
+                                 pSrcReq->voui,
+                                 pSrcReq->num_vendor_oui *
+                                 sizeof(*pDstReq->voui));
+                }
+                else
+                {
+                    pDstReq->num_vendor_oui = 0;
+                    smsLog(pMac, LOGE, FL("No memory for voui"));
+                    break;
+                }
+            }
         }
     }while(0);
 
@@ -6742,6 +6807,13 @@ eHalStatus csrScanFreeRequest(tpAniSirGlobal pMac, tCsrScanRequest *pReq)
     }
     pReq->SSIDs.numOfSSIDs = 0;
 
+    if(pReq->voui)
+    {
+        vos_mem_free(pReq->voui);
+        pReq->voui = NULL;
+    }
+    pReq->num_vendor_oui = 0;
+
     return eHAL_STATUS_SUCCESS;
 }
 
@@ -6751,14 +6823,19 @@ void csrScanCallCallback(tpAniSirGlobal pMac, tSmeCmd *pCommand, eCsrScanStatus 
     if(pCommand->u.scanCmd.callback)
     {
         if (pCommand->u.scanCmd.abort_scan_indication) {
-             smsLog(pMac, LOG1, FL("scanDone due to abort"));
-             scanStatus = eCSR_SCAN_ABORT;
+             if ((pCommand->u.scanCmd.reason != eCsrScanForSsid) ||
+                 (scanStatus != eCSR_SCAN_SUCCESS)) {
+                 smsLog( pMac, LOG1, FL("scanDone due to abort"));
+                 scanStatus = eCSR_SCAN_ABORT;
+             }
         }
         pCommand->u.scanCmd.callback(pMac, pCommand->u.scanCmd.pContext,
                                      pCommand->sessionId,
                                      pCommand->u.scanCmd.scanID, scanStatus);
     } else {
-        smsLog( pMac, LOG2, "%s:%d - Callback NULL!!!", __func__, __LINE__);
+        smsLog(pMac, LOG2,
+               FL("Callback NULL cmd reason %d"),
+               pCommand->u.scanCmd.reason);
     }
 }
 
@@ -7598,7 +7675,37 @@ eHalStatus csrScanGetBKIDCandidateList(tpAniSirGlobal pMac, tANI_U32 sessionId,
 }
 #endif /* FEATURE_WLAN_WAPI */
 
+/**
+ * csr_ssid_scan_done_callback() - Callback to indicate
+ *                            scan is done for ssid scan
+ * @halHandle: handle to hal
+ * @context: SSID scan context
+ * @scanId: Scan id for the scheduled scan
+ * @status: scan done status
+ *
+ * Return - eHalStatus
+ */
+static eHalStatus csr_ssid_scan_done_callback(tHalHandle halHandle,
+					      void *context,
+					      tANI_U8 sessionId,
+					      tANI_U32 scanId,
+					      eCsrScanStatus status)
+{
+	struct csr_scan_for_ssid_context *scan_context =
+		(struct csr_scan_for_ssid_context *)context;
 
+	if (NULL == scan_context)
+		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+				FL("scan for ssid context not found"));
+
+	if (eCSR_SCAN_ABORT == status)
+		csrRoamCallCallback(scan_context->pMac, scan_context->sessionId,
+				NULL, scan_context->roamId,
+				eCSR_ROAM_ASSOCIATION_FAILURE,
+				eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE);
+	vos_mem_free(scan_context);
+	return eHAL_STATUS_SUCCESS;
+}
 
 //This function is usually used for BSSs that suppresses SSID so the profile
 //shall have one and only one SSID
@@ -7611,6 +7718,7 @@ eHalStatus csrScanForSSID(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoamProfi
     tANI_U32 numSsid = pProfile->SSIDs.numOfSSIDs;
     tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
                               &pMac->roam.neighborRoamInfo[sessionId];
+    struct csr_scan_for_ssid_context *context;
 
     smsLog(pMac, LOG2, FL("called"));
     //For WDS, we use the index 0. There must be at least one in there
@@ -7638,13 +7746,23 @@ eHalStatus csrScanForSSID(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoamProfi
             {
                 status = csrRoamCopyProfile(pMac, pScanCmd->u.scanCmd.pToRoamProfile, pProfile);
             }
+            context = vos_mem_malloc(sizeof(*context));
+            if (NULL == context)
+            {
+                smsLog(pMac, LOGE,
+                       "Failed to allocate memory for ssid scan context");
+                status = eHAL_STATUS_FAILED_ALLOC;
+            }
             if(!HAL_STATUS_SUCCESS(status))
                 break;
+            context->pMac = pMac;
+            context->sessionId = sessionId;
+            context->roamId = roamId;
             pScanCmd->u.scanCmd.roamId = roamId;
             pScanCmd->command = eSmeCommandScan;
             pScanCmd->sessionId = (tANI_U8)sessionId;
-            pScanCmd->u.scanCmd.callback = NULL;
-            pScanCmd->u.scanCmd.pContext = NULL;
+            pScanCmd->u.scanCmd.callback = csr_ssid_scan_done_callback;
+            pScanCmd->u.scanCmd.pContext = context;
             pScanCmd->u.scanCmd.reason = eCsrScanForSsid;//Need to check: might need a new reason for SSID scan for LFR during multisession with p2p
             pScanCmd->u.scanCmd.scanID = pMac->scan.nextScanID++; //let it wrap around
             vos_mem_set(&pScanCmd->u.scanCmd.u.scanRequest, sizeof(tCsrScanRequest), 0);
@@ -8660,8 +8778,8 @@ eHalStatus csrScanSavePreferredNetworkFound(tpAniSirGlobal pMac,
     * of pointer that holds the next BSS description
     */
    pBssDescr->length = (tANI_U16)(
-                     sizeof(tSirBssDescription) - sizeof(tANI_U16) -
-                     sizeof(tANI_U32) + uLen);
+        ((uintptr_t)OFFSET_OF(tSirBssDescription, ieFields))
+        - sizeof(pBssDescr->length) + uLen);
    if (pParsedFrame->dsParamsPresent)
    {
       pBssDescr->channelId = pParsedFrame->channelNumber;
@@ -8935,10 +9053,10 @@ eHalStatus csrScanCreateEntryInScanCache(tpAniSirGlobal pMac, tANI_U32 sessionId
 
 #ifdef FEATURE_WLAN_ESE
 //  Update the TSF with the difference in system time
-void UpdateCCKMTSF(tANI_U32 *timeStamp0, tANI_U32 *timeStamp1, tANI_U32 *incr)
+void UpdateCCKMTSF(tANI_U32 *timeStamp0, tANI_U32 *timeStamp1, uint64_t *incr)
 {
     tANI_U64 timeStamp64 = ((tANI_U64)*timeStamp1 << 32) | (*timeStamp0);
-    timeStamp64 = (tANI_U64)(timeStamp64 + (tANI_U64)*incr);
+    timeStamp64 = (tANI_U64)(timeStamp64 + (*incr));
     *timeStamp0 = (tANI_U32)(timeStamp64 & 0xffffffff);
     *timeStamp1 = (tANI_U32)((timeStamp64 >> 32) & 0xffffffff);
 }

@@ -6119,10 +6119,13 @@ static int __iw_setint_getnone(struct net_device *dev,
         }
         case WE_SET_MAX_TX_POWER_2_4:
         {
+           if (NULL == hHal)
+               return -EINVAL;
+
            hddLog(VOS_TRACE_LEVEL_INFO,
                   "%s: Setting maximum tx power %d dBm for 2.4 GHz band",
                   __func__, set_value);
-           if (sme_SetMaxTxPowerPerBand(eCSR_BAND_24, set_value) !=
+           if (sme_SetMaxTxPowerPerBand(eCSR_BAND_24, set_value, hHal) !=
                                         eHAL_STATUS_SUCCESS)
            {
               hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -6135,10 +6138,13 @@ static int __iw_setint_getnone(struct net_device *dev,
         }
         case WE_SET_MAX_TX_POWER_5_0:
         {
+           if (NULL == hHal)
+               return -EINVAL;
+
            hddLog(VOS_TRACE_LEVEL_INFO,
                   "%s: Setting maximum tx power %d dBm for 5.0 GHz band",
                   __func__, set_value);
-           if (sme_SetMaxTxPowerPerBand(eCSR_BAND_5G, set_value) !=
+           if (sme_SetMaxTxPowerPerBand(eCSR_BAND_5G, set_value, hHal) !=
                                         eHAL_STATUS_SUCCESS)
            {
               hddLog(VOS_TRACE_LEVEL_ERROR,
@@ -10554,6 +10560,20 @@ int iw_set_pno(struct net_device *dev, struct iw_request_info *info,
     ptr += nOffset;
   }/*For ucNetworkCount*/
 
+  if (sscanf(ptr, "%u %n", &(pnoRequest.fast_scan_period), &nOffset) > 0) {
+    pnoRequest.fast_scan_period *= MSEC_PER_SEC;
+    ptr += nOffset;
+  }
+
+  if (sscanf(ptr, "%hhu %n", &(pnoRequest.fast_scan_max_cycles),
+             &nOffset) > 0)
+    ptr += nOffset;
+
+  if (sscanf(ptr, "%u %n", &(pnoRequest.slow_scan_period), &nOffset) > 0) {
+    pnoRequest.slow_scan_period *= MSEC_PER_SEC;
+    ptr += nOffset;
+  }
+
   ucParams = sscanf(ptr,"%hhu %n",&(ucMode), &nOffset);
 
   pnoRequest.modePNO = ucMode;
@@ -11044,7 +11064,9 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
             tCsrRoamProfile roam_profile;
 
             hddLog(LOG1, "Set monitor mode Channel %d", value[1]);
-            hdd_select_cbmode(pAdapter, value[1], &vht_channel_width);
+            hdd_select_mon_cbmode(pAdapter, value[1], &vht_channel_width);
+
+            vos_mem_zero(&roam_profile, sizeof(roam_profile));
             roam_profile.ChannelInfo.ChannelList = &ch_info->channel;
             roam_profile.ChannelInfo.numOfChannels = 1;
             roam_profile.vht_channel_width = ch_info->channel_width;

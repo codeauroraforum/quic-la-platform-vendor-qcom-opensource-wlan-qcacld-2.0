@@ -72,6 +72,11 @@ ifeq ($(KERNEL_BUILD), 0)
 	#Flag to enable Legacy Fast Roaming3(LFR3)
 	CONFIG_QCACLD_WLAN_LFR3 := y
 
+	#Enable Power debugfs feature only if debug_fs is enabled
+	ifeq ($(CONFIG_DEBUG_FS), y)
+	CONFIG_WLAN_POWER_DEBUGFS := y
+	endif
+
 	#JB kernel has PMKSA patches, hence enabling this flag
 	CONFIG_PRIMA_WLAN_OKC := y
 
@@ -1019,6 +1024,10 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DWLAN_VOWIFI_DEBUG \
 		-DATH_SUPPORT_DFS
 
+ifeq ($(CONFIG_WLAN_POWER_DEBUGFS), y)
+CDEFINES += -DWLAN_POWER_DEBUGFS
+endif
+
 ifeq ($(CONFIG_SCPC_FEATURE), y)
 CDEFINES += -DWLAN_SCPC_FEATURE
 endif
@@ -1535,6 +1544,14 @@ endif
 ifeq ($(CONFIG_ARCH_MSM8909), y)
 CDEFINES += -DMSM8976_TCP_PERF
 CDEFINES += -DTX_COMPLETION_THREAD
+CDEFINES += -DACS_FW_REPORT_PARAM
+CDEFINES += -DFEATURE_WLAN_SUB_20_MHZ
+CDEFINES += -DHL_RX_AGGREGATION_HOLE_DETCTION
+endif
+
+ifeq ($(CONFIG_ARCH_MSM8996), y)
+CDEFINES += -DACS_FW_REPORT_PARAM
+CDEFINES += -DFEATURE_WLAN_SUB_20_MHZ
 endif
 
 ifdef CPTCFG_QCA_CLD_WLAN
@@ -1594,6 +1611,10 @@ KBUILD_CPPFLAGS += $(CDEFINES)
 # will override the kernel settings.
 ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
 EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
 endif
 
 # If the module name is not "wlan", then the define MULTI_IF_NAME to be the

@@ -310,6 +310,14 @@ typedef struct tagCsrScanRequest
     eCsrRequestType requestType;    //11d scan or full scan
     tANI_BOOLEAN p2pSearch;
     tANI_BOOLEAN skipDfsChnlInP2pSearch;
+
+    uint32_t enable_scan_randomization;
+    uint8_t mac_addr[VOS_MAC_ADDR_SIZE];
+    uint8_t mac_addr_mask[VOS_MAC_ADDR_SIZE];
+    bool ie_whitelist;
+    uint32_t probe_req_ie_bitmap[PROBE_REQ_BITMAP_LEN];
+    uint32_t num_vendor_oui;
+    struct vendor_oui *voui;
 }tCsrScanRequest;
 
 typedef struct tagCsrBGScanRequest
@@ -1020,6 +1028,7 @@ typedef struct tagCsrRoamProfile
     uint16_t beacon_tx_rate;
     tSirMacRateSet  supported_rates;
     tSirMacRateSet  extended_rates;
+    uint8_t sub20_channelwidth;
 }tCsrRoamProfile;
 
 
@@ -1718,6 +1727,17 @@ struct tagCsrDelStaParams
     tCsrBssid peerMacAddr;
     u16 reason_code;
     u8 subtype;
+};
+
+/**
+ * struct csr_set_tx_max_pwr_per_band - Req params to
+ * set max tx power per band
+ * @band: band for which power to be set
+ * @power: power to set in dB
+ */
+struct csr_set_tx_max_pwr_per_band {
+	eCsrBand band;
+	tPowerdBm power;
 };
 
 /**
