@@ -3132,6 +3132,7 @@ static int iw_get_linkspeed_priv(struct net_device *dev,
     return 0;
 }
 
+#if 0
 /*
  * Support for the RSSI & RSSI-APPROX private commands
  * Per the WiFi framework the response must be of the form
@@ -3194,6 +3195,7 @@ static int iw_get_rssi(struct net_device *dev,
    /* a value is being successfully returned */
    return rc;
 }
+#endif
 
 /*
  * Support for SoftAP channel range private command
@@ -3450,6 +3452,7 @@ void* wlan_hdd_change_country_code_callback(void *pAdapter)
     return NULL;
 }
 
+#if 0
 static int iw_set_priv(struct net_device *dev,
                        struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
@@ -3795,6 +3798,7 @@ done:
     kfree(cmd);
     return rc;
 }
+#endif
 
 static int iw_set_nick(struct net_device *dev,
                        struct iw_request_info *info,
@@ -9793,7 +9797,7 @@ static const iw_handler      we_handler[] =
    (iw_handler) NULL,              /* SIOCGIWSENS */
    (iw_handler) NULL,             /* SIOCSIWRANGE */
    (iw_handler) iw_get_range,      /* SIOCGIWRANGE */
-   (iw_handler) iw_set_priv,       /* SIOCSIWPRIV */
+   (iw_handler) NULL,       /* SIOCSIWPRIV */
    (iw_handler) NULL,             /* SIOCGIWPRIV */
    (iw_handler) NULL,             /* SIOCSIWSTATS */
    (iw_handler) NULL,             /* SIOCGIWSTATS */
