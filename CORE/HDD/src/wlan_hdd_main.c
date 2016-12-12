@@ -601,7 +601,7 @@ done:
 
   --------------------------------------------------------------------------*/
 
-static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
+void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
 {
     hdd_ap_ctx_t *pHddApCtx;
     hdd_hostapd_state_t *pHostapdState;

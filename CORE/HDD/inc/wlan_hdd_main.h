@@ -1749,4 +1749,11 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind);
 hdd_adapter_t *hdd_get_adapter_by_sme_session_id(hdd_context_t *hdd_ctx,
 						uint32_t sme_session_id);
 
+#if defined (FEATURE_WLAN_MCC_TO_SCC_SWITCH) || \
+	defined (FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE)
+void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter);
+#else
+static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter) {}
+#endif
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

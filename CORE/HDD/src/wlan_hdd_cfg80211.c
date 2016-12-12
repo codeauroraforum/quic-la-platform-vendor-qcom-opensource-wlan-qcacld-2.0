@@ -4003,6 +4003,179 @@ static int wlan_hdd_cfg80211_setband(struct wiphy *wiphy,
 	return ret;
 }
 
+
+#ifdef FEATURE_WLAN_CH_AVOID
+
+static int hdd_validate_avoid_freq_chanlist(hdd_context_t *hdd_ctx,
+					    tHddAvoidFreqList *channel_list) {
+	int range_idx, ch_idx;
+	int unsafe_channel_index, unsafe_channel_count = 0;
+	bool ch_found = false;
+
+	unsafe_channel_count = VOS_MIN((uint16_t)hdd_ctx->unsafe_channel_count,
+			(uint16_t)NUM_20MHZ_RF_CHANNELS);
+
+	for (range_idx = 0; range_idx < channel_list->avoidFreqRangeCount;
+					range_idx++) {
+		/* validate channel range */
+		if ((channel_list->avoidFreqRange[range_idx].startFreq <
+		     MIN_2_4GHZ_CHANNEL) ||
+		    (channel_list->avoidFreqRange[range_idx].endFreq >
+		     MAX_5GHZ_CHANNEL) ||
+		    (channel_list->avoidFreqRange[range_idx].startFreq >
+		     channel_list->avoidFreqRange[range_idx].endFreq))
+				continue;
+
+		for (ch_idx = channel_list->avoidFreqRange[range_idx].startFreq;
+		     ch_idx <= channel_list->avoidFreqRange[range_idx].endFreq;
+		     ch_idx++) {
+			for (unsafe_channel_index = 0;
+			     unsafe_channel_index < unsafe_channel_count;
+			     unsafe_channel_index++) {
+				if (ch_idx ==
+					hdd_ctx->unsafe_channel_list[
+					unsafe_channel_index]) {
+					hddLog(VOS_TRACE_LEVEL_INFO,
+					       FL("Duplicate channel %d"),
+					       ch_idx);
+					ch_found = true;
+					break;
+				}
+			}
+			if (!ch_found) {
+				hdd_ctx->unsafe_channel_list[
+				unsafe_channel_count++] = ch_idx;
+			}
+			ch_found = false;
+		}
+	}
+	return unsafe_channel_count;
+}
+/**
+ * __wlan_hdd_cfg80211_avoid_freq() - ask driver to restart SAP if SAP
+ * is on unsafe channel.
+ * @wiphy:    wiphy structure pointer
+ * @wdev:     Wireless device structure pointer
+ * @data:     Pointer to the data received
+ * @data_len: Length of @data
+ *
+ * wlan_hdd_cfg80211_avoid_freq do restart the sap if sap is already
+ * on any of unsafe channels.
+ * If sap is on any of unsafe channel, hdd_unsafe_channel_restart_sap
+ * will send WLAN_SVC_LTE_COEX_IND indication to userspace to restart.
+ *
+ * Return: 0 on success; errno on failure
+ */
+static int
+__wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
+		struct wireless_dev *wdev,
+		const void *data, int data_len)
+{
+	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+	int ret;
+	int unsafe_channel_index;
+	tHddAvoidFreqList *channel_list;
+	int ch;
+	hdd_adapter_t *ap_adapter;
+	bool restart_sap = false;
+
+	ENTER();
+
+	if (VOS_FTM_MODE == hdd_get_conparam()) {
+		hddLog(LOGE, FL("Command not allowed in FTM mode"));
+		return -EINVAL;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return -EINVAL;
+
+	channel_list = (tHddAvoidFreqList *)data;
+	if (!channel_list) {
+		hddLog(LOGE, FL("Avoid frequency channel list empty"));
+		return -EINVAL;
+	}
+#ifdef CONFIG_CNSS
+	cnss_get_wlan_unsafe_channel(hdd_ctx->unsafe_channel_list,
+			&(hdd_ctx->unsafe_channel_count),
+			sizeof(hdd_ctx->unsafe_channel_list));
+#endif
+
+	hdd_ctx->unsafe_channel_count =
+		hdd_validate_avoid_freq_chanlist(hdd_ctx,
+						 channel_list);
+
+#ifdef CONFIG_CNSS
+	if (cnss_set_wlan_unsafe_channel(hdd_ctx->unsafe_channel_list,
+		                                unsafe_channel_count)) {
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+					"%s: Failed to set unsafe channel",
+					__func__);
+	}
+#endif
+
+	ap_adapter = hdd_get_adapter(hdd_ctx, WLAN_HDD_SOFTAP);
+	if (ap_adapter != NULL &&
+	    test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+
+		ch = ap_adapter->sessionCtx.ap.sapConfig.channel;
+
+		for (unsafe_channel_index = 0;
+		     unsafe_channel_index < hdd_ctx->unsafe_channel_count;
+		     unsafe_channel_index++) {
+
+			hddLog(VOS_TRACE_LEVEL_INFO, FL("Channel %d is not safe."),
+			       hdd_ctx->unsafe_channel_list
+			       [unsafe_channel_index]);
+
+			if (ch == hdd_ctx->unsafe_channel_list
+			    [unsafe_channel_index])
+				restart_sap = true;
+		}
+		if (restart_sap) {
+			ap_adapter->sessionCtx.ap.sapConfig.channel =
+				AUTO_CHANNEL_SELECT;
+			wlan_hdd_restart_sap(ap_adapter);
+		}
+	}
+	else
+		hddLog(VOS_TRACE_LEVEL_INFO,
+		       FL("SAP not restarted.Channel list updated"));
+
+	return 0;
+}
+
+/**
+ * wlan_hdd_cfg80211_avoid_freq() - ask driver to restart SAP if SAP
+ * is on unsafe channel.
+ * @wiphy:    wiphy structure pointer
+ * @wdev:     Wireless device structure pointer
+ * @data:     Pointer to the data received
+ * @data_len: Length of @data
+ *
+ * wlan_hdd_cfg80211_avoid_freq do restart the sap if sap is already
+ * on any of unsafe channels.
+ * If sap is on any of unsafe channel, hdd_unsafe_channel_restart_sap
+ * will send WLAN_SVC_LTE_COEX_IND indication to userspace to restart.
+ *
+ * Return: 0 on success; errno on failure
+ */
+int wlan_hdd_cfg80211_avoid_freq(struct wiphy *wiphy,
+		struct wireless_dev *wdev,
+		const void *data, int data_len)
+{
+	int ret;
+
+	vos_ssr_protect(__func__);
+	ret = __wlan_hdd_cfg80211_avoid_freq(wiphy, wdev, data, data_len);
+	vos_ssr_unprotect(__func__);
+
+	return ret;
+}
+
+
+#endif
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
 {
     {
@@ -4251,6 +4424,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
 			 WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_setband
 	},
+#ifdef FEATURE_WLAN_CH_AVOID
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_avoid_freq
+	},
+#endif
 };
 
 
