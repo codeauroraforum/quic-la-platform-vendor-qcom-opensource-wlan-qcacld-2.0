@@ -800,11 +800,6 @@ void hdd_tx_resume_cb(void *adapter_context,
        {
           vos_timer_stop(&pAdapter->tx_flow_control_timer);
        }
-       if (adf_os_unlikely(hdd_sta_ctx->hdd_ReassocScenario)) {
-           hddLog(LOGW,
-                  FL("flow control, tx queues un-pause avoided as we are in REASSOCIATING state"));
-           return;
-       }
        hddLog(LOG1, FL("Enabling queues"));
        netif_tx_wake_all_queues(pAdapter->dev);
        pAdapter->hdd_stats.hddTxRxStats.txflow_unpause_cnt++;
