@@ -264,6 +264,7 @@ typedef struct sap_StationAssocIndication_s {
     eCsrEncryptionType negotiatedUCEncryptionType;
     eCsrEncryptionType negotiatedMCEncryptionType;
     tANI_BOOLEAN fAuthRequired;
+    uint8_t      ecsa_capable;
 } tSap_StationAssocIndication;
 
 typedef struct sap_StationAssocReassocCompleteEvent_s {
@@ -284,6 +285,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
     tANI_U8*     assocRespPtr;
     tANI_U8      timingMeasCap;
     tSirSmeChanInfo chan_info;
+    uint8_t      ecsa_capable;
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {
@@ -573,6 +575,9 @@ typedef struct sap_Config {
     tSirMacRateSet  extended_rates;
     eCsrBand   target_band;
     uint16_t  sub20_channelwidth;
+    /* beacon count before channel switch */
+    uint8_t          sap_chanswitch_beacon_cnt;
+    uint8_t          sap_chanswitch_mode;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -684,6 +689,9 @@ typedef struct sSapDfsInfo
     v_U8_t              disable_dfs_ch_switch;
     uint16_t            tx_leakage_threshold;
     uint8_t             new_sub20_channelwidth;
+    /* beacon count before channel switch */
+    uint8_t            sap_ch_switch_beacon_cnt;
+    uint8_t            sap_ch_switch_mode;
 } tSapDfsInfo;
 
 typedef struct tagSapCtxList

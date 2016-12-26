@@ -222,6 +222,51 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 #endif
 
 static enum powersave_qpower_mode wma_get_qpower_config(tp_wma_handle wma);
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+/**
+ * wma_wow_wakeup_stats_event()- send wow wakeup stats
+ * tp_wma_handle wma: WOW wakeup packet counter
+ *
+ * This function sends wow wakeup stats diag event
+ *
+ * Return: void.
+ */
+static void wma_wow_wakeup_stats_event(tp_wma_handle wma)
+{
+        WLAN_VOS_DIAG_EVENT_DEF(WowStats,
+                vos_event_wlan_powersave_wow_stats);
+        vos_mem_zero(&WowStats, sizeof(WowStats));
+
+        WowStats.wow_ucast_wake_up_count = wma->wow_ucast_wake_up_count;
+        WowStats.wow_bcast_wake_up_count = wma->wow_bcast_wake_up_count;
+        WowStats.wow_ipv4_mcast_wake_up_count =
+                                        wma->wow_ipv4_mcast_wake_up_count;
+        WowStats.wow_ipv6_mcast_wake_up_count =
+                                        wma->wow_ipv6_mcast_wake_up_count;
+        WowStats.wow_ipv6_mcast_ra_stats = wma->wow_ipv6_mcast_ra_stats;
+        WowStats.wow_ipv6_mcast_ns_stats = wma->wow_ipv6_mcast_ns_stats;
+        WowStats.wow_ipv6_mcast_na_stats = wma->wow_ipv6_mcast_na_stats;
+        WowStats.wow_pno_match_wake_up_count = wma->wow_pno_match_wake_up_count;
+        WowStats.wow_pno_complete_wake_up_count =
+                                        wma->wow_pno_complete_wake_up_count;
+        WowStats.wow_gscan_wake_up_count = wma->wow_gscan_wake_up_count;
+        WowStats.wow_low_rssi_wake_up_count =  wma->wow_low_rssi_wake_up_count;
+        WowStats.wow_rssi_breach_wake_up_count =
+                                        wma->wow_rssi_breach_wake_up_count;
+        WowStats.wow_icmpv4_count = wma->wow_icmpv4_count;
+        WowStats.wow_icmpv6_count = wma->wow_icmpv6_count;
+        WowStats.wow_oem_response_wake_up_count =
+                                        wma->wow_oem_response_wake_up_count;
+        WLAN_VOS_DIAG_EVENT_REPORT(&WowStats, EVENT_WLAN_POWERSAVE_WOW_STATS);
+}
+#else
+static void wma_wow_wakeup_stats_event(tp_wma_handle wma)
+{
+        return;
+}
+#endif
+
 #ifdef FEATURE_WLAN_EXTSCAN
 /**
  * enum extscan_report_events_type - extscan report events type
@@ -4393,102 +4438,6 @@ static int wma_passpoint_match_event_handler(void *handle,
 	return 0;
 }
 
-/**
- * wma_extscan_hotlist_ssid_match_event_handler() -
- *	Handler for SSID hotlist match event from firmware
- * @handle: WMA handle
- * @cmd_param_info: WMI command buffer
- * @len: length of @cmd_param_info
- *
- * Return: 0 on success, non-zero on failure
- */
-static int
-wma_extscan_hotlist_ssid_match_event_handler(void *handle,
-					     uint8_t *cmd_param_info,
-					     uint32_t len)
-{
-	tp_wma_handle wma = (tp_wma_handle) handle;
-	WMI_EXTSCAN_HOTLIST_SSID_MATCH_EVENTID_param_tlvs *param_buf;
-	wmi_extscan_hotlist_ssid_match_event_fixed_param  *event;
-	tSirWifiScanResultEvent  *dest_hotlist;
-	tSirWifiScanResult      *dest_ap;
-	wmi_extscan_wlan_descriptor    *src_hotlist;
-	int numap, j;
-	bool ssid_found = false;
-	tpAniSirGlobal mac =
-		vos_get_context(VOS_MODULE_ID_PE, wma->vos_context);
-
-	if (!mac) {
-		WMA_LOGE("%s: Invalid mac", __func__);
-		return -EINVAL;
-	}
-
-	if (!mac->sme.pExtScanIndCb) {
-		WMA_LOGE("%s: Callback not registered", __func__);
-		return -EINVAL;
-	}
-
-	param_buf = (WMI_EXTSCAN_HOTLIST_SSID_MATCH_EVENTID_param_tlvs *)
-					cmd_param_info;
-	if (!param_buf) {
-		WMA_LOGE("%s: Invalid hotlist match event", __func__);
-		return -EINVAL;
-	}
-
-	event = param_buf->fixed_param;
-	src_hotlist = param_buf->hotlist_ssid_match;
-	numap = event->total_entries;
-	if (!src_hotlist || !numap) {
-		WMA_LOGE("%s: Hotlist AP's list invalid", __func__);
-		return -EINVAL;
-	}
-
-	dest_hotlist = vos_mem_malloc(sizeof(*dest_hotlist) +
-					sizeof(*dest_ap) * numap);
-	if (!dest_hotlist) {
-		WMA_LOGE("%s: Allocation failed for hotlist buffer", __func__);
-		return -EINVAL;
-	}
-
-	dest_ap = &dest_hotlist->ap[0];
-	dest_hotlist->numOfAps = event->total_entries;
-	dest_hotlist->requestId = event->config_request_id;
-
-	if (event->first_entry_index +
-		event->num_entries_in_page < event->total_entries)
-		dest_hotlist->moreData = 1;
-	else
-		dest_hotlist->moreData = 0;
-
-	WMA_LOGD("%s: Hotlist match: requestId: %u, numOfAps: %d", __func__,
-		 dest_hotlist->requestId, dest_hotlist->numOfAps);
-
-	for (j = 0; j < numap; j++) {
-		dest_ap->channel = src_hotlist->channel;
-		dest_ap->ts = src_hotlist->tstamp;
-		ssid_found = src_hotlist->flags & WMI_HOTLIST_FLAG_PRESENCE;
-		dest_ap->rtt = src_hotlist->rtt;
-		dest_ap->rtt_sd = src_hotlist->rtt_sd;
-		dest_ap->beaconPeriod = src_hotlist->beacon_interval;
-		dest_ap->capability = src_hotlist->capabilities;
-		dest_ap->ieLength = src_hotlist-> ie_length;
-		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_hotlist->bssid,
-						dest_ap->bssid);
-		vos_mem_copy(dest_ap->ssid, src_hotlist->ssid.ssid,
-					src_hotlist->ssid.ssid_len);
-		dest_ap->ssid[src_hotlist->ssid.ssid_len] = '\0';
-		dest_ap++;
-		src_hotlist++;
-	}
-
-	dest_hotlist->ap_found = ssid_found;
-	mac->sme.pExtScanIndCb(mac->hHdd,
-			       eSIR_EXTSCAN_HOTLIST_SSID_MATCH_IND,
-			       dest_hotlist);
-	WMA_LOGD("%s: sending hotlist ssid match event", __func__);
-	vos_mem_free(dest_hotlist);
-	return 0;
-}
 #endif
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -5298,13 +5247,17 @@ static void __wma_fill_tx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 				ac = &tx_stats[k];
 				WMA_FILL_TX_STATS(wmi_tx_stats, ac);
 				ac->mpdu_aggr_size = tx_mpdu_aggr;
-				ac->aggr_len = tx_mpdu_aggr_array_len;
-				ac->success_mcs_len = tx_succ_mcs_array_len;
+				ac->aggr_len = tx_mpdu_aggr_array_len *
+							sizeof(uint32_t);
+				ac->success_mcs_len = tx_succ_mcs_array_len *
+							sizeof(uint32_t);
 				ac->success_mcs = tx_succ_mcs;
 				ac->fail_mcs = tx_fail_mcs;
-				ac->fail_mcs_len = tx_fail_mcs_array_len;
+				ac->fail_mcs_len = tx_fail_mcs_array_len *
+							sizeof(uint32_t);
 				ac->delay = tx_delay;
-				ac->delay_len = tx_delay_array_len;
+				ac->delay_len = tx_delay_array_len *
+							sizeof(uint32_t);
 				peer_stats->ac_stats[k].tx_stats = ac;
 				peer_stats->ac_stats[k].type = k;
 				tx_mpdu_aggr += tx_mpdu_aggr_array_len;
@@ -5410,9 +5363,11 @@ static void __wma_fill_rx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 				ac = &rx_stats[k];
 				WMA_FILL_RX_STATS(wmi_rx_stats, ac);
 				ac->mpdu_aggr = rx_mpdu_aggr;
-				ac->aggr_len = rx_mpdu_aggr_array_len;
+				ac->aggr_len = rx_mpdu_aggr_array_len *
+							sizeof(uint32_t);
 				ac->mcs = rx_mcs;
-				ac->mcs_len = rx_mcs_array_len;
+				ac->mcs_len = rx_mcs_array_len *
+							sizeof(uint32_t);
 				peer_stats->ac_stats[k].rx_stats = ac;
 				peer_stats->ac_stats[k].type = k;
 				rx_mpdu_aggr += rx_mpdu_aggr_array_len;
@@ -8028,10 +7983,6 @@ wma_register_extscan_event_handler(tp_wma_handle wma_handle)
 			WMI_PASSPOINT_MATCH_EVENTID,
 			wma_passpoint_match_event_handler);
 
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-			WMI_EXTSCAN_HOTLIST_SSID_MATCH_EVENTID,
-			wma_extscan_hotlist_ssid_match_event_handler);
-
 	return;
 
 }
@@ -8998,8 +8949,9 @@ static VOS_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 	struct wma_txrx_node *iface = &wma_handle->interfaces[vdev_id];
 	struct wma_target_req *msg;
 
-	if ((iface->type == WMI_VDEV_TYPE_AP) &&
-	    (iface->sub_type == WMI_UNIFIED_VDEV_SUBTYPE_P2P_DEVICE)) {
+	if (((iface->type == WMI_VDEV_TYPE_AP) &&
+	     (iface->sub_type == WMI_UNIFIED_VDEV_SUBTYPE_P2P_DEVICE)) ||
+	    (iface->type == WMI_VDEV_TYPE_MONITOR)) {
 
 		WMA_LOGA("P2P Device: removing self peer %pM",
 				pdel_sta_self_req_param->selfMacAddr);
@@ -17520,6 +17472,8 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	VOS_STATUS status;
 	int32_t ret;
 	struct wma_txrx_node *iface = NULL;
+	uint32_t mcs_limit, i, j;
+	uint8_t *rate_pos;
 
 	pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
 
@@ -17597,6 +17551,46 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	}
 
 	wmi_unified_send_txbf(wma, add_sta);
+
+	/*
+	 * Get MCS limit from ini configure, and map it to rate parameters
+	 * This will limit HT rate upper bound. CFG_CTRL_MASK is used to
+	 * check whether ini config is enabled and CFG_DATA_MASK to get the
+	 * MCS value.
+	 */
+#define CFG_CTRL_MASK              0xFF00
+#define CFG_DATA_MASK              0x00FF
+
+	if (wlan_cfgGetInt(wma->mac_context, WNI_CFG_SAP_MAX_MCS_DATA,
+			   &mcs_limit) != eSIR_SUCCESS) {
+		mcs_limit = WNI_CFG_SAP_MAX_MCS_DATA_DEF;
+	}
+
+	if (mcs_limit & CFG_CTRL_MASK) {
+		WMA_LOGD("%s: set mcs_limit %x", __func__, mcs_limit);
+
+		mcs_limit &= CFG_DATA_MASK;
+		rate_pos = (u_int8_t *)add_sta->supportedRates.supportedMCSSet;
+		for (i = 0, j = 0; i < MAX_SUPPORTED_RATES;) {
+			if (j < mcs_limit / 8) {
+				rate_pos[j] = 0xff;
+				j++;
+				i += 8;
+			} else if (j < mcs_limit / 8 + 1) {
+				if (i <= mcs_limit)
+					rate_pos[i / 8] |= 1 << (i % 8);
+				else
+					rate_pos[i / 8] &= ~(1 << (i % 8));
+				i++;
+
+				if (i >= (j + 1) * 8)
+					j++;
+			} else {
+				rate_pos[j++] = 0;
+				i += 8;
+			}
+		}
+	}
 
 	ret = wmi_unified_send_peer_assoc(wma, add_sta->nwType, add_sta);
 	if (ret) {
@@ -21821,10 +21815,6 @@ static int wma_extscan_get_eventid_from_tlvtag(uint32_t tag)
 		event_id = WMI_EXTSCAN_CAPABILITIES_EVENTID;
 		break;
 
-	case WMITLV_TAG_STRUC_wmi_extscan_hotlist_ssid_match_event_fixed_param:
-		event_id = WMI_EXTSCAN_HOTLIST_SSID_MATCH_EVENTID;
-		break;
-
 	default:
 		event_id = 0;
 		WMA_LOGE("%s: Unknown tag: %d", __func__, tag);
@@ -21906,11 +21896,6 @@ static void wma_extscan_wow_event_callback(void *handle, void *event,
 
 	case WMITLV_TAG_STRUC_wmi_extscan_capabilities_event_fixed_param:
 		wma_extscan_capabilities_event_handler(handle,
-				wmi_cmd_struct_ptr, len);
-		break;
-
-	case WMITLV_TAG_STRUC_wmi_extscan_hotlist_ssid_match_event_fixed_param:
-		wma_extscan_hotlist_ssid_match_event_handler(handle,
 				wmi_cmd_struct_ptr, len);
 		break;
 
@@ -22584,6 +22569,7 @@ static int wma_wow_wakeup_host_event(void *handle, u_int8_t *event,
 			wake_info->wake_reason,
 			wake_info->vdev_id);
 		vos_wow_wakeup_host_event(wake_info->wake_reason);
+		wma_wow_wakeup_stats_event(wma);
 	}
 
 	vos_event_set(&wma->wma_resume_event);
@@ -24392,7 +24378,15 @@ static VOS_STATUS wma_suspend_req(tp_wma_handle wma, tpSirWlanSuspendParam info)
 	 * suspend indication received on last vdev before
 	 * enabling wow in fw.
 	 */
-	if (wma->no_of_suspend_ind < wma_get_vdev_count(wma)) {
+	/*
+	 * While processing suspend indication, there is a possibility of
+	 * vdev(SAP/P2P-GO) deletion due to stop_ap. This may lead, Host to
+	 * send WoW indication twice to FW, as vdev is one but HDD sends
+	 * suspend indication twice to WMA. To fix this race condition check
+	 *  for wow_enable along with vdev count.
+	 */
+	if (wma->no_of_suspend_ind < wma_get_vdev_count(wma) ||
+		wma->wow.wow_enable) {
 		vos_mem_free(info);
 		return VOS_STATUS_SUCCESS;
 	}
@@ -28615,7 +28609,7 @@ VOS_STATUS wma_get_buf_extscan_hotlist_cmd(tp_wma_handle wma_handle,
 	int cmd_len = 0;
 	int num_entries = 0;
 	int min_entries = 0;
-	int numap = photlist->numAp;
+	uint32_t numap = photlist->numAp;
 	int len = sizeof(*cmd);
 
 	len += WMI_TLV_HDR_SIZE;
@@ -28624,8 +28618,8 @@ VOS_STATUS wma_get_buf_extscan_hotlist_cmd(tp_wma_handle wma_handle,
 	/* setbssid hotlist expects the bssid list
 	 * to be non zero value
 	 */
-	if (!numap) {
-		WMA_LOGE("%s: Invalid number of bssid's", __func__);
+	if (!numap || (numap > WLAN_EXTSCAN_MAX_HOTLIST_APS)) {
+		WMA_LOGE("%s: Invalid number of APs: %d", __func__, numap);
 		return VOS_STATUS_E_INVAL;
 	}
 	num_entries = wma_get_hotlist_entries_per_page(wma_handle->wmi_handle,
@@ -28800,111 +28794,6 @@ VOS_STATUS wma_extscan_stop_hotlist_monitor(tp_wma_handle wma,
 	return VOS_STATUS_SUCCESS;
 }
 
-/**
- * wma_set_ssid_hotlist() - Handle an SSID hotlist set request
- * @wma: WMA handle
- * @request: SSID hotlist set request from SME
- *
- * Return: VOS_STATUS
- */
-static VOS_STATUS
-wma_set_ssid_hotlist(tp_wma_handle wma,
-		     struct sir_set_ssid_hotlist_request *request)
-{
-	wmi_extscan_configure_hotlist_ssid_monitor_cmd_fixed_param *cmd;
-	wmi_buf_t wmi_buf;
-	uint32_t len;
-	uint32_t array_size;
-	uint8_t *buf_ptr;
-
-	if (!wma || !wma->wmi_handle) {
-		WMA_LOGE("%s: WMA is closed, can not issue hotlist cmd",
-			 __func__);
-		return VOS_STATUS_E_INVAL;
-	}
-	if (!request) {
-		WMA_LOGE("%s: Invalid request buffer",
-			__func__);
-		return VOS_STATUS_E_INVAL;
-	}
-	if (!WMI_SERVICE_IS_ENABLED(wma->wmi_service_bitmap,
-				    WMI_SERVICE_EXTSCAN)) {
-		WMA_LOGE("%s: extscan not enabled",
-			__func__);
-		return VOS_STATUS_E_FAILURE;
-	}
-
-	/* length of fixed portion */
-	len = sizeof(*cmd);
-
-	/* length of variable portion */
-	array_size =
-		request->ssid_count * sizeof(wmi_extscan_hotlist_ssid_entry);
-	len += WMI_TLV_HDR_SIZE + array_size;
-
-	wmi_buf = wmi_buf_alloc(wma->wmi_handle, len);
-	if (!wmi_buf) {
-		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
-		return VOS_STATUS_E_NOMEM;
-	}
-
-	buf_ptr = (uint8_t *) wmi_buf_data(wmi_buf);
-	cmd = (wmi_extscan_configure_hotlist_ssid_monitor_cmd_fixed_param *)
-						buf_ptr;
-	WMITLV_SET_HDR
-		(&cmd->tlv_header,
-		 WMITLV_TAG_STRUC_wmi_extscan_configure_hotlist_ssid_monitor_cmd_fixed_param,
-		 WMITLV_GET_STRUCT_TLVLEN
-			(wmi_extscan_configure_hotlist_ssid_monitor_cmd_fixed_param));
-
-	cmd->request_id = request->request_id;
-	cmd->requestor_id = 0;
-	cmd->vdev_id = request->session_id;
-	cmd->table_id = 0;
-	cmd->lost_ap_scan_count = request->lost_ssid_sample_size;
-	cmd->total_entries = request->ssid_count;
-	cmd->num_entries_in_page = request->ssid_count;
-	cmd->first_entry_index = 0;
-
-	buf_ptr += sizeof(*cmd);
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC, array_size);
-
-	if (request->ssid_count) {
-		wmi_extscan_hotlist_ssid_entry *entry;
-		int i;
-
-		buf_ptr += WMI_TLV_HDR_SIZE;
-		entry = (wmi_extscan_hotlist_ssid_entry *)buf_ptr;
-		for (i = 0; i < request->ssid_count; i++) {
-			WMITLV_SET_HDR
-				(entry,
-				 WMITLV_TAG_ARRAY_STRUC,
-				 WMITLV_GET_STRUCT_TLVLEN
-					(wmi_extscan_hotlist_ssid_entry));
-			entry->ssid.ssid_len = request->ssids[i].ssid.length;
-			vos_mem_copy(entry->ssid.ssid,
-				     request->ssids[i].ssid.ssId,
-				     request->ssids[i].ssid.length);
-			entry->band = request->ssids[i].band;
-			entry->min_rssi = request->ssids[i].rssi_low;
-			entry->max_rssi = request->ssids[i].rssi_high;
-			entry++;
-		}
-		cmd->mode = WMI_EXTSCAN_MODE_START;
-	} else {
-		cmd->mode = WMI_EXTSCAN_MODE_STOP;
-	}
-
-	if (wmi_unified_cmd_send
-		(wma->wmi_handle, wmi_buf, len,
-		 WMI_EXTSCAN_CONFIGURE_HOTLIST_SSID_MONITOR_CMDID)) {
-		WMA_LOGE("%s: failed to send command", __func__);
-		wmi_buf_free(wmi_buf);
-		return VOS_STATUS_E_FAILURE;
-	}
-	return VOS_STATUS_SUCCESS;
-}
-
 VOS_STATUS wma_get_buf_extscan_change_monitor_cmd(tp_wma_handle wma_handle,
 			tSirExtScanSetSigChangeReqParams *psigchange,
 			wmi_buf_t *buf, int *buf_len)
@@ -28914,12 +28803,12 @@ VOS_STATUS wma_get_buf_extscan_change_monitor_cmd(tp_wma_handle wma_handle,
 	u_int8_t *buf_ptr;
 	int j;
 	int len = sizeof(*cmd);
-	int numap = psigchange->numAp;
+	uint32_t numap = psigchange->numAp;
 	tSirAPThresholdParam  *src_ap = psigchange->ap;
 
-	if (!numap) {
-		WMA_LOGE("%s: Invalid number of bssid's",
-			__func__);
+	if (!numap || (numap > WLAN_EXTSCAN_MAX_SIGNIFICANT_CHANGE_APS)) {
+		WMA_LOGE("%s: Invalid number of APs: %d",
+			__func__, numap);
 		return VOS_STATUS_E_INVAL;
 	}
 	len += WMI_TLV_HDR_SIZE;
@@ -31399,6 +31288,16 @@ VOS_STATUS wma_get_wakelock_stats(struct sir_wake_lock_stats *wake_lock_stats)
 	wake_lock_stats->wow_icmpv4_count = wma_handle->wow_icmpv4_count;
 	wake_lock_stats->wow_icmpv6_count =
 			wma_handle->wow_icmpv6_count;
+	wake_lock_stats->wow_rssi_breach_wake_up_count =
+			wma_handle->wow_rssi_breach_wake_up_count;
+	wake_lock_stats->wow_low_rssi_wake_up_count =
+			wma_handle->wow_low_rssi_wake_up_count;
+	wake_lock_stats->wow_gscan_wake_up_count =
+			wma_handle->wow_gscan_wake_up_count;
+	wake_lock_stats->wow_pno_complete_wake_up_count =
+			wma_handle->wow_pno_complete_wake_up_count;
+	wake_lock_stats->wow_pno_match_wake_up_count =
+			wma_handle->wow_pno_match_wake_up_count;
 
 	return VOS_STATUS_SUCCESS;
 }
@@ -31515,25 +31414,30 @@ VOS_STATUS wma_set_tx_rx_aggregation_size
 /**
  * wma_set_powersave_config() - update power save config in wma
  * @val: new power save value
+ * @vdev_id: vdev id
  *
  * This function update qpower value in wma layer
  *
  * Return: VOS_STATUS_SUCCESS on success, error number otherwise
  */
-VOS_STATUS wma_set_powersave_config(uint8_t val)
+VOS_STATUS wma_set_powersave_config(uint8_t vdev_id, uint8_t val)
 {
 	tp_wma_handle wma_handle;
 
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA,
 			vos_get_global_context(VOS_MODULE_ID_WDA, NULL));
 
+	WMA_LOGI("configuring qpower: %d vdev %d", val, vdev_id);
 	if (!wma_handle) {
 		WMA_LOGE("%s: WMA context is invald!", __func__);
 		return VOS_STATUS_E_INVAL;
 	}
 	wma_handle->powersave_mode = val;
 
-	return VOS_STATUS_SUCCESS;
+	return wmi_unified_set_sta_ps_param(wma_handle->wmi_handle,
+					    vdev_id,
+					    WMI_STA_PS_ENABLE_QPOWER,
+					    wma_get_qpower_config(wma_handle));
 }
 
 /**
@@ -32483,11 +32387,6 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 		case WDA_EXTSCAN_RESET_BSSID_HOTLIST_REQ:
 			wma_extscan_stop_hotlist_monitor(wma_handle,
 			(tSirExtScanResetBssidHotlistReqParams *)msg->bodyptr);
-			vos_mem_free(msg->bodyptr);
-			break;
-		case WDA_EXTSCAN_SET_SSID_HOTLIST_REQ:
-			wma_set_ssid_hotlist(wma_handle,
-				(struct sir_set_ssid_hotlist_request *)msg->bodyptr);
 			vos_mem_free(msg->bodyptr);
 			break;
 		case WDA_EXTSCAN_SET_SIGNF_CHANGE_REQ:
@@ -38038,6 +37937,7 @@ int wma_dfs_indicate_radar(struct ieee80211com *ic,
 			vos_mem_malloc(sizeof(*radar_event));
 		if (radar_event == NULL) {
 			WMA_LOGE(FL("Failed to allocate memory for radar_event"));
+			adf_os_spin_unlock_bh(&ic->chan_lock);
 			return -ENOMEM;
 		}
 

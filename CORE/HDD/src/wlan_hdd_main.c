@@ -1251,18 +1251,18 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx)
 {
 
     if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini) {
-        hddLog(LOGE, FL("%pS HDD context is Null"), (void *)_RET_IP_);
+        hddLog(LOG1, FL("%pS HDD context is Null"), (void *)_RET_IP_);
         return -ENODEV;
     }
 
     if (pHddCtx->isLogpInProgress) {
-        hddLog(LOGE, FL("%pS LOGP in Progress. Ignore!!!"), (void *)_RET_IP_);
+        hddLog(LOG1, FL("%pS LOGP in Progress. Ignore!!!"), (void *)_RET_IP_);
         return -EAGAIN;
     }
 
     if ((pHddCtx->isLoadInProgress) ||
         (pHddCtx->isUnloadInProgress)) {
-        hddLog(LOGE,
+        hddLog(LOG1,
              FL("%pS Unloading/Loading in Progress. Ignore!!!"),
              (void *)_RET_IP_);
         return -EAGAIN;
@@ -10009,7 +10009,11 @@ static void __hdd_set_multicast_list(struct net_device *dev)
 
    /* Delete already configured multicast address list */
    if (0 < pAdapter->mc_addr_list.mc_cnt)
-      wlan_hdd_set_mc_addr_list(pAdapter, false);
+      if (wlan_hdd_set_mc_addr_list(pAdapter, false)) {
+           hddLog(VOS_TRACE_LEVEL_ERROR, FL("failed to clear mc addr list"));
+           return;
+      }
+
 
    if (dev->flags & IFF_ALLMULTI)
    {
@@ -10066,7 +10070,8 @@ static void __hdd_set_multicast_list(struct net_device *dev)
    }
 
    /* Configure the updated multicast address list */
-   wlan_hdd_set_mc_addr_list(pAdapter, true);
+   if (wlan_hdd_set_mc_addr_list(pAdapter, true))
+       hddLog(VOS_TRACE_LEVEL_INFO, FL("failed to set mc addr list"));
 
    EXIT();
    return;
@@ -10132,6 +10137,9 @@ static struct net_device_ops wlan_drv_ops = {
  static struct net_device_ops wlan_mon_drv_ops = {
       .ndo_open = hdd_mon_open,
       .ndo_stop = hdd_stop,
+#ifdef CONFIG_HL_SUPPORT
+      .ndo_start_xmit = hdd_hard_start_xmit,
+#endif
       .ndo_get_stats = hdd_stats,
 };
 
@@ -11089,11 +11097,14 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
             goto err_free_netdev;
          }
 
-         //Stop the Interface TX queue.
-         hddLog(LOG1, FL("Disabling queues"));
-         wlan_hdd_netif_queue_control(pAdapter,
-            WLAN_NETIF_TX_DISABLE_N_CARRIER,
-            WLAN_CONTROL_PATH);
+         /* do not disable tx in monitor mode */
+         if (VOS_MONITOR_MODE != vos_get_conparam()) {
+             /* Stop the Interface TX queue */
+             hddLog(LOG1, FL("Disabling queues"));
+             wlan_hdd_netif_queue_control(pAdapter,
+                                          WLAN_NETIF_TX_DISABLE_N_CARRIER,
+                                          WLAN_CONTROL_PATH);
+         }
 
 #ifdef QCA_LL_TX_FLOW_CT
          /* SAT mode default TX Flow control instance
@@ -12238,6 +12249,10 @@ void hdd_dump_concurrency_info(hdd_context_t *pHddCtx)
           }
           break;
       case WLAN_HDD_IBSS:
+#ifdef QCA_LL_TX_FLOW_CT
+          pAdapter->tx_flow_low_watermark =
+                       pHddCtx->cfg_ini->TxFlowLowWaterMark;
+#endif
           return; /* skip printing station message below */
       default:
           break;
@@ -13285,10 +13300,8 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
          "%s: Failed to close VOSS Scheduler",__func__);
       VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
    }
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
    /* Destroy the wake lock */
    vos_wake_lock_destroy(&pHddCtx->rx_wake_lock);
-#endif
    /* Destroy the wake lock */
    vos_wake_lock_destroy(&pHddCtx->sap_wake_lock);
 
@@ -13607,9 +13620,7 @@ void hdd_wlan_wakelock_destroy(void)
 void wlan_hdd_wakelocks_destroy(hdd_context_t *hdd_ctx)
 {
 	if (hdd_ctx) {
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
 		vos_wake_lock_destroy(&hdd_ctx->rx_wake_lock);
-#endif
 		vos_wake_lock_destroy(&hdd_ctx->sap_wake_lock);
 		hdd_hostapd_channel_wakelock_deinit(hdd_ctx);
 	}
@@ -15644,11 +15655,9 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    reg_netdev_notifier_done = TRUE;
 #endif
 
-#ifdef WLAN_FEATURE_HOLD_RX_WAKELOCK
    /* Initialize the wake lcok */
    vos_wake_lock_init(&pHddCtx->rx_wake_lock,
            "qcom_rx_wakelock");
-#endif
    /* Initialize the wake lcok */
    vos_wake_lock_init(&pHddCtx->sap_wake_lock,
            "qcom_sap_wakelock");
@@ -15845,6 +15854,13 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, FALSE);
    vos_set_load_in_progress(VOS_MODULE_ID_VOSS, FALSE);
 
+   if (pHddCtx->cfg_ini->fIsLogpEnabled) {
+       vos_wdthread_init_timer_work(vos_process_wd_timer);
+       /* Initialize the timer to detect thread stuck issues */
+       vos_thread_stuck_timer_init(
+               &((VosContextType*)pVosContext)->vosWatchdog);
+   }
+
    if (pHddCtx->cfg_ini->enable_dynamic_sta_chainmask)
       hdd_decide_dynamic_chain_mask(pHddCtx,
                             HDD_ANTENNA_MODE_1X1);
@@ -15879,6 +15895,19 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
        if ((set_value > 0) && (set_value <= SIFS_BURST_DUR_MAX))
            process_wma_set_command(0, (int)WMI_PDEV_PARAM_BURST_DUR,
                                           set_value, PDEV_CMD);
+   }
+
+   if (pHddCtx->cfg_ini->max_mpdus_inampdu) {
+       set_value = pHddCtx->cfg_ini->max_mpdus_inampdu;
+       process_wma_set_command(0, (int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
+                                      set_value, PDEV_CMD);
+   }
+
+   if (pHddCtx->cfg_ini->enable_rts_sifsbursting) {
+       set_value = pHddCtx->cfg_ini->enable_rts_sifsbursting;
+       process_wma_set_command(0, (int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
+                                      set_value, PDEV_CMD);
+
    }
 
    if (hdd_wlan_enable_egap(pHddCtx))
@@ -17876,7 +17905,12 @@ void wlan_hdd_check_sta_ap_concurrent_ch_intf(void *data)
     if (intf_ch == 0)
         return;
 
+    hddLog(VOS_TRACE_LEVEL_INFO,
+        FL("SAP restarts due to MCC->SCC switch, orig chan: %d, new chan: %d"),
+        pHddApCtx->sapConfig.channel, intf_ch);
+
     pHddApCtx->sapConfig.channel = intf_ch;
+    pHddApCtx->bss_stop_reason = BSS_STOP_DUE_TO_MCC_SCC_SWITCH;
     sme_SelectCBMode(hHal,
                      pHddApCtx->sapConfig.SapHw_mode,
                      pHddApCtx->sapConfig.channel,
@@ -18462,6 +18496,9 @@ int hdd_init_packet_filtering(hdd_context_t *hdd_ctx,
 		hddLog(LOGE, FL("Could not allocate Memory"));
 		return -ENOMEM;
 	}
+
+	vos_mem_zero(adapter->mc_addr_list.addr,
+		(hdd_ctx->max_mc_addr_list * ETH_ALEN));
 
 	return 0;
 }

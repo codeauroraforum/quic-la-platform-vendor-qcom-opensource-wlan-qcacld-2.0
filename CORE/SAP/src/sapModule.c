@@ -819,6 +819,10 @@ WLANSAP_StartBss
          */
         pmac->sap.SapDfsInfo.disable_dfs_ch_switch =
                                    pConfig->disableDFSChSwitch;
+        pmac->sap.SapDfsInfo.sap_ch_switch_beacon_cnt =
+            pConfig->sap_chanswitch_beacon_cnt;
+        pmac->sap.SapDfsInfo.sap_ch_switch_mode =
+            pConfig->sap_chanswitch_mode;
         // Copy MAC filtering settings to sap context
         pSapCtx->eSapMacAddrAclMode = pConfig->SapMacaddr_acl;
         vos_mem_copy(pSapCtx->acceptMacList, pConfig->accept_mac, sizeof(pConfig->accept_mac));
@@ -2878,6 +2882,14 @@ WLANSAP_ChannelChangeRequest(v_PVOID_t pSapCtx, uint8_t target_channel)
     }
     pMac = PMAC_STRUCT( hHal );
     phyMode = sapContext->csrRoamProfile.phyMode;
+
+    if (sapContext->csrRoamProfile.ChannelInfo.numOfChannels == 0 ||
+        sapContext->csrRoamProfile.ChannelInfo.ChannelList == NULL)
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                   FL("Invalid channel list"));
+        return VOS_STATUS_E_FAULT;
+    }
     sapContext->csrRoamProfile.ChannelInfo.ChannelList[0] = target_channel;
     /*
      * We are getting channel bonding mode from sapDfsInfor structure

@@ -1788,9 +1788,22 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                        FL("P2PGO is going down now"));
                 hdd_issue_stored_joinreq(sta_adapter, pHddCtx);
             }
-            pHddApCtx->groupKey.keyLength = 0;
-            for (i = 0; i < CSR_MAX_NUM_KEY; i++)
-                pHddApCtx->wepKey[i].keyLength = 0;
+
+            hddLog(VOS_TRACE_LEVEL_INFO,
+                FL("bss_stop_reason=%d"), pHddApCtx->bss_stop_reason);
+            if (pHddApCtx->bss_stop_reason != BSS_STOP_DUE_TO_MCC_SCC_SWITCH){
+                /* when MCC to SCC switching happens, key storage should not be
+                 * cleared due to hostapd will not repopulate the original keys
+                 */
+                pHddApCtx->groupKey.keyLength = 0;
+                for (i = 0; i < CSR_MAX_NUM_KEY; i++)
+                    pHddApCtx->wepKey[i].keyLength = 0;
+            }
+
+            /* clear the reason code in case BSS is stopped
+             * in another place
+             */
+            pHddApCtx->bss_stop_reason = BSS_STOP_REASON_INVALID;
             goto stopbss;
 
         case eSAP_DFS_CAC_START:
@@ -1969,6 +1982,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                     ->sapevt.sapStationAssocReassocCompleteEvent.
                     chan_info.sub20_channelwidth;
             }
+
+            pHostapdAdapter->aStaInfo[staId].ecsa_capable =
+                pSapEvent->
+                sapevt.sapStationAssocReassocCompleteEvent.ecsa_capable;
 
 #ifdef IPA_OFFLOAD
             if (hdd_ipa_is_enabled(pHddCtx))
@@ -3721,6 +3738,20 @@ static __iw_softap_setparam(struct net_device *dev,
 
         case QCASAP_PARAM_RX_STBC:
             ret = hdd_set_rx_stbc(pHostapdAdapter, set_value);
+            break;
+
+        case QCSAP_SET_DEFAULT_AMPDU:
+            hddLog(LOG1, "QCSAP_SET_DEFAULT_AMPDU val %d", set_value);
+            ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                         (int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
+                                         set_value, PDEV_CMD);
+            break;
+
+        case QCSAP_ENABLE_RTS_BURSTING:
+            hddLog(LOG1, "QCSAP_ENABLE_RTS_BURSTING val %d", set_value);
+            ret = process_wma_set_command((int)pHostapdAdapter->sessionId,
+                                   (int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
+                                   set_value, PDEV_CMD);
             break;
 
         default:
@@ -5610,27 +5641,33 @@ hdd_softap_get_sta_info(hdd_adapter_t *pAdapter, v_U8_t *pBuf, int buf_len)
 
     for (i = 0; i <= maxSta; i++)
     {
-        if(pAdapter->aStaInfo[i].isUsed)
-        {
-            len = scnprintf(pBuf, buf_len, "%5d .%02x:%02x:%02x:%02x:%02x:%02x",
-                                       pAdapter->aStaInfo[i].ucSTAId,
-                                       pAdapter->aStaInfo[i].macAddrSTA.bytes[0],
-                                       pAdapter->aStaInfo[i].macAddrSTA.bytes[1],
-                                       pAdapter->aStaInfo[i].macAddrSTA.bytes[2],
-                                       pAdapter->aStaInfo[i].macAddrSTA.bytes[3],
-                                       pAdapter->aStaInfo[i].macAddrSTA.bytes[4],
-                                       pAdapter->aStaInfo[i].macAddrSTA.bytes[5]);
-            if (len >= buf_len) {
+        if (!pAdapter->aStaInfo[i].isUsed)
+                continue;
+
+        if (CHAN_HOP_ALL_BANDS_ENABLE &&
+            (i == (WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->uBCStaId))
+                continue;
+
+        if (WE_GET_STA_INFO_SIZE > buf_len)
+                break;
+
+        len = scnprintf(pBuf, buf_len,
+                        "%d: %02x:%02x:%02x:%02x:%02x:%02x \t ecsa=%d\n",
+                        pAdapter->aStaInfo[i].ucSTAId,
+                        pAdapter->aStaInfo[i].macAddrSTA.bytes[0],
+                        pAdapter->aStaInfo[i].macAddrSTA.bytes[1],
+                        pAdapter->aStaInfo[i].macAddrSTA.bytes[2],
+                        pAdapter->aStaInfo[i].macAddrSTA.bytes[3],
+                        pAdapter->aStaInfo[i].macAddrSTA.bytes[4],
+                        pAdapter->aStaInfo[i].macAddrSTA.bytes[5],
+                        pAdapter->aStaInfo[i].ecsa_capable);
+
+        if (len >= buf_len) {
                 hddLog(LOGE, FL("Insufficient buffer:%d, %d"), buf_len, len);
                 return -E2BIG;
-            }
-            pBuf += len;
-            buf_len -= len;
         }
-        if(WE_GET_STA_INFO_SIZE > buf_len)
-        {
-            break;
-        }
+        pBuf += len;
+        buf_len -= len;
     }
     EXIT();
     return 0;
@@ -6478,6 +6515,16 @@ static const struct iw_priv_args hostapd_private_args[] = {
         IW_PRIV_TYPE_INT| IW_PRIV_SIZE_FIXED | 1,
         0,
         "set_rx_stbc" },
+
+    {   QCSAP_SET_DEFAULT_AMPDU,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "def_ampdu" },
+
+    {   QCSAP_ENABLE_RTS_BURSTING,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "rts_bursting" },
 
   { QCSAP_IOCTL_GETPARAM, 0,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,    "getparam" },

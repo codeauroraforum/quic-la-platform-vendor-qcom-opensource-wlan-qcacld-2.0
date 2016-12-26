@@ -9402,6 +9402,8 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             pRoamInfo->timingMeasCap = pUpperLayerAssocCnf->timingMeasCap;
             vos_mem_copy(&pRoamInfo->chan_info, &pUpperLayerAssocCnf->chan_info,
                                                        sizeof(tSirSmeChanInfo));
+            pRoamInfo->ecsa_capable = pUpperLayerAssocCnf->ecsa_capable;
+
             if(CSR_IS_INFRA_AP(pRoamInfo->u.pConnectedProfile) )
             {
                 pMac->roam.roamSession[sessionId].connectState = eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED;
@@ -10389,6 +10391,7 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
                                  sizeof(tCsrBssid));
                     pRoamInfo->wmmEnabledSta = pAssocInd->wmmEnabledSta;
                     pRoamInfo->timingMeasCap = pAssocInd->timingMeasCap;
+                    pRoamInfo->ecsa_capable = pAssocInd->ecsa_capable;
                     vos_mem_copy(&pRoamInfo->chan_info, &pAssocInd->chan_info,
                                  sizeof(tSirSmeChanInfo));
                     if(CSR_IS_WDS_AP( pRoamInfo->u.pConnectedProfile))
@@ -10834,11 +10837,12 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
                     status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pApNewCaps->bssId, &sessionId );
                     if( HAL_STATUS_SUCCESS( status ) )
                     {
-                        if ((eCSR_ROAMING_STATE_JOINED == pMac->roam.curState[sessionId]) &&
+                        if (((eCSR_ROAMING_STATE_JOINED == pMac->roam.curState[sessionId]) &&
                                 ((eCSR_ROAM_SUBSTATE_JOINED_REALTIME_TRAFFIC == pMac->roam.curSubState[sessionId]) ||
                                  (eCSR_ROAM_SUBSTATE_NONE == pMac->roam.curSubState[sessionId]) ||
                                  (eCSR_ROAM_SUBSTATE_JOINED_NON_REALTIME_TRAFFIC == pMac->roam.curSubState[sessionId]) ||
-                                 (eCSR_ROAM_SUBSTATE_JOINED_NO_TRAFFIC == pMac->roam.curSubState[sessionId]))
+                                 (eCSR_ROAM_SUBSTATE_JOINED_NO_TRAFFIC == pMac->roam.curSubState[sessionId]))) ||
+                            (eCSR_ROAMING_STATE_SCANNING == pMac->roam.curState[sessionId])
                            )
                         {
                             smsLog(pMac, LOGW, "Calling csrRoamDisconnectInternal");
@@ -11098,6 +11102,11 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
                                     {
                                        tpSirSetActiveModeSetBncFilterReq pMsg;
                                        pMsg = vos_mem_malloc(sizeof(tSirSetActiveModeSetBncFilterReq));
+                                       if (!pMsg) {
+                                           smsLog(pMac, LOGE,
+                                               FL("Failed to allocate memory"));
+                                           return;
+                                       }
                                        pMsg->messageType = pal_cpu_to_be16((tANI_U16)eWNI_SME_SET_BCN_FILTER_REQ);
                                        pMsg->length = pal_cpu_to_be16(sizeof(
                                            tSirSetActiveModeSetBncFilterReq));
@@ -15142,6 +15151,10 @@ eHalStatus csrSendAssocIndToUpperLayerCnfMsg(   tpAniSirGlobal pMac,
         pBuf += sizeof (tANI_U8);
         vos_mem_copy((void *)pBuf, &pAssocInd->chan_info,
                         sizeof(tSirSmeChanInfo));
+
+        pBuf += sizeof(tSirSmeChanInfo);
+        *pBuf = pAssocInd->ecsa_capable;
+
         msgQ.type = eWNI_SME_UPPER_LAYER_ASSOC_CNF;
         msgQ.bodyptr = pMsg;
         msgQ.bodyval = 0;
@@ -19081,6 +19094,7 @@ void csrRoamFTPreAuthRspProcessor( tHalHandle hHal, tpSirFTPreAuthRsp pFTPreAuth
    eCsrAuthType conn_Auth_type;
    tANI_U32     sessionId = pFTPreAuthRsp->smeSessionId;
    tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
+   tDot11fAuthentication *pAuth = NULL;
 
    if (NULL == pSession)
    {
@@ -19187,6 +19201,22 @@ void csrRoamFTPreAuthRspProcessor( tHalHandle hHal, tpSirFTPreAuthRsp pFTPreAuth
          pSession->ftSmeContext.reassoc_ft_ies_length = 0;
          pSession->ftSmeContext.reassoc_ft_ies = NULL;
       }
+
+      pAuth = (tDot11fAuthentication *) vos_mem_malloc(sizeof(tDot11fAuthentication));
+      if(pAuth == NULL)
+         return;
+
+      status = dot11fUnpackAuthentication(pMac, pFTPreAuthRsp->ft_ies,
+                  pFTPreAuthRsp->ft_ies_length, pAuth);
+      if (DOT11F_FAILED(status))
+      {
+         smsLog( pMac, LOGE, FL("Failed to parse an Authentication frame"));
+      }
+      else if (pAuth->MobilityDomain.present)
+      {
+         pSession->ftSmeContext.addMDIE = TRUE;
+      }
+      vos_mem_free(pAuth);
 
       if (!ft_ies_length)
          return;
@@ -19717,6 +19747,9 @@ csrRoamSendChanSwIERequest(tpAniSirGlobal pMac, tCsrBssid bssid,
     vos_mem_copy(pMsg->bssid, bssid, VOS_MAC_ADDR_SIZE);
     pMsg->ch_bandwidth = ch_bandwidth;
     pMsg->sub20_channelwidth = pMac->sap.SapDfsInfo.new_sub20_channelwidth;
+    pMsg->ch_switch_beacon_cnt = pMac->sap.SapDfsInfo.sap_ch_switch_beacon_cnt;
+    pMsg->ch_switch_mode = pMac->sap.SapDfsInfo.sap_ch_switch_mode;
+    pMsg->dfs_ch_switch_disable = pMac->sap.SapDfsInfo.disable_dfs_ch_switch;
 
     status = palSendMBMessage(pMac->hHdd, pMsg);
 
