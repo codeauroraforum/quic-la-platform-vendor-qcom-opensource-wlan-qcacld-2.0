@@ -80,6 +80,17 @@
 #define SOFTAP_MAX_COUNT        (60)
 #define SOFTAP_RSSI_WEIGHT      (20)
 #define SOFTAP_COUNT_WEIGHT     (20)
+#define SOFTAP_MIN_NF           (-120)
+#define SOFTAP_MAX_NF           (-60)
+#define SOFTAP_MIN_CHNFREE              (0)
+#define SOFTAP_MAX_CHNFREE              (1)
+#define SOFTAP_MIN_TXPWR                (0)
+#define SOFTAP_MAX_TXPWR                (63)
+
+#define SOFTAP_NF_WEIGHT                (20)
+#define SOFTAP_CHNFREE_WEIGHT           (20)
+#define SOFTAP_TXPWR_WEIGHT             (20)
+
 
 #define SAP_DEFAULT_24GHZ_CHANNEL     (6)
 #define SAP_DEFAULT_5GHZ_CHANNEL      (40)

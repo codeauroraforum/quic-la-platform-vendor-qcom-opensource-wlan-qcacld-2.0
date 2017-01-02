@@ -527,6 +527,7 @@ typedef struct sAniSirLim
     tANI_U8 abortScan;
     tLimScanChnInfo scanChnInfo;
 
+    struct lim_scan_channel_status scan_channel_status;
     //////////////////////////////////////     SCAN/LEARN RELATED START ///////////////////////////////////////////
     tSirMacAddr         gSelfMacAddr;   //added for BT-AMP Support
 

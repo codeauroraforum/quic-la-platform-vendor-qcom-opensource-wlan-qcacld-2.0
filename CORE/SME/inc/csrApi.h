@@ -1965,4 +1965,8 @@ typedef void (*csr_mib_stats_callback)
  */
 typedef void (*tcsr_fw_state_callback)(void *context);
 void csr_packetdump_timer_stop(void);
+struct lim_channel_status *csr_get_channel_status(
+       void *p_mac, uint32_t channel_id);
+void csr_clear_channel_status(void *p_mac);
+
 #endif
