@@ -265,6 +265,24 @@ typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
 #define MAX_PROBE_REQ_OUIS 16
 
+#define SCAN_REJECT_THRESHOLD_TIME 300000 /* Time is in msec, equal to 5 mins */
+
+/*
+ * @eHDD_SCAN_REJECT_DEFAULT: default value
+ * @eHDD_CONNECTION_IN_PROGRESS: connection is in progress
+ * @eHDD_REASSOC_IN_PROGRESS: reassociation is in progress
+ * @eHDD_EAPOL_IN_PROGRESS: STA/P2P-CLI is in middle of EAPOL/WPS exchange
+ * @eHDD_SAP_EAPOL_IN_PROGRESS: SAP/P2P-GO is in middle of EAPOL/WPS exchange
+ */
+typedef enum
+{
+   eHDD_SCAN_REJECT_DEFAULT = 0,
+   eHDD_CONNECTION_IN_PROGRESS,
+   eHDD_REASSOC_IN_PROGRESS,
+   eHDD_EAPOL_IN_PROGRESS,
+   eHDD_SAP_EAPOL_IN_PROGRESS,
+} scan_reject_states;
+
 /*
  * Generic asynchronous request/response support
  *
@@ -316,7 +334,7 @@ struct linkspeedContext
 extern spinlock_t hdd_context_lock;
 
 #define STATS_CONTEXT_MAGIC 0x53544154   //STAT
-#define RSSI_CONTEXT_MAGIC  0x52535349   //RSSI
+#define PEER_INFO_CONTEXT_MAGIC  0x52535349   /* PEER_INFO */
 #define POWER_CONTEXT_MAGIC 0x504F5752   //POWR
 #define SNR_CONTEXT_MAGIC   0x534E5200   //SNR
 #define LINK_CONTEXT_MAGIC  0x4C494E4B   //LINKSPEED
@@ -837,6 +855,66 @@ typedef struct {
    uint8_t   sub20_dynamic_channelwidth;
    /** Extended CSA capabilities */
    uint8_t   ecsa_capable;
+
+   /** Max phy rate */
+   uint32_t max_phy_rate;
+
+   /** Tx packets */
+   uint32_t tx_packets;
+
+   /** Tx bytes */
+   uint64_t tx_bytes;
+
+   /** Rx packets */
+   uint32_t rx_packets;
+
+   /** Rx bytes */
+   uint64_t rx_bytes;
+
+   /** Last tx/rx timestamp */
+   adf_os_time_t last_tx_rx_ts;
+
+   /** Assoc timestamp */
+   adf_os_time_t assoc_ts;
+
+   /** Tx Rate */
+   uint32_t tx_rate;
+
+   /** Rx Rate */
+   uint32_t rx_rate;
+
+   /** Ampdu */
+   bool ampdu;
+
+   /** Short GI */
+   bool sgi_enable;
+
+   /** Tx stbc */
+   bool tx_stbc;
+
+   /** Rx stbc */
+   bool rx_stbc;
+
+   /** Channel Width */
+   uint8_t ch_width;
+
+   /** Mode */
+   uint8_t mode;
+
+   /** Max supported idx */
+   uint8_t max_supp_idx;
+
+   /** Max extended idx */
+   uint8_t max_ext_idx;
+
+   /** HT max mcs idx */
+   uint8_t max_mcs_idx;
+
+   /** VHT rx mcs map */
+   uint8_t rx_mcs_map;
+
+   /** VHT tx mcs map */
+   uint8_t tx_mcs_map;
 } hdd_station_info_t;
 
 struct hdd_ap_ctx_s
@@ -1918,6 +1996,9 @@ struct hdd_context_s
 
     uint32_t no_of_probe_req_ouis;
     struct vendor_oui *probe_req_voui;
+    v_U8_t last_scan_reject_session_id;
+    scan_reject_states last_scan_reject_reason;
+    v_TIME_t last_scan_reject_timestamp;
 };
 
 /*---------------------------------------------------------------------------
@@ -2018,7 +2099,8 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
 v_BOOL_t hdd_is_valid_mac_address(const tANI_U8* pMacAddr);
 VOS_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
 void hdd_ipv4_notifier_work_queue(struct work_struct *work);
-bool hdd_isConnectionInProgress(hdd_context_t *pHddCtx);
+bool hdd_isConnectionInProgress(hdd_context_t *pHddCtx, v_U8_t *session_id,
+				scan_reject_states *reason);
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 int wlan_hdd_setIPv6Filter(hdd_context_t *pHddCtx, tANI_U8 filterType, tANI_U8 sessionId);
 #endif
