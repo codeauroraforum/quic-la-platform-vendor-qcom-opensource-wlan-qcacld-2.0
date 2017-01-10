@@ -1995,7 +1995,7 @@ void hdd_unsafe_channel_restart_sap(hdd_context_t *hdd_ctx);
 	defined (FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE)
 void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter);
 #else
-static inline void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
+static inline void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter);
 {
 }
 #endif
