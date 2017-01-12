@@ -8051,6 +8051,9 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 		return -EINVAL;
 	}
 	sap_config->acs_cfg.acs_mode = true;
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+	if (is_auto_channel_select(WLAN_HDD_GET_SAP_CTX_PTR(adapter)))
+#endif
 	set_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 
 	return 0;
@@ -11045,6 +11048,7 @@ uint8_t hdd_get_sap_operating_channel(hdd_context_t *hdd_ctx) {
 		else sap_operating_band = eCSR_BAND_ALL;
 		status = hdd_get_next_adapter(hdd_ctx, adapter_node,
 				&next);
+		adapter_node = next;
 	}
 	return sap_operating_band;
 }
