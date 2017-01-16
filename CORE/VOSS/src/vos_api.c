@@ -2657,6 +2657,26 @@ uint8_t vos_is_multicast_logging(void)
 }
 
 /*
+ * vos_reset_log_completion() - Reset log param structure
+ *@vos_context: Pointer to global vos context
+ *
+ * This function is used to reset the logging related
+ * parameters to default.
+ *
+ * Return: None
+ */
+void vos_reset_log_completion(VosContextType *vos_context)
+{
+	/* Vos Context is validated by the caller */
+	vos_spin_lock_acquire(&vos_context->bug_report_lock);
+	vos_context->log_complete.indicator = WLAN_LOG_INDICATOR_UNUSED;
+	vos_context->log_complete.is_fatal = WLAN_LOG_TYPE_NON_FATAL;
+	vos_context->log_complete.is_report_in_progress = false;
+	vos_context->log_complete.reason_code = WLAN_LOG_REASON_CODE_UNUSED;
+	vos_spin_lock_release(&vos_context->bug_report_lock);
+}
+
+/*
  * vos_init_log_completion() - Initialize log param structure
  *
  * This function is used to initialize the logging related
@@ -2679,9 +2699,7 @@ void vos_init_log_completion(void)
 	vos_context->log_complete.indicator = WLAN_LOG_INDICATOR_UNUSED;
 	vos_context->log_complete.reason_code = WLAN_LOG_REASON_CODE_UNUSED;
 	vos_context->log_complete.is_report_in_progress = false;
-	/* Attempting to initialize an already initialized lock
-	 * results in a failure. This must be ok here.
-	 */
+
 	vos_spin_lock_init(&vos_context->bug_report_lock);
 }
 
@@ -2774,17 +2792,15 @@ void vos_get_log_and_reset_completion(uint32_t *is_fatal,
 	if ((WLAN_LOG_INDICATOR_HOST_DRIVER == *indicator) &&
 	    ((WLAN_LOG_REASON_SME_OUT_OF_CMD_BUF == *reason_code) ||
 		 (WLAN_LOG_REASON_SME_COMMAND_STUCK == *reason_code) ||
-		 (WLAN_LOG_REASON_STALE_SESSION_FOUND == *reason_code)))
+		 (WLAN_LOG_REASON_STALE_SESSION_FOUND == *reason_code) ||
+		 (WLAN_LOG_REASON_SCAN_NOT_ALLOWED == *reason_code)))
 		*is_ssr_needed = true;
 	else
 		*is_ssr_needed = false;
 
-	/* reset */
-	vos_context->log_complete.indicator = WLAN_LOG_INDICATOR_UNUSED;
-	vos_context->log_complete.is_fatal = WLAN_LOG_TYPE_NON_FATAL;
-	vos_context->log_complete.is_report_in_progress = false;
-	vos_context->log_complete.reason_code = WLAN_LOG_REASON_CODE_UNUSED;
 	vos_spin_lock_release(&vos_context->bug_report_lock);
+
+	vos_reset_log_completion(vos_context);
 }
 
 /**
@@ -2951,7 +2967,7 @@ VOS_STATUS vos_flush_logs(uint32_t is_fatal,
 	if (0 != ret) {
 		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
 			"%s: Failed to send flush FW log", __func__);
-		vos_init_log_completion();
+		vos_reset_log_completion(vos_context);
 		return VOS_STATUS_E_FAILURE;
 	}
 

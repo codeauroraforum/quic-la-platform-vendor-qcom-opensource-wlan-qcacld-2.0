@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -265,6 +265,24 @@ typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
 #define MAX_PROBE_REQ_OUIS 16
 
+#define SCAN_REJECT_THRESHOLD_TIME 300000 /* Time is in msec, equal to 5 mins */
+
+/*
+ * @eHDD_SCAN_REJECT_DEFAULT: default value
+ * @eHDD_CONNECTION_IN_PROGRESS: connection is in progress
+ * @eHDD_REASSOC_IN_PROGRESS: reassociation is in progress
+ * @eHDD_EAPOL_IN_PROGRESS: STA/P2P-CLI is in middle of EAPOL/WPS exchange
+ * @eHDD_SAP_EAPOL_IN_PROGRESS: SAP/P2P-GO is in middle of EAPOL/WPS exchange
+ */
+typedef enum
+{
+   eHDD_SCAN_REJECT_DEFAULT = 0,
+   eHDD_CONNECTION_IN_PROGRESS,
+   eHDD_REASSOC_IN_PROGRESS,
+   eHDD_EAPOL_IN_PROGRESS,
+   eHDD_SAP_EAPOL_IN_PROGRESS,
+} scan_reject_states;
+
 /*
  * Generic asynchronous request/response support
  *
@@ -316,7 +334,7 @@ struct linkspeedContext
 extern spinlock_t hdd_context_lock;
 
 #define STATS_CONTEXT_MAGIC 0x53544154   //STAT
-#define RSSI_CONTEXT_MAGIC  0x52535349   //RSSI
+#define PEER_INFO_CONTEXT_MAGIC  0x52535349   /* PEER_INFO */
 #define POWER_CONTEXT_MAGIC 0x504F5752   //POWR
 #define SNR_CONTEXT_MAGIC   0x534E5200   //SNR
 #define LINK_CONTEXT_MAGIC  0x4C494E4B   //LINKSPEED
@@ -776,6 +794,20 @@ typedef struct hdd_hostapd_state_s
 
 } hdd_hostapd_state_t;
 
+/**
+ * enum bss_stop_reason - reasons why a BSS is stopped.
+ * @BSS_STOP_REASON_INVALID: no reason specified explicitly.
+ * @BSS_STOP_DUE_TO_MCC_SCC_SWITCH: BSS stopped due to host
+ *  driver is trying to switch AP role to a different channel
+ *  to maintain SCC mode with the STA role on the same card.
+ *  this usually happens when STA is connected to an external
+ *  AP that runs on a different channel
+ */
+enum bss_stop_reason
+{
+	BSS_STOP_REASON_INVALID = 0,
+	BSS_STOP_DUE_TO_MCC_SCC_SWITCH = 1,
+};
 
 /*
  * Per station structure kept in HDD for multiple station support for SoftAP
@@ -823,6 +855,66 @@ typedef struct {
    uint8_t   sub20_dynamic_channelwidth;
    /** Extended CSA capabilities */
    uint8_t   ecsa_capable;
+
+   /** Max phy rate */
+   uint32_t max_phy_rate;
+
+   /** Tx packets */
+   uint32_t tx_packets;
+
+   /** Tx bytes */
+   uint64_t tx_bytes;
+
+   /** Rx packets */
+   uint32_t rx_packets;
+
+   /** Rx bytes */
+   uint64_t rx_bytes;
+
+   /** Last tx/rx timestamp */
+   adf_os_time_t last_tx_rx_ts;
+
+   /** Assoc timestamp */
+   adf_os_time_t assoc_ts;
+
+   /** Tx Rate */
+   uint32_t tx_rate;
+
+   /** Rx Rate */
+   uint32_t rx_rate;
+
+   /** Ampdu */
+   bool ampdu;
+
+   /** Short GI */
+   bool sgi_enable;
+
+   /** Tx stbc */
+   bool tx_stbc;
+
+   /** Rx stbc */
+   bool rx_stbc;
+
+   /** Channel Width */
+   uint8_t ch_width;
+
+   /** Mode */
+   uint8_t mode;
+
+   /** Max supported idx */
+   uint8_t max_supp_idx;
+
+   /** Max extended idx */
+   uint8_t max_ext_idx;
+
+   /** HT max mcs idx */
+   uint8_t max_mcs_idx;
+
+   /** VHT rx mcs map */
+   uint8_t rx_mcs_map;
+
+   /** VHT tx mcs map */
+   uint8_t tx_mcs_map;
 } hdd_station_info_t;
 
 struct hdd_ap_ctx_s
@@ -875,6 +967,7 @@ struct hdd_ap_ctx_s
    v_PVOID_t sapContext;
 #endif
    v_BOOL_t dfs_cac_block_tx;
+   enum bss_stop_reason bss_stop_reason;
 };
 
 typedef struct hdd_scaninfo_s
@@ -1903,6 +1996,9 @@ struct hdd_context_s
 
     uint32_t no_of_probe_req_ouis;
     struct vendor_oui *probe_req_voui;
+    v_U8_t last_scan_reject_session_id;
+    scan_reject_states last_scan_reject_reason;
+    v_TIME_t last_scan_reject_timestamp;
 };
 
 /*---------------------------------------------------------------------------
@@ -2003,7 +2099,8 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
 v_BOOL_t hdd_is_valid_mac_address(const tANI_U8* pMacAddr);
 VOS_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
 void hdd_ipv4_notifier_work_queue(struct work_struct *work);
-bool hdd_isConnectionInProgress(hdd_context_t *pHddCtx);
+bool hdd_isConnectionInProgress(hdd_context_t *pHddCtx, v_U8_t *session_id,
+				scan_reject_states *reason);
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 int wlan_hdd_setIPv6Filter(hdd_context_t *pHddCtx, tANI_U8 filterType, tANI_U8 sessionId);
 #endif
@@ -2092,10 +2189,6 @@ static inline int hdd_wlan_enable_egap(struct hdd_context_s *hdd_ctx) {
 void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx);
 #endif
 
-#ifdef WLAN_FEATURE_LINK_LAYER_STATS
-void wlan_hdd_cfg80211_link_layer_stats_init(hdd_context_t *pHddCtx);
-#endif
-
 void hdd_update_macaddr(hdd_config_t *cfg_ini, v_MACADDR_t hw_macaddr);
 #if defined(FEATURE_WLAN_LFR) && defined(WLAN_FEATURE_ROAM_SCAN_OFFLOAD)
 void wlan_hdd_disable_roaming(hdd_adapter_t *pAdapter);
@@ -2142,16 +2235,77 @@ static inline void hdd_init_ll_stats_ctx(hdd_context_t *hdd_ctx)
 
 	return;
 }
+
+/**
+ * wlan_hdd_cfg80211_link_layer_stats_init() - Initialize llstats callbacks
+ * @pHddCtx: HDD context
+ *
+ * Return: none
+ */
+void wlan_hdd_cfg80211_link_layer_stats_init(hdd_context_t *pHddCtx);
+
 #else
 static inline bool hdd_link_layer_stats_supported(void)
 {
 	return false;
 }
+
 static inline void hdd_init_ll_stats_ctx(hdd_context_t *hdd_ctx)
 {
 	return;
 }
+
+void wlan_hdd_cfg80211_link_layer_stats_init(hdd_context_t *pHddCtx)
+{
+	return;
+}
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+
+#ifdef FEATURE_WLAN_LFR
+static inline bool hdd_driver_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return hdd_ctx->cfg_ini->isFastRoamIniFeatureEnabled;
+}
+#else
+static inline bool hdd_driver_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return false;
+}
+#endif
+
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+static inline bool hdd_firmware_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return hdd_ctx->cfg_ini->isRoamOffloadScanEnabled;
+}
+#else
+static inline bool hdd_firmware_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return false;
+}
+#endif
+
+static inline bool hdd_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	bool val;
+
+	val = hdd_driver_roaming_supported(hdd_ctx) ||
+		hdd_firmware_roaming_supported(hdd_ctx);
+
+	return val;
+}
+
+#ifdef CFG80211_SCAN_RANDOM_MAC_ADDR
+static inline bool hdd_scan_random_mac_addr_supported(void)
+{
+	return true;
+}
+#else
+static inline bool hdd_scan_random_mac_addr_supported(void)
+{
+	return false;
+}
+#endif
 
 void hdd_get_fw_version(hdd_context_t *hdd_ctx,
 			uint32_t *major_spid, uint32_t *minor_spid,
@@ -2197,6 +2351,11 @@ wlan_hdd_clean_tx_flow_control_timer(hdd_context_t *hddctx,
 {
 }
 #endif
+
+struct cfg80211_bss *hdd_cfg80211_get_bss(struct wiphy *wiphy,
+	struct ieee80211_channel *channel,
+	const u8 *bssid,
+	const u8 *ssid, size_t ssid_len);
 
 void hdd_connect_result(struct net_device *dev, const u8 *bssid,
 			tCsrRoamInfo *roam_info, const u8 *req_ie,

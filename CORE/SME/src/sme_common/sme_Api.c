@@ -3214,10 +3214,10 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                    vos_mem_free(pMsg->bodyptr);
                }
                break;
-          case eWNI_SME_GET_RSSI_IND:
-               if (pMac->sme.pget_rssi_ind_cb)
-                   pMac->sme.pget_rssi_ind_cb(pMsg->bodyptr,
-                                            pMac->sme.pget_rssi_cb_context);
+          case eWNI_SME_GET_PEER_INFO_IND:
+               if (pMac->sme.pget_peer_info_ind_cb)
+                   pMac->sme.pget_peer_info_ind_cb(pMsg->bodyptr,
+                                        pMac->sme.pget_peer_info_cb_context);
                vos_mem_free(pMsg->bodyptr);
                break;
           case eWNI_SME_CSA_OFFLOAD_EVENT:
@@ -6803,6 +6803,7 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
             sme_ReleaseGlobalLock( &pMac->sme );
             return eHAL_STATUS_FAILURE;
         }
+        pSession->dhcp_done = false;
 
         pMsg = (tAniDHCPInd*)vos_mem_malloc(sizeof(tAniDHCPInd));
         if (NULL == pMsg)
@@ -6875,6 +6876,7 @@ eHalStatus sme_DHCPStopInd( tHalHandle hHal,
             sme_ReleaseGlobalLock( &pMac->sme );
             return eHAL_STATUS_FAILURE;
         }
+        pSession->dhcp_done = false;
 
         pMsg = (tAniDHCPInd*)vos_mem_malloc(sizeof(tAniDHCPInd));
         if (NULL == pMsg)
@@ -12524,19 +12526,19 @@ eHalStatus sme_GetLinkSpeed(tHalHandle hHal, tSirLinkSpeedInfo *lsReq, void *pls
 
 
 /**
- * sme_get_rssi() - get station's rssi
+ * sme_get_peer_info() - get station's info
  * @hal: hal interface
- * @req: get rssi request information
+ * @req: get peer info request information
  * @context: event handle context
  * @pcallbackfn: callback function pointer
  *
- * This function will send WDA_GET_RSSI to WMA
+ * This function will send WDA_GET_PEER_INFO to WMA
  *
  * Return: 0 on success, otherwise error value
  */
-eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
+eHalStatus sme_get_peer_info(tHalHandle hal, struct sir_peer_info_req req,
 			void *context,
-			void (*callbackfn)(struct sir_rssi_resp *param,
+			void (*callbackfn)(struct sir_peer_info_resp *param,
 						void *pcontext))
 {
 
@@ -12555,8 +12557,8 @@ eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
 			return eHAL_STATUS_FAILURE;
 		}
 
-		mac->sme.pget_rssi_ind_cb = callbackfn;
-		mac->sme.pget_rssi_cb_context = context;
+		mac->sme.pget_peer_info_ind_cb = callbackfn;
+		mac->sme.pget_peer_info_cb_context = context;
 
 		/* serialize the req through MC thread */
 		vosmessage.bodyptr = vos_mem_malloc(sizeof(req));
@@ -12567,11 +12569,11 @@ eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
 			return eHAL_STATUS_E_MALLOC_FAILED;
 		}
 		vos_mem_copy(vosmessage.bodyptr, &req, sizeof(req));
-		vosmessage.type    = WDA_GET_RSSI;
+		vosmessage.type    = WDA_GET_PEER_INFO;
 		vosstatus = vos_mq_post_message(VOS_MQ_ID_WDA, &vosmessage);
 		if (!VOS_IS_STATUS_SUCCESS(vosstatus)) {
 			VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-				"%s: Post get rssi msg fail", __func__);
+				"%s: Post get peer info msg fail", __func__);
 			vos_mem_free(vosmessage.bodyptr);
 			status = eHAL_STATUS_FAILURE;
 		}
@@ -15966,52 +15968,6 @@ eHalStatus sme_ResetBssHotlist (tHalHandle hHal,
     return status;
 }
 
-/**
- * sme_set_ssid_hotlist() - Set the SSID hotlist
- * @hal: SME handle
- * @request: set ssid hotlist request
- *
- * Return: eHalStatus
- */
-eHalStatus
-sme_set_ssid_hotlist(tHalHandle hal,
-		     struct sir_set_ssid_hotlist_request *request)
-{
-	eHalStatus status;
-	VOS_STATUS vstatus;
-	tpAniSirGlobal mac = PMAC_STRUCT(hal);
-	vos_msg_t vos_message;
-	struct sir_set_ssid_hotlist_request *set_req;
-
-	set_req = vos_mem_malloc(sizeof(*set_req));
-	if (!set_req) {
-		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-			  "%s: Not able to allocate memory for WDA_EXTSCAN_SET_SSID_HOTLIST_REQ",
-			  __func__);
-		return eHAL_STATUS_FAILURE;
-	}
-
-	*set_req = *request;
-	status = sme_AcquireGlobalLock(&mac->sme);
-	if (eHAL_STATUS_SUCCESS == status) {
-		/* Serialize the req through MC thread */
-		vos_message.bodyptr = set_req;
-		vos_message.type    = WDA_EXTSCAN_SET_SSID_HOTLIST_REQ;
-		vstatus = vos_mq_post_message(VOS_MQ_ID_WDA, &vos_message);
-		sme_ReleaseGlobalLock(&mac->sme);
-		if (!VOS_IS_STATUS_SUCCESS(vstatus)) {
-			vos_mem_free(set_req);
-			status = eHAL_STATUS_FAILURE;
-		}
-	} else {
-		VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-			  "%s: sme_AcquireGlobalLock error", __func__);
-		vos_mem_free(set_req);
-		status = eHAL_STATUS_FAILURE;
-	}
-	return status;
-}
-
 /* ---------------------------------------------------------------------------
     \fn sme_SetSignificantChange
     \brief  SME API to set significant change
@@ -18051,7 +18007,7 @@ uint8_t sme_is_any_session_in_connected_state(tHalHandle h_hal)
  */
 eHalStatus vos_send_flush_logs_cmd_to_fw(tpAniSirGlobal mac)
 {
-	eHalStatus status;
+	eHalStatus status = eHAL_STATUS_SUCCESS;
 	VOS_STATUS vos_status;
 	vos_msg_t vos_message;
 
