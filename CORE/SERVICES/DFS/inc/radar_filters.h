@@ -132,8 +132,10 @@ struct dfs_bin5pulse dfs_fcc_bin5pulses[] = {
 };
 
 struct dfs_bin5pulse dfs_jpn_bin5pulses[] = {
-        {5, 28, 105, 12, 22, 5},
+        /*{5, 28, 105, 12, 22, 5},*/
+        {5, 28, 105, 12, 16, 5},
 };
+
 struct dfs_pulse dfs_etsi_radars[] = {
 
     /* TYPE staggered pulse */
