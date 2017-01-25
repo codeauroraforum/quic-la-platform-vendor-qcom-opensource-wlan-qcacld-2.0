@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1080,6 +1080,7 @@ sme_process_cmd:
                                         &pCommand->Link, LL_ACCESS_LOCK)) {
                                csrReleaseCommand(pMac, pCommand);
                             }
+                            pMac->max_power_cmd_pending = false;
                             break;
                         case eSmeCommandSetMaxTxPowerPerBand:
                             csrLLUnlock(&pMac->sme.smeCmdActiveList);
@@ -1092,6 +1093,7 @@ sme_process_cmd:
                                         &pCommand->Link, LL_ACCESS_LOCK)) {
                                csrReleaseCommand(pMac, pCommand);
                             }
+                            pMac->max_power_cmd_pending = false;
                             break;
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -3214,10 +3216,10 @@ eHalStatus sme_ProcessMsg(tHalHandle hHal, vos_msg_t* pMsg)
                    vos_mem_free(pMsg->bodyptr);
                }
                break;
-          case eWNI_SME_GET_RSSI_IND:
-               if (pMac->sme.pget_rssi_ind_cb)
-                   pMac->sme.pget_rssi_ind_cb(pMsg->bodyptr,
-                                            pMac->sme.pget_rssi_cb_context);
+          case eWNI_SME_GET_PEER_INFO_IND:
+               if (pMac->sme.pget_peer_info_ind_cb)
+                   pMac->sme.pget_peer_info_ind_cb(pMsg->bodyptr,
+                                        pMac->sme.pget_peer_info_cb_context);
                vos_mem_free(pMsg->bodyptr);
                break;
           case eWNI_SME_CSA_OFFLOAD_EVENT:
@@ -6803,6 +6805,7 @@ eHalStatus sme_DHCPStartInd( tHalHandle hHal,
             sme_ReleaseGlobalLock( &pMac->sme );
             return eHAL_STATUS_FAILURE;
         }
+        pSession->dhcp_done = false;
 
         pMsg = (tAniDHCPInd*)vos_mem_malloc(sizeof(tAniDHCPInd));
         if (NULL == pMsg)
@@ -6875,6 +6878,7 @@ eHalStatus sme_DHCPStopInd( tHalHandle hHal,
             sme_ReleaseGlobalLock( &pMac->sme );
             return eHAL_STATUS_FAILURE;
         }
+        pSession->dhcp_done = false;
 
         pMsg = (tAniDHCPInd*)vos_mem_malloc(sizeof(tAniDHCPInd));
         if (NULL == pMsg)
@@ -9764,6 +9768,12 @@ eHalStatus sme_SetMaxTxPowerPerBand(eCsrBand band, v_S7_t dB,
 	tSmeCmd *set_max_tx_pwr_per_band;
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
 
+        if (mac_ctx->max_power_cmd_pending) {
+           smsLog(mac_ctx, LOG1,
+                 FL("set max tx power already in progress"));
+           return eHAL_STATUS_RESOURCES;
+        }
+
 	smsLog(mac_ctx, LOG1,
 		  FL("band : %d power %d dB"),
 		  band, dB);
@@ -9781,6 +9791,7 @@ eHalStatus sme_SetMaxTxPowerPerBand(eCsrBand band, v_S7_t dB,
 				set_tx_max_pwr_per_band.band = band;
 			set_max_tx_pwr_per_band->u.
 				set_tx_max_pwr_per_band.power = dB;
+                        mac_ctx->max_power_cmd_pending = true;
 			status = csrQueueSmeCommand(mac_ctx,
 						set_max_tx_pwr_per_band,
 						eANI_BOOLEAN_TRUE);
@@ -9790,6 +9801,7 @@ eHalStatus sme_SetMaxTxPowerPerBand(eCsrBand band, v_S7_t dB,
 						status);
 				csrReleaseCommand(mac_ctx,
 						set_max_tx_pwr_per_band);
+                                mac_ctx->max_power_cmd_pending = false;
 			}
 		} else {
 			smsLog(mac_ctx, LOGE,
@@ -9821,6 +9833,12 @@ eHalStatus sme_SetMaxTxPower(tHalHandle hHal, tSirMacAddr bssid,
 	eHalStatus status = eHAL_STATUS_SUCCESS;
 	tSmeCmd *set_max_tx_pwr;
 
+        if (mac_ptr->max_power_cmd_pending) {
+           smsLog(mac_ptr, LOG1,
+                 FL("set max tx power already in progress"));
+           return eHAL_STATUS_RESOURCES;
+        }
+
 	MTRACE(vos_trace(VOS_MODULE_ID_SME,
 		TRACE_CODE_SME_RX_HDD_SET_MAXTXPOW, NO_SESSION, 0));
 	smsLog(mac_ptr, LOG1,
@@ -9837,6 +9855,7 @@ eHalStatus sme_SetMaxTxPower(tHalHandle hHal, tSirMacAddr bssid,
 			vos_mem_copy(set_max_tx_pwr->u.set_tx_max_pwr.self_sta_mac_addr,
 				self_mac_addr, SIR_MAC_ADDR_LENGTH);
 			set_max_tx_pwr->u.set_tx_max_pwr.power = db;
+                        mac_ptr->max_power_cmd_pending = true;
 			status = csrQueueSmeCommand(mac_ptr, set_max_tx_pwr,
 							eANI_BOOLEAN_TRUE);
 			if (!HAL_STATUS_SUCCESS(status)) {
@@ -9844,6 +9863,7 @@ eHalStatus sme_SetMaxTxPower(tHalHandle hHal, tSirMacAddr bssid,
 					FL("fail to send msg status = %d"),
 									status);
 				csrReleaseCommandScan(mac_ptr, set_max_tx_pwr);
+                                mac_ptr->max_power_cmd_pending = false;
 			}
 		}
 		else
@@ -12524,19 +12544,19 @@ eHalStatus sme_GetLinkSpeed(tHalHandle hHal, tSirLinkSpeedInfo *lsReq, void *pls
 
 
 /**
- * sme_get_rssi() - get station's rssi
+ * sme_get_peer_info() - get station's info
  * @hal: hal interface
- * @req: get rssi request information
+ * @req: get peer info request information
  * @context: event handle context
  * @pcallbackfn: callback function pointer
  *
- * This function will send WDA_GET_RSSI to WMA
+ * This function will send WDA_GET_PEER_INFO to WMA
  *
  * Return: 0 on success, otherwise error value
  */
-eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
+eHalStatus sme_get_peer_info(tHalHandle hal, struct sir_peer_info_req req,
 			void *context,
-			void (*callbackfn)(struct sir_rssi_resp *param,
+			void (*callbackfn)(struct sir_peer_info_resp *param,
 						void *pcontext))
 {
 
@@ -12555,8 +12575,8 @@ eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
 			return eHAL_STATUS_FAILURE;
 		}
 
-		mac->sme.pget_rssi_ind_cb = callbackfn;
-		mac->sme.pget_rssi_cb_context = context;
+		mac->sme.pget_peer_info_ind_cb = callbackfn;
+		mac->sme.pget_peer_info_cb_context = context;
 
 		/* serialize the req through MC thread */
 		vosmessage.bodyptr = vos_mem_malloc(sizeof(req));
@@ -12567,11 +12587,11 @@ eHalStatus sme_get_rssi(tHalHandle hal, struct sir_rssi_req req,
 			return eHAL_STATUS_E_MALLOC_FAILED;
 		}
 		vos_mem_copy(vosmessage.bodyptr, &req, sizeof(req));
-		vosmessage.type    = WDA_GET_RSSI;
+		vosmessage.type    = WDA_GET_PEER_INFO;
 		vosstatus = vos_mq_post_message(VOS_MQ_ID_WDA, &vosmessage);
 		if (!VOS_IS_STATUS_SUCCESS(vosstatus)) {
 			VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-				"%s: Post get rssi msg fail", __func__);
+				"%s: Post get peer info msg fail", __func__);
 			vos_mem_free(vosmessage.bodyptr);
 			status = eHAL_STATUS_FAILURE;
 		}

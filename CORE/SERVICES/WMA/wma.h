@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -467,8 +467,10 @@ typedef struct {
 	u_int32_t txpow5g;
 	u_int32_t burst_enable;
 	u_int32_t burst_dur;
-	u_int32_t chainmask_2g;
-	u_int32_t chainmask_5g;
+	u_int32_t chainmask_2g_tx;
+	u_int32_t chainmask_5g_tx;
+	u_int32_t chainmask_2g_rx;
+	u_int32_t chainmask_5g_rx;
 } pdev_cli_config_t;
 
 typedef struct {
@@ -802,7 +804,7 @@ typedef struct wma_handle {
 	v_BOOL_t ptrn_match_enable_all_vdev;
 	void* pGetRssiReq;
 	v_S7_t first_rssi;
-	bool get_sta_rssi;
+	bool get_sta_peer_info;
 	v_MACADDR_t peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
         v_BOOL_t  roam_offload_enabled;
@@ -1873,4 +1875,10 @@ VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 WLAN_PHY_MODE wma_chan_to_mode(uint8_t chan, ePhyChanBondState chan_offset,
 		uint8_t vht_capable, uint8_t dot11_mode);
 
+#define RESET_BEACON_INTERVAL_TIMEOUT 200
+struct wma_beacon_interval_reset_req {
+	vos_timer_t event_timeout;
+	uint8_t vdev_id;
+	uint16_t interval;
+};
 #endif

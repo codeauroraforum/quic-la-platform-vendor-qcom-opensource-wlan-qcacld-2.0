@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1253,6 +1253,13 @@ typedef struct sSirSmeChanInfo
     /* sub20 channelwidth */
     uint32_t sub20_channelwidth;
 } tSirSmeChanInfo, *tpSirSmeChanInfo;
+
+enum sir_sme_phy_mode {
+	SIR_SME_PHY_MODE_LEGACY = 0,
+	SIR_SME_PHY_MODE_HT = 1,
+	SIR_SME_PHY_MODE_VHT = 2
+};
+
 /// Definition for Association indication from peer
 /// MAC --->
 typedef struct sSirSmeAssocInd
@@ -1290,6 +1297,17 @@ typedef struct sSirSmeAssocInd
     tSirSmeChanInfo      chan_info;
     /* Extended CSA capability of station */
     uint8_t              ecsa_capable;
+    bool                 ampdu;
+    bool                 sgi_enable;
+    bool                 tx_stbc;
+    bool                 rx_stbc;
+    tSirMacHTChannelWidth ch_width;
+    enum sir_sme_phy_mode mode;
+    uint8_t              max_supp_idx;
+    uint8_t              max_ext_idx;
+    uint8_t              max_mcs_idx;
+    uint8_t              rx_mcs_map;
+    uint8_t              tx_mcs_map;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
 
@@ -3025,6 +3043,7 @@ typedef struct sLimScanChn
  * @bss_rx_cycle_count: BSS rx cycle count
  * @rx_11b_mode_data_duration: b-mode data rx time (units are microseconds)
  * @channel_id: channel index
+ * @cmd_flags: indicate which stat event is this status coming from
  */
 struct lim_channel_status {
 	uint32_t    channelfreq;
@@ -3037,6 +3056,7 @@ struct lim_channel_status {
 	uint32_t    bss_rx_cycle_count;
 	uint32_t    rx_11b_mode_data_duration;
 	uint32_t    channel_id;
+	uint32_t    cmd_flags;
 };
 
 typedef struct sSmeGetScanChnRsp
@@ -4760,40 +4780,44 @@ typedef struct sSirLinkSpeedInfo
 
 
 /*
- * struct sir_rssi_req - rssi request struct
+ * struct sir_peer_info_req - peer info request struct
  * @peer_macaddr: MAC address
  * @sessionId: vdev id
  *
- * rssi request message's struct
+ * peer info request message's struct
  */
-struct sir_rssi_req {
+struct sir_peer_info_req {
 	v_MACADDR_t peer_macaddr;
-	uint8_t sessionId;
+	uint8_t sessionid;
 };
 
 
 /*
- * struct sir_rssi_info - rssi information struct
+ * struct sir_peer_info - peer information struct
  * @peer_macaddr: MAC address
  * @rssi: rssi
+ * @tx_rate: last tx rate
+ * @rx_rate: last rx rate
  *
- * a station's rssi information
+ * a station's information
  */
-struct sir_rssi_info {
+struct sir_peer_info {
 	tSirMacAddr peer_macaddr;
 	int8_t rssi;
+	uint32_t tx_rate;
+	uint32_t rx_rate;
 };
 
 /*
- * struct sir_rssi_info - all peers rssi information struct
+ * struct sir_peer_info_resp - all peers information struct
  * @count: peer's number
- * @info: rssi information
+ * @info: peer information
  *
- * all station's rssi information
+ * all station's information
  */
-struct sir_rssi_resp {
+struct sir_peer_info_resp {
 	uint8_t count;
-	struct sir_rssi_info info[0];
+	struct sir_peer_info info[0];
 };
 
 
@@ -6390,10 +6414,6 @@ struct sir_wifi_tx {
  * @mpdu_retry: number of RX packets flagged as retransmissions
  * @mpdu_dup: number of RX packets identified as duplicates
  * @mpdu_discard: number of RX packets discarded
- * @sta_ps_inds: how many times STAs go to sleep
- * @sta_ps_durs: total sleep time of STAs
- * @probe_reqs: number of probe requests received
- * @mgmts: number of management frames received, no probe requests
  * @aggr_len: length of MPDU aggregation histogram buffer
  * @mpdu_aggr: histogram of MPDU aggregation size
  * @mcs_len: length of mcs histogram buffer
@@ -6408,10 +6428,6 @@ struct sir_wifi_rx {
 	uint32_t mpdu_retry;
 	uint32_t mpdu_dup;
 	uint32_t mpdu_discard;
-	uint32_t sta_ps_inds;
-	uint32_t sta_ps_durs;
-	uint32_t probe_reqs;
-	uint32_t mgmts;
 	uint32_t aggr_len;
 	uint32_t *mpdu_aggr;
 	uint32_t mcs_len;
@@ -6438,15 +6454,21 @@ struct sir_wifi_ll_ext_wmm_ac_stats {
  * struct sir_wifi_ll_ext_peer_stats - per peer stats
  * @peer_id: peer ID
  * @vdev_id: VDEV ID
+ * @sta_ps_inds: how many times STAs go to sleep
+ * @sta_ps_durs: total sleep time of STAs (units in ms)
+ * @rx_probe_reqs: number of probe requests received
+ * @rx_oth_mgmts: number of other management frames received,
+ *		  not including probe requests
  * @peer_signal_stat: signal stats
- * @be_stats: WMM BE stats
- * @bk_stats: WMM BK stats
- * @vi_stats: WMM VI stats
- * @vo_stats: WMM VO stats
+ * @ac_stats: WMM BE/BK/VI/VO stats
  */
 struct sir_wifi_ll_ext_peer_stats {
 	uint32_t peer_id;
 	uint32_t vdev_id;
+	uint32_t sta_ps_inds;
+	uint32_t sta_ps_durs;
+	uint32_t rx_probe_reqs;
+	uint32_t rx_oth_mgmts;
 	struct sir_wifi_peer_signal_stats peer_signal_stats;
 	struct sir_wifi_ll_ext_wmm_ac_stats ac_stats[WIFI_MAX_AC];
 };

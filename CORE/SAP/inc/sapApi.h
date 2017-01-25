@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -286,6 +286,17 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
     tANI_U8      timingMeasCap;
     tSirSmeChanInfo chan_info;
     uint8_t      ecsa_capable;
+    bool                 ampdu;
+    bool                 sgi_enable;
+    bool                 tx_stbc;
+    bool                 rx_stbc;
+    tSirMacHTChannelWidth ch_width;
+    enum sir_sme_phy_mode mode;
+    uint8_t              max_supp_idx;
+    uint8_t              max_ext_idx;
+    uint8_t              max_mcs_idx;
+    uint8_t              rx_mcs_map;
+    uint8_t              tx_mcs_map;
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {
@@ -544,6 +555,7 @@ typedef struct sap_Config {
     eCsrBand        scanBandPreference;
     v_BOOL_t        enOverLapCh;
     v_U16_t         acsBandSwitchThreshold;
+    uint32_t        auto_channel_select_weight;
     struct sap_acs_cfg acs_cfg;
 #ifdef WLAN_FEATURE_11W
     v_BOOL_t        mfpRequired;
@@ -578,6 +590,8 @@ typedef struct sap_Config {
     /* beacon count before channel switch */
     uint8_t          sap_chanswitch_beacon_cnt;
     uint8_t          sap_chanswitch_mode;
+    bool             dfs_beacon_tx_enhanced;
+    uint16_t         reduced_beacon_interval;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -692,6 +706,8 @@ typedef struct sSapDfsInfo
     /* beacon count before channel switch */
     uint8_t            sap_ch_switch_beacon_cnt;
     uint8_t            sap_ch_switch_mode;
+    bool               dfs_beacon_tx_enhanced;
+    uint16_t           reduced_beacon_interval;
 } tSapDfsInfo;
 
 typedef struct tagSapCtxList
@@ -842,6 +858,15 @@ void sapCleanupChannelList(v_PVOID_t sapContext);
 
 void sapCleanupAllChannelList(void);
 
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+/**
+ * is_auto_channel_select() - is channel AUTO_CHANNEL_SELECT
+ * @p_vos_gctx: Pointer to ptSapContext
+ *
+ * Return: true on AUTO_CHANNEL_SELECT, false otherwise
+ */
+bool is_auto_channel_select(v_PVOID_t p_vos_gctx);
+#endif
 /*==========================================================================
   FUNCTION    WLANSAP_Set_WpsIe
 

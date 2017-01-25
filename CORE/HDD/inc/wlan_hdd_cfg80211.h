@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -110,6 +110,9 @@
 
 
 #define MAX_CHANNEL (NUM_2_4GHZ_CHANNELS + NUM_5GHZ_CHANNELS)
+
+#define IS_CHANNEL_VALID(channel) ((channel >= 0 && channel < 15) \
+                     || (channel >= 36 && channel <= 184))
 
 typedef struct {
    u8 element_id;
@@ -271,6 +274,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_ACS_POLICY = 116,
 	QCA_NL80211_VENDOR_SUBCMD_STA_CONNECT_ROAM_POLICY = 117,
 	QCA_NL80211_VENDOR_SUBCMD_SET_SAP_CONFIG  = 118,
+	QCA_NL80211_VENDOR_SUBCMD_GET_STATION = 121,
 
 	/* subcommand for link layer statistics extension */
 	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_EXT = 127,
@@ -1585,7 +1589,7 @@ enum qca_wlan_vendor_acs_hw_mode {
 #define CFG_AGG_RETRY_MAX                      (31)
 #define CFG_MGMT_RETRY_MAX                     (31)
 #define CFG_CTRL_RETRY_MAX                     (31)
-#define CFG_PROPAGATION_DELAY_MAX              (63)
+#define CFG_PROPAGATION_DELAY_MAX              (16383)
 #define CFG_AGG_RETRY_MIN                      (5)
 
 /**
@@ -2058,6 +2062,117 @@ enum qca_wlan_vendor_attr_sap_config {
 	QCA_WLAN_VENDOR_ATTR_SAP_CONFIG_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_SAP_CONFIG_MAX =
 		QCA_WLAN_VENDOR_ATTR_SAP_CONFIG_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_get_station - Sub commands used by
+ * QCA_NL80211_VENDOR_SUBCMD_GET_STATION to get the corresponding
+ * station information. The information obtained through these
+ * commands signify the current info in connected state and
+ * latest cached information during the connected state , if queried
+ * when in disconnected state.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INVALID: Invalid attribute
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO: bss info
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_ASSOC_FAIL_REASON: assoc fail reason
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_REMOTE: remote peer info
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_AFTER_LAST: After last
+ */
+enum qca_wlan_vendor_attr_get_station {
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO = 1,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_ASSOC_FAIL_REASON = 2,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_REMOTE = 3,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_MAX =
+		QCA_WLAN_VENDOR_ATTR_GET_STATION_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_get_station_info - Station Info queried
+ * through QCA_NL80211_VENDOR_SUBCMD_GET_STATION.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_INVALID: Invalid Attribute
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_LINK_STANDARD_NL80211_ATTR:
+ *  Get the standard NL attributes Nested with this attribute.
+ *  Ex : Query BW , BITRATE32 , NSS , Signal , Noise of the Link -
+ *  NL80211_ATTR_SSID / NL80211_ATTR_SURVEY_INFO (Connected Channel) /
+ *  NL80211_ATTR_STA_INFO
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_STANDARD_NL80211_ATTR:
+ *  Get the standard NL attributes Nested with this attribute.
+ *  Ex : Query HT/VHT Capability advertized by the AP.
+ *  NL80211_ATTR_VHT_CAPABILITY / NL80211_ATTR_HT_CAPABILITY
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ROAM_COUNT:
+ *  Number of successful Roam attempts before a
+ *  disconnect, Unsigned 32 bit value
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AKM:
+ *  Authentication Key Management Type used for the connected session.
+ *  Signified by enum qca_wlan_auth_type
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_802_11_MODE: 802.11 Mode of the
+ *  connected Session, signified by enum qca_wlan_802_11_mode
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_HS20_INDICATION:
+ *  HS20 Indication Element
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_FAIL_REASON:
+ *  Status Code Corresponding to the Association Failure.
+ *  Unsigned 32 bit value.
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_MAX_PHY_RATE:
+ *  max phy rate for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_PACKETS:
+ *  tx packets for remote peer (interface layer)
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_BYTES:
+ *  tx bytes for remote peer (interface layer)
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_PACKETS:
+ *  rx packets for remote peer (interface layer)
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_BYTES:
+ *  rx bytes for remote peer (interface layer)
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_LAST_TX_RATE:
+ *  last tx rate for remote peer (in kbps)
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_LAST_RX_RATE:
+ *  last rx rate for remote peer (in kbps)
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_WMM:
+ *  wmm for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_SUPPORTED_MODE:
+ *  supported mode for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_AMPDU:
+ *  ampdu for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_STBC:
+ *  tx stbc for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_STBC:
+ *  rx stbc for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH:
+ *  ch widht for remote peer
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AFTER_LAST: After last
+ */
+enum qca_wlan_vendor_attr_get_station_info {
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_LINK_STANDARD_NL80211_ATTR,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_STANDARD_NL80211_ATTR,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ROAM_COUNT,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AKM,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_802_11_MODE,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AP_HS20_INDICATION,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_HT_OPERATION,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_VHT_OPERATION,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_FAIL_REASON,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_MAX_PHY_RATE,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_PACKETS,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_BYTES,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_PACKETS,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_BYTES,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_LAST_TX_RATE,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_LAST_RX_RATE,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_WMM,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_SUPPORTED_MODE,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_AMPDU,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_STBC,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_STBC,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_MAX =
+		QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AFTER_LAST - 1,
 };
 
 /** enum qca_vendor_attr_txpower_scale - vendor sub commands index
