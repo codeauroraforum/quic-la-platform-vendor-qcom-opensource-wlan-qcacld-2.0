@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -200,8 +200,6 @@
 #define WLAN_HDD_MAX_FEATURE_SET   8
 
 #define IS_DFS_MODE_VALID(mode) ((mode >= DFS_MODE_NONE && mode <= DFS_MODE_DEPRIORITIZE))
-#define IS_CHANNEL_VALID(channel) ((channel >= 0 && channel < 15) \
-		|| (channel >= 36 && channel <= 184))
 
 #ifdef FEATURE_WLAN_EXTSCAN
 /*
@@ -5944,8 +5942,7 @@ static void hdd_link_layer_process_radio_stats(hdd_adapter_t *pAdapter,
  * after receiving Link Layer indications from FW.This callback converts the
  * firmware data to the NL data and send the same to the kernel/upper layers.
  */
-static void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx,
-                                                        int indType,
+static void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx, int indType,
                                                         void *pRsp)
 {
     hdd_adapter_t *pAdapter = NULL;
@@ -7162,12 +7159,11 @@ static void wlan_hdd_cfg80211_ll_stats_ext_callback(tSirLLStatsResults *rsp)
 
 void wlan_hdd_cfg80211_link_layer_stats_init(hdd_context_t *pHddCtx)
 {
-    sme_SetLinkLayerStatsIndCB(pHddCtx->hHal,
-                                 wlan_hdd_cfg80211_link_layer_stats_callback);
-    sme_set_ll_ext_cb(pHddCtx->hHal,
-                      wlan_hdd_cfg80211_ll_stats_ext_callback);
+        sme_SetLinkLayerStatsIndCB(pHddCtx->hHal,
+                                   wlan_hdd_cfg80211_link_layer_stats_callback);
+        sme_set_ll_ext_cb(pHddCtx->hHal,
+                          wlan_hdd_cfg80211_ll_stats_ext_callback);
 }
-
 
 const struct
 nla_policy
@@ -8948,6 +8944,9 @@ static int wlan_hdd_cfg80211_start_acs(hdd_adapter_t *adapter)
 		return -EINVAL;
 	}
 	sap_config->acs_cfg.acs_mode = true;
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+	if (is_auto_channel_select(WLAN_HDD_GET_SAP_CTX_PTR(adapter)))
+#endif
 	set_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 
 	return 0;
@@ -9143,6 +9142,13 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 			sap_config->acs_cfg.ch_width == eHT_CHANNEL_WIDTH_80MHZ)
 			sap_config->acs_cfg.ch_width = eHT_CHANNEL_WIDTH_40MHZ;
 	}
+
+	sap_config->acsBandSwitchThreshold =
+		hdd_ctx->cfg_ini->acsBandSwitchThreshold;
+
+	if (hdd_ctx->cfg_ini->auto_channel_select_weight)
+		sap_config->auto_channel_select_weight =
+		    hdd_ctx->cfg_ini->auto_channel_select_weight;
 
 	hddLog(LOG1, FL("ACS Config for wlan%d: HW_MODE: %d ACS_BW: %d HT: %d VHT: %d START_CH: %d END_CH: %d"),
 		adapter->dev->ifindex, sap_config->acs_cfg.hw_mode,
@@ -9415,7 +9421,7 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_AGG_RETRY] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_MGMT_RETRY] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_CTRL_RETRY] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_FAIL_COUNT] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_ENA] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_CHAIN] = {.type = NLA_U32 },
@@ -9555,7 +9561,8 @@ static int __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	int ret_val = 0;
 	u32 modulated_dtim;
 	uint16_t stats_avg_factor, tx_rate;
-	uint8_t set_value, retry, delay, qpower;
+	uint8_t set_value, retry, qpower;
+	uint32_t delay;
 	u32 guard_time;
 	u32 ftm_capab;
 	eHalStatus status;
@@ -9779,7 +9786,7 @@ static int __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY]) {
-		delay = nla_get_u8(
+		delay = nla_get_u32(
 			tb[QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY]);
 		delay = delay > CFG_PROPAGATION_DELAY_MAX ?
 				CFG_PROPAGATION_DELAY_MAX : delay;
@@ -15741,6 +15748,11 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     pConfig->sap_chanswitch_mode =
         iniConfig->sap_chanswitch_mode;
 
+    pConfig->dfs_beacon_tx_enhanced =
+        iniConfig->dfs_beacon_tx_enhanced;
+
+    pConfig->reduced_beacon_interval =
+        iniConfig->reduced_beacon_interval;
     //channel is already set in the set_channel Call back
     //pConfig->channel = pCommitConfig->channel;
 
@@ -18958,20 +18970,9 @@ struct cfg80211_bss* wlan_hdd_cfg80211_update_bss_list(
     struct wiphy *wiphy = wdev->wiphy;
     struct cfg80211_bss *bss = NULL;
 
-    bss = cfg80211_get_bss(wiphy, NULL, bssid,
+    bss = hdd_cfg80211_get_bss(wiphy, NULL, bssid,
                            NULL,
-                           0,
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)) && !defined(WITH_BACKPORTS) \
-     && !defined(IEEE80211_PRIVACY)
-                           (pAdapter->device_mode == WLAN_HDD_IBSS) ? \
-                               WLAN_CAPABILITY_IBSS : WLAN_CAPABILITY_ESS,
-                           (pAdapter->device_mode == WLAN_HDD_IBSS) ? \
-                               WLAN_CAPABILITY_IBSS : WLAN_CAPABILITY_ESS);
-#else
-                           (pAdapter->device_mode == WLAN_HDD_IBSS) ? \
-                               IEEE80211_BSS_TYPE_IBSS : IEEE80211_BSS_TYPE_ESS,
-                           IEEE80211_PRIVACY_ANY);
-#endif
+                           0);
     if (bss == NULL) {
         hddLog(LOGE, FL("BSS not present"));
     } else {
@@ -20477,7 +20478,8 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     wlan_hdd_update_scan_rand_attrs((void *)&scanRequest, (void *)request,
                                     WLAN_HDD_HOST_SCAN);
 
-    if (!hdd_connIsConnected(station_ctx)) {
+    if (!hdd_connIsConnected(station_ctx) &&
+        (pHddCtx->cfg_ini->probe_req_ie_whitelist)) {
         if (pHddCtx->no_of_probe_req_ouis != 0) {
             scanRequest.voui = (struct vendor_oui *)vos_mem_malloc(
                                               pHddCtx->no_of_probe_req_ouis *
@@ -20490,12 +20492,11 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
             }
         }
 
-        if (pHddCtx->cfg_ini->probe_req_ie_whitelist)
-            wlan_hdd_fill_whitelist_ie_attrs(&scanRequest.ie_whitelist,
-                                             scanRequest.probe_req_ie_bitmap,
-                                             &scanRequest.num_vendor_oui,
-                                             scanRequest.voui,
-                                             pHddCtx);
+        wlan_hdd_fill_whitelist_ie_attrs(&scanRequest.ie_whitelist,
+                                         scanRequest.probe_req_ie_bitmap,
+                                         &scanRequest.num_vendor_oui,
+                                         scanRequest.voui,
+                                         pHddCtx);
     }
 
     vos_runtime_pm_prevent_suspend(pHddCtx->runtime_context.scan);
@@ -20923,8 +20924,11 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
         vos_mem_copy((void *)(pRoamProfile->SSIDs.SSIDList->SSID.ssId),
                 ssid, ssid_len);
 
-        if (bssid)
-        {
+        /* cleanup bssid hint and bssid */
+        vos_mem_zero(pRoamProfile->bssid_hint, VOS_MAC_ADDR_SIZE);
+        vos_mem_zero(pRoamProfile->BSSIDs.bssid, VOS_MAC_ADDR_SIZE);
+
+        if (bssid) {
             pRoamProfile->BSSIDs.numOfBSSIDs = 1;
             pRoamProfile->do_not_roam = true;
             vos_mem_copy((void *)(pRoamProfile->BSSIDs.bssid), bssid,
@@ -20935,11 +20939,8 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
              */
             vos_mem_copy((void *)(pWextState->req_bssId), bssid,
                     VOS_MAC_ADDR_SIZE);
-        }
-        else if (bssid_hint)
-        {
-            pRoamProfile->BSSIDs.numOfBSSIDs = 1;
-            vos_mem_copy((void *)(pRoamProfile->BSSIDs.bssid), bssid_hint,
+        } else if (bssid_hint) {
+            vos_mem_copy(pRoamProfile->bssid_hint, bssid_hint,
                     VOS_MAC_ADDR_SIZE);
             /* Save BSSID in separate variable as well, as RoamProfile
                BSSID is getting zeroed out in the association process. And in
@@ -20949,11 +20950,6 @@ int wlan_hdd_cfg80211_connect_start( hdd_adapter_t  *pAdapter,
                     VOS_MAC_ADDR_SIZE);
             hddLog(LOGW, FL(" bssid_hint "MAC_ADDRESS_STR),
                    MAC_ADDR_ARRAY(bssid_hint));
-
-        }
-        else
-        {
-            vos_mem_zero((void *)(pRoamProfile->BSSIDs.bssid), VOS_MAC_ADDR_SIZE);
         }
 
         hddLog(LOG1, FL("Connect to SSID: %.*s operating Channel: %u"),
@@ -24578,7 +24574,8 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
         return -ENOTSUPP;
     }
 
-    if (!hdd_connIsConnected(station_ctx))
+    if (!hdd_connIsConnected(station_ctx) &&
+        pHddCtx->cfg_ini->probe_req_ie_whitelist)
         pPnoRequest = (tpSirPNOScanReq) vos_mem_malloc(sizeof(tSirPNOScanReq) +
                                     (pHddCtx->no_of_probe_req_ouis) *
                                     (sizeof(struct vendor_oui)));
@@ -24592,9 +24589,14 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
         return -ENOMEM;
     }
 
-    memset(pPnoRequest, 0, sizeof (tSirPNOScanReq) +
-                           (pHddCtx->no_of_probe_req_ouis) *
-                           (sizeof(struct vendor_oui)));
+    if (!hdd_connIsConnected(station_ctx) &&
+        pHddCtx->cfg_ini->probe_req_ie_whitelist)
+        memset(pPnoRequest, 0, sizeof (tSirPNOScanReq) +
+               (pHddCtx->no_of_probe_req_ouis) *
+               (sizeof(struct vendor_oui)));
+    else
+        memset(pPnoRequest, 0, sizeof (tSirPNOScanReq));
+
     pPnoRequest->enable = 1; /*Enable PNO */
     pPnoRequest->ucNetworksCount = request->n_match_sets;
     if ((!pPnoRequest->ucNetworksCount ) ||
@@ -26324,6 +26326,12 @@ static int __wlan_hdd_cfg80211_testmode(struct wiphy *wiphy,
             if ((hb_params_temp->cmd == LPHB_SET_TCP_PARAMS_INDID) &&
                 (hb_params_temp->params.lphbTcpParamReq.timePeriodSec == 0))
                 return -EINVAL;
+
+            if (buf_len > sizeof(*hb_params)) {
+                hddLog(LOGE, FL("buf_len=%d exceeded hb_params size limit"),
+                       buf_len);
+                return -ERANGE;
+            }
 
             hb_params = (tSirLPHBReq *)vos_mem_malloc(sizeof(tSirLPHBReq));
             if (NULL == hb_params) {

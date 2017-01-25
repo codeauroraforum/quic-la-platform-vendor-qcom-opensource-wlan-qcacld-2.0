@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -110,6 +110,9 @@
 
 
 #define MAX_CHANNEL (NUM_2_4GHZ_CHANNELS + NUM_5GHZ_CHANNELS)
+
+#define IS_CHANNEL_VALID(channel) ((channel >= 0 && channel < 15) \
+                     || (channel >= 36 && channel <= 184))
 
 typedef struct {
    u8 element_id;
@@ -1586,7 +1589,7 @@ enum qca_wlan_vendor_acs_hw_mode {
 #define CFG_AGG_RETRY_MAX                      (31)
 #define CFG_MGMT_RETRY_MAX                     (31)
 #define CFG_CTRL_RETRY_MAX                     (31)
-#define CFG_PROPAGATION_DELAY_MAX              (63)
+#define CFG_PROPAGATION_DELAY_MAX              (16383)
 #define CFG_AGG_RETRY_MIN                      (5)
 
 /**
