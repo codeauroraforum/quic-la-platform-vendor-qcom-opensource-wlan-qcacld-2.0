@@ -200,8 +200,6 @@
 #define WLAN_HDD_MAX_FEATURE_SET   8
 
 #define IS_DFS_MODE_VALID(mode) ((mode >= DFS_MODE_NONE && mode <= DFS_MODE_DEPRIORITIZE))
-#define IS_CHANNEL_VALID(channel) ((channel >= 0 && channel < 15) \
-		|| (channel >= 36 && channel <= 184))
 
 #ifdef FEATURE_WLAN_EXTSCAN
 /*
@@ -2996,8 +2994,13 @@ __wlan_hdd_cfg80211_extscan_set_ssid_hotlist(struct wiphy *wiphy,
 		ssid_length = nla_strlcpy(ssid_string,
 			   tb2[PARAM_SSID],
 			   sizeof(ssid_string));
-		hddLog(LOG1, FL("SSID %s"),
-		       ssid_string);
+
+		/* nla_parse will detect overflow but not underflow */
+		if (0 == ssid_length) {
+			hddLog(LOGE, FL("zero ssid length"));
+			goto fail;
+		}
+		hddLog(LOG1, FL("SSID %s"), ssid_string);
 		ssid_len = strlen(ssid_string);
 		if (ssid_length > SIR_MAC_MAX_SSID_LENGTH) {
 			hddLog(LOGE, FL("Invalid ssid length"));
@@ -23909,6 +23912,12 @@ static int __wlan_hdd_cfg80211_testmode(struct wiphy *wiphy,
             if ((hb_params_temp->cmd == LPHB_SET_TCP_PARAMS_INDID) &&
                 (hb_params_temp->params.lphbTcpParamReq.timePeriodSec == 0))
                 return -EINVAL;
+
+            if (buf_len > sizeof(*hb_params)) {
+                hddLog(LOGE, FL("buf_len=%d exceeded hb_params size limit"),
+                       buf_len);
+                return -ERANGE;
+            }
 
             hb_params = (tSirLPHBReq *)vos_mem_malloc(sizeof(tSirLPHBReq));
             if (NULL == hb_params) {
