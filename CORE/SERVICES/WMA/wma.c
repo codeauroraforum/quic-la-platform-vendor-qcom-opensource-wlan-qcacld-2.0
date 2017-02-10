@@ -7075,8 +7075,7 @@ wma_chan_info_event_handler(void *handle, u_int8_t *event_buf,
 		mac->chan_info_cb(&buf);
 	}
        if (ACS_FW_REPORT_PARAM_CONFIGURED &&
-                mac->sme.currDeviceMode == VOS_STA_SAP_MODE &&
-                mac->scan.curScanType == eSIR_ACTIVE_SCAN) {
+	        mac->sme.currDeviceMode == VOS_STA_SAP_MODE) {
                param_buf = (WMI_CHAN_INFO_EVENTID_param_tlvs *) event_buf;
                if (!param_buf)  {
                        WMA_LOGE("Invalid chan info event buffer");
@@ -7089,9 +7088,9 @@ wma_chan_info_event_handler(void *handle, u_int8_t *event_buf,
 			WMA_LOGE(FL("Mem alloc fail"));
 			return -ENOMEM;
  		}
-		WMA_LOGI(FL("freq=%d nf=%d rx_cnt=%d cycle_count=%d "
+		WMA_LOGI(FL("freq=%d nf=%d rx_cnt=%u cycle_count=%u "
 			    "tx_pwr_range=%d tx_pwr_tput=%d "
-			    "rx_frame_count=%d my_bss_rx_cycle_count=%d "
+			    "rx_frame_count=%u my_bss_rx_cycle_count=%u "
 			    "rx_11b_mode_data_duration=%d cmd_flags=%d"),
 			 event->freq,
 			 event->noise_floor,
@@ -9344,8 +9343,7 @@ VOS_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 			cmd->scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
                 if (ACS_FW_REPORT_PARAM_CONFIGURED) {
                        /* add chan stat info report tag */
-                        if (scan_req->scanType == eSIR_ACTIVE_SCAN &&
-                               scan_req->bssType == eSIR_INFRA_AP_MODE) {
+	               if (scan_req->bssType == eSIR_INFRA_AP_MODE) {
                                 cmd->scan_ctrl_flags |=
                                        WMI_SCAN_CHAN_STAT_EVENT;
                                 WMA_LOGI("set ACS ctrl BIT");
