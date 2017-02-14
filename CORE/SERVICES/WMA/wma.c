@@ -23076,9 +23076,9 @@ static VOS_STATUS wma_feed_wow_config_to_fw(tp_wma_handle wma,
 	bool wps_enable = false;
 
 	if (wma->wow.wow_enable) {
-		WMA_LOGD("Already%s Fatal Error!",
+		WMA_LOGE("Already%s Fatal Error!",
 			runtime_pm ? " runtime suspended" : " cfg suspended");
-		VOS_BUG(0);
+		WARN_ON(1);
 		return VOS_STATUS_E_AGAIN;
 	}
 
