@@ -3809,6 +3809,18 @@ typedef struct
 } tSirNetworkType;
 
 /**
+ * struct connected_pno_band_rssi_pref - BSS preference based on band
+ * and RSSI
+ * @band: band preference
+ * @rssi_pref: RSSI preference
+ */
+struct connected_pno_band_rssi_pref
+{
+	tSirRFBand band;
+	int8_t rssi;
+};
+
+/**
  * struct sSirPNOScanReq - PNO Scan request structure
  * @enable: flag to enable or disable
  * @modePNO: PNO Mode
@@ -3827,6 +3839,10 @@ typedef struct
  * @p24GProbeTemplate: 2.4G probe template
  * @us5GProbeTemplateLen: 5G probe template length
  * @p5GProbeTemplate: 5G probe template
+ * @relative_rssi_set: Flag to check whether realtive_rssi is set or not
+ * @relative_rssi: Relative rssi threshold, used for connected pno
+ * @band_rssi_pref: Band and RSSI preference that can be given to one BSS
+ * over the other BSS
  */
 typedef struct sSirPNOScanReq {
 	uint8_t         enable;
@@ -3848,6 +3864,10 @@ typedef struct sSirPNOScanReq {
 	uint8_t         p24GProbeTemplate[SIR_PNO_MAX_PB_REQ_SIZE];
 	uint16_t        us5GProbeTemplateLen;
 	uint8_t         p5GProbeTemplate[SIR_PNO_MAX_PB_REQ_SIZE];
+
+	bool            relative_rssi_set;
+	int8_t          relative_rssi;
+	struct          connected_pno_band_rssi_pref band_rssi_pref;
 
 	/* mac address randomization attributes */
 	uint32_t enable_pno_scan_randomization;
@@ -4580,6 +4600,7 @@ typedef struct sSirScanOffloadReq {
     tANI_U16 uIEFieldLen;
     tANI_U16 uIEFieldOffset;
 
+    uint32_t burst_scan_duration;
     uint32_t enable_scan_randomization;
     uint8_t mac_addr[VOS_MAC_ADDR_SIZE];
     uint8_t mac_addr_mask[VOS_MAC_ADDR_SIZE];
