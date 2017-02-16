@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3851,6 +3851,21 @@ eHalStatus sme_get_peer_info(tHalHandle hal, struct sir_peer_info_req req,
 						void *pcontext));
 
 /*----------------------------------------------------------------------------
+ \fn  sme_get_peer_info_ext
+ \brief  This function sends msg to get info for remote peer
+ \param  hHal - global structure
+ \param  req - get peer info request pointer
+ \param  context - event handle context
+ \param  callbackfn - callback fn with response
+ \- return Success or failure
+-----------------------------------------------------------------------------*/
+eHalStatus sme_get_peer_info_ext(tHalHandle hal,
+		struct sir_peer_info_ext_req *req,
+		void *context,
+		void (*callbackfn)(struct sir_peer_info_ext_resp *param,
+			void *pcontext));
+
+/*----------------------------------------------------------------------------
  \fn  sme_ModifyAddIE
  \brief  This function sends msg to updates the additional IE buffers in PE
  \param  hHal - global structure
@@ -4749,4 +4764,38 @@ eHalStatus sme_power_debug_stats_req(tHalHandle hal, void (*callback_fn)
 			(struct power_stats_response *response,
 			void *context), void *power_stats_context);
 #endif
+
+/**
+ * sme_set_random_mac() - Set random mac address filter
+ * @hal: hal handle for getting global mac struct
+ * @callback: callback to be invoked for response from firmware
+ * @session_id: interface id
+ * @random_mac: random mac address to be set
+ * @context: parameter to callback
+ *
+ * This function is used to set random mac address filter for action frames
+ * which are send with the same address, callback is invoked when corresponding
+ * event from firmware has come.
+ *
+ * Return: eHalStatus enumeration.
+ */
+eHalStatus sme_set_random_mac(tHalHandle hal,
+			      action_frame_random_filter_callback callback,
+			      uint32_t session_id, uint8_t *random_mac,
+			      void *context);
+
+/**
+ * sme_clear_random_mac() - clear random mac address filter
+ * @hal: HAL handle
+ * @session_id: interface id
+ * @random_mac: random mac address to be cleared
+ *
+ * This function is used to clear the randmom mac address filters
+ * which are set with sme_set_random_mac
+ *
+ * Return: eHalStatus enumeration.
+ */
+eHalStatus sme_clear_random_mac(tHalHandle hal, uint32_t session_id,
+				uint8_t *random_mac);
+
 #endif //#if !defined( __SME_API_H )
