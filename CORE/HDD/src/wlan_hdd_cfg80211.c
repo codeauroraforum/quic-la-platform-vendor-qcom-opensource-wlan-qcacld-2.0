@@ -9515,6 +9515,16 @@ static int hdd_set_qpower_config(hdd_context_t *hddctx, hdd_adapter_t *adapter,
 {
 	VOS_STATUS vos_status;
 
+	if(!adapter) {
+		hddLog(LOGE,"invalid adapter");
+		return -EINVAL;
+	}
+	if (adapter->device_mode != WLAN_HDD_INFRA_STATION &&
+	    adapter->device_mode != WLAN_HDD_P2P_CLIENT) {
+		hddLog(VOS_TRACE_LEVEL_INFO,
+		       FL("QPOWER is only supported for STA/P2P-CLIENT"));
+		return -EINVAL;
+	}
 	if (!hddctx->cfg_ini->enablePowersaveOffload) {
 		hddLog(LOGE,
 		       FL("qpower is disabled in configuration"));
@@ -14037,6 +14047,29 @@ static void wlan_hdd_cfg80211_add_connected_pno_support(struct wiphy *wiphy)
 }
 #endif
 
+#ifdef CFG80211_RAND_TA_FOR_PUBLIC_ACTION_FRAME
+/**
+ * wlan_hdd_cfg80211_action_frame_randomization_init() - Randomize SA of MA frms
+ * @wiphy: Pointer to wiphy
+ *
+ * This function is used to indicate the support of source mac address
+ * randomization of management action frames
+ *
+ * Return: None
+ */
+static void
+wlan_hdd_cfg80211_action_frame_randomization_init(struct wiphy *wiphy)
+{
+       wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_MGMT_TX_RANDOM_TA);
+}
+#else
+static void
+wlan_hdd_cfg80211_action_frame_randomization_init(struct wiphy *wiphy)
+{
+       return;
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -14292,6 +14325,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
     hdd_config_sched_scan_plans_to_wiphy(wiphy, pCfg);
     wlan_hdd_cfg80211_scan_randomization_init(wiphy);
+    wlan_hdd_cfg80211_action_frame_randomization_init(wiphy);
 
     EXIT();
     return 0;
@@ -16848,7 +16882,8 @@ static int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0)) || defined(BEACON_RATE_BACKPORTS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)) || \
+	defined(CFG80211_BEACON_TX_RATE_CUSTOM_BACKPORT)
 /**
  * hdd_get_data_rate_from_rate_mask() - convert mask to rate
  * @wiphy: Pointer to wiphy
@@ -20100,6 +20135,7 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     uint8_t num_chan = 0;
     v_U8_t curr_session_id;
     scan_reject_states curr_reason;
+    static uint32_t scan_ebusy_cnt;
 
     ENTER();
 
@@ -20152,11 +20188,12 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
         }
     }
 
-    if (TRUE == pScanInfo->mScanPending)
-    {
-        if ( MAX_PENDING_LOG > pScanInfo->mScanPendingCounter++ )
-        {
-            hddLog(VOS_TRACE_LEVEL_ERROR, "%s: mScanPending is TRUE", __func__);
+    if (TRUE == pScanInfo->mScanPending) {
+        scan_ebusy_cnt++;
+
+        if (MAX_PENDING_LOG > pScanInfo->mScanPendingCounter++) {
+            hddLog(LOGE, "%s: mScanPending is TRUE scan_ebusy_cnt: %u",
+                   __func__, scan_ebusy_cnt);
         }
         return -EBUSY;
     }
@@ -20165,9 +20202,11 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     //Channel and action frame is pending
     //Otherwise Cancel Remain On Channel and allow Scan
     //If no action frame pending
-    if (0 != wlan_hdd_check_remain_on_channel(pAdapter))
-    {
-        hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Remain On Channel Pending", __func__);
+    if (0 != wlan_hdd_check_remain_on_channel(pAdapter)) {
+        scan_ebusy_cnt++;
+        hddLog(LOGE, "%s: Remain On Channel Pending. scan_ebusy_cnt: %u",
+               __func__, scan_ebusy_cnt);
+
         return -EBUSY;
     }
 #ifdef FEATURE_WLAN_TDLS
@@ -20203,8 +20242,10 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     if (TRUE == pHddCtx->tmInfo.tmAction.enterImps)
     {
         mutex_unlock(&pHddCtx->tmInfo.tmOperationLock);
-        hddLog(VOS_TRACE_LEVEL_ERROR,
-               "%s: MAX TM Level Scan not allowed", __func__);
+        scan_ebusy_cnt++;
+        hddLog(LOGE, "%s: MAX TM Level Scan not allowed. scan_ebusy_cnt: %u",
+               __func__, scan_ebusy_cnt);
+
         return -EBUSY;
     }
     mutex_unlock(&pHddCtx->tmInfo.tmOperationLock);
@@ -20212,7 +20253,10 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
     /* Check if scan is allowed at this point of time.
      */
     if (hdd_isConnectionInProgress(pHddCtx, &curr_session_id, &curr_reason)) {
-        hddLog(LOGE, FL("Scan not allowed"));
+        scan_ebusy_cnt++;
+        hddLog(LOGE, FL("Scan not allowed, scan_ebusy_cnt: %u"),
+               scan_ebusy_cnt);
+
         if (pHddCtx->last_scan_reject_session_id != curr_session_id ||
             pHddCtx->last_scan_reject_reason != curr_reason ||
             !pHddCtx->last_scan_reject_timestamp) {
@@ -20531,14 +20575,13 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
         hddLog(VOS_TRACE_LEVEL_ERROR,
                 "%s: sme_ScanRequest returned error %d", __func__, status);
         complete(&pScanInfo->scan_req_completion_event);
-        if(eHAL_STATUS_RESOURCES == status)
-        {
-           hddLog(VOS_TRACE_LEVEL_ERROR, "%s: HO is in progress.So defer the scan by informing busy",
-                  __func__);
+        if (eHAL_STATUS_RESOURCES == status) {
+           scan_ebusy_cnt++;
+           hddLog(LOGE, FL("HO is in progress. Defer scan by informing busy scan_ebusy_cnt: %u"),
+                  scan_ebusy_cnt);
+
            status = -EBUSY;
-        }
-        else
-        {
+        } else {
            status = -EIO;
         }
 
@@ -20564,6 +20607,9 @@ free_mem:
 
     if(scanRequest.voui)
         vos_mem_free(scanRequest.voui);
+
+    if (status == 0)
+        scan_ebusy_cnt = 0;
 
     EXIT();
     return status;
