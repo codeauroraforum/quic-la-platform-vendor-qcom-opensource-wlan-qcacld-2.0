@@ -34,7 +34,36 @@
 #include <adf_nbuf.h>
 #include <adf_os_io.h>
 
+#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
+#include <net/cnss_prealloc.h>
+#endif
 adf_nbuf_trace_update_t  trace_update_cb = NULL;
+#if defined(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
+struct sk_buff *__adf_nbuf_pre_alloc(adf_os_device_t osdev, size_t size)
+{
+	struct sk_buff *skb = NULL;
+
+	if (size >= WCNSS_PRE_SKB_ALLOC_GET_THRESHOLD)
+		skb = wcnss_skb_prealloc_get(size);
+
+	return skb;
+}
+
+int __adf_nbuf_pre_alloc_free(struct sk_buff *skb)
+{
+	return wcnss_skb_prealloc_put(skb);
+}
+#else
+struct sk_buff *__adf_nbuf_pre_alloc(adf_os_device_t osdev, size_t size)
+{
+	return NULL;
+}
+
+int __adf_nbuf_pre_alloc_free(struct sk_buff *skb)
+{
+	return 0;
+}
+#endif
 
 /*
  * @brief This allocates an nbuf aligns if needed and reserves
