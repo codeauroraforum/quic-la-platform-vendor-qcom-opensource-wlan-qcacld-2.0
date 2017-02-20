@@ -512,6 +512,24 @@ enum vendor_ie_access_policy {
 	ACCESS_POLICY_DONOT_RESPOND_IF_IE_IS_PRESENT,
 };
 
+/*
+ * enum sub20_chan_switch_mode- sub20 channel
+ * switch mode
+ * @SUB20_NONE: unsupport sub20 channel width
+ * @SUB20_STATIC: support sub20 channel width,
+ * but unsupport sub20 channel width switch
+ * @SUB20_DYN: support sub20 channel width,
+ * sub20 channel width switch auto
+ * @SUB20_MANUAL: support sub20 channel width,
+ * sub20 channel width switch manual
+ */
+enum sub20_chan_switch_mode {
+	SUB20_NONE,
+	SUB20_STATIC,
+	SUB20_DYN,
+	SUB20_MANUAL
+};
+
 typedef struct sap_Config {
     tSap_SSIDInfo_t SSIDinfo;
     eCsrPhyMode     SapHw_mode; /* Wireless Mode */
@@ -552,6 +570,7 @@ typedef struct sap_Config {
     v_U32_t         ht_op_mode_fixed;
     tVOS_CON_MODE   persona; /*Tells us which persona it is GO or AP for now*/
     v_U8_t          disableDFSChSwitch;
+    v_U8_t          enable_radar_war;
     eCsrBand        scanBandPreference;
     v_BOOL_t        enOverLapCh;
     v_U16_t         acsBandSwitchThreshold;
@@ -592,6 +611,7 @@ typedef struct sap_Config {
     uint8_t          sap_chanswitch_mode;
     bool             dfs_beacon_tx_enhanced;
     uint16_t         reduced_beacon_interval;
+    enum sub20_chan_switch_mode  sub20_switch_mode;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -701,6 +721,7 @@ typedef struct sSapDfsInfo
      * channel switch is disabled.
      */
     v_U8_t              disable_dfs_ch_switch;
+    v_U8_t              sap_enable_radar_war;
     uint16_t            tx_leakage_threshold;
     uint8_t             new_sub20_channelwidth;
     /* beacon count before channel switch */
@@ -708,6 +729,7 @@ typedef struct sSapDfsInfo
     uint8_t            sap_ch_switch_mode;
     bool               dfs_beacon_tx_enhanced;
     uint16_t           reduced_beacon_interval;
+    enum sub20_chan_switch_mode  sub20_switch_mode;
 } tSapDfsInfo;
 
 typedef struct tagSapCtxList

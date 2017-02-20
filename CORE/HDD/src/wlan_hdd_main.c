@@ -9018,6 +9018,30 @@ void hdd_update_tgt_cfg(void *context, void *param)
     hdd_ctx->max_mc_addr_list = cfg->max_mc_addr_list;
 }
 
+void hdd_update_dfs_cac_block_tx_flag(void *context, bool cac_block_tx)
+{
+	hdd_context_t *hdd_ctx = (hdd_context_t *)context;
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	hdd_adapter_t *adapter;
+	VOS_STATUS status;
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+	if (hdd_ctx->cfg_ini->disableDFSChSwitch)
+		return;
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (NULL != adapter_node && VOS_STATUS_SUCCESS == status) {
+		adapter = adapter_node->pAdapter;
+		if (WLAN_HDD_SOFTAP == adapter->device_mode ||
+				WLAN_HDD_P2P_GO == adapter->device_mode)
+			WLAN_HDD_GET_AP_CTX_PTR(adapter)->dfs_cac_block_tx =
+					cac_block_tx;
+
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+}
+
 /* This function is invoked in atomic context when a radar
  * is found on the SAP current operating channel and Data
  * Tx from netif has to be stopped to honor the DFS regulations.
@@ -10270,6 +10294,19 @@ static inline void
 hdd_adapter_runtime_suspend_denit(hdd_adapter_t *adapter) { }
 #endif
 
+/**
+ * hdd_adapter_init_action_frame_random_mac() - Initialze attributes needed for
+ * randomization of SA in management action frames
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+static void hdd_adapter_init_action_frame_random_mac(hdd_adapter_t *adapter)
+{
+	spin_lock_init(&adapter->random_mac_lock);
+	vos_mem_zero(adapter->random_mac, sizeof(adapter->random_mac));
+}
+
 static hdd_adapter_t* hdd_alloc_station_adapter(hdd_context_t *pHddCtx,
                                                 tSirMacAddr macAddr,
                                                 unsigned char name_assign_type,
@@ -11102,6 +11139,9 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          if( VOS_STATUS_SUCCESS != status )
             goto err_free_netdev;
 
+         /* initialize action frame random mac info */
+         hdd_adapter_init_action_frame_random_mac(pAdapter);
+
          // Workqueue which gets scheduled in IPv4 notification callback
          vos_init_work(&pAdapter->ipv4NotifierWorkQueue,
                         hdd_ipv4_notifier_work_queue);
@@ -11168,7 +11208,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          pAdapter->device_mode = session_type;
 
          hdd_initialize_adapter_common(pAdapter);
-         status = hdd_init_ap_mode(pAdapter);
+         status = hdd_init_ap_mode(pAdapter, false);
          if( VOS_STATUS_SUCCESS != status )
             goto err_free_netdev;
 
@@ -11868,10 +11908,24 @@ VOS_STATUS hdd_reset_all_adapters( hdd_context_t *pHddCtx )
    while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
    {
       pAdapter = pAdapterNode->pAdapter;
+
       hddLog(LOG1, FL("Disabling queues"));
-      wlan_hdd_netif_queue_control(pAdapter,
-          WLAN_NETIF_TX_DISABLE_N_CARRIER,
-          WLAN_CONTROL_PATH);
+
+      if (pHddCtx->cfg_ini->sap_internal_restart &&
+          pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+          hddLog(LOG1, FL("driver supports sap restart"));
+          vos_flush_work(&pHddCtx->sap_start_work);
+          wlan_hdd_netif_queue_control(pAdapter,
+                                 WLAN_NETIF_TX_DISABLE,
+                                  WLAN_CONTROL_PATH);
+          hdd_sap_indicate_disconnect_for_sta(pAdapter);
+          hdd_cleanup_actionframe(pHddCtx, pAdapter);
+          hdd_sap_destroy_events(pAdapter);
+
+      } else
+          wlan_hdd_netif_queue_control(pAdapter,
+              WLAN_NETIF_TX_DISABLE_N_CARRIER,
+              WLAN_CONTROL_PATH);
 
       pAdapter->sessionCtx.station.hdd_ReassocScenario = VOS_FALSE;
 
@@ -12132,7 +12186,17 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
             break;
 
          case WLAN_HDD_SOFTAP:
-            /* softAP can handle SSR */
+            if (pHddCtx->cfg_ini->sap_internal_restart) {
+                hdd_init_ap_mode(pAdapter, true);
+
+#ifdef QCA_LL_TX_FLOW_CT
+                WLANTL_RegisterTXFlowControl(pHddCtx->pvosContext,
+                          hdd_softap_tx_resume_cb,
+                          pAdapter->sessionId,
+                          (void *)pAdapter);
+#endif
+
+            }
             break;
 
          case WLAN_HDD_P2P_GO:
@@ -12637,6 +12701,25 @@ hdd_adapter_t * hdd_get_adapter_by_macaddr( hdd_context_t *pHddCtx,
 
    return NULL;
 
+}
+
+hdd_adapter_t * hdd_get_adapter_by_rand_macaddr(hdd_context_t *hdd_ctx,
+						tSirMacAddr mac_addr)
+{
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	hdd_adapter_t *adapter;
+	VOS_STATUS status;
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (adapter_node && status == VOS_STATUS_SUCCESS) {
+		adapter = adapter_node->pAdapter;
+		if(adapter && hdd_check_random_mac(adapter, mac_addr))
+			return adapter;
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+
+	return NULL;
 }
 
 hdd_adapter_t * hdd_get_adapter_by_name( hdd_context_t *pHddCtx, tANI_U8 *name )
@@ -15359,6 +15442,13 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
                   __func__, ret);
        }
    }
+   ret = process_wma_set_command(0, WMI_PDEV_PARAM_ARP_AC_OVERRIDE,
+                                 pHddCtx->cfg_ini->arp_ac_category, PDEV_CMD);
+   if (0 != ret) {
+       hddLog(LOGE,
+              "%s: WMI_PDEV_PARAM_ARP_AC_OVERRIDE failed AC: %d ret: %d",
+              __func__, pHddCtx->cfg_ini->arp_ac_category, ret);
+   }
 
    status = hdd_set_sme_chan_list(pHddCtx);
    if (status != VOS_STATUS_SUCCESS) {
@@ -17216,8 +17306,8 @@ void hdd_unsafe_channel_restart_sap(hdd_context_t *hdd_ctx)
 						0);
 
 				hddLog(LOG1, FL("driver to start sap: %d"),
-					hdd_ctx->cfg_ini->sap_restrt_ch_avoid);
-				if (hdd_ctx->cfg_ini->sap_restrt_ch_avoid) {
+					hdd_ctx->cfg_ini->sap_internal_restart);
+				if (hdd_ctx->cfg_ini->sap_internal_restart) {
 					wlan_hdd_netif_queue_control(adapter,
 							WLAN_NETIF_TX_DISABLE,
 							WLAN_CONTROL_PATH);
@@ -18134,7 +18224,7 @@ void wlan_hdd_stop_sap(hdd_adapter_t *ap_adapter)
  *
  * Return: void.
  */
-void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
+void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit)
 {
     hdd_ap_ctx_t *hdd_ap_ctx;
     hdd_hostapd_state_t *hostapd_state;
@@ -18153,8 +18243,13 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
     hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
     pConfig = &ap_adapter->sessionCtx.ap.sapConfig;
 
-    if (0 != wlan_hdd_validate_context(hdd_ctx))
-        return;
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+              FL("ssr in progress %d"), reinit);
+
+     if (!reinit) {
+        if (0 != wlan_hdd_validate_context(hdd_ctx))
+            return;
+    }
 
     mutex_lock(&hdd_ctx->sap_lock);
     if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags))

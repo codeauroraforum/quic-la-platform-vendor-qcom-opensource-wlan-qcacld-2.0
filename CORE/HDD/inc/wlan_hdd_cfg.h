@@ -1482,6 +1482,11 @@ typedef enum
 #define CFG_DISABLE_DFS_CH_SWITCH_MAX             ( 1 )
 #define CFG_DISABLE_DFS_CH_SWITCH_DEFAULT         ( 0 )
 
+#define CFG_ENABLE_RADAR_WAR                 "gEnableRadarAssocWar"
+#define CFG_ENABLE_RADAR_WAR_MIN             ( 0 )
+#define CFG_ENABLE_RADAR_WAR_MAX             ( 1 )
+#define CFG_ENABLE_RADAR_WAR_DEFAULT         ( 1 )
+
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY               "gEnableDFSMasterCap"
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY_MIN           ( 0 )
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY_MAX           ( 1 )
@@ -1564,6 +1569,43 @@ typedef enum
 #define CFG_SAP_GET_PEER_INFO_MIN                   (0)
 #define CFG_SAP_GET_PEER_INFO_MAX                   (1)
 #define CFG_SAP_GET_PEER_INFO_DEFAULT               (0)
+
+/*
+ * <ini>
+ * gDisableABGRateForTxData - disable abg rate for tx data
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to disable abg rate for tx data.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DISABLE_ABG_RATE_FOR_TX_DATA                 "gDisableABGRateForTxData"
+#define CFG_DISABLE_ABG_RATE_FOR_TX_DATA_MIN             (WNI_CFG_DISABLE_ABG_RATE_FOR_TX_DATA_STAMIN)
+#define CFG_DISABLE_ABG_RATE_FOR_TX_DATA_MAX             (WNI_CFG_DISABLE_ABG_RATE_FOR_TX_DATA_STAMAX)
+#define CFG_DISABLE_ABG_RATE_FOR_TX_DATA_DEFAULT         (WNI_CFG_DISABLE_ABG_RATE_FOR_TX_DATA_STADEF)
+
+/*
+ * <ini>
+ * gRateForTxMgmt - rate for tx mgmt frame
+ * @Min: 0x0
+ * @Max: 0xFF
+ * @Default: 0xFF
+ *
+ * This ini is used to configure the rate for tx
+ * mgmt frame. Default 0xFF means disable.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_RATE_FOR_TX_MGMT                  "gRateForTxMgmt"
+#define CFG_RATE_FOR_TX_MGMT_MIN              (WNI_CFG_RATE_FOR_TX_MGMT_STAMIN)
+#define CFG_RATE_FOR_TX_MGMT_MAX              (WNI_CFG_RATE_FOR_TX_MGMT_STAMAX)
+#define CFG_RATE_FOR_TX_MGMT_DEFAULT          (WNI_CFG_RATE_FOR_TX_MGMT_STADEF)
 
 /*
  * RSSI Thresholds
@@ -1835,7 +1877,7 @@ typedef enum
 
 #define CFG_ACS_BAND_SWITCH_THRESHOLD             "gACSBandSwitchThreshold"
 #define CFG_ACS_BAND_SWITCH_THRESHOLD_MIN         (0)
-#define CFG_ACS_BAND_SWITCH_THRESHOLD_MAX         (4444)
+#define CFG_ACS_BAND_SWITCH_THRESHOLD_MAX         (26664)
 /* 2 BSS, maximum RSSI -90 */
 #define CFG_ACS_BAND_SWITCH_THRESHOLD_DEFAULT     (296)
 
@@ -4155,10 +4197,10 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_TGT_GTX_USR_CFG_MAX       (32)
 #define CFG_TGT_GTX_USR_CFG_DEFAULT   (32)
 
-#define CFG_CH_AVOID_SAP_RESTART_NAME    "sap_ch_avoid_restart"
-#define CFG_CH_AVOID_SAP_RESTART_MIN     (0)
-#define CFG_CH_AVOID_SAP_RESTART_MAX     (1)
-#define CFG_CH_AVOID_SAP_RESTART_DEFAULT (0)
+#define CFG_SAP_INTERNAL_RESTART_NAME    "gEnableSapInternalRestart"
+#define CFG_SAP_INTERNAL_RESTART_MIN     (0)
+#define CFG_SAP_INTERNAL_RESTART_MAX     (1)
+#define CFG_SAP_INTERNAL_RESTART_DEFAULT (1)
 
 /*
  * This parameter will help to debug ssr reinit failure issues
@@ -4296,6 +4338,7 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
  * g_sub20_channel_width=3: Switch between 5 and 20 MHz bandwidth dynamically
  * g_sub20_channel_width=4: Switch between 10 and 20 MHz bandwidth dynamically
  * g_sub20_channel_width=5: Switch between 5/10 and 20 MHz bandwidth dynamically
+ * g_sub20_channel_width=6: Switch between 5/10 and 20 MHz bandwidth manually
  * Default : Disable
  */
 #define CFG_SUB_20_CHANNEL_WIDTH_NAME      "g_sub20_channel_width"
@@ -4305,8 +4348,10 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_SUB_20_CHANNEL_WIDTH_DYN_5MHZ        (3)
 #define CFG_SUB_20_CHANNEL_WIDTH_DYN_10MHZ       (4)
 #define CFG_SUB_20_CHANNEL_WIDTH_DYN_ALL         (5)
+#define CFG_SUB_20_CHANNEL_WIDTH_MANUAL          (6)
+
 #define CFG_SUB_20_CHANNEL_WIDTH_MIN             (0)
-#define CFG_SUB_20_CHANNEL_WIDTH_MAX             (5)
+#define CFG_SUB_20_CHANNEL_WIDTH_MAX             (6)
 #define CFG_SUB_20_CHANNEL_WIDTH_DEFAULT         (0)
 
 /*
@@ -4503,6 +4548,33 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_REDUCED_BEACON_INTERVAL_MIN     (0)
 #define CFG_REDUCED_BEACON_INTERVAL_MAX     (100)
 #define CFG_REDUCED_BEACON_INTERVAL_DEFAULT (0)
+
+/*
+ * <ini>
+ * arp_ac_category - ARP access category
+ * @Min: 0
+ * @Max: 3
+ * @Default: 3
+ *
+ * Firmware by default categorizes ARP packets with VOICE TID.
+ * This ini shall be used to override the default configuration.
+ * Access category enums are referenced in ieee80211_common.h
+ * WME_AC_BE = 0 (Best effort)
+ * WME_AC_BK = 1 (Background)
+ * WME_AC_VI = 2 (Video)
+ * WME_AC_VO = 3 (Voice)
+ *
+ * Related: none
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_ARP_AC_CATEGORY                "arp_ac_category"
+#define CFG_ARP_AC_CATEGORY_MIN            (0)
+#define CFG_ARP_AC_CATEGORY_MAX            (3)
+#define CFG_ARP_AC_CATEGORY_DEFAULT        (3)
+
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -4988,6 +5060,7 @@ struct hdd_config {
    v_U8_t                      max_sap_peers;
    v_U8_t                      max_go_peers;
    v_U8_t                      disableDFSChSwitch;
+   v_U8_t                      enable_radar_war;
    v_U8_t                      enableDFSMasterCap;
    v_U16_t                     thermalTempMinLevel0;
    v_U16_t                     thermalTempMaxLevel0;
@@ -5013,6 +5086,8 @@ struct hdd_config {
    uint8_t                     max_mpdus_inampdu;
    uint16_t                    max_ht_mcs_txdata;
    bool                        sap_get_peer_info;
+   bool                        disable_abg_rate_txdata;
+   uint8_t                     rate_for_tx_mgmt;
 #ifdef QCA_LL_TX_FLOW_CT
    v_U32_t                     TxFlowLowWaterMark;
    v_U32_t                     TxFlowHighWaterMarkOffset;
@@ -5298,7 +5373,7 @@ struct hdd_config {
 
    /* parameter to control GTX */
    uint32_t                    tgt_gtx_usr_cfg;
-   bool                        sap_restrt_ch_avoid;
+   bool                        sap_internal_restart;
    bool                        bug_on_reinit_failure;
    /* parameter to force sap into 11n */
    bool                        sap_force_11n_for_11ac;
@@ -5347,6 +5422,7 @@ struct hdd_config {
    uint8_t                     sap_chanswitch_mode;
    uint8_t                     dfs_beacon_tx_enhanced;
    uint16_t                    reduced_beacon_interval;
+   uint32_t                    arp_ac_category;
 };
 
 typedef struct hdd_config hdd_config_t;
@@ -5488,6 +5564,14 @@ tANI_BOOLEAN hdd_is_okc_mode_enabled(hdd_context_t *pHddCtx);
 VOS_STATUS hdd_set_idle_ps_config(hdd_context_t *pHddCtx, v_U32_t val);
 
 void hdd_update_tgt_cfg(void *context, void *param);
+/**
+ * hdd_update_dfs_cac_block_tx_flag() - to set dfs_cac_block_tx flag
+ * @context: Pointer to hdd contex
+ * @cac_block_tx: value to be set
+ *
+ * Return: none
+ */
+void hdd_update_dfs_cac_block_tx_flag(void *context, bool cac_block_tx);
 bool hdd_dfs_indicate_radar(void *context, void *param);
 
 VOS_STATUS hdd_string_to_u8_array( char *str, tANI_U8 *intArray, tANI_U8 *len,
