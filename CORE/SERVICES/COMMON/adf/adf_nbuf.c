@@ -89,10 +89,17 @@ __adf_nbuf_alloc(adf_os_device_t osdev, size_t size, int reserve, int align, int
 
     skb = dev_alloc_skb(size);
 
+    if (skb)
+       goto skb_cb;
+
+    skb = __adf_nbuf_pre_alloc(osdev, size);
+
     if (!skb) {
         printk("ERROR:NBUF alloc failed\n");
         return NULL;
     }
+
+skb_cb:
     memset(skb->cb, 0x0, sizeof(skb->cb));
 
     /*
@@ -138,7 +145,11 @@ __adf_nbuf_free(struct sk_buff *skb)
         NBUF_CALLBACK_FN_EXEC(skb);
     else
 #endif
-    dev_kfree_skb_any(skb);
+    {
+       if (__adf_nbuf_pre_alloc_free(skb))
+           return;
+       dev_kfree_skb_any(skb);
+    }
 }
 
 
