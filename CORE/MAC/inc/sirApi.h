@@ -3809,6 +3809,18 @@ typedef struct
 } tSirNetworkType;
 
 /**
+ * struct connected_pno_band_rssi_pref - BSS preference based on band
+ * and RSSI
+ * @band: band preference
+ * @rssi_pref: RSSI preference
+ */
+struct connected_pno_band_rssi_pref
+{
+	tSirRFBand band;
+	int8_t rssi;
+};
+
+/**
  * struct sSirPNOScanReq - PNO Scan request structure
  * @enable: flag to enable or disable
  * @modePNO: PNO Mode
@@ -3827,6 +3839,10 @@ typedef struct
  * @p24GProbeTemplate: 2.4G probe template
  * @us5GProbeTemplateLen: 5G probe template length
  * @p5GProbeTemplate: 5G probe template
+ * @relative_rssi_set: Flag to check whether realtive_rssi is set or not
+ * @relative_rssi: Relative rssi threshold, used for connected pno
+ * @band_rssi_pref: Band and RSSI preference that can be given to one BSS
+ * over the other BSS
  */
 typedef struct sSirPNOScanReq {
 	uint8_t         enable;
@@ -3848,6 +3864,10 @@ typedef struct sSirPNOScanReq {
 	uint8_t         p24GProbeTemplate[SIR_PNO_MAX_PB_REQ_SIZE];
 	uint16_t        us5GProbeTemplateLen;
 	uint8_t         p5GProbeTemplate[SIR_PNO_MAX_PB_REQ_SIZE];
+
+	bool            relative_rssi_set;
+	int8_t          relative_rssi;
+	struct          connected_pno_band_rssi_pref band_rssi_pref;
 
 	/* mac address randomization attributes */
 	uint32_t enable_pno_scan_randomization;
@@ -3878,7 +3898,7 @@ typedef struct sSirSetRSSIFilterReq
  * SIR_MAC_ACTION_DLP              2      0
  * SIR_MAC_ACTION_BLKACK           3      0
  * SIR_MAC_ACTION_PUBLIC_USAGE     4      1
- * SIR_MAC_ACTION_RRM              5      1
+ * SIR_MAC_ACTION_RRM              5      0
  * SIR_MAC_ACTION_FAST_BSS_TRNST   6      0
  * SIR_MAC_ACTION_HT               7      0
  * SIR_MAC_ACTION_SA_QUERY         8      1
@@ -3898,7 +3918,6 @@ typedef struct sSirSetRSSIFilterReq
 		((1 << SIR_MAC_ACTION_SPECTRUM_MGMT) | \
 		 (1 << SIR_MAC_ACTION_QOS_MGMT) | \
 		 (1 << SIR_MAC_ACTION_PUBLIC_USAGE) | \
-		 (1 << SIR_MAC_ACTION_RRM) | \
 		 (1 << SIR_MAC_ACTION_SA_QUERY) | \
 		 (1 << SIR_MAC_ACTION_WNM) | \
 		 (1 << SIR_MAC_ACTION_WME) | \
@@ -4580,6 +4599,7 @@ typedef struct sSirScanOffloadReq {
     tANI_U16 uIEFieldLen;
     tANI_U16 uIEFieldOffset;
 
+    uint32_t burst_scan_duration;
     uint32_t enable_scan_randomization;
     uint8_t mac_addr[VOS_MAC_ADDR_SIZE];
     uint8_t mac_addr_mask[VOS_MAC_ADDR_SIZE];
@@ -4820,6 +4840,64 @@ struct sir_peer_info_resp {
 	struct sir_peer_info info[0];
 };
 
+/**
+ * struct sir_peer_info_ext_req - peer info request struct
+ * @peer_macaddr: MAC address
+ * @sessionId: vdev id
+ * @reset_after_request: fw reset statistics after query
+ *
+ * peer info request message's struct
+ */
+struct sir_peer_info_ext_req {
+	v_MACADDR_t peer_macaddr;
+	uint8_t sessionid;
+	uint8_t reset_after_request;
+};
+
+/**
+ * struct sir_peer_info_ext - peer info information struct
+ *                            (refer to station_info struct in Kernel)
+ * @peer_macaddr: MAC address
+ * @tx_packets: packets transmitted to this station
+ * @tx_bytes: bytes transmitted to this station
+ * @rx_packets: packets received from this station
+ * @rx_bytes: bytes received from this station
+ * @rx_retries: cumulative retry counts
+ * @tx_failed: number of failed transmissions
+ * @rssi: The signal strength
+ * @tx_rate: last used tx bitrate (kbps)
+ * @tx_rate_code: last tx rate code (last_tx_rate_code of wmi_peer_stats_info)
+ * @rx_rate: last used rx bitrate (kbps)
+ * @rx_rate_code: last rx rate code (last_rx_rate_code of wmi_peer_stats_info)
+ *
+ * a station's information
+ */
+struct sir_peer_info_ext {
+	tSirMacAddr peer_macaddr;
+	uint32_t tx_packets;
+	uint64_t tx_bytes;
+	uint32_t rx_packets;
+	uint64_t rx_bytes;
+	uint32_t tx_retries;
+	uint32_t tx_failed;
+	int32_t rssi;
+	uint32_t tx_rate;
+	uint32_t tx_rate_code;
+	uint32_t rx_rate;
+	uint32_t rx_rate_code;
+};
+
+/**
+ * struct sir_peer_info_ext_resp - all peers' information struct
+ * @count: peer's number
+ * @info: peer information
+ *
+ * all station's information
+ */
+struct sir_peer_info_ext_resp {
+	uint8_t count;
+	struct sir_peer_info_ext info[0];
+};
 
 typedef struct sSirAddPeriodicTxPtrn
 {
@@ -5077,6 +5155,7 @@ typedef struct sSirDfsCsaIeRequest
     uint8_t  ch_switch_beacon_cnt;
     uint8_t  ch_switch_mode;
     uint8_t  dfs_ch_switch_disable;
+    uint8_t  sub20_switch_mode;
 }tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -6371,7 +6450,9 @@ struct sir_wifi_peer_signal_stats {
 
 /**
  * struct sir_wifi_tx - per AC tx stats
- * @mpdus: number of totoal TX packets on MAC layer in the period
+ * @msdus: number of totoal MSDUs on MAC layer in the period
+ * @mpdus: number of totoal MPDUs on MAC layer in the period
+ * @ppdus: number of totoal PPDUs on PHY layer in the period
  * @bytes: bytes of tx data on MAC layer in the period
  * @drops: number of TX packets cancelled due to any reason in the period,
  *	such as WMM limitation/bandwidth limitation/radio congestion
@@ -6388,7 +6469,9 @@ struct sir_wifi_peer_signal_stats {
  * @delay: histogram of delays on MAC layer
  */
 struct sir_wifi_tx {
+	uint32_t msdus;
 	uint32_t mpdus;
+	uint32_t ppdus;
 	uint32_t bytes;
 	uint32_t drops;
 	uint32_t drop_bytes;
@@ -6454,6 +6537,7 @@ struct sir_wifi_ll_ext_wmm_ac_stats {
  * struct sir_wifi_ll_ext_peer_stats - per peer stats
  * @peer_id: peer ID
  * @vdev_id: VDEV ID
+ * mac_address: MAC address
  * @sta_ps_inds: how many times STAs go to sleep
  * @sta_ps_durs: total sleep time of STAs (units in ms)
  * @rx_probe_reqs: number of probe requests received
@@ -6465,6 +6549,7 @@ struct sir_wifi_ll_ext_wmm_ac_stats {
 struct sir_wifi_ll_ext_peer_stats {
 	uint32_t peer_id;
 	uint32_t vdev_id;
+	tSirMacAddr mac_address;
 	uint32_t sta_ps_inds;
 	uint32_t sta_ps_durs;
 	uint32_t rx_probe_reqs;
@@ -8276,6 +8361,34 @@ struct sir_peer_set_rx_blocksize {
 	uint32_t vdev_id;
 	v_MACADDR_t peer_macaddr;
 	uint32_t rx_block_ack_win_limit;
+};
+
+/**
+ * enum action_filter_type - Type of action frame filter
+ * @SME_ACTION_FRAME_RANDOM_MAC_SET: Set filter
+ * @SME_ACTION_FRAME_RANDOM_MAC_CLEAR: Clear filter
+ */
+enum action_filter_type {
+	SME_ACTION_FRAME_RANDOM_MAC_SET,
+	SME_ACTION_FRAME_RANDOM_MAC_CLEAR,
+};
+
+typedef void (*action_frame_random_filter_callback)(bool set_random_addr,
+						    void *context);
+/**
+ * struct action_frame_random_filter - Random mac filter attrs for set/clear
+ * @session_id: Session interface
+ * @filter_type: Type of filter from action_filter_type
+ * @callback: Invoked from wmi
+ * @context: Parameter to be used with callback
+ * @mac_addr: Random mac addr for which filter is to be set
+ */
+struct action_frame_random_filter {
+	uint32_t session_id;
+	enum action_filter_type filter_type;
+	action_frame_random_filter_callback callback;
+	void *context;
+	uint8_t mac_addr[VOS_MAC_ADDR_SIZE];
 };
 
 #endif /* __SIR_API_H */

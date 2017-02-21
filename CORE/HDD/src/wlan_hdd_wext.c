@@ -10422,7 +10422,6 @@ int iw_set_pno(struct net_device *dev, struct iw_request_info *info,
   }
   vos_mem_zero(data, len);
   vos_mem_copy(data, &extra[nOffset], (len-1));
-  data[len] = '\0';
   ptr = data;
 
   if (1 != sscanf(ptr," %hhu%n", &(pnoRequest.enable), &nOffset))
@@ -11160,6 +11159,8 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
             roam_profile.ChannelInfo.numOfChannels = 1;
             roam_profile.vht_channel_width = ch_info->channel_width;
             roam_profile.phyMode = ch_info->phy_mode;
+            roam_profile.sub20_channelwidth =
+                    (hdd_ctx->cfg_ini->sub_20_channel_width & 0x3);
 
             vos_mem_copy(bssid, pAdapter->macAddressCurrent.bytes,
                          VOS_MAC_ADDR_SIZE);

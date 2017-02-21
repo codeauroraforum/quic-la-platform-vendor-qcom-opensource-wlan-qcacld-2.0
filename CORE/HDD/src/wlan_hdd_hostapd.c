@@ -368,8 +368,9 @@ bool hdd_hostapd_sub20_channelwidth_can_switch(
 	int i;
 	int sta_count = 0;
 	uint8_t sap_s20_caps;
+	uint8_t sap_s20_config;
 	uint8_t sta_s20_caps = SUB20_MODE_NONE;
-	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(adapter);
+	tHalHandle hal_ptr = WLAN_HDD_GET_HAL_CTX(adapter);
 	tSmeConfigParams *sme_config;
 	hdd_station_info_t *sta;
 	hdd_ap_ctx_t *ap = WLAN_HDD_GET_AP_CTX_PTR(adapter);
@@ -381,11 +382,13 @@ bool hdd_hostapd_sub20_channelwidth_can_switch(
 	}
 	vos_mem_zero(sme_config, sizeof(*sme_config));
 
-	sme_GetConfigParam(hHal, sme_config);
+	sme_GetConfigParam(hal_ptr, sme_config);
 	sap_s20_caps = sme_config->sub20_dynamic_channelwidth;
+	sap_s20_config = sme_config->sub20_config_info;
 	vos_mem_free(sme_config);
-	if (sap_s20_caps == SUB20_MODE_NONE) {
-		hddLog(LOGE, FL("sub20 none"));
+	if (sap_s20_caps == SUB20_MODE_NONE ||
+	    sap_s20_config == CFG_SUB_20_CHANNEL_WIDTH_MANUAL) {
+		hddLog(LOGE, FL("sub20 not switch"));
 		return false;
 	}
 
@@ -432,7 +435,7 @@ bool hdd_hostapd_sub20_channelwidth_can_restore(
 	int sta_count = 0;
 	uint8_t sap_s20_caps;
 	uint8_t sta_s20_caps = SUB20_MODE_NONE;
-	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(adapter);
+	tHalHandle hal_ptr = WLAN_HDD_GET_HAL_CTX(adapter);
 	tSmeConfigParams *sme_config;
 	hdd_station_info_t *sta;
 	hdd_ap_ctx_t *ap = WLAN_HDD_GET_AP_CTX_PTR(adapter);
@@ -443,7 +446,7 @@ bool hdd_hostapd_sub20_channelwidth_can_restore(
 		return false;
 	}
 	vos_mem_zero(sme_config, sizeof(*sme_config));
-	sme_GetConfigParam(hHal, sme_config);
+	sme_GetConfigParam(hal_ptr, sme_config);
 
 	sap_s20_caps = sme_config->sub20_dynamic_channelwidth;
 	vos_mem_free(sme_config);
@@ -471,6 +474,92 @@ bool hdd_hostapd_sub20_channelwidth_can_restore(
 		return true;
 	}
 }
+
+/**
+  * hdd_hostapd_sub20_channelwidth_can_set() - check
+  * channel width manual switch to 5/10M condition
+  * @adapter: pointer to HDD context
+  * @sub20_channel_width: new channel width
+  *
+  * Return:  true or false
+  */
+bool hdd_hostapd_sub20_channelwidth_can_set(
+	hdd_adapter_t *adapter, uint32_t sub20_channel_width)
+{
+	int i;
+	int sta_count = 0;
+	uint8_t sap_s20_config;
+	uint8_t sta_s20_caps = SUB20_MODE_NONE;
+	tHalHandle hal_ptr = WLAN_HDD_GET_HAL_CTX(adapter);
+	tSmeConfigParams *sme_config;
+	hdd_station_info_t *sta;
+	hdd_ap_ctx_t *ap = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	bool channel_support_sub20 = true;
+	enum phy_ch_width phy_sub20_channel_width = CH_WIDTH_INVALID;
+
+	sme_config = vos_mem_malloc(sizeof(*sme_config));
+	if (!sme_config) {
+		hddLog(LOGE, FL("mem alloc failed for sme_config"));
+		return false;
+	}
+	vos_mem_zero(sme_config, sizeof(*sme_config));
+
+	sme_GetConfigParam(hal_ptr, sme_config);
+	sap_s20_config = sme_config->sub20_config_info;
+	vos_mem_free(sme_config);
+	sme_config = NULL;
+	if (sap_s20_config != CFG_SUB_20_CHANNEL_WIDTH_MANUAL) {
+		hddLog(LOGE, FL("ini unsupport manual set sub20"));
+		return false;
+	}
+
+	switch (sub20_channel_width) {
+	case SUB20_MODE_5MHZ:
+		phy_sub20_channel_width = CH_WIDTH_5MHZ;
+		break;
+	case SUB20_MODE_10MHZ:
+		phy_sub20_channel_width = CH_WIDTH_10MHZ;
+		break;
+	case SUB20_MODE_NONE:
+		return true;
+	default:
+		return false;
+	}
+
+	channel_support_sub20 =
+	      vos_is_channel_support_sub20(ap->operatingChannel,
+					   phy_sub20_channel_width,
+					   0);
+	if (!channel_support_sub20) {
+		hddLog(VOS_TRACE_LEVEL_ERROR,
+		       FL("ch%d width%d unsupport by reg domain"),
+		       ap->operatingChannel, phy_sub20_channel_width);
+		return false;
+	}
+
+	spin_lock_bh(&adapter->staInfo_lock);
+	for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
+		sta = &adapter->aStaInfo[i];
+		if (sta->isUsed && (ap->uBCStaId != i)) {
+			sta_count++;
+			sta_s20_caps |=
+				sta->sub20_dynamic_channelwidth;
+		}
+	}
+	spin_unlock_bh(&adapter->staInfo_lock);
+	if (sta_count != 1) {
+		hddLog(VOS_TRACE_LEVEL_ERROR,
+		       "%d STAs connected with sub20 Channelwidth %d",
+		       sta_count, sta_s20_caps);
+		return false;
+	}
+
+	if (!(sta_s20_caps & sub20_channel_width))
+		return false;
+
+	return true;
+}
+
 #endif
 
 /**
@@ -2453,7 +2542,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 return VOS_STATUS_E_FAILURE;
             }
 #ifdef IPA_OFFLOAD
-            if (hdd_ipa_is_enabled(pHddCtx))
+            if (!pHddCtx->isLogpInProgress && hdd_ipa_is_enabled(pHddCtx))
             {
                 status = hdd_ipa_wlan_evt(pHostapdAdapter, staId, WLAN_CLIENT_DISCONNECT,
                 pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac.bytes);
@@ -3022,6 +3111,115 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel)
 
     return ret;
 }
+
+#ifdef FEATURE_WLAN_SUB_20_MHZ
+/**
+ * hdd_softap_set_channel_sub20_chanwidth_change() -This
+ * function to support SAP channel change with CSA IE
+ * set in the beacons.
+ * @dev: Pointer to the net device
+ * @chan_width: new sub20 channel width
+ *
+ * Return:  true or false
+ */
+int hdd_softap_set_channel_sub20_chanwidth_change(struct net_device *dev,
+						  uint32_t chan_width)
+{
+	VOS_STATUS status;
+	int ret;
+	hdd_adapter_t *hostapd_adapter = (netdev_priv(dev));
+	hdd_context_t *hdd_ctx_ptr;
+	hdd_adapter_t *sta_adapter;
+	hdd_station_ctx_t *sta_ctx;
+	uint32_t sub20_chan_width;
+	bool sub20_operate_permission;
+	void *vos_ctx_ptr;
+
+	hdd_ctx_ptr = WLAN_HDD_GET_CTX(hostapd_adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx_ptr);
+	if (ret)
+		return ret;
+
+	sta_adapter = hdd_get_adapter(hdd_ctx_ptr, WLAN_HDD_INFRA_STATION);
+	/*
+	 * conc_custom_rule1:
+	 * Force SCC for SAP + STA
+	 * if STA is already connected then we shouldn't allow
+	 * channel switch in SAP interface
+	 */
+	if (sta_adapter && hdd_ctx_ptr->cfg_ini->conc_custom_rule1) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(sta_adapter);
+		if (hdd_connIsConnected(sta_ctx)) {
+			hddLog(LOGE,
+			       FL("sub20 chan switch not allowed"));
+			return -EBUSY;
+		}
+	}
+
+	switch (chan_width) {
+	case NL80211_CHAN_WIDTH_5:
+		sub20_chan_width = SUB20_MODE_5MHZ;
+		break;
+	case NL80211_CHAN_WIDTH_10:
+		sub20_chan_width = SUB20_MODE_10MHZ;
+		break;
+	case NL80211_CHAN_WIDTH_20_NOHT:
+		sub20_chan_width = SUB20_MODE_NONE;
+		break;
+	default:
+		hddLog(LOGE, FL("invalid param %d"), chan_width);
+		return -EINVAL;
+	}
+
+	sub20_operate_permission =
+		hdd_hostapd_sub20_channelwidth_can_set(hostapd_adapter,
+						       sub20_chan_width);
+	if (!sub20_operate_permission) {
+		hddLog(LOGE, FL("can't set sub20_chan_width in curr chan"));
+		return -EINVAL;
+	}
+
+	spin_lock_bh(&hdd_ctx_ptr->dfs_lock);
+	if (hdd_ctx_ptr->dfs_radar_found == VOS_TRUE) {
+		spin_unlock_bh(&hdd_ctx_ptr->dfs_lock);
+		hddLog(LOGE,
+		       FL("sub20 chan width switch in progress!!"));
+		return -EBUSY;
+	}
+	/*
+	 * Set the dfs_radar_found flag to mimic channel change
+	 * when a radar is found. This will enable synchronizing
+	 * SAP and HDD states similar to that of radar indication.
+	 * Suspend the netif queues to stop queuing Tx frames
+	 * from upper layers.  netif queues will be resumed
+	 * once the channel change is completed and SAP will
+	 * post eSAP_START_BSS_EVENT success event to HDD.
+	 */
+	hdd_ctx_ptr->dfs_radar_found = VOS_TRUE;
+	spin_unlock_bh(&hdd_ctx_ptr->dfs_lock);
+
+	vos_ctx_ptr = WLAN_HDD_GET_SAP_CTX_PTR(hostapd_adapter);
+	status = WLANSAP_set_sub20_channelwidth_with_csa(vos_ctx_ptr,
+							 sub20_chan_width);
+	if (VOS_STATUS_SUCCESS != status) {
+		hddLog(LOGE,
+		       FL("sub20 chan width %d switch failed"),
+		       sub20_chan_width);
+		/*
+		 * If channel change command fails then clear the
+		 * radar found flag and also restart the netif
+		 * queues.
+		 */
+		spin_lock_bh(&hdd_ctx_ptr->dfs_lock);
+		hdd_ctx_ptr->dfs_radar_found = VOS_FALSE;
+		spin_unlock_bh(&hdd_ctx_ptr->dfs_lock);
+
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+#endif
 
 /**
  * hdd_sap_get_chan_width() - get channel width of sap
@@ -6099,6 +6297,13 @@ static int __iw_set_ap_genie(struct net_device *dev,
         return 0;
     }
 
+    if (wrqu->data.length > DOT11F_IE_RSN_MAX_LEN) {
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+               "%s: WPARSN Ie input length is more than max[%d]", __func__,
+                wrqu->data.length);
+       return -EINVAL;
+    }
+
     switch (genie[0])
     {
         case DOT11F_EID_WPA:
@@ -7163,7 +7368,7 @@ void hdd_set_ap_ops( struct net_device *pWlanHostapdDev )
   pWlanHostapdDev->netdev_ops = &net_ops_struct;
 }
 
-VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
+VOS_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 {
     hdd_hostapd_state_t * phostapdBuf;
     struct net_device *dev = pAdapter->dev;
@@ -7189,20 +7394,27 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
             __func__, ret);
     }
 
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+               FL("SSR in progress: %d"), reinit);
 #ifdef WLAN_FEATURE_MBSSID
-    sapContext = WLANSAP_Open(pVosContext);
-    if (sapContext == NULL)
-    {
-          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: WLANSAP_Open failed!!"));
-          return VOS_STATUS_E_FAULT;
+    if (reinit) {
+        sapContext = pAdapter->sessionCtx.ap.sapContext;
+    } else {
+        sapContext = WLANSAP_Open(pVosContext);
+        if (sapContext == NULL)
+        {
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                       FL("ERROR: WLANSAP_Open failed!!"));
+            return VOS_STATUS_E_FAULT;
+        }
+
+        pAdapter->sessionCtx.ap.sapContext = sapContext;
+        pAdapter->sessionCtx.ap.sapConfig.channel =
+                                   pHddCtx->acs_policy.acs_channel;
+        mode = pHddCtx->acs_policy.acs_dfs_mode;
+        pAdapter->sessionCtx.ap.sapConfig.acs_dfs_mode =
+                                        wlan_hdd_get_dfs_mode(mode);
     }
-
-    pAdapter->sessionCtx.ap.sapContext = sapContext;
-    pAdapter->sessionCtx.ap.sapConfig.channel = pHddCtx->acs_policy.acs_channel;
-    mode = pHddCtx->acs_policy.acs_dfs_mode;
-    pAdapter->sessionCtx.ap.sapConfig.acs_dfs_mode =
-          wlan_hdd_get_dfs_mode(mode);
-
 
     if (pAdapter->device_mode == WLAN_HDD_P2P_GO) {
         device_mode = VOS_P2P_GO_MODE;
@@ -7316,10 +7528,12 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
                     __func__, ret);
     }
 
-    pAdapter->sessionCtx.ap.sapConfig.acs_cfg.acs_mode = false;
-    vos_mem_free(pAdapter->sessionCtx.ap.sapConfig.acs_cfg.ch_list);
-    vos_mem_zero(&pAdapter->sessionCtx.ap.sapConfig.acs_cfg,
-                                                   sizeof(struct sap_acs_cfg));
+    if (!reinit) {
+        pAdapter->sessionCtx.ap.sapConfig.acs_cfg.acs_mode = false;
+        vos_mem_free(pAdapter->sessionCtx.ap.sapConfig.acs_cfg.ch_list);
+        vos_mem_zero(&pAdapter->sessionCtx.ap.sapConfig.acs_cfg,
+                                           sizeof(struct sap_acs_cfg));
+    }
     return status;
 
 error_wmm_init:
@@ -7489,4 +7703,81 @@ VOS_STATUS hdd_unregister_hostapd(hdd_adapter_t *pAdapter, bool rtnl_held)
 
    EXIT();
    return 0;
+}
+
+/**
+ * hdd_sap_indicate_disconnect_for_sta() - Indicate disconnect indication
+ * to supplicant, if there any clients connected to SAP interface.
+ * @adapter: sap adapter context
+ *
+ * Return:   nothing
+ */
+void hdd_sap_indicate_disconnect_for_sta(hdd_adapter_t *adapter)
+{
+	tSap_Event sap_event;
+	int staId;
+	ptSapContext sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+
+	ENTER();
+
+	if (!sap_ctx) {
+		hddLog(LOGE, FL("invalid sap context"));
+		return;
+	}
+
+	for (staId = 0; staId < WLAN_MAX_STA_COUNT; staId++) {
+		if (adapter->aStaInfo[staId].isUsed) {
+			hddLog(LOG1, FL("staId: %d isUsed: %d %p"),
+				staId, adapter->aStaInfo[staId].isUsed,
+				sap_ctx);
+
+			if (vos_is_macaddr_broadcast(
+				&adapter->aStaInfo[staId].macAddrSTA))
+				continue;
+
+			sap_event.sapHddEventCode = eSAP_STA_DISASSOC_EVENT;
+			vos_mem_copy(
+				&sap_event.sapevt.
+					sapStationDisassocCompleteEvent.staMac,
+				&adapter->aStaInfo[staId].macAddrSTA,
+				sizeof(v_MACADDR_t));
+			sap_event.sapevt.sapStationDisassocCompleteEvent.
+			reason =
+				eSAP_MAC_INITATED_DISASSOC;
+			sap_event.sapevt.sapStationDisassocCompleteEvent.
+			statusCode =
+				eSIR_SME_RESOURCES_UNAVAILABLE;
+			hdd_hostapd_SAPEventCB(&sap_event,
+				sap_ctx->pUsrContext);
+		}
+	}
+
+	clear_bit(SOFTAP_BSS_STARTED, &adapter->event_flags);
+
+	EXIT();
+}
+
+/**
+ * hdd_sap_destroy_events() - Destroy sap evets
+ * @adapter: sap adapter context
+ *
+ * Return:   nothing
+ */
+void hdd_sap_destroy_events(hdd_adapter_t *adapter)
+{
+	ptSapContext sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+
+	if (!sap_ctx) {
+	hddLog(LOGE, FL("invalid sap context"));
+	return;
+	}
+
+	if (!VOS_IS_STATUS_SUCCESS(vos_lock_destroy(&sap_ctx->SapGlobalLock)))
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+		FL("WLANSAP_Stop failed destroy lock"));
+
+	if (!VOS_IS_STATUS_SUCCESS(vos_event_destroy(
+		&sap_ctx->sap_session_opened_evt)))
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+		FL("failed to destroy session open event"));
 }

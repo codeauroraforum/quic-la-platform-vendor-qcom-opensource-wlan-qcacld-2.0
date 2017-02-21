@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1236,10 +1236,16 @@ void *tlshim_peer_validity(void *vos_ctx, uint8_t sta_id)
 {
 	struct txrx_tl_shim_ctx *tl_shim = vos_get_context(VOS_MODULE_ID_TL,
 							vos_ctx);
+	struct ol_txrx_pdev_t *pdev = vos_get_context(VOS_MODULE_ID_TXRX,
+							vos_ctx);
 	struct ol_txrx_peer_t *peer;
 
 	if (!tl_shim) {
 		TLSHIM_LOGE("tl_shim is NULL");
+		return NULL;
+	}
+	if (!pdev) {
+		TLSHIM_LOGE("pdev is NULL");
 		return NULL;
 	}
 
@@ -1253,9 +1259,7 @@ void *tlshim_peer_validity(void *vos_ctx, uint8_t sta_id)
 		return NULL;
 	}
 
-	peer = ol_txrx_peer_find_by_local_id(
-			vos_get_context(VOS_MODULE_ID_TXRX,vos_ctx),
-			sta_id);
+	peer = ol_txrx_peer_find_by_local_id(pdev, sta_id);
 	if (!peer) {
 		TLSHIM_LOGW("Invalid peer");
 		return NULL;
@@ -2130,6 +2134,42 @@ VOS_STATUS tl_shim_get_vdevid(struct ol_txrx_peer_t *peer, u_int8_t *vdev_id)
 	*vdev_id = peer->vdev->vdev_id;
 	return VOS_STATUS_SUCCESS;
 }
+
+#ifdef QCA_SUPPORT_TXRX_LOCAL_PEER_ID
+/**
+ * tl_shim_get_sta_id_by_addr() - get peer local id given the MAC address.
+ * @vos_context: pointer to vos context
+ * @mac_addr: pointer to mac address
+ *
+ * Return: local id of the peer given the MAC address.
+ */
+uint16_t tl_shim_get_sta_id_by_addr(void *vos_context, uint8_t *mac_addr)
+{
+	struct ol_txrx_peer_t *peer;
+	ol_txrx_pdev_handle pdev;
+	uint8_t peer_id;
+
+	if (vos_context == NULL || mac_addr == NULL) {
+		TLSHIM_LOGE("Invalid argument %p, %p", vos_context, mac_addr);
+		return 0;
+	}
+
+	pdev = vos_get_context(VOS_MODULE_ID_TXRX, vos_context);
+	if (!pdev) {
+		TLSHIM_LOGE("PDEV [%pM] not found", mac_addr);
+		return 0;
+	}
+
+	peer = ol_txrx_find_peer_by_addr(pdev, mac_addr, &peer_id);
+
+	if (!peer) {
+		TLSHIM_LOGW("PEER [%pM] not found", mac_addr);
+		return 0;
+	}
+
+	return peer->local_id;
+}
+#endif
 
 /*
  * Function to get vdev(tl_context) given the MAC address.

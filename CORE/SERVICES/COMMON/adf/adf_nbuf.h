@@ -121,6 +121,8 @@
  * @rate: Rate in terms 500Kbps
  * @ant_signal_db: Rx packet RSSI
  * @nr_ant: Number of Antennas used for streaming
+ * @mcs_info: Parsed ht sig info
+ * @vht_info: Parsed vht sig info
  */
 
 struct mon_rx_status {
@@ -131,6 +133,36 @@ struct mon_rx_status {
 	uint8_t  rate;
 	uint8_t  ant_signal_db;
 	uint8_t  nr_ant;
+	struct mon_rx_mcs_info {
+		uint8_t  valid;
+		uint32_t mcs: 7,
+			 bw: 1,
+			 smoothing: 1,
+			 not_sounding: 1,
+			 aggregation: 1,
+			 stbc: 2,
+			 fec: 1,
+			 sgi: 1,
+			 ness: 2,
+			 reserved: 15;
+	} mcs_info;
+
+	struct mon_rx_vht_info {
+		uint8_t  valid;
+		uint32_t bw: 2,
+			 stbc: 1,
+			 gid: 6,
+			 nss: 3,
+			 paid: 9,
+			 txps_forbidden: 1,
+			 sgi: 1,
+			 sgi_disambiguation: 1,
+			 coding: 1,
+			 ldpc_extra_symbol: 1,
+			 mcs: 4,
+			 beamformed: 1,
+			 reserved: 1;
+	} vht_info;
 };
 
 /* DHCP Related Mask */
@@ -178,6 +210,8 @@ struct mon_rx_status {
 #define ICMPV6_SUBTYPE_OFFSET         54
 #define ICMPV6_REQUEST                0x80
 #define ICMPV6_RESPONSE               0x81
+#define ICMPV6_RS                     0x85
+#define ICMPV6_RA                     0x86
 #define ICMPV6_NS                     0x87
 #define ICMPV6_NA                     0x88
 #define ADF_NBUF_IPA_CHECK_MASK       0x80000000
@@ -219,6 +253,8 @@ enum adf_proto_type {
  * @ADF_PROTO_ICMP_RES - icmp response
  * @ADF_PROTO_ICMPV6_REQ - icmpv6 request
  * @ADF_PROTO_ICMPV6_RES - icmpv6 response
+ * @ADF_PROTO_ICMPV6_RS - icmpv6 rs packet
+ * @ADF_PROTO_ICMPV6_RA - icmpv6 ra packet
  * @ADF_PROTO_ICMPV6_NS - icmpv6 ns packet
  * @ADF_PROTO_ICMPV6_NA - icmpv6 na packet
  * @ADF_PROTO_IPV4_UDP - ipv4 udp
@@ -253,6 +289,8 @@ enum adf_proto_subtype {
 	ADF_PROTO_ICMP_RES,
 	ADF_PROTO_ICMPV6_REQ,
 	ADF_PROTO_ICMPV6_RES,
+	ADF_PROTO_ICMPV6_RS,
+	ADF_PROTO_ICMPV6_RA,
 	ADF_PROTO_ICMPV6_NS,
 	ADF_PROTO_ICMPV6_NA,
 	ADF_PROTO_IPV4_UDP,
