@@ -201,6 +201,8 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
        flags = GFP_ATOMIC;
    }
 
+   if (!memory_dbug_flag)
+   {
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
    if (size > WCNSS_PRE_ALLOC_GET_THRESHOLD)
    {
@@ -212,6 +214,8 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
       }
    }
 #endif
+      return kmalloc(size, flags);
+   }
 
 
    new_size = size + sizeof(struct s_vos_mem_struct) + 8;
