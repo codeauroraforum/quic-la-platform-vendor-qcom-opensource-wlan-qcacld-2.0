@@ -5155,6 +5155,7 @@ typedef struct sSirDfsCsaIeRequest
     uint8_t  ch_switch_beacon_cnt;
     uint8_t  ch_switch_mode;
     uint8_t  dfs_ch_switch_disable;
+    uint8_t  sub20_switch_mode;
 }tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -6449,7 +6450,9 @@ struct sir_wifi_peer_signal_stats {
 
 /**
  * struct sir_wifi_tx - per AC tx stats
- * @mpdus: number of totoal TX packets on MAC layer in the period
+ * @msdus: number of totoal MSDUs on MAC layer in the period
+ * @mpdus: number of totoal MPDUs on MAC layer in the period
+ * @ppdus: number of totoal PPDUs on PHY layer in the period
  * @bytes: bytes of tx data on MAC layer in the period
  * @drops: number of TX packets cancelled due to any reason in the period,
  *	such as WMM limitation/bandwidth limitation/radio congestion
@@ -6466,7 +6469,9 @@ struct sir_wifi_peer_signal_stats {
  * @delay: histogram of delays on MAC layer
  */
 struct sir_wifi_tx {
+	uint32_t msdus;
 	uint32_t mpdus;
+	uint32_t ppdus;
 	uint32_t bytes;
 	uint32_t drops;
 	uint32_t drop_bytes;
@@ -6532,6 +6537,7 @@ struct sir_wifi_ll_ext_wmm_ac_stats {
  * struct sir_wifi_ll_ext_peer_stats - per peer stats
  * @peer_id: peer ID
  * @vdev_id: VDEV ID
+ * mac_address: MAC address
  * @sta_ps_inds: how many times STAs go to sleep
  * @sta_ps_durs: total sleep time of STAs (units in ms)
  * @rx_probe_reqs: number of probe requests received
@@ -6543,6 +6549,7 @@ struct sir_wifi_ll_ext_wmm_ac_stats {
 struct sir_wifi_ll_ext_peer_stats {
 	uint32_t peer_id;
 	uint32_t vdev_id;
+	tSirMacAddr mac_address;
 	uint32_t sta_ps_inds;
 	uint32_t sta_ps_durs;
 	uint32_t rx_probe_reqs;

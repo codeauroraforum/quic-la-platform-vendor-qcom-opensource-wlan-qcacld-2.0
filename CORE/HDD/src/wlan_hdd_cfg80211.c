@@ -1856,7 +1856,7 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 	uint8_t session_id;
 	struct roam_ext_params roam_params;
 	uint32_t cmd_type, req_id;
-	struct nlattr *curr_attr;
+	struct nlattr *curr_attr = NULL;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX + 1];
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX + 1];
 	int rem, i;
@@ -1898,46 +1898,61 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 	switch(cmd_type) {
 	case QCA_WLAN_VENDOR_ATTR_ROAM_SUBCMD_SSID_WHITE_LIST:
 		i = 0;
-		nla_for_each_nested(curr_attr,
-			tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID_LIST],
-			rem) {
-			if (nla_parse(tb2,
-				QCA_WLAN_VENDOR_ATTR_ROAM_SUBCMD_MAX,
-				nla_data(curr_attr), nla_len(curr_attr),
-				NULL)) {
-				hddLog(LOGE, FL("nla_parse failed"));
-				goto fail;
+		if (tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID_NUM_NETWORKS]) {
+			count = nla_get_u32(
+			tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID_NUM_NETWORKS]);
+		} else {
+			hddLog(LOGE, FL("Number of networks is not provided"));
+			goto fail;
+		}
+
+		if (count &&
+		    tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID_LIST]) {
+			nla_for_each_nested(curr_attr,
+				tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID_LIST],
+				rem) {
+				if (nla_parse(tb2,
+					QCA_WLAN_VENDOR_ATTR_ROAM_SUBCMD_MAX,
+					nla_data(curr_attr), nla_len(curr_attr),
+					NULL)) {
+					hddLog(LOGE, FL("nla_parse failed"));
+					goto fail;
+				}
+				/* Parse and Fetch allowed SSID list*/
+				if (!tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID]) {
+					hddLog(LOGE, FL("attr allowed ssid failed"));
+					goto fail;
+				}
+				buf_len = nla_len(tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID]);
+				/*
+				 * Upper Layers include a null termination character.
+				 * Check for the actual permissible length of SSID and
+				 * also ensure not to copy the NULL termination
+				 * character to the driver buffer.
+				 */
+				if (buf_len && (i < MAX_SSID_ALLOWED_LIST) &&
+					((buf_len - 1) <= SIR_MAC_MAX_SSID_LENGTH)) {
+					nla_memcpy(roam_params.ssid_allowed_list[i].ssId,
+						tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID],
+						buf_len - 1);
+					roam_params.ssid_allowed_list[i].length =
+						buf_len - 1;
+					hddLog(VOS_TRACE_LEVEL_DEBUG,
+						FL("SSID[%d]: %.*s,length = %d"), i,
+						roam_params.ssid_allowed_list[i].length,
+						roam_params.ssid_allowed_list[i].ssId,
+						roam_params.ssid_allowed_list[i].length);
+					i++;
+				} else {
+					hddLog(LOGE, FL("Invalid SSID len %d,idx %d"),
+						buf_len, i);
+				}
 			}
-			/* Parse and Fetch allowed SSID list*/
-			if (!tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID]) {
-				hddLog(LOGE, FL("attr allowed ssid failed"));
-				goto fail;
-			}
-			buf_len = nla_len(tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID]);
-			/*
-			 * Upper Layers include a null termination character.
-			 * Check for the actual permissible length of SSID and
-			 * also ensure not to copy the NULL termination
-			 * character to the driver buffer.
-			 */
-			if (buf_len && (i < MAX_SSID_ALLOWED_LIST) &&
-				((buf_len - 1) <= SIR_MAC_MAX_SSID_LENGTH)) {
-				nla_memcpy(roam_params.ssid_allowed_list[i].ssId,
-					tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_WHITE_LIST_SSID],
-					buf_len - 1);
-				roam_params.ssid_allowed_list[i].length =
-					buf_len - 1;
-				hddLog(VOS_TRACE_LEVEL_DEBUG,
-					FL("SSID[%d]: %.*s,length = %d"), i,
-					roam_params.ssid_allowed_list[i].length,
-					roam_params.ssid_allowed_list[i].ssId,
-					roam_params.ssid_allowed_list[i].length);
-				i++;
-			}
-			else {
-				hddLog(LOGE, FL("Invalid SSID len %d,idx %d"),
-					buf_len, i);
-			}
+		}
+		if (i != count) {
+			hddLog(LOGE, FL("Invalid number of SSIDs i = %d, count = %d"),
+						i, count);
+			goto fail;
 		}
 		roam_params.num_ssid_allowed_list = i;
 		hddLog(VOS_TRACE_LEVEL_DEBUG, FL("Num of Allowed SSID %d"),
@@ -2109,34 +2124,39 @@ __wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 		hddLog(VOS_TRACE_LEVEL_DEBUG,
 			FL("Num of blacklist BSSID: %d"), count);
 		i = 0;
-		nla_for_each_nested(curr_attr,
-			tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS],
-			rem) {
-
-			if (i == count) {
-				hddLog(LOGW, FL("Ignoring excess Blacklist BSSID"));
-				break;
+		if (count &&
+		    tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS]) {
+			nla_for_each_nested(curr_attr,
+				tb[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS],
+				rem) {
+				if (i == count) {
+					hddLog(LOGW, FL("Ignoring excess Blacklist BSSID"));
+					break;
+				}
+				if (curr_attr == NULL) {
+					hddLog(LOGW, FL("Blacklist BSSID, curr_attr is null"));
+					continue;
+				}
+				if (nla_parse(tb2,
+					QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX,
+					nla_data(curr_attr), nla_len(curr_attr),
+					NULL)) {
+					hddLog(LOGE, FL("nla_parse failed"));
+					goto fail;
+				}
+				/* Parse and fetch MAC address */
+				if (!tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS_BSSID]) {
+					hddLog(LOGE, FL("attr blacklist addr failed"));
+					goto fail;
+				}
+				nla_memcpy(roam_params.bssid_avoid_list[i],
+					tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS_BSSID],
+					sizeof(tSirMacAddr));
+				hddLog(VOS_TRACE_LEVEL_DEBUG, MAC_ADDRESS_STR,
+					MAC_ADDR_ARRAY(
+					roam_params.bssid_avoid_list[i]));
+				i++;
 			}
-
-			if (nla_parse(tb2,
-				QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_MAX,
-				nla_data(curr_attr), nla_len(curr_attr),
-				NULL)) {
-				hddLog(LOGE, FL("nla_parse failed"));
-				goto fail;
-			}
-			/* Parse and fetch MAC address */
-			if (!tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS_BSSID]) {
-				hddLog(LOGE, FL("attr blacklist addr failed"));
-				goto fail;
-			}
-			nla_memcpy(roam_params.bssid_avoid_list[i],
-				tb2[QCA_WLAN_VENDOR_ATTR_ROAMING_PARAM_SET_BSSID_PARAMS_BSSID],
-				sizeof(tSirMacAddr));
-			hddLog(VOS_TRACE_LEVEL_DEBUG, MAC_ADDRESS_STR,
-				MAC_ADDR_ARRAY(
-				roam_params.bssid_avoid_list[i]));
-			i++;
 		}
 		if (i < count)
 			hddLog(LOGW,
@@ -6782,8 +6802,12 @@ static int put_wifi_wmm_ac_tx_info(struct sir_wifi_tx *tx_stats,
 	fail_mcs = tx_stats->fail_mcs;
 	delay = tx_stats->delay;
 
-	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_MPDU,
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_MSDU,
+			tx_stats->msdus) ||
+	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_MPDU,
 			tx_stats->mpdus) ||
+	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_PPDU,
+			tx_stats->ppdus) ||
 	    nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_BYTES,
 			tx_stats->bytes) ||
@@ -6974,6 +6998,8 @@ static int put_wifi_ll_ext_peer_info(struct sir_wifi_ll_ext_peer_stats *peers,
 	    nla_put_u32(skb,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_RX_MGMT,
 			peers->rx_oth_mgmts) ||
+	    nla_put(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_MAC_ADDRESS,
+		    VOS_MAC_ADDR_SIZE, peers->mac_address) ||
 	    put_wifi_signal_info(&peers->peer_signal_stats, skb)) {
 		hddLog(LOGE, FL("put peer signal attr failed"));
 		return -EINVAL;
@@ -14314,6 +14340,10 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 #ifdef CHANNEL_SWITCH_SUPPORTED
     wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
 #endif
+
+    if (pCfg->sub_20_channel_width)
+        wiphy->flags |= WIPHY_FLAG_SUPPORTS_5_10_MHZ;
+
     wiphy->features |= NL80211_FEATURE_INACTIVITY_TIMER;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0)) || \
@@ -15798,6 +15828,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
     pConfig->beacon_int =  pMgmt_frame->u.beacon.beacon_int;
 
     pConfig->disableDFSChSwitch = iniConfig->disableDFSChSwitch;
+    pConfig->enable_radar_war = iniConfig->enable_radar_war;
 
     pConfig->sap_chanswitch_beacon_cnt =
         iniConfig->sap_chanswitch_beacon_cnt;
@@ -15809,6 +15840,24 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
     pConfig->reduced_beacon_interval =
         iniConfig->reduced_beacon_interval;
+    switch (iniConfig->sub_20_channel_width) {
+    case CFG_SUB_20_CHANNEL_WIDTH_DISABLE:
+        pConfig->sub20_switch_mode = SUB20_NONE;
+        break;
+    case CFG_SUB_20_CHANNEL_WIDTH_5MHZ:
+    case CFG_SUB_20_CHANNEL_WIDTH_10MHZ:
+        pConfig->sub20_switch_mode = SUB20_STATIC;
+        break;
+    case CFG_SUB_20_CHANNEL_WIDTH_DYN_5MHZ:
+    case CFG_SUB_20_CHANNEL_WIDTH_DYN_10MHZ:
+    case CFG_SUB_20_CHANNEL_WIDTH_DYN_ALL:
+        pConfig->sub20_switch_mode = SUB20_DYN;
+        break;
+    case CFG_SUB_20_CHANNEL_WIDTH_MANUAL:
+        pConfig->sub20_switch_mode = SUB20_MANUAL;
+        break;
+    }
+
     //channel is already set in the set_channel Call back
     //pConfig->channel = pCommitConfig->channel;
 
@@ -17057,50 +17106,56 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
                     return -EINVAL;
             }
 
-            if (sub20_config != CFG_SUB_20_CHANNEL_WIDTH_DYN_ALL) {
-                    sub20_channelwidth = (sub20_static_channelwidth != 0) ?
-                         sub20_static_channelwidth : sub20_dyn_channelwidth;
-                    phy_sub20_channel_width =
-                         (sub20_channelwidth == SUB20_MODE_5MHZ) ?
-                         CH_WIDTH_5MHZ : CH_WIDTH_10MHZ;
-                    channel_support_sub20 =
-                          vos_is_channel_support_sub20(channel,
-                                                       phy_sub20_channel_width,
-                                                       0);
-                    if (!channel_support_sub20) {
-                            hddLog(VOS_TRACE_LEVEL_ERROR,
-                                   FL("ch%dwidth%d unsupport by reg domain"),
-                                   channel, phy_sub20_channel_width);
-                            return -EINVAL;
-                    }
-            } else {
-                    channel_support_sub20 =
-                         vos_is_channel_support_sub20(channel,
-                                                      CH_WIDTH_5MHZ, 0);
-                    if (!channel_support_sub20) {
-                            hddLog(VOS_TRACE_LEVEL_ERROR,
-                                   FL("ch%dwidth5M unsupport by reg domain"),
-                                   channel);
-                            sub20_dyn_channelwidth &= ~SUB20_MODE_5MHZ;
-                    }
+            switch (sub20_config) {
+            case CFG_SUB_20_CHANNEL_WIDTH_5MHZ:
+            case CFG_SUB_20_CHANNEL_WIDTH_10MHZ:
+            case CFG_SUB_20_CHANNEL_WIDTH_DYN_5MHZ:
+            case CFG_SUB_20_CHANNEL_WIDTH_DYN_10MHZ:
+                sub20_channelwidth = (sub20_static_channelwidth != 0) ?
+                        sub20_static_channelwidth : sub20_dyn_channelwidth;
+                phy_sub20_channel_width =
+                        (sub20_channelwidth == SUB20_MODE_5MHZ) ?
+                            CH_WIDTH_5MHZ : CH_WIDTH_10MHZ;
+                channel_support_sub20 =
+                        vos_is_channel_support_sub20(channel,
+                                                     phy_sub20_channel_width,
+                                                     0);
+                if (!channel_support_sub20) {
+                        hddLog(VOS_TRACE_LEVEL_ERROR,
+                               FL("ch%dwidth%d unsupport by reg domain"),
+                               channel, phy_sub20_channel_width);
+                        return -EINVAL;
+                }
+                break;
+            case CFG_SUB_20_CHANNEL_WIDTH_DYN_ALL:
+                channel_support_sub20 =
+                    vos_is_channel_support_sub20(channel, CH_WIDTH_5MHZ, 0);
+                if (!channel_support_sub20) {
+                        hddLog(VOS_TRACE_LEVEL_ERROR,
+                               FL("ch%dwidth5M unsupport by reg domain"),
+                               channel);
+                        sub20_dyn_channelwidth &= ~SUB20_MODE_5MHZ;
+                }
 
-                    channel_support_sub20 =
-                         vos_is_channel_support_sub20(channel,
-                                                      CH_WIDTH_10MHZ, 0);
-                    if (!channel_support_sub20) {
-                            hddLog(VOS_TRACE_LEVEL_ERROR,
-                                   FL("ch%dwidth10M unsupport by reg domain"),
-                                   channel);
-                            sub20_dyn_channelwidth &= ~SUB20_MODE_10MHZ;
-                    }
+                channel_support_sub20 =
+                    vos_is_channel_support_sub20(channel, CH_WIDTH_10MHZ, 0);
+                if (!channel_support_sub20) {
+                        hddLog(VOS_TRACE_LEVEL_ERROR,
+                               FL("ch%dwidth10M unsupport by reg domain"),
+                               channel);
+                        sub20_dyn_channelwidth &= ~SUB20_MODE_10MHZ;
+                }
 
-                    if (sub20_dyn_channelwidth == 0) {
-                            return -EINVAL;
-                    } else {
-                            sme_config.sub20_dynamic_channelwidth =
+                if (sub20_dyn_channelwidth == 0) {
+                        return -EINVAL;
+                } else {
+                        sme_config.sub20_dynamic_channelwidth =
                                  sub20_dyn_channelwidth;
-                            sme_UpdateConfig(pHddCtx->hHal, &sme_config);
-                    }
+                        sme_UpdateConfig(pHddCtx->hHal, &sme_config);
+                }
+                break;
+            default:
+                break;
             }
     }
 
@@ -21877,7 +21932,7 @@ int wlan_hdd_cfg80211_set_privacy(hdd_adapter_t *pAdapter,
  * This function is used to disconnect from previous
  * connection
  */
-static int wlan_hdd_try_disconnect( hdd_adapter_t *pAdapter )
+int wlan_hdd_try_disconnect( hdd_adapter_t *pAdapter )
 {
     unsigned long rc;
     hdd_station_ctx_t *pHddStaCtx;
@@ -27852,11 +27907,18 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *hdd_ctx;
 	v_U8_t channel;
+	uint8_t current_channel;
 	v_U16_t freq;
 	int ret;
+	tsap_Config_t *sap_config;
 
-	hddLog(LOG1, FL(" Set Freq %d"), csa_params->chandef.chan->center_freq);
+	hddLog(LOG1, FL("Set Freq %d sub20 chanwidth %d"),
+	       csa_params->chandef.chan->center_freq,
+	       csa_params->chandef.width);
 
+	current_channel =
+		(WLAN_HDD_GET_AP_CTX_PTR(adapter))->operatingChannel;
+	sap_config = &((WLAN_HDD_GET_AP_CTX_PTR(adapter))->sapConfig);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
 
@@ -27871,7 +27933,15 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	freq = csa_params->chandef.chan->center_freq;
 	channel = vos_freq_to_chan(freq);
 
-	ret = hdd_softap_set_channel_change(dev, channel);
+	if (channel != current_channel) {
+		ret = hdd_softap_set_channel_change(dev, channel);
+	} else if (sap_config->sub20_switch_mode == SUB20_MANUAL) {
+		ret = hdd_softap_set_channel_sub20_chanwidth_change(
+					dev, csa_params->chandef.width);
+	} else {
+		hddLog(LOGE, FL("nothing to do"));
+		return -EINVAL;
+	}
 	return ret;
 }
 

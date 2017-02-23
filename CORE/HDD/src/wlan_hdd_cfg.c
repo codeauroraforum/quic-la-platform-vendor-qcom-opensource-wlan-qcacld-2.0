@@ -2364,6 +2364,13 @@ REG_TABLE_ENTRY g_registry_table[] =
                  CFG_DISABLE_DFS_CH_SWITCH_MIN,
                  CFG_DISABLE_DFS_CH_SWITCH_MAX ),
 
+   REG_VARIABLE( CFG_ENABLE_RADAR_WAR, WLAN_PARAM_Integer,
+                 hdd_config_t, enable_radar_war,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_ENABLE_RADAR_WAR_DEFAULT,
+                 CFG_ENABLE_RADAR_WAR_MIN,
+                 CFG_ENABLE_RADAR_WAR_MAX ),
+
    REG_VARIABLE( CFG_ENABLE_DFS_MASTER_CAPABILITY, WLAN_PARAM_Integer,
                  hdd_config_t, enableDFSMasterCap,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -6502,20 +6509,20 @@ eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode( eHddDot11Mode dot11Mode )
 uint8_t hdd_cfg_get_sub20_dyn_capabilities(hdd_context_t *hdd_ctx_ptr)
 {
 	hdd_config_t *config_ptr = hdd_ctx_ptr->cfg_ini;
+	uint8_t sub_20_channel_width = config_ptr->sub_20_channel_width;
 
-	if (config_ptr->sub_20_channel_width ==
-	    CFG_SUB_20_CHANNEL_WIDTH_DYN_5MHZ) {
+	switch (sub_20_channel_width) {
+	case CFG_SUB_20_CHANNEL_WIDTH_DYN_5MHZ:
 		return SUB20_MODE_5MHZ;
-	} else if (config_ptr->sub_20_channel_width ==
-		   CFG_SUB_20_CHANNEL_WIDTH_DYN_10MHZ) {
+	case CFG_SUB_20_CHANNEL_WIDTH_DYN_10MHZ:
 		return SUB20_MODE_10MHZ;
-	} else if (config_ptr->sub_20_channel_width ==
-		   CFG_SUB_20_CHANNEL_WIDTH_DYN_ALL) {
+	case CFG_SUB_20_CHANNEL_WIDTH_DYN_ALL:
+	case CFG_SUB_20_CHANNEL_WIDTH_MANUAL:
 		return SUB20_MODE_5MHZ | SUB20_MODE_10MHZ;
+	default:
+		return SUB20_MODE_NONE;
 	}
-	return SUB20_MODE_NONE;
 }
-
 /**
  * hdd_cfg_get_static_sub20_channel_width()
  * @hdd_ctx_ptr:  HDD context
