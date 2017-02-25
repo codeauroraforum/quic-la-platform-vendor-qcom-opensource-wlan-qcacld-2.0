@@ -9065,7 +9065,10 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
-	if (hdd_cfg_is_sub20_channel_width_enabled(hdd_ctx)) {
+	if ((hdd_ctx->cfg_ini->sub_20_channel_width ==
+		    CFG_SUB_20_CHANNEL_WIDTH_5MHZ) ||
+		(hdd_ctx->cfg_ini->sub_20_channel_width ==
+		 CFG_SUB_20_CHANNEL_WIDTH_10MHZ)) {
 		hddLog(LOGE, FL("ACS not support in sub20 enable"));
 		status = -EINVAL;
 		goto out;
