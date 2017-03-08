@@ -35,13 +35,17 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_MOBILE_ROUTER := y
 	endif
 
-	ifeq ($(CONFIG_ARCH_MDMCALIFORNIUM), y)
+	ifeq ($(CONFIG_ARCH_MDM9650), y)
 	CONFIG_MOBILE_ROUTER := y
 	endif
 
 	ifeq ($(CONFIG_ARCH_MDM9607), y)
 	CONFIG_MOBILE_ROUTER := y
 	CONFIG_QCOM_LTE_COEX := y
+	endif
+
+	ifeq ($(CONFIG_ARCH_SDXHEDGEHOG), y)
+	CONFIG_MOBILE_ROUTER := y
 	endif
 
 	# As per target team, build is done as follows:
@@ -1057,7 +1061,15 @@ ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 CDEFINES += -DWLAN_FEATURE_DSRC
 endif
 
-ifeq ($(CONFIG_ARCH_MDMCALIFORNIUM), y)
+ifeq ($(CONFIG_ARCH_MDM9650), y)
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+ifeq ($(CONFIG_WCNSS_SKB_PRE_ALLOC), y)
+CDEFINES += -DFEATURE_SKB_PRE_ALLOC
+endif
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_SDXHEDGEHOG), y)
 ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 ifeq ($(CONFIG_WCNSS_SKB_PRE_ALLOC), y)
 CDEFINES += -DFEATURE_SKB_PRE_ALLOC
@@ -1170,6 +1182,10 @@ endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR3),y)
 CDEFINES += -DWLAN_FEATURE_ROAM_OFFLOAD
+endif
+
+ifeq ($(CONFIG_CNSS_GENL), y)
+CDEFINES += -DCNSS_GENL
 endif
 
 ifeq ($(CONFIG_PRIMA_WLAN_OKC),y)
@@ -1385,7 +1401,11 @@ endif
 endif
 endif
 
-ifeq ($(CONFIG_ARCH_MDMCALIFORNIUM), y)
+ifeq ($(CONFIG_ARCH_MDM9650), y)
+CDEFINES += -DSYNC_IPA_READY
+endif
+
+ifeq ($(CONFIG_ARCH_SDXHEDGEHOG), y)
 CDEFINES += -DSYNC_IPA_READY
 endif
 
