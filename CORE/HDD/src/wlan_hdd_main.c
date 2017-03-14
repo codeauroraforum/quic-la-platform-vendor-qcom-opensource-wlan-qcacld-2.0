@@ -3965,6 +3965,22 @@ static void hdd_get_fw_state_cb(void *callback_context)
 	spin_unlock(&hdd_context_lock);
 }
 
+static inline bool is_in_time( a_uint32_t timeout )
+{
+	unsigned long ticks_current = adf_os_ticks();
+	a_uint32_t interval_ms = adf_os_ticks_to_msecs( ticks_current - g_ticks_last_hif_resp );
+
+	if( timeout <= interval_ms )
+	{
+		hddLog(LOG1, FL("timeout=%ums <= interval=%ums (current_ticks=%lu, last_ticks=%lu)")
+			, timeout, interval_ms, ticks_current, g_ticks_last_hif_resp );
+		return false;
+	}
+
+	hddLog(LOG1, FL("timeout=%ums > interval=%ums (current_ticks=%lu, last_ticks=%lu)")
+		, timeout, interval_ms, ticks_current, g_ticks_last_hif_resp );
+	return true;
+}
 /**
  * wlan_hdd_get_fw_state() - get firmware state
  * @adapter:     pointer to the adapter
@@ -3989,6 +4005,12 @@ bool wlan_hdd_get_fw_state(hdd_adapter_t *adapter)
 		return false;
 	}
 
+	if( is_in_time( WLAN_WAIT_TIME_FW_STATUS ) )
+	{
+		hddLog(LOG1, FL("return true immediately"));
+		return true;
+	}
+
 	init_completion(&context.completion);
 	context.pAdapter = adapter;
 	context.magic = FW_STATUS_MAGIC;
@@ -4002,10 +4024,11 @@ bool wlan_hdd_get_fw_state(hdd_adapter_t *adapter)
 	} else {
 		/* request is sent -- wait for the response */
 		rc = wait_for_completion_timeout(&context.completion,
-			msecs_to_jiffies(WLAN_WAIT_TIME_LINK_STATUS));
-		if (!rc) {
+			msecs_to_jiffies(WLAN_WAIT_TIME_FW_STATUS));
+		if (!rc && !is_in_time( WLAN_WAIT_TIME_FW_STATUS ) ) {
 			hddLog(LOGE,
-				FL("SME timed out while retrieving firmware status"));
+				FL("SME timed out while retrieving firmware status, timeout=%ums")
+				, WLAN_WAIT_TIME_FW_STATUS );
 			fw_active = false;
 		}
 	}
