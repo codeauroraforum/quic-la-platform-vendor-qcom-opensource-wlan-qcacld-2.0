@@ -12661,6 +12661,10 @@ static int hdd_driver_init( void)
 
    ENTER();
 
+
+   wcnss_pre_alloc_init();
+
+
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
    hdd_prevent_suspend();
 #ifdef HDD_TRACE_RECORD
@@ -12876,6 +12880,10 @@ static void hdd_driver_exit(void)
    vos_mem_free(adf_ctx);
 
    vos_preClose( &pVosContext );
+
+
+   wcnss_pre_alloc_exit();
+
 
 #ifdef TIMER_MANAGER
    vos_timer_exit();

@@ -35,7 +35,7 @@
 #include <adf_os_io.h>
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
-#include <net/cnss_prealloc.h>
+#include <cnss_prealloc.h>
 #endif
 adf_nbuf_trace_update_t  trace_update_cb = NULL;
 #if defined(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
@@ -83,19 +83,24 @@ __adf_nbuf_alloc(adf_os_device_t osdev, size_t size, int reserve, int align, int
 {
     struct sk_buff *skb;
     unsigned long offset;
+    int flags = GFP_KERNEL;
 
     if(align)
         size += (align - 1);
 
-    skb = dev_alloc_skb(size);
+    skb = __adf_nbuf_pre_alloc(osdev, size);
 
     if (skb)
        goto skb_cb;
 
-    skb = __adf_nbuf_pre_alloc(osdev, size);
+    if ( in_interrupt() || irqs_disabled() )
+        flags = GFP_ATOMIC;
+
+    skb = __alloc_skb(size + NET_SKB_PAD, flags, SKB_ALLOC_RX, NUMA_NO_NODE);
 
     if (!skb) {
-        printk("ERROR:NBUF alloc failed\n");
+        printk("ERROR:NBUF alloc failed : %s[%d] size=%d\n", ( ( flags == GFP_ATOMIC ) ? "GFP_ATOMIC" :
+                                            ( flags == GFP_KERNEL ) ? "GFP_KERNEL" : "other" ), flags, size + NET_SKB_PAD );
         return NULL;
     }
 
@@ -148,7 +153,7 @@ __adf_nbuf_free(struct sk_buff *skb)
     {
        if (__adf_nbuf_pre_alloc_free(skb))
            return;
-       dev_kfree_skb_any(skb);
+       __kfree_skb(skb);
     }
 }
 
