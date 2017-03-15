@@ -16773,7 +16773,7 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
     int rssi = 0;
     hdd_context_t *pHddCtx;
     int status;
-#ifdef CONFIG_CNSS
+#ifdef ANI_OS_TYPE_ANDROID
     struct timespec ts;
 #endif
     hdd_config_t *cfg_param = NULL;
@@ -16792,7 +16792,7 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
 
     memcpy(mgmt->bssid, bss_desc->bssId, ETH_ALEN);
 
-#ifdef CONFIG_CNSS
+#ifdef ANI_OS_TYPE_ANDROID
     /* Android does not want the time stamp from the frame.
        Instead it wants a monotonic increasing value */
     vos_get_monotonic_boottime_ts(&ts);
