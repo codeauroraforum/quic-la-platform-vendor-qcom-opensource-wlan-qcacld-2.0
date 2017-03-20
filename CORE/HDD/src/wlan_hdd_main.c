@@ -12661,9 +12661,9 @@ static int hdd_driver_init( void)
 
    ENTER();
 
-
+#ifdef CONFIG_WCNSS_SKB_PRE_ALLOC
    wcnss_pre_alloc_init();
-
+#endif
 
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
    hdd_prevent_suspend();
@@ -12881,9 +12881,9 @@ static void hdd_driver_exit(void)
 
    vos_preClose( &pVosContext );
 
-
+#ifdef CONFIG_WCNSS_SKB_PRE_ALLOC
    wcnss_pre_alloc_exit();
-
+#endif
 
 #ifdef TIMER_MANAGER
    vos_timer_exit();
