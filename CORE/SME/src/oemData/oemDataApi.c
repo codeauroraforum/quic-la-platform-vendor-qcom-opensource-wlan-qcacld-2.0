@@ -230,7 +230,6 @@ eHalStatus oemData_SendMBOemDataReq(tpAniSirGlobal pMac, tOemDataReq *pOemDataRe
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tSirOemDataReq* pMsg;
-    tANI_U16 msgLen;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, pOemDataReq->sessionId );
 
     smsLog(pMac, LOGW, "OEM_DATA: entering Function %s", __func__);
@@ -251,9 +250,8 @@ eHalStatus oemData_SendMBOemDataReq(tpAniSirGlobal pMac, tOemDataReq *pOemDataRe
         vos_mem_free(pMsg);
         return eHAL_STATUS_FAILED_ALLOC;
     }
-    msgLen = (uint16_t) (sizeof(*pMsg) + pOemDataReq->data_len);
     pMsg->messageType = pal_cpu_to_be16((tANI_U16)eWNI_SME_OEM_DATA_REQ);
-    pMsg->messageLen = pal_cpu_to_be16(msgLen);
+    pMsg->messageLen = pal_cpu_to_be16((uint16_t) sizeof(*pMsg));
     vos_mem_copy(pMsg->selfMacAddr, pSession->selfMacAddr, sizeof(tSirMacAddr) );
     pMsg->data_len = pOemDataReq->data_len;
     vos_mem_copy(pMsg->data, pOemDataReq->data, pOemDataReq->data_len);
